@@ -9,6 +9,7 @@ contract Ecosystem is ERC20, Ownable {
     uint256 public constant MAX_SUPPLY = 10000000000 * 10 ** 18;
     uint256 public constant ECOSYSTEM_POOL = (MAX_SUPPLY * 15) / 100;
     uint256 public constant CREATE_COURSE_REWARD = 5 * 10 ** 18;
+    uint256 public constant ENROLLMENT_REWARD = 2;
     uint256 public constant REQUIRED_APPROVALS = 1;
     uint256 public constant MAX_SCORE = 100; 
     uint256 public constant MIN_APPROVAL_SCORE = 80;
@@ -16,11 +17,11 @@ contract Ecosystem is ERC20, Ownable {
 
     uint256 public ecosystemPoolSupply;
 
-    address public initialOwner;
-
     uint256 public courseCount;
 
     uint256 public nextCourseId;
+
+    uint256 public numberofEnrolledCourses;
 
     address[] public admins;
 
@@ -31,6 +32,7 @@ contract Ecosystem is ERC20, Ownable {
         bool approved;
         uint256 approvalCount;
         address creator;
+        address[] enrolled;
     }
 
     struct Review {
@@ -58,21 +60,24 @@ contract Ecosystem is ERC20, Ownable {
     mapping(address => mapping(uint256 => bool)) public approvals;
     mapping(address => bool) public isAdminMap;
 
+
     Course[] public listOfCourses;
+
 
 
     event MintSuccess(address indexed _to, uint256 indexed _amount);
     event CourseCreationSuccess(uint256 indexed _courseID, string indexed _courseName, bool _approved);
     event EcosystemPoolUpdate(address indexed _to, uint256 indexed _amount);
     event BurnSuccess(address indexed _account, uint256 _amount);
+    event EnrollmentSuccess(uint256 indexed _courseId, address indexed _by);
+    event unEnrollmentSuccess(uint256 indexed _courseId, address indexed _by);
 
     modifier onlyAdmin() {
         require(isAdminMap[msg.sender], "Caller is not an admin");
         _;
     }
 
-    constructor(address[] memory _admins) ERC20("ABYA TOKEN", "ABYTKN") Ownable(initialOwner) {
-        initialOwner = msg.sender;
+    constructor(address[] memory _admins) ERC20("ABYA TOKEN", "ABYTKN") Ownable(msg.sender) {
         require(_admins.length >= 2, "At least 2 admins are required");
         admins = _admins;
         for (uint256 i = 0; i < _admins.length; i++) {
@@ -82,7 +87,7 @@ contract Ecosystem is ERC20, Ownable {
     }
 
     //function to mint token
-    function mintToken(address to, uint256 amount) internal returns(bool){
+    function mintToken(address to, uint256 amount) public returns(bool){
         require(amount + getCurrentEcosystemPoolSupply() <= ECOSYSTEM_POOL, "Limit Exceeded!");
 
         _mint(to, amount);
@@ -118,7 +123,7 @@ contract Ecosystem is ERC20, Ownable {
         require(nextCourseId > 0, "All course IDs have been assigned");
         require(courseObject[nextCourseId].creator == address(0), "Course ID already exists");
 
-        Course memory newCourse = Course(nextCourseId,_courseName, _description, false, 0, msg.sender);
+        Course memory newCourse = Course(nextCourseId,_courseName, _description, false, 0, msg.sender, new address[](0));
         courseObject[nextCourseId] = newCourse;
 
         listOfCourses.push(newCourse);
@@ -207,6 +212,51 @@ contract Ecosystem is ERC20, Ownable {
             course.approved = true;
             mintToken(course.creator, CREATE_COURSE_REWARD);
         }
+    }
+
+    //function to enroll into a course
+    function enroll(uint256 _courseId) external returns(bool) {
+        Course storage course = courseObject[_courseId];
+        require(course.approved, "Course not yet approved!");
+        for (uint256 i = 0; i < course.enrolled.length; i++) {
+            require(course.enrolled[i] != msg.sender, "You are already enrolled in this course!");
+        }
+
+        course.enrolled.push(msg.sender);
+        numberofEnrolledCourses++;
+
+        mintToken(msg.sender, ENROLLMENT_REWARD);
+
+        emit EnrollmentSuccess(_courseId, msg.sender);
+
+        return true;
+    }
+
+    //function to unenroll from a course
+    function unEnroll(uint256 _courseId) external returns(bool) {
+        Course storage course = courseObject[_courseId];
+        bool isEnrolled = false;
+        uint256 index = 0;
+
+        for (uint256 i = 0; i < course.enrolled.length; i++) {
+            if (course.enrolled[i] == msg.sender) {
+                isEnrolled = true;
+                index = i;
+                break;
+            }
+        }
+
+        require(isEnrolled, "You are not enrolled in this course!");
+
+        course.enrolled[index] = course.enrolled[course.enrolled.length - 1];
+        course.enrolled.pop();
+        numberofEnrolledCourses--;
+
+        burn(msg.sender, ENROLLMENT_REWARD);
+
+        emit unEnrollmentSuccess(_courseId, msg.sender);
+
+        return true;
     }
 
 }
