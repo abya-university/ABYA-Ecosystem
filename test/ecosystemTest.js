@@ -12,7 +12,7 @@ describe("Ecosystem", function () {
     beforeEach("Run Before All", async function () {
         Ecosystem = await ethers.getContractFactory("Ecosystem", owner);
         [owner, addr1, addr2, addr3] = await ethers.getSigners();
-        this.ecosystem = await Ecosystem.deploy([owner.address, addr1.address, addr2.address, addr3.address]);
+        this.ecosystem = await Ecosystem.deploy([owner.address, addr1.address, addr2.address]);
     })
 
     describe("Deployment", async function () {
@@ -79,6 +79,142 @@ describe("Ecosystem", function () {
             await this.ecosystem.burn(addr1.address, 500);
 
             await expect(await this.ecosystem.getCurrentEcosystemPoolSupply()).to.equal(500);
+        })
+    })
+
+    describe("Create course function", async function () {
+        it("Should create a course correctly", async function () {
+            // const nextCourseId = 2;
+            const createCourse = await this.ecosystem.connect(addr1).createCourse("Introduction to Blockchain", "Its a course that explains and gives more insight on smart contracts and generally web3.")
+
+            await expect(createCourse).to.emit(this.ecosystem, "CourseCreationSuccess").withArgs(1, "Introduction to Blockchain", false);
+        })
+    })
+
+    describe("Submit Course Review Function", async function () {
+        it("Should revert accordingly if caller is not admin", async function () {
+            // const nextCourseId = 2;
+            await this.ecosystem.connect(addr1).createCourse("Introduction to Blockchain", "Its a course that explains and gives more insight on smart contracts and generally web3.");
+
+            await expect(this.ecosystem.connect(addr3).submitReview(1, 9, 8, 6, 5, 7, 8, 9, 4, 6, 8)).to.be.revertedWith("Caller is not an admin");
+
+        })
+
+        it("Should revert accordingly if value is greater than 10", async function () {
+            // const nextCourseId = 2;
+            await this.ecosystem.connect(addr1).createCourse("Introduction to Blockchain", "Its a course that explains and gives more insight on smart contracts and generally web3.");
+
+            await expect(this.ecosystem.connect(addr2).submitReview(1, 9, 8, 6, 5, 7, 8, 9, 4, 16, 8)).to.be.revertedWith("Scores must be between 1 and 10.");
+
+        })
+
+    })
+
+    describe("Approve Course Function", async function () {
+        // it("Should approve a course correctly", async function () { })
+        it("Should revert accordingly if caller is not admin", async function () {
+            // const nextCourseId = 2;
+            await this.ecosystem.connect(addr1).createCourse("Introduction to Blockchain", "Its a course that explains and gives more insight on smart contracts and generally web3.");
+
+            await this.ecosystem.connect(addr2).submitReview(1, 9, 8, 6, 5, 7, 8, 9, 4, 6, 8);
+
+            await expect(this.ecosystem.connect(addr3).approveCourse(1)).to.be.revertedWith("Caller is not an admin");
+        })
+
+        it("Should award tokens accordingly to course owner after successful approval", async function () {
+            // const nextCourseId = 2;
+            await this.ecosystem.connect(addr1).createCourse("Introduction to Blockchain", "Its a course that explains and gives more insight on smart contracts and generally web3.");
+
+            await this.ecosystem.connect(addr2).submitReview(1, 9, 8, 6, 5, 7, 8, 9, 4, 6, 8);
+
+            await this.ecosystem.connect(addr2).approveCourse(1);
+
+            await expect(await this.ecosystem.balanceOf(addr1.address)).to.equal(ethers.parseEther("5"));
+        })
+
+        it("Should revert accordingly if course is already approved", async function () {
+            // const nextCourseId = 2;
+            await this.ecosystem.connect(addr1).createCourse("Introduction to Blockchain", "Its a course that explains and gives more insight on smart contracts and generally web3.");
+
+            await this.ecosystem.connect(addr2).submitReview(1, 9, 8, 6, 5, 7, 8, 9, 4, 6, 8);
+
+            await this.ecosystem.connect(addr2).approveCourse(1);
+
+            await expect(this.ecosystem.connect(addr2).approveCourse(1)).to.be.revertedWith("Course already approved");
+        })
+
+    })
+
+    describe("Enroll Function", async function () {
+        it("Should revert accordingly if course is not yet approved", async function () {
+            // const nextCourseId = 2;
+            await this.ecosystem.connect(addr1).createCourse("Introduction to Blockchain", "Its a course that explains and gives more insight on smart contracts and generally web3.");
+
+            await expect(this.ecosystem.connect(addr3).enroll(1)).to.be.revertedWith("Course not yet approved!");
+        })
+
+        it("Should enroll successfully if all conditions are met", async function () {
+            // const nextCourseId = 2;
+            await this.ecosystem.connect(addr1).createCourse("Introduction to Blockchain", "Its a course that explains and gives more insight on smart contracts and generally web3.");
+
+            await this.ecosystem.connect(addr2).submitReview(1, 9, 8, 6, 5, 7, 8, 9, 4, 6, 8);
+
+            await this.ecosystem.connect(addr2).approveCourse(1);
+
+            await expect(await this.ecosystem.connect(addr3).enroll(1)).emit(this.ecosystem, "EnrollmentSuccess").withArgs(1, addr3.address);
+        })
+
+        it("Should award enrollment tokens after successful enrollment", async function () {
+            // const nextCourseId = 2;
+            await this.ecosystem.connect(addr1).createCourse("Introduction to Blockchain", "Its a course that explains and gives more insight on smart contracts and generally web3.");
+
+            await this.ecosystem.connect(addr2).submitReview(1, 9, 8, 6, 5, 7, 8, 9, 4, 6, 8);
+
+            await this.ecosystem.connect(addr2).approveCourse(1);
+
+            await this.ecosystem.connect(addr3).enroll(1);
+            await expect(await this.ecosystem.balanceOf(addr3.address)).to.equal(2);
+        })
+    })
+
+    describe("Unenroll Function", async function () {
+        it("Should revert accordingly if you are not apparently enrolled", async function () {
+            // const nextCourseId = 2;
+            await this.ecosystem.connect(addr1).createCourse("Introduction to Blockchain", "Its a course that explains and gives more insight on smart contracts and generally web3.");
+
+            await this.ecosystem.connect(addr2).submitReview(1, 9, 8, 6, 5, 7, 8, 9, 4, 6, 8);
+
+            await this.ecosystem.connect(addr2).approveCourse(1);
+
+            await expect(this.ecosystem.connect(addr3).unEnroll(1)).to.be.rejectedWith("You are not enrolled in this course!");
+        })
+
+        it("Should successful Unenroll from course if all conditions are met", async function () {
+            // const nextCourseId = 2;
+            await this.ecosystem.connect(addr1).createCourse("Introduction to Blockchain", "Its a course that explains and gives more insight on smart contracts and generally web3.");
+
+            await this.ecosystem.connect(addr2).submitReview(1, 9, 8, 6, 5, 7, 8, 9, 4, 6, 8);
+
+            await this.ecosystem.connect(addr2).approveCourse(1);
+
+            await this.ecosystem.connect(addr3).enroll(1);
+
+            await expect(await this.ecosystem.connect(addr3).unEnroll(1)).to.emit(this.ecosystem, "unEnrollmentSuccess").withArgs(1, addr3.address);
+        })
+
+        it("Should burn the assigned tokens if user successfully unenrolls from a course", async function () {
+            // const nextCourseId = 2;
+            await this.ecosystem.connect(addr1).createCourse("Introduction to Blockchain", "Its a course that explains and gives more insight on smart contracts and generally web3.");
+
+            await this.ecosystem.connect(addr2).submitReview(1, 9, 8, 6, 5, 7, 8, 9, 4, 6, 8);
+
+            await this.ecosystem.connect(addr2).approveCourse(1);
+
+            await this.ecosystem.connect(addr3).enroll(1);
+
+            await this.ecosystem.connect(addr3).unEnroll(1)
+
+            await expect(await this.ecosystem.balanceOf(addr3.address)).to.equal(0);
         })
     })
 

@@ -200,7 +200,7 @@ contract Ecosystem is ERC20, Ownable {
                review.assessmentForLearning + review.engagementAndMotivation;
     }
 
-    function approveCourse(uint256 _courseId) internal onlyAdmin {
+    function approveCourse(uint256 _courseId) public onlyAdmin {
         Course storage course = courseObject[_courseId];
         require(!course.approved, "Course already approved");
         require(!approvals[msg.sender][_courseId], "You have already approved this course");
