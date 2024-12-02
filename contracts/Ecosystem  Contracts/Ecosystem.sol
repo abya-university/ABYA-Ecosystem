@@ -122,10 +122,7 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
 
     event CourseCreationSuccess(uint256 indexed _courseID, string indexed _courseName, bool _approved);
     event EnrollmentSuccess(uint256 indexed _courseId, address indexed _by);
-    event unEnrollmentSuccess(uint256 indexed _courseId, address indexed _by);
-    event ChaptersAddedSuccessfully(uint256 indexed _courseId, uint256 indexed numberOfChapters);
-    event LessonCreationSuccess(uint256 indexed _lessonId, string indexed _lessonName, uint256 indexed _additonalResources);
-    event ResourceAddSuccess(uint256 indexed _lessonId, uint256 indexed resourceCount);
+    event unEnrollmentSuccess(uint256 indexed _courseId, address indexed _by); 
     event EcosystemPoolUpdate(address indexed _to, uint256 indexed _amount);
 
 
@@ -279,33 +276,6 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
         burn(msg.sender, ENROLLMENT_REWARD);
 
         emit unEnrollmentSuccess(_courseId, msg.sender);
-
-        return true;
-    }
-
-    //function to add a chapter
-    function addChapters(uint256 _courseId, string[] memory _chapters) external returns(bool) {
-        require(courseObject[_courseId].creator != address(0), "Course does not exist!");
-
-        for (uint i = 0; i < _chapters.length; i++) {
-            Chapter memory newChapter = Chapter(nextChapterId, _chapters[i]);
-            listOfChapters.push(newChapter);
-
-            uint256 _chapterId = nextChapterId;
-            chapter[_chapterId] = newChapter;
-
-            nextChapterId++;
-        }
-
-        // Clear the existing chapters for the course
-        delete courseChapters[_courseId];
-
-        // Copy each chapter from memory to storage
-        for (uint i = 0; i < _chapters.length; i++) {
-            courseChapters[_courseId].push(_chapters[i]);
-        }
-
-        emit ChaptersAddedSuccessfully(_courseId, _chapters.length);
 
         return true;
     }

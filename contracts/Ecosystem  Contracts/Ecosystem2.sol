@@ -9,8 +9,39 @@ contract Ecosystem2 is Ecosystem {
     event QuizCreatedSuccess(uint256 indexed _quizId, string indexed _title);
     event QuestionAdded(uint256 quizId, uint256 questionId, string questionText);
     event ChoiceAdded(uint256 questionId, uint256 choiceId, string option);
+    event ChaptersAddedSuccessfully(uint256 indexed _courseId, uint256 indexed numberOfChapters);
+    event LessonCreationSuccess(uint256 indexed _lessonId, string indexed _lessonName, uint256 indexed _additonalResources);
+    event ResourceAddSuccess(uint256 indexed _lessonId, uint256 indexed resourceCount);
 
     constructor(address[] memory _admins) Ecosystem(_admins) {}
+
+
+    //function to add a chapter
+    function addChapters(uint256 _courseId, string[] memory _chapters) external returns(bool) {
+        require(courseObject[_courseId].creator != address(0), "Course does not exist!");
+
+        for (uint i = 0; i < _chapters.length; i++) {
+            Chapter memory newChapter = Chapter(nextChapterId, _chapters[i]);
+            listOfChapters.push(newChapter);
+
+            uint256 _chapterId = nextChapterId;
+            chapter[_chapterId] = newChapter;
+
+            nextChapterId++;
+        }
+
+        // Clear the existing chapters for the course
+        delete courseChapters[_courseId];
+
+        // Copy each chapter from memory to storage
+        for (uint i = 0; i < _chapters.length; i++) {
+            courseChapters[_courseId].push(_chapters[i]);
+        }
+
+        emit ChaptersAddedSuccessfully(_courseId, _chapters.length);
+
+        return true;
+    }
 
     //function to get all course chapters
     function getChapters(uint256 _courseId) external view returns (Chapter[] memory) {
