@@ -26,7 +26,7 @@ contract LMSToken is ERC20, AccessControl {
     }
 
     // Mint function
-    function mintToken(address to, uint256 amount) internal  returns (bool) {
+    function mintToken(address to, uint256 amount) internal virtual returns(bool) {
         require(amount + totalSupply() <= MAX_SUPPLY, "Limit Exceeded!");
         _mint(to, amount);
         emit MintSuccess(to, amount);
@@ -34,7 +34,7 @@ contract LMSToken is ERC20, AccessControl {
     }
 
     // Burn function
-    function burn(address account, uint256 amount) internal {
+    function burn(address account, uint256 amount) internal virtual {
         require(balanceOf(account) >= amount, "Insufficient balance");
         _burn(account, amount);
         emit BurnSuccess(account, amount);

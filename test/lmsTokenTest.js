@@ -53,4 +53,37 @@ describe("LMSToken", function () {
         })
     })
 
+    describe("Remove admin", async function () {
+        it("Should remove an admin successfully", async function () {
+            expect(await this.lmstoken.hasRole(this.lmstoken.ADMIN_ROLE(), addr1.address)).to.be.true;
+            await this.lmstoken.connect(addr1).addAdmin(addr3.address);
+
+            await this.lmstoken.connect(owner).removeAdmin(addr3.address);
+
+            const isAdmin3 = await this.lmstoken.hasRole(this.lmstoken.ADMIN_ROLE(), addr3.address);
+            await expect(isAdmin3).to.be.false;
+        })
+
+    })
+
+    // describe("Mint Function", async function () {
+    //     it("Should mint tokens successfully", async function () {
+    //         await this.lmstoken.connect(addr3).mintToken(addr1.address, 100);
+    //         const balance = await this.lmstoken.balanceOf(addr1.address);
+
+    //         await expect(await balance).to.be.equal(100);
+    //     })
+    // })
+
+    // describe("Burn Function", async function () {
+    //     it("Should burn tokens successfully", async function () {
+    //         await this.lmstoken.connect(addr3).mintToken(addr1.address, 1000);
+    //         await this.lmstoken.burn(addr1.address, 101);
+
+    //         const balance = await this.lmstoken.balanceOf(addr1.address);
+
+    //         await expect(await balance).to.be.equal(899);
+    //     })
+    // })
+
 });
