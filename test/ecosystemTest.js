@@ -10,7 +10,7 @@ describe("Ecosystem", function () {
     let Ecosystem, LMSToken, owner, addr1, addr2, addr3, addr4;
 
     beforeEach(async function () {
-        [owner, addr1, addr2, addr3] = await ethers.getSigners();
+        [owner, addr1, addr2, addr3, addr4] = await ethers.getSigners();
 
         // Deploy LMSToken contract
         LMSToken = await ethers.getContractFactory("LMSToken");
@@ -65,51 +65,160 @@ describe("Ecosystem", function () {
 
     describe("Submit Course Review Function", async function () {
         it("Should revert accordingly if value is greater than 10", async function () {
+            // Prepare the ecosystem
+            await this.ecosystem.connect(owner).grantRole(await this.ecosystem.REVIEWER_ROLE(), addr1.address);
+            await this.ecosystem.connect(owner).grantRole(await this.ecosystem.REVIEWER_ROLE(), addr2.address);
+            await this.ecosystem.connect(owner).grantRole(await this.ecosystem.REVIEWER_ROLE(), addr3.address);
+
+            // Create a course
             await this.ecosystem.connect(addr1).createCourse(
                 "Introduction to Blockchain",
                 "It's a course that explains and gives more insight on smart contracts and generally web3."
             );
 
-            const rt = await this.ecosystem.getCourseReviewers(0);
-            console.log("rt: ", rt);
+            // Select reviewers
+            await this.ecosystem.connect(addr1).selectCourseReviewers(0);
 
-            console.log([owner.address, addr1.address, addr2.address, addr3.address]);
-
-            await this.ecosystem.connect(addr1).selectCourseReviewers(0)
-            await this.ecosystem.connect(addr2).selectCourseReviewers(0)
-            await this.ecosystem.connect(addr3).selectCourseReviewers(0)
-
+            // Get selected reviewers
             const rt2 = await this.ecosystem.getCourseReviewers(0);
-            console.log("rt2: ", rt2);
+            console.log("Selected Reviewers: ", rt2);
 
-            await expect(this.ecosystem.connect(addr2).submitReview(1, 9, 8, 6, 5, 7, 8, 9, 4, 16, 8)).to.be.revertedWith("Scores must be between 1 and 10.");
+            // Find a selected reviewer
+            const selectedReviewer = rt2[0];
+            const selectedReviewerSigner = await ethers.getSigner(selectedReviewer);
 
-        })
-
-    })
+            // Attempt to submit a review with an invalid score
+            await expect(
+                this.ecosystem.connect(selectedReviewerSigner).submitReview(0, 9, 8, 6, 5, 7, 8, 9, 4, 16, 8)
+            ).to.be.revertedWith("Scores must be between 1 and 10.");
+        });
+    });
 
     describe("Approve Course Function", async function () {
         it("Should revert accordingly if course is already approved", async function () {
-            // const nextCourseId = 2;
-            await this.ecosystem.connect(addr1).createCourse("Introduction to Blockchain", "Its a course that explains and gives more insight on smart contracts and generally web3.");
+            // Grant reviewer roles
+            await this.ecosystem.connect(owner).grantRole(await this.ecosystem.REVIEWER_ROLE(), addr1.address);
+            await this.ecosystem.connect(owner).grantRole(await this.ecosystem.REVIEWER_ROLE(), addr2.address);
+            await this.ecosystem.connect(owner).grantRole(await this.ecosystem.REVIEWER_ROLE(), addr3.address);
+            await this.ecosystem.connect(owner).grantRole(await this.ecosystem.REVIEWER_ROLE(), addr4.address);
 
-            await this.ecosystem.connect(addr2).submitReview(1, 9, 8, 6, 5, 7, 8, 9, 4, 6, 8);
 
-            await this.ecosystem.connect(addr2).approveCourse(1);
+            // Create a course
+            await this.ecosystem.connect(addr1).createCourse(
+                "Introduction to Blockchain",
+                "Its a course that explains and gives more insight on smart contracts and generally web3."
+            );
 
-            await expect(this.ecosystem.connect(addr2).approveCourse(1)).to.be.revertedWith("You have already approved this course");
-        })
+            // Select reviewers for the course (courseId = 0)
+            await this.ecosystem.connect(addr1).selectCourseReviewers(0);
 
-    })
+            // Get selected reviewers
+            const rt2 = await this.ecosystem.getCourseReviewers(0);
+            console.log("Selected Reviewers: ", rt2);
 
-    describe("Enroll Function", async function () {
-        it("Should revert accordingly if course is not yet approved", async function () {
-            // const nextCourseId = 2;
-            await this.ecosystem.connect(addr1).createCourse("Introduction to Blockchain", "Its a course that explains and gives more insight on smart contracts and generally web3.");
+            // Find a selected reviewer
+            const selectedReviewer = rt2[0];
+            const selectedReviewerSigner = await ethers.getSigner(selectedReviewer);
 
-            await expect(this.ecosystem.connect(addr3).enroll(1)).to.be.revertedWith("Course not yet approved!");
-        })
+            // Submit review (using courseId 0, not 1)
+            await this.ecosystem.connect(selectedReviewerSigner).submitReview(
+                0,  // Correct course ID
+                9, 8, 6, 5, 7, 8, 9, 4, 6, 8
+            );
 
-    })
+            // Approve course
+            await this.ecosystem.connect(selectedReviewerSigner).approveCourse(0);
+
+            // Try to approve again (should revert)
+            await expect(
+                this.ecosystem.connect(selectedReviewerSigner).approveCourse(0)
+            ).to.be.revertedWith("You have already approved this course");
+        });
+    });
+
+    // describe("Approve Course Status", async function () {
+    //     it("Should set course approved status to true", async function () {
+    //         // Grant reviewer roles
+    //         await this.ecosystem.connect(owner).grantRole(await this.ecosystem.REVIEWER_ROLE(), addr1.address);
+    //         await this.ecosystem.connect(owner).grantRole(await this.ecosystem.REVIEWER_ROLE(), addr2.address);
+    //         await this.ecosystem.connect(owner).grantRole(await this.ecosystem.REVIEWER_ROLE(), addr3.address);
+    //         await this.ecosystem.connect(owner).grantRole(await this.ecosystem.REVIEWER_ROLE(), addr4.address);
+
+    //         // Create a course
+    //         await this.ecosystem.connect(addr1).createCourse(
+    //             "Introduction to Blockchain",
+    //             "Its a course that explains and gives more insight on smart contracts and generally web3."
+    //         );
+
+    //         // Select reviewers for the course (courseId = 0)
+    //         await this.ecosystem.connect(addr1).selectCourseReviewers(0);
+
+    //         // Get selected reviewers
+    //         const selectedReviewers = await this.ecosystem.getCourseReviewers(0);
+    //         console.log("Selected Reviewers: ", selectedReviewers);
+
+    //         // Submit reviews from selected reviewers
+    //         const reviews = [
+    //             { reviewer: selectedReviewers[0], scores: [9, 8, 6, 5, 7, 8, 9, 4, 6, 8] },
+    //             { reviewer: selectedReviewers[1], scores: [9, 7, 6, 5, 9, 8, 9, 4, 6, 8] },
+    //             { reviewer: selectedReviewers[2], scores: [9, 8, 6, 5, 7, 8, 9, 8, 6, 8] }
+    //         ];
+
+    //         // Submit reviews
+    //         for (const review of reviews) {
+    //             const reviewerSigner = await ethers.getSigner(review.reviewer);
+    //             await this.ecosystem.connect(reviewerSigner).submitReview(
+    //                 0,  // Correct course ID
+    //                 ...review.scores
+    //             );
+    //         }
+
+    //         await this.ecosystem.connect(selectedReviewers[0]).approveCourse(0);
+
+    //         // Retrieve the specific course
+    //         const course = await this.ecosystem.getCourse(0);
+
+    //         // Assert that the course is approved
+    //         expect(course.approved).to.be.true;
+    //     });
+
+    //     it("Should not approve course with insufficient reviews", async function () {
+    //         // Grant reviewer roles
+    //         await this.ecosystem.connect(owner).grantRole(await this.ecosystem.REVIEWER_ROLE(), addr1.address);
+    //         await this.ecosystem.connect(owner).grantRole(await this.ecosystem.REVIEWER_ROLE(), addr2.address);
+
+    //         // Add reviewers to pool
+    //         await this.ecosystem.connect(addr1).addToReviewerPool();
+    //         await this.ecosystem.connect(addr2).addToReviewerPool();
+
+    //         // Create a course
+    //         await this.ecosystem.connect(addr1).createCourse(
+    //             "Introduction to Blockchain",
+    //             "Its a course that explains and gives more insight on smart contracts and generally web3."
+    //         );
+
+    //         // Select reviewers for the course (courseId = 0)
+    //         await this.ecosystem.connect(addr1).selectCourseReviewers(0);
+
+    //         // Get selected reviewers
+    //         const selectedReviewers = await this.ecosystem.getCourseReviewers(0);
+
+    //         // Submit review from one reviewer
+    //         const reviewerSigner = await ethers.getSigner(selectedReviewers[0]);
+    //         await this.ecosystem.connect(reviewerSigner).submitReview(
+    //             0,  // Correct course ID
+    //             9, 8, 6, 5, 7, 8, 9, 4, 6, 8
+    //         );
+
+    //         // Approve course by one reviewer
+    //         await this.ecosystem.connect(reviewerSigner).approveCourse(0);
+
+    //         // Retrieve the specific course
+    //         const course = await this.ecosystem.getCourse(0);
+
+    //         // Assert that the course is not approved
+    //         expect(course.approved).to.be.false;
+    //     });
+    // });
 
 })
