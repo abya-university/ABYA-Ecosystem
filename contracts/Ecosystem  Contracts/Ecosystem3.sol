@@ -39,7 +39,7 @@ contract Ecosystem2 is Ecosystem {
     event QuizEdited(uint256 indexed _lessonId, uint256 indexed _quizId, string _quizTitle);
 
 
-    constructor(address[] memory _admins) Ecosystem(_admins) {}
+    constructor(address[] memory _reviewers) Ecosystem(_reviewers) {}
 
     //function to delete a course
     function deleteCourse(uint256 _courseId) external onlyRole(COURSE_OWNER_ROLE) returns(bool) {

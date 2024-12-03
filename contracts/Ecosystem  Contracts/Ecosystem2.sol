@@ -12,8 +12,37 @@ contract Ecosystem2 is Ecosystem {
     event ChaptersAddedSuccessfully(uint256 indexed _courseId, uint256 indexed numberOfChapters);
     event LessonCreationSuccess(uint256 indexed _lessonId, string indexed _lessonName, uint256 indexed _additonalResources);
     event ResourceAddSuccess(uint256 indexed _lessonId, uint256 indexed resourceCount);
+    event EnrollmentSuccess(uint256 indexed _courseId, address indexed _by);
+    event unEnrollmentSuccess(uint256 indexed _courseId, address indexed _by); 
 
-    constructor(address[] memory _admins) Ecosystem(_admins) {}
+    constructor(address[] memory _reviewers) Ecosystem(_reviewers) {}
+
+    //function to enroll into a course
+    function enroll(uint256 _courseId) external nonReentrant returns(bool) {
+        require(courseObject[_courseId].approved, "Course not yet approved!");
+        require(!isEnrolled[_courseId][msg.sender], "You are already enrolled into this course");
+        
+        isEnrolled[_courseId][msg.sender] = true;
+
+        mintToken(msg.sender, ENROLLMENT_REWARD);
+
+        emit EnrollmentSuccess(_courseId, msg.sender);
+
+        return true;
+    }
+
+    //function to unEnroll from a course
+    function unEnroll(uint256 _courseId) external nonReentrant returns(bool) {
+        require(isEnrolled[_courseId][msg.sender], "You are not enrolled in this course!");
+
+        isEnrolled[_courseId][msg.sender] = false;
+
+        burn(msg.sender, ENROLLMENT_REWARD);
+
+        emit unEnrollmentSuccess(_courseId, msg.sender);
+
+        return true;
+    }
 
 
     //function to add a chapter

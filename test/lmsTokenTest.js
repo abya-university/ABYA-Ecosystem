@@ -11,7 +11,7 @@ describe("LMSToken", function () {
     beforeEach("Run Before All", async function () {
         LMSToken = await ethers.getContractFactory("LMSToken");
         [owner, addr1, addr2, addr3] = await ethers.getSigners();
-        this.lmstoken = await LMSToken.deploy([owner.address, addr1.address, addr2.address]);
+        this.lmstoken = await LMSToken.deploy([owner.address, addr1.address, addr2.address, addr3.address]);
     });
 
     describe("Deployment", async function () {
@@ -28,62 +28,48 @@ describe("LMSToken", function () {
             expect(symbol).to.equal("ABYTKN");
         });
 
-        it("Should set the admins correctly", async function () {
-            const isAdmin1 = await this.lmstoken.hasRole(this.lmstoken.ADMIN_ROLE(), addr1.address);
-            const isAdmin2 = await this.lmstoken.hasRole(this.lmstoken.ADMIN_ROLE(), addr2.address);
-            expect(isAdmin1).to.be.true;
-            expect(isAdmin2).to.be.true;
+        it("Should set the reviewers correctly", async function () {
+            const isReviewer1 = await this.lmstoken.hasRole(this.lmstoken.REVIEWER_ROLE(), addr1.address);
+            const isReviewer2 = await this.lmstoken.hasRole(this.lmstoken.REVIEWER_ROLE(), addr2.address);
+            expect(isReviewer1).to.be.true;
+            expect(isReviewer2).to.be.true;
         });
     });
 
-    describe("Add admin", async function () {
-        it("Should add an admin successfully", async function () {
-            expect(await this.lmstoken.hasRole(this.lmstoken.ADMIN_ROLE(), addr1.address)).to.be.true;
-            await this.lmstoken.connect(addr1).addAdmin(addr3.address);
+    describe("Add reviewer", async function () {
+        it("Should add an reviewer successfully", async function () {
+            expect(await this.lmstoken.hasRole(this.lmstoken.REVIEWER_ROLE(), addr1.address)).to.be.true;
+            await this.lmstoken.connect(addr1).addReviewer(addr3.address);
 
-            const isAdmin3 = await this.lmstoken.hasRole(this.lmstoken.ADMIN_ROLE(), addr3.address);
+            const isAdmin3 = await this.lmstoken.hasRole(this.lmstoken.REVIEWER_ROLE(), addr3.address);
             await expect(isAdmin3).to.be.true;
         })
-
-        it("Should remove an admin successfully", async function () {
-            await this.lmstoken.connect(owner).removeAdmin(addr1.address);
-
-            const isAdmin1 = await this.lmstoken.hasRole(this.lmstoken.ADMIN_ROLE(), addr3.address);
-            await expect(isAdmin1).to.be.false;
-        })
     })
 
-    describe("Remove admin", async function () {
-        it("Should remove an admin successfully", async function () {
-            expect(await this.lmstoken.hasRole(this.lmstoken.ADMIN_ROLE(), addr1.address)).to.be.true;
-            await this.lmstoken.connect(addr1).addAdmin(addr3.address);
+    describe("Remove reviewer", async function () {
+        it("Should remove an reviewer successfully", async function () {
+            expect(await this.lmstoken.hasRole(this.lmstoken.REVIEWER_ROLE(), addr1.address)).to.be.true;
+            await this.lmstoken.connect(addr1).addReviewer(addr3.address);
 
-            await this.lmstoken.connect(owner).removeAdmin(addr3.address);
+            await this.lmstoken.connect(owner).removeReviewer(addr3.address);
 
-            const isAdmin3 = await this.lmstoken.hasRole(this.lmstoken.ADMIN_ROLE(), addr3.address);
-            await expect(isAdmin3).to.be.false;
+            const isReviewer3 = await this.lmstoken.hasRole(this.lmstoken.REVIEWER_ROLE(), addr3.address);
+            await expect(isReviewer3).to.be.false;
         })
 
     })
 
-    // describe("Mint Function", async function () {
-    //     it("Should mint tokens successfully", async function () {
-    //         await this.lmstoken.connect(addr3).mintToken(addr1.address, 100);
-    //         const balance = await this.lmstoken.balanceOf(addr1.address);
+    describe("Check if is Reviewer", async function () {
+        it("Should check if an address is a reviewer", async function () {
+            await expect(await this.lmstoken.hasRole(this.lmstoken.REVIEWER_ROLE(), addr1.address)).to.be.true;
+        })
 
-    //         await expect(await balance).to.be.equal(100);
-    //     })
-    // })
-
-    // describe("Burn Function", async function () {
-    //     it("Should burn tokens successfully", async function () {
-    //         await this.lmstoken.connect(addr3).mintToken(addr1.address, 1000);
-    //         await this.lmstoken.burn(addr1.address, 101);
-
-    //         const balance = await this.lmstoken.balanceOf(addr1.address);
-
-    //         await expect(await balance).to.be.equal(899);
-    //     })
-    // })
+        it("Should check if an address is a reviewer", async function () {
+            await this.lmstoken.connect(owner).addReviewer(addr1.address);
+            await this.lmstoken.connect(owner).removeReviewer(addr1.address);
+            const isReviewer = await this.lmstoken.hasRole(this.lmstoken.REVIEWER_ROLE(), addr1.address);
+            await expect(isReviewer).to.be.false;
+        })
+    })
 
 });

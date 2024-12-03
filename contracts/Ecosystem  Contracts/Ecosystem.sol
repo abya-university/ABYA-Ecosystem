@@ -109,6 +109,8 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
     mapping(uint256 => string[]) public chapterLessons;
     mapping(uint256 => Quiz) public quizzes;
     mapping(uint256 => Question) public questions;
+    mapping(uint256 => address[]) public courseReviewers;
+    mapping(uint256 => bool) public courseReviewInitiated;
     mapping(uint256 => mapping(address => bool)) public isEnrolled;
 
 
@@ -121,12 +123,11 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
 
 
     event CourseCreationSuccess(uint256 indexed _courseID, string indexed _courseName, bool _approved);
-    event EnrollmentSuccess(uint256 indexed _courseId, address indexed _by);
-    event unEnrollmentSuccess(uint256 indexed _courseId, address indexed _by); 
     event EcosystemPoolUpdate(address indexed _to, uint256 indexed _amount);
+    event ReviewersSelected(uint256 indexed courseId, address[] reviewers);
 
 
-    constructor(address[] memory _admins) LMSToken(_admins) ReentrancyGuard() {
+    constructor(address[] memory _reviewers) LMSToken(_reviewers) ReentrancyGuard() {
         data.initialize();
     }
 
@@ -196,35 +197,16 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
     }
 
     //function to submit review
-    function submitReview(
-        uint256 courseId,
-        uint256 learnerAgency,
-        uint256 criticalThinking,
-        uint256 collaborativeLearning,
-        uint256 reflectivePractice,
-        uint256 adaptiveLearning,
-        uint256 authenticLearning,
-        uint256 technologyIntegration,
-        uint256 learnerSupport,
-        uint256 assessmentForLearning,
+    function submitReview(uint256 courseId,uint256 learnerAgency,uint256 criticalThinking,uint256 collaborativeLearning,uint256 reflectivePractice,
+        uint256 adaptiveLearning,uint256 authenticLearning,uint256 technologyIntegration,uint256 learnerSupport,uint256 assessmentForLearning,
         uint256 engagementAndMotivation
-    ) public onlyRole(ADMIN_ROLE) {
+    ) public onlyRole(REVIEWER_ROLE) {
+        require(isReviewer(courseId, msg.sender), "Not selected as a reviewer for this course");
         require(!reviews[courseId][msg.sender].isSubmitted, "Review already submitted by this reviewer.");
-        require(learnerAgency <= 10 && criticalThinking <= 10 && collaborativeLearning <= 10 && reflectivePractice <= 10 &&
-                adaptiveLearning <= 10 && authenticLearning <= 10 && technologyIntegration <= 10 &&
-                learnerSupport <= 10 && assessmentForLearning <= 10 && engagementAndMotivation <= 10, "Scores must be between 1 and 10.");
+        validateScores(learnerAgency, criticalThinking,collaborativeLearning,reflectivePractice,adaptiveLearning,authenticLearning,technologyIntegration,learnerSupport,assessmentForLearning,engagementAndMotivation);
 
-        reviews[courseId][msg.sender] = Review({
-            learnerAgency: learnerAgency,
-            criticalThinking: criticalThinking,
-            collaborativeLearning: collaborativeLearning,
-            reflectivePractice: reflectivePractice,
-            adaptiveLearning: adaptiveLearning,
-            authenticLearning: authenticLearning,
-            technologyIntegration: technologyIntegration,
-            learnerSupport: learnerSupport,
-            assessmentForLearning: assessmentForLearning,
-            engagementAndMotivation: engagementAndMotivation,
+        reviews[courseId][msg.sender] = Review({learnerAgency: learnerAgency,criticalThinking: criticalThinking,collaborativeLearning: collaborativeLearning,
+            reflectivePractice: reflectivePractice,adaptiveLearning: adaptiveLearning,authenticLearning: authenticLearning,technologyIntegration: technologyIntegration,learnerSupport: learnerSupport,assessmentForLearning: assessmentForLearning,engagementAndMotivation: engagementAndMotivation,
             isSubmitted: true
         });
 
@@ -239,7 +221,27 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
                review.assessmentForLearning + review.engagementAndMotivation;
     }
 
-    function approveCourse(uint256 _courseId) public onlyRole(ADMIN_ROLE) {
+    function validateScores(uint256 learnerAgency,uint256 criticalThinking,uint256 collaborativeLearning,uint256 reflectivePractice,uint256 adaptiveLearning,
+        uint256 authenticLearning,uint256 technologyIntegration,uint256 learnerSupport,uint256 assessmentForLearning,uint256 engagementAndMotivation
+        ) internal pure {
+        require(
+            learnerAgency <= 10 && criticalThinking <= 10 && collaborativeLearning <= 10 && reflectivePractice <= 10 &&
+            adaptiveLearning <= 10 && authenticLearning <= 10 && technologyIntegration <= 10 &&
+            learnerSupport <= 10 && assessmentForLearning <= 10 && engagementAndMotivation <= 10,
+            "Scores must be between 1 and 10."
+        );
+    }   
+
+    function isReviewer(uint256 courseId, address reviewer) internal view returns (bool) {
+        for (uint256 i = 0; i < courseReviewers[courseId].length; i++) {
+            if (courseReviewers[courseId][i] == reviewer) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function approveCourse(uint256 _courseId) public onlyRole(REVIEWER_ROLE) {
         Course storage course = courseObject[_courseId];
         require(!course.approved, "Course already approved");
         require(!approvals[msg.sender][_courseId], "You have already approved this course");
@@ -253,31 +255,52 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
         }
     }
 
-    //function to enroll into a course
-    function enroll(uint256 _courseId) external nonReentrant returns(bool) {
-        require(courseObject[_courseId].approved, "Course not yet approved!");
-        require(!isEnrolled[_courseId][msg.sender], "You are already enrolled into this course");
+    function selectCourseReviewers(uint256 courseId) public onlyRole(REVIEWER_ROLE) {
+        require(!courseReviewInitiated[courseId], "Reviewers already selected");
+        require(reviewerPool.length >= 3, "Not enough reviewers in the pool");
+    
+        // Reset selected reviewers
+        delete courseReviewers[courseId];
+    
+        // Pseudo-random selection
+        for (uint256 i = 0; i < 3; i++) {
+            // Use block variables and iteration to create pseudo-randomness
+            uint256 randomIndex = uint256(
+                keccak256(
+                    abi.encodePacked(
+                        block.timestamp, 
+                        block.prevrandao, 
+                        reviewerPool.length, 
+                        i
+                    )
+                )
+            ) % reviewerPool.length;
         
-        isEnrolled[_courseId][msg.sender] = true;
+            address selectedReviewer = reviewerPool[randomIndex];
+        
+            // Ensure no duplicate selections
+            bool alreadySelected = false;
+            for (uint256 j = 0; j < courseReviewers[courseId].length; j++) {
+                if (courseReviewers[courseId][j] == selectedReviewer) {
+                    alreadySelected = true;
+                    break;
+                }
+            }
+        
+            if (!alreadySelected) {
+                courseReviewers[courseId].push(selectedReviewer);
+            }
+        }
 
-        mintToken(msg.sender, ENROLLMENT_REWARD);
-
-        emit EnrollmentSuccess(_courseId, msg.sender);
-
-        return true;
+        if(courseReviewers[courseId].length == 3) {
+            courseReviewInitiated[courseId] = true;
+        }
+    
+        emit ReviewersSelected(courseId, courseReviewers[courseId]);
     }
 
-    //function to unEnroll from a course
-    function unEnroll(uint256 _courseId) external nonReentrant returns(bool) {
-        require(isEnrolled[_courseId][msg.sender], "You are not enrolled in this course!");
-
-        isEnrolled[_courseId][msg.sender] = false;
-
-        burn(msg.sender, ENROLLMENT_REWARD);
-
-        emit unEnrollmentSuccess(_courseId, msg.sender);
-
-        return true;
-    }
+    function getCourseReviewers(uint256 courseId) public view returns (address[] memory) {
+        return courseReviewers[courseId];
+    }   
     
 }
