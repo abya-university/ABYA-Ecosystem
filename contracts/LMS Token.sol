@@ -28,6 +28,8 @@ contract LMSToken is ERC20, AccessControl {
         // Grant each admin the REVIEWER_ROLE
         for (uint256 i = 0; i < _reviewers.length; i++) {
             _grantRole(REVIEWER_ROLE, _reviewers[i]);
+            reviewerPool.push(_reviewers[i]);
+            isInReviewerPool[_reviewers[i]] = true;
         }
     }
 

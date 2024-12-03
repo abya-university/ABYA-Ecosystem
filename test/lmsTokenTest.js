@@ -6,11 +6,11 @@ import { describe, it, beforeEach } from 'mocha';
 const { ethers } = pkg;
 
 describe("LMSToken", function () {
-    let LMSToken, owner, addr1, addr2, addr3;
+    let LMSToken, owner, addr1, addr2, addr3, addr4;
 
     beforeEach("Run Before All", async function () {
         LMSToken = await ethers.getContractFactory("LMSToken");
-        [owner, addr1, addr2, addr3] = await ethers.getSigners();
+        [owner, addr1, addr2, addr3, addr4] = await ethers.getSigners();
         this.lmstoken = await LMSToken.deploy([owner.address, addr1.address, addr2.address, addr3.address]);
     });
 
@@ -39,21 +39,21 @@ describe("LMSToken", function () {
     describe("Add reviewer", async function () {
         it("Should add an reviewer successfully", async function () {
             expect(await this.lmstoken.hasRole(this.lmstoken.REVIEWER_ROLE(), addr1.address)).to.be.true;
-            await this.lmstoken.connect(addr1).addReviewer(addr3.address);
+            await this.lmstoken.connect(addr1).addReviewer(addr4.address);
 
-            const isAdmin3 = await this.lmstoken.hasRole(this.lmstoken.REVIEWER_ROLE(), addr3.address);
-            await expect(isAdmin3).to.be.true;
+            const isReviewer4 = await this.lmstoken.hasRole(this.lmstoken.REVIEWER_ROLE(), addr4.address);
+            await expect(isReviewer4).to.be.true;
         })
     })
 
     describe("Remove reviewer", async function () {
         it("Should remove an reviewer successfully", async function () {
             expect(await this.lmstoken.hasRole(this.lmstoken.REVIEWER_ROLE(), addr1.address)).to.be.true;
-            await this.lmstoken.connect(addr1).addReviewer(addr3.address);
+            await this.lmstoken.connect(addr1).addReviewer(addr4.address);
 
-            await this.lmstoken.connect(owner).removeReviewer(addr3.address);
+            await this.lmstoken.connect(owner).removeReviewer(addr4.address);
 
-            const isReviewer3 = await this.lmstoken.hasRole(this.lmstoken.REVIEWER_ROLE(), addr3.address);
+            const isReviewer3 = await this.lmstoken.hasRole(this.lmstoken.REVIEWER_ROLE(), addr4.address);
             await expect(isReviewer3).to.be.false;
         })
 
@@ -65,9 +65,9 @@ describe("LMSToken", function () {
         })
 
         it("Should check if an address is a reviewer", async function () {
-            await this.lmstoken.connect(owner).addReviewer(addr1.address);
-            await this.lmstoken.connect(owner).removeReviewer(addr1.address);
-            const isReviewer = await this.lmstoken.hasRole(this.lmstoken.REVIEWER_ROLE(), addr1.address);
+            await this.lmstoken.connect(owner).addReviewer(addr4.address);
+            await this.lmstoken.connect(owner).removeReviewer(addr4.address);
+            const isReviewer = await this.lmstoken.hasRole(this.lmstoken.REVIEWER_ROLE(), addr4.address);
             await expect(isReviewer).to.be.false;
         })
     })

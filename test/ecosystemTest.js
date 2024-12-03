@@ -75,11 +75,6 @@ describe("Ecosystem", function () {
 
             console.log([owner.address, addr1.address, addr2.address, addr3.address]);
 
-            await this.ecosystem.connect(addr1).addReviewerToPool(addr2.address);
-            await this.ecosystem.connect(addr2).addReviewerToPool(addr3.address);
-            await this.ecosystem.connect(addr3).addReviewerToPool(owner.address);
-            // await this.ecosystem.connect(addr3).addReviewerToPool(addr1.address);
-
             await this.ecosystem.connect(addr1).selectCourseReviewers(0)
             await this.ecosystem.connect(addr2).selectCourseReviewers(0)
             await this.ecosystem.connect(addr3).selectCourseReviewers(0)
