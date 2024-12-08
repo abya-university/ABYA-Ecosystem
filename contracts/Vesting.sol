@@ -5,6 +5,7 @@ pragma solidity ^0.8.24;
 import { LMSToken } from "./LMS Token.sol";
 import "@openzeppelin/contracts/finance/VestingWallet.sol";
 import "@openzeppelin/contracts/finance/VestingWalletCliff.sol";
+
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract Vesting is LMSToken, AccessControl,VestingWallet{
@@ -77,11 +78,22 @@ contract Vesting is LMSToken, AccessControl,VestingWallet{
         emit AddressAdded(beneficiary, "Advisors");
     }
 
+    // Internal helper function to remove an address from an array
+    function _removeFromArray(address[] storage array, address target) internal {
+        uint256 length = array.length;
+        for (uint256 i = 0; i < length; i++) {
+            if (array[i] == target) {
+                array[i] = array[length - 1];
+                array.pop();
+                break;
+            }
+        }
+    }
  
     //function to add beneficiary to Investors Array
     function removeFromInvestors(address beneficiary) external onlyRole(DEFAULT_ADMIN_ROLE){
         require(isInInvestor[beneficiary], "Address not in Investors");
-        investors.pop(beneficiary);
+        _removeFromArray(investors, beneficiary);
         isInInvestor[beneficiary] = false;
         _revokeRole(INVESTOR_ROLE, beneficiary);
 
@@ -91,7 +103,7 @@ contract Vesting is LMSToken, AccessControl,VestingWallet{
     //function to add beneficiary to Team Array
     function removeFromTeam(address beneficiary) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(isInTeam[beneficiary], "Address not in Team");
-        team.pop(beneficiary);
+        _removeFromArray(team, beneficiary);
         isInTeam[beneficiary] = false;
         _revokeRole(TEAM_ROLE, beneficiary);
 
@@ -101,7 +113,7 @@ contract Vesting is LMSToken, AccessControl,VestingWallet{
     //function to add beneficiarys to Advisors Array
     function removeFromAdvisors(address beneficiary) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(isInAdvisors[beneficiary], "Address not in Advisors");
-        advisors.pop(beneficiary);
+        _removeFromArray(advisors, beneficiary);
         isInAdvisors[beneficiary] = false;
         _revokedRole(ADVISOR_ROLE, beneficiary);
 
@@ -117,7 +129,7 @@ contract Vesting is LMSToken, AccessControl,VestingWallet{
         require(unlockTime > block.timestamp, "Unlock time must be in the future");
 
         //ensuring there are enough tokens in the contract to lock
-        require(balanceOf(address(this)) >= tokenAmount, "Not enough tokens in contract");
+        require(token.balanceOf(address(this)) >= tokenAmount, "Not enough tokens in contract");
 
         //check to ensure participant already has locked tokens to prevent overallocation
         require(tokenLocks[beneficiary].amount == 0, "Tokens already locked for this beneficiary");
@@ -127,8 +139,32 @@ contract Vesting is LMSToken, AccessControl,VestingWallet{
                 unlockTime: unlockTime});
 
         // Emit event for locking tokens
-        emit lockTokens(beneficiary, tokenAmount, unlockTime);
+        emit TokensLocked(beneficiary, tokenAmount, unlockTime);
 
     }
     //This function releases vested tokens allowing beneficiarys claim unclaimed tokens
+    function releaseVestedTokens() external {
+        Lock storage lockData = tokenLocks[msg.sender];
+        require(lockData.amount > 0, "No tokens to release");
+        require(block.timestamp >= lockData.unlockTime, "Tokens are still locked");
+
+        uint256 amount = lockData.amount;
+        lockData.amount = 0; // Reset locked amount
+        token.transfer(msg.sender, amount);
+
+        emit TokensReleased(msg.sender, amount);
+    }
+    
+    //added a function to query lockedand claimabl tokens
+    function getVestedTokens(address beneficiary) external view
+    returns (uint256 lockedAmount, uint256 claimableAmount, uint64 unlockTime)
+    {
+    
+    Lock storage lockData = tokenLocks[beneficiary];
+    if (block.timestamp >= lockData.unlockTime) {
+        return (0, lockData.amount, lockData.unlockTime);
+    }
+    return (lockData.amount, 0, lockData.unlockTime);
+    }
+
 }
