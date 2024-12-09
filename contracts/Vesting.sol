@@ -8,16 +8,18 @@ import "@openzeppelin/contracts/finance/VestingWalletCliff.sol";
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract Vesting is LMSToken, AccessControl,VestingWallet{
+contract Vesting is LMSToken, AccessControl{
     LMSToken private immutable token;
 
     bytes32 public constant TEAM_ROLE = keccak256("TEAM_ROLE");
     bytes32 public constant INVESTOR_ROLE = keccak256("INVESTOR_ROLE");
     bytes32 public constant ADVISOR_ROLE = keccak256("ADVISOR_ROLE");
 
+    uint256 public constant VESTING_POOL = (MAX_SUPPLY * 45) / 100;
+    
     event AddressAdded(address indexed beneficiary, string role);
     event AddressRemoved(address indexed beneficiary, string role);
-    event TokensLocked(address indexed beneficiary, uint256 amount, uint64 unlockTime);
+    event TokensLocked(address indexed beneficiary, uint256 amount);
     event TokensReleased(address indexed beneficiary, uint256 amount);
 
     address[] public investors;
@@ -28,25 +30,38 @@ contract Vesting is LMSToken, AccessControl,VestingWallet{
     mapping(address => bool) public isInTeam;
     mapping(address=> bool) public isInAdvisors;
 
+    struct VestingSchedule {
+        uint64 startTime;
+        uint64 cliffTime;
+        uint64 duration;
+        uint64 interval; // New: Periodic release interval in seconds
+    }
+    mapping(address => VestingSchedule) public vestingSchedules;
+
+    // Modifier to check unlock period conditions
+    modifier validateLockParams(address beneficiary, uint256 tokenAmount) {
+        require(beneficiary != address(0), "Invalid beneficiary address");
+        require(tokenAmount > 0, "Token amount must be greater than 0");
+        _;
+    }
+
+    
+    struct Lock{
+        uint256 amount;
+        uint256 claimedAmount;
+    }
+    mapping(address => Lock) public tokenLocks;
+
     constructor(
         LMSToken _token,
         address admin
-    )
-        VestingWallet(admin, uint64(block.timestamp)){
+    ){
             require(address(_token) != address(0), "Invalid Token Address");
             require(admin != address(0), "Invalid Admin Address");
 
             token = _token;
-            _setupRole(DEFAULT_ADMIN_ROLE, admin);
+            _grantRole(DEFAULT_ADMIN_ROLE, admin);
         }
-    
-
-    struct Lock{
-        uint256 amount;
-        uint64 unlockTime;
-    }
-    mapping(address => Lock) public tokenLocks;
-
 
     //function to add beneficiary to Investors Array
     function addToInvestors(address beneficiary) external onlyRole(DEFAULT_ADMIN_ROLE){
@@ -115,56 +130,103 @@ contract Vesting is LMSToken, AccessControl,VestingWallet{
         require(isInAdvisors[beneficiary], "Address not in Advisors");
         _removeFromArray(advisors, beneficiary);
         isInAdvisors[beneficiary] = false;
-        _revokedRole(ADVISOR_ROLE, beneficiary);
+        _revokeRole(ADVISOR_ROLE, beneficiary);
 
         emit AddressRemoved(beneficiary, "Advisors");
     }
 
-
+    function setVestingSchedule(address beneficiary,uint64 startTime,uint64 cliffTime,uint64 duration,uint64 interval)
+    external onlyRole(DEFAULT_ADMIN_ROLE)
+        {
+        require(vestingSchedules[beneficiary].startTime == 0, "Vesting schedule already set");
+        require(duration > cliffTime, "Duration must be greater than cliff time.");
+        require(interval > 0, "Interval must be greater than 0");
+        vestingSchedules[beneficiary] = VestingSchedule({
+            startTime: startTime,
+            cliffTime:cliffTime,
+            duration: duration,
+            interval: interval
+        });
+        }
     //function to lock tokens for a specified duration
-    function lockTokens(address beneficiary, uint256 tokenAmount, uint64 unlockTime) internal onlyRole(DEFAULT_ADMIN_ROLE)
+    function lockTokens(address beneficiary,uint256 tokenAmount, uint256 claimedAmount) 
+    internal onlyRole(DEFAULT_ADMIN_ROLE) validateLockParams(beneficiary, tokenAmount)
     {
-        require(beneficiary != address(0), "Invalid beneficiary address");
-        require(tokenAmount > 0, "Invalid token amount it must be greater than 0");
-        require(unlockTime > block.timestamp, "Unlock time must be in the future");
-
         //ensuring there are enough tokens in the contract to lock
         require(token.balanceOf(address(this)) >= tokenAmount, "Not enough tokens in contract");
-
         //check to ensure participant already has locked tokens to prevent overallocation
         require(tokenLocks[beneficiary].amount == 0, "Tokens already locked for this beneficiary");
 
         tokenLocks[beneficiary] = Lock({
                 amount: tokenAmount,
-                unlockTime: unlockTime});
+                claimedAmount: claimedAmount});
 
         // Emit event for locking tokens
-        emit TokensLocked(beneficiary, tokenAmount, unlockTime);
+        emit TokensLocked(beneficiary, tokenAmount);
 
     }
     //This function releases vested tokens allowing beneficiarys claim unclaimed tokens
     function releaseVestedTokens() external {
+        VestingSchedule storage schedule = vestingSchedules[msg.sender];
         Lock storage lockData = tokenLocks[msg.sender];
-        require(lockData.amount > 0, "No tokens to release");
-        require(block.timestamp >= lockData.unlockTime, "Tokens are still locked");
+
+        require(schedule.startTime > 0, "No vesting schedule");
+        require(block.timestamp >= schedule.startTime, "Vesting not started");
+
+        uint256 totalAmount = lockData.amount;
+        require(totalAmount > 0, "No tokens to release");
+
+        uint64 elapsedTime = uint64(block.timestamp) - schedule.startTime;
+        require(elapsedTime >= schedule.cliffTime, "Cliff period not reached");
+
+        uint64 elapsedIntervals = elapsedTime / schedule.interval;
+        uint64 totalIntervals = schedule.duration / schedule.interval;
+
+        uint256 vestedAmount = (elapsedIntervals >= totalIntervals)
+            ? totalAmount
+            : (totalAmount * elapsedIntervals) / totalIntervals;
+
+        uint256 claimableAmount = vestedAmount - lockData.claimedAmount;
+        require(claimableAmount > 0, "No tokens available to claim");
 
         uint256 amount = lockData.amount;
-        lockData.amount = 0; // Reset locked amount
-        token.transfer(msg.sender, amount);
 
-        emit TokensReleased(msg.sender, amount);
+        lockData.claimedAmount += claimableAmount;
+        token.transfer(msg.sender, claimableAmount);
+
+        emit TokensReleased(msg.sender, claimableAmount);
     }
     
-    //added a function to query lockedand claimabl tokens
-    function getVestedTokens(address beneficiary) external view
-    returns (uint256 lockedAmount, uint256 claimableAmount, uint64 unlockTime)
+    //added a function to get all vesting details 
+    function getVestingDetails(address beneficiary)
+        external
+        view
+        returns (
+            uint256 lockedAmount,
+            uint256 claimedAmount,
+            uint256 claimableAmount,
+            uint64 cliffTime,
+            uint64 duration,
+            uint64 interval
+        )
     {
-    
-    Lock storage lockData = tokenLocks[beneficiary];
-    if (block.timestamp >= lockData.unlockTime) {
-        return (0, lockData.amount, lockData.unlockTime);
-    }
-    return (lockData.amount, 0, lockData.unlockTime);
+        VestingSchedule memory schedule = vestingSchedules[beneficiary];
+        Lock memory lockData = tokenLocks[beneficiary];
+
+        uint256 vestedAmount = (block.timestamp >= schedule.startTime + schedule.duration)
+            ? lockData.amount
+            : (lockData.amount * ((block.timestamp - schedule.startTime) / schedule.interval)) / (schedule.duration / schedule.interval);
+
+        uint256 claimable = vestedAmount - lockData.claimedAmount;
+
+        return (
+            lockData.amount,
+            lockData.claimedAmount,
+            claimable,
+            schedule.cliffTime,
+            schedule.duration,
+            schedule.interval
+        );
     }
 
 }
