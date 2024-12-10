@@ -5,7 +5,7 @@ import { LMSToken } from "../LMS Token.sol";
 import { CommunityBadgeSystem } from "./CommunityBadgeSystem.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract CommunityEnhanced is LMSToken, ReentrancyGuard, CommunityBadgeSystem {
+contract Community is LMSToken, ReentrancyGuard, CommunityBadgeSystem {
     // Constants
     uint256 public constant COMMUNITY_POOL = (MAX_SUPPLY * 10) / 100;
     uint256 public constant MAX_COMMUNITY_PROJECT_FUNDING = (COMMUNITY_POOL * 5) / 100;

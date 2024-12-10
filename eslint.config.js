@@ -23,6 +23,17 @@ export default [
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
     },
+    "env": {
+      "node": true,
+      "es2021": true
+    },
+    "extends": [
+      "eslint:recommended"
+    ],
+    "parserOptions": {
+      "ecmaVersion": 12,
+      "sourceType": "module"
+    },
     rules: {
       ...js.configs.recommended.rules,
       ...react.configs.recommended.rules,

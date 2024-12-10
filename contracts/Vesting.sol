@@ -3,8 +3,8 @@
 pragma solidity ^0.8.24;
 
 import { LMSToken } from "./LMS Token.sol";
-import "@openzeppelin/contracts/finance/VestingWallet.sol";
-import "@openzeppelin/contracts/finance/VestingWalletCliff.sol";
+// import "@openzeppelin/contracts/finance/VestingWallet.sol";
+// import "@openzeppelin/contracts/finance/VestingWalletCliff.sol";
 
 contract Vesting is LMSToken{
 

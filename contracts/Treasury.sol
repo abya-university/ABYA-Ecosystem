@@ -74,16 +74,17 @@ contract Treasury is LMSToken, ReentrancyGuard {
             "performAirdrop(uint256,address[])", 
             amount
         );
-        createMultiSigProposal(address(this), data);
+        uint256 proposalId = createMultiSigProposal(address(this), data);
 
-        // Transfer funds
-        (bool success, ) = payable(msg.sender).call{value: amount}("");
+    }
+
+    // Internal function called after multi-sig approval
+    function performWithdrawal(uint256 amount, address recipient) external {
+        (bool success, ) = payable(recipient).call{value: amount}("");
         require(success, "Treasury: Withdrawal transfer failed");
 
-        // Update contract balance
         contractBalance -= amount;
-
-        emit WithdrawalSuccess(msg.sender, amount);
+        emit WithdrawalSuccess(recipient, amount);
     }
 
     // View contract balance
