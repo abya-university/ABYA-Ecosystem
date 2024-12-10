@@ -3,12 +3,10 @@
 pragma solidity ^0.8.24;
 
 import { LMSToken } from "./LMS Token.sol";
-import "@openzeppelin/contracts/finance/VestingWallet.sol";
-import "@openzeppelin/contracts/finance/VestingWalletCliff.sol";
+// import "@openzeppelin/contracts/finance/VestingWallet.sol";
+// import "@openzeppelin/contracts/finance/VestingWalletCliff.sol";
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
-
-contract Vesting is LMSToken, AccessControl{
+contract Vesting is LMSToken{
     LMSToken private immutable token;
 
     bytes32 public constant TEAM_ROLE = keccak256("TEAM_ROLE");
@@ -53,15 +51,16 @@ contract Vesting is LMSToken, AccessControl{
     mapping(address => Lock) public tokenLocks;
 
     constructor(
+        address[] memory reviewers, // Required for LMSToken constructor
         LMSToken _token,
         address admin
-    ){
-            require(address(_token) != address(0), "Invalid Token Address");
-            require(admin != address(0), "Invalid Admin Address");
+    ) LMSToken(reviewers) { // Pass reviewers to the LMSToken constructor
+        require(address(_token) != address(0), "Invalid Token Address");
+        require(admin != address(0), "Invalid Admin Address");
 
-            token = _token;
-            _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        }
+        token = _token;
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+    }
 
     //function to add beneficiary to Investors Array
     function addToInvestors(address beneficiary) external onlyRole(DEFAULT_ADMIN_ROLE){

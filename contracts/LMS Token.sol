@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract LMSToken is ERC20, AccessControl {
     uint256 public constant MAX_SUPPLY = 10000000000 * 10 ** 18;
-    bytes32 public constant REVIEWER_ROLE = keccak256("REVIEWER_ROLE");
+    bytesa32 public constant REVIEWER_ROLE = keccak256("REVIEWER_ROLE");
 
     address[] public reviewerPool;
 
