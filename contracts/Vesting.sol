@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/finance/VestingWallet.sol";
 import "@openzeppelin/contracts/finance/VestingWalletCliff.sol";
 
 contract Vesting is LMSToken{
-    LMSToken private immutable token;
 
     bytes32 public constant TEAM_ROLE = keccak256("TEAM_ROLE");
     bytes32 public constant INVESTOR_ROLE = keccak256("INVESTOR_ROLE");
@@ -50,15 +49,8 @@ contract Vesting is LMSToken{
     }
     mapping(address => Lock) public tokenLocks;
 
-    constructor(
-        LMSToken _token,
-        address admin
-    ){
-            require(address(_token) != address(0), "Invalid Token Address");
-            require(admin != address(0), "Invalid Admin Address");
-
-            token = _token;
-            _grantRole(DEFAULT_ADMIN_ROLE, admin);
+    constructor(address[] memory _reviewers) LMSToken(_reviewers) {
+            _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         }
 
     //function to add beneficiary to Investors Array
@@ -151,7 +143,7 @@ contract Vesting is LMSToken{
     internal onlyRole(DEFAULT_ADMIN_ROLE) validateLockParams(beneficiary, tokenAmount)
     {
         //ensuring there are enough tokens in the contract to lock
-        require(token.balanceOf(address(this)) >= tokenAmount, "Not enough tokens in contract");
+        require(balanceOf(address(this)) >= tokenAmount, "Not enough tokens in contract");
         //check to ensure participant already has locked tokens to prevent overallocation
         require(tokenLocks[beneficiary].amount == 0, "Tokens already locked for this beneficiary");
 
@@ -190,7 +182,7 @@ contract Vesting is LMSToken{
         uint256 amount = lockData.amount;
 
         lockData.claimedAmount += claimableAmount;
-        token.transfer(msg.sender, claimableAmount);
+        transfer(msg.sender, claimableAmount);
 
         emit TokensReleased(msg.sender, claimableAmount);
     }
