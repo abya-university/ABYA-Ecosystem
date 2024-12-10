@@ -69,6 +69,13 @@ contract Treasury is LMSToken, ReentrancyGuard {
         require(amount <= address(this).balance, "Treasury: Insufficient contract balance");
         require(amount <= contractBalance, "Treasury: Insufficient tracked balance");
 
+        // Create a multi-sig proposal for withdrawal
+        bytes memory data = abi.encodeWithSignature(
+            "performAirdrop(uint256,address[])", 
+            amount
+        );
+        createMultiSigProposal(address(this), data);
+
         // Transfer funds
         (bool success, ) = payable(msg.sender).call{value: amount}("");
         require(success, "Treasury: Withdrawal transfer failed");

@@ -6,9 +6,7 @@ import { LMSToken } from "./LMS Token.sol";
 import "@openzeppelin/contracts/finance/VestingWallet.sol";
 import "@openzeppelin/contracts/finance/VestingWalletCliff.sol";
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
-
-contract Vesting is LMSToken, AccessControl{
+contract Vesting is LMSToken{
     LMSToken private immutable token;
 
     bytes32 public constant TEAM_ROLE = keccak256("TEAM_ROLE");

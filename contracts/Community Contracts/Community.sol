@@ -13,7 +13,6 @@ contract CommunityEnhanced is LMSToken, ReentrancyGuard, CommunityBadgeSystem {
 
     // Roles
     bytes32 public constant COMMUNITY_MANAGER = keccak256("COMMUNITY_MANAGER");
-    bytes32 public constant MULTISIG_APPROVER = keccak256("MULTISIG_APPROVER");
 
     // State Variables
     uint256 public communityPoolSupply;
@@ -31,19 +30,8 @@ contract CommunityEnhanced is LMSToken, ReentrancyGuard, CommunityBadgeSystem {
         bool isActive;
     }
 
-    struct MultiSigProposal {
-        uint256 id;
-        address proposer;
-        address targetContract;
-        bytes data;
-        uint256 approvalCount;
-        bool executed;
-        mapping(address => bool) approvals;
-    }
-
     // Mappings
     mapping(uint256 => CommunityEvent) public communityEvents;
-    mapping(uint256 => MultiSigProposal) public multiSigProposals;
     mapping(address => uint256) public communityContributorRewards;
 
     // Events
@@ -52,9 +40,6 @@ contract CommunityEnhanced is LMSToken, ReentrancyGuard, CommunityBadgeSystem {
     event CommunityProjectFunded(address indexed project, uint256 amount);
     event EventCreated(uint256 indexed eventId, string name, address creator);
     event EventParticipation(uint256 indexed eventId, address participant);
-    event MultiSigProposalCreated(uint256 indexed proposalId, address proposer);
-    event MultiSigProposalApproved(uint256 indexed proposalId, address approver);
-    event MultiSigProposalExecuted(uint256 indexed proposalId);
 
     // Counters (simulating OpenZeppelin's Counters library)
     uint256 private _eventIdCounter;
@@ -89,50 +74,6 @@ contract CommunityEnhanced is LMSToken, ReentrancyGuard, CommunityBadgeSystem {
     // Get Current Community Pool Supply
     function getCurrentCommunityPoolSupply() internal view returns(uint256) {
         return communityPoolSupply;
-    }
-
-    // Multi-Signature Proposal Creation
-    function createMultiSigProposal(
-        address _targetContract, 
-        bytes memory _data
-    ) internal onlyRole(COMMUNITY_MANAGER) returns(uint256) {
-        uint256 proposalId = _proposalIdCounter++;
-        
-        MultiSigProposal storage proposal = multiSigProposals[proposalId];
-        proposal.id = proposalId;
-        proposal.proposer = msg.sender;
-        proposal.targetContract = _targetContract;
-        proposal.data = _data;
-        proposal.approvalCount = 1; // Proposer's approval
-        proposal.executed = false;
-        proposal.approvals[msg.sender] = true;
-
-        emit MultiSigProposalCreated(proposalId, msg.sender);
-        return proposalId;
-    }
-
-    // Approve Multi-Signature Proposal
-    function approveMultiSigProposal(
-        uint256 _proposalId
-    ) external onlyRole(MULTISIG_APPROVER) {
-        MultiSigProposal storage proposal = multiSigProposals[_proposalId];
-        
-        require(!proposal.executed, "Proposal already executed");
-        require(!proposal.approvals[msg.sender], "Already approved");
-
-        proposal.approvals[msg.sender] = true;
-        proposal.approvalCount++;
-
-        emit MultiSigProposalApproved(_proposalId, msg.sender);
-
-        // Execute if enough approvals (e.g., 3 out of 5 approvers)
-        if (proposal.approvalCount >= 3) {
-            (bool success, ) = proposal.targetContract.call(proposal.data);
-            require(success, "Proposal execution failed");
-            
-            proposal.executed = true;
-            emit MultiSigProposalExecuted(_proposalId);
-        }
     }
 
     // Distribute Airdrops with Multi-Sig Approval
