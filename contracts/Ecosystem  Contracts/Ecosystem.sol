@@ -251,7 +251,7 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
 
         if (course.approvalCount >= REQUIRED_APPROVALS) {
             course.approved = true;
-            mintToken(course.creator, CREATE_COURSE_REWARD);
+            mintToken(course.creator, CREATE_COURSE_REWARD); //mint the course creation reward to the course creator
         }
     }
 

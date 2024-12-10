@@ -31,7 +31,7 @@ contract LiquidityContract is LMSToken {
     constructor(
         address[] memory _reviewers
     ) LMSToken(_reviewers) {
-        swapRouter = ISwapRouter("0xE592427A0AEce92De3Edee1F18E0157C05861564"); //uniswaprouter address
+        swapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564); //uniswaprouter address
         nativeToken = IERC20(address(this));
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
