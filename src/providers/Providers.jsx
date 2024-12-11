@@ -44,7 +44,7 @@ export default function Providers({ children }) {
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider
           theme={lightTheme({
-            accentColor: "#083344",
+            accentColor: "#eab308",
             accentColorForeground: "white",
           })}
         >
