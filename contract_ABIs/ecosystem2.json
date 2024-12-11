@@ -1,0 +1,2600 @@
+[
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address[]",
+                "name": "_reviewers",
+                "type": "address[]"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "AccessControlBadConfirmation",
+        "type": "error"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+            },
+            {
+                "internalType": "bytes32",
+                "name": "neededRole",
+                "type": "bytes32"
+            }
+        ],
+        "name": "AccessControlUnauthorizedAccount",
+        "type": "error"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "spender",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "allowance",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "needed",
+                "type": "uint256"
+            }
+        ],
+        "name": "ERC20InsufficientAllowance",
+        "type": "error"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "sender",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "balance",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "needed",
+                "type": "uint256"
+            }
+        ],
+        "name": "ERC20InsufficientBalance",
+        "type": "error"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "approver",
+                "type": "address"
+            }
+        ],
+        "name": "ERC20InvalidApprover",
+        "type": "error"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "receiver",
+                "type": "address"
+            }
+        ],
+        "name": "ERC20InvalidReceiver",
+        "type": "error"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "sender",
+                "type": "address"
+            }
+        ],
+        "name": "ERC20InvalidSender",
+        "type": "error"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "spender",
+                "type": "address"
+            }
+        ],
+        "name": "ERC20InvalidSpender",
+        "type": "error"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "ReentrancyGuardReentrantCall",
+        "type": "error"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "spender",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+            }
+        ],
+        "name": "Approval",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "_account",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "_amount",
+                "type": "uint256"
+            }
+        ],
+        "name": "BurnSuccess",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "_courseId",
+                "type": "uint256"
+            },
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "numberOfChapters",
+                "type": "uint256"
+            }
+        ],
+        "name": "ChaptersAddedSuccessfully",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "questionId",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "choiceId",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "string",
+                "name": "option",
+                "type": "string"
+            }
+        ],
+        "name": "ChoiceAdded",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "_courseID",
+                "type": "uint256"
+            },
+            {
+                "indexed": true,
+                "internalType": "string",
+                "name": "_courseName",
+                "type": "string"
+            },
+            {
+                "indexed": false,
+                "internalType": "bool",
+                "name": "_approved",
+                "type": "bool"
+            }
+        ],
+        "name": "CourseCreationSuccess",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "_to",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "_amount",
+                "type": "uint256"
+            }
+        ],
+        "name": "EcosystemPoolUpdate",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "_courseId",
+                "type": "uint256"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "_by",
+                "type": "address"
+            }
+        ],
+        "name": "EnrollmentSuccess",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "_lessonId",
+                "type": "uint256"
+            },
+            {
+                "indexed": true,
+                "internalType": "string",
+                "name": "_lessonName",
+                "type": "string"
+            },
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "_additonalResources",
+                "type": "uint256"
+            }
+        ],
+        "name": "LessonCreationSuccess",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "_to",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "_amount",
+                "type": "uint256"
+            }
+        ],
+        "name": "MintSuccess",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "proposalId",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "address",
+                "name": "approver",
+                "type": "address"
+            }
+        ],
+        "name": "MultiSigProposalApproved",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "proposalId",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "address",
+                "name": "proposer",
+                "type": "address"
+            }
+        ],
+        "name": "MultiSigProposalCreated",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "proposalId",
+                "type": "uint256"
+            }
+        ],
+        "name": "MultiSigProposalExecuted",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "quizId",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "questionId",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "string",
+                "name": "questionText",
+                "type": "string"
+            }
+        ],
+        "name": "QuestionAdded",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "_quizId",
+                "type": "uint256"
+            },
+            {
+                "indexed": true,
+                "internalType": "string",
+                "name": "_title",
+                "type": "string"
+            }
+        ],
+        "name": "QuizCreatedSuccess",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "_lessonId",
+                "type": "uint256"
+            },
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "resourceCount",
+                "type": "uint256"
+            }
+        ],
+        "name": "ResourceAddSuccess",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "reviewer",
+                "type": "address"
+            }
+        ],
+        "name": "ReviewerAddedToPool",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "reviewer",
+                "type": "address"
+            }
+        ],
+        "name": "ReviewerRemovedFromPool",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "courseId",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "address[]",
+                "name": "reviewers",
+                "type": "address[]"
+            }
+        ],
+        "name": "ReviewersSelected",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "role",
+                "type": "bytes32"
+            },
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "previousAdminRole",
+                "type": "bytes32"
+            },
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "newAdminRole",
+                "type": "bytes32"
+            }
+        ],
+        "name": "RoleAdminChanged",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "role",
+                "type": "bytes32"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "sender",
+                "type": "address"
+            }
+        ],
+        "name": "RoleGranted",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "role",
+                "type": "bytes32"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "sender",
+                "type": "address"
+            }
+        ],
+        "name": "RoleRevoked",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "from",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+            }
+        ],
+        "name": "Transfer",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": 
+        [
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "_courseId",
+                "type": "uint256"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "_by",
+                "type": "address"
+            }
+        ],
+        "name": "unEnrollmentSuccess",
+        "type": "event"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "COURSE_OWNER_ROLE",
+        "outputs": 
+        [
+            {
+                "internalType": "bytes32",
+                "name": "",
+                "type": "bytes32"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "CREATE_COURSE_REWARD",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "DEFAULT_ADMIN_ROLE",
+        "outputs": 
+        [
+            {
+                "internalType": "bytes32",
+                "name": "",
+                "type": "bytes32"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "ECOSYSTEM_POOL",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "ENROLLMENT_REWARD",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "MAX_SCORE",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "MAX_SUPPLY",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "MIN_APPROVAL_SCORE",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "MULTISIG_APPROVER",
+        "outputs": 
+        [
+            {
+                "internalType": "bytes32",
+                "name": "",
+                "type": "bytes32"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "REQUIRED_APPROVALS",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "REVIEWER_ROLE",
+        "outputs": 
+        [
+            {
+                "internalType": "bytes32",
+                "name": "",
+                "type": "bytes32"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "name": "accountCourses",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "courseCount",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "_courseId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string[]",
+                "name": "_chapters",
+                "type": "string[]"
+            }
+        ],
+        "name": "addChapters",
+        "outputs": 
+        [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "_chapterId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "_lessonName",
+                "type": "string"
+            },
+            {
+                "internalType": "string",
+                "name": "_lessonContent",
+                "type": "string"
+            }
+        ],
+        "name": "addLesson",
+        "outputs": 
+        [
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "_lessonId",
+                "type": "uint256"
+            },
+            {
+                "components": 
+                [
+                    {
+                        "internalType": "string",
+                        "name": "contentType",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "url",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "description",
+                        "type": "string"
+                    }
+                ],
+                "internalType": "struct Ecosystem.Resource[]",
+                "name": "_resources",
+                "type": "tuple[]"
+            }
+        ],
+        "name": "addResourcesToLesson",
+        "outputs": 
+        [
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "newReviewer",
+                "type": "address"
+            }
+        ],
+        "name": "addReviewer",
+        "outputs": 
+        [
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "spender",
+                "type": "address"
+            }
+        ],
+        "name": "allowance",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "approvals",
+        "outputs": 
+        [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "spender",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+            }
+        ],
+        "name": "approve",
+        "outputs": 
+        [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "_courseId",
+                "type": "uint256"
+            }
+        ],
+        "name": "approveCourse",
+        "outputs": 
+        [
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "_proposalId",
+                "type": "uint256"
+            }
+        ],
+        "name": "approveMultiSigProposal",
+        "outputs": 
+        [
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+            }
+        ],
+        "name": "balanceOf",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "chapter",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "chapterId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "chapterName",
+                "type": "string"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "chapterLessons",
+        "outputs": 
+        [
+            {
+                "internalType": "string",
+                "name": "",
+                "type": "string"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "courseChapters",
+        "outputs": 
+        [
+            {
+                "internalType": "string",
+                "name": "",
+                "type": "string"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "courseCount",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "courseObject",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "courseId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "courseName",
+                "type": "string"
+            },
+            {
+                "internalType": "string",
+                "name": "description",
+                "type": "string"
+            },
+            {
+                "internalType": "bool",
+                "name": "approved",
+                "type": "bool"
+            },
+            {
+                "internalType": "uint256",
+                "name": "approvalCount",
+                "type": "uint256"
+            },
+            {
+                "internalType": "address",
+                "name": "creator",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "courseReviewInitiated",
+        "outputs": 
+        [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "courseReviewers",
+        "outputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "string",
+                "name": "_courseName",
+                "type": "string"
+            },
+            {
+                "internalType": "string",
+                "name": "_description",
+                "type": "string"
+            }
+        ],
+        "name": "createCourse",
+        "outputs": 
+        [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "_quizId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "_questionText",
+                "type": "string"
+            },
+            {
+                "internalType": "string[]",
+                "name": "_options",
+                "type": "string[]"
+            },
+            {
+                "internalType": "uint8",
+                "name": "_correctChoiceIndex",
+                "type": "uint8"
+            }
+        ],
+        "name": "createQuestionWithChoices",
+        "outputs": 
+        [
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "_lessonId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "_title",
+                "type": "string"
+            }
+        ],
+        "name": "createQuiz",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "decimals",
+        "outputs": 
+        [
+            {
+                "internalType": "uint8",
+                "name": "",
+                "type": "uint8"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "ecosystemPoolSupply",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "_courseId",
+                "type": "uint256"
+            }
+        ],
+        "name": "enroll",
+        "outputs": 
+        [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "getAllCourses",
+        "outputs": 
+        [
+            {
+                "components": 
+                [
+                    {
+                        "internalType": "uint256",
+                        "name": "courseId",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "courseName",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "description",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "approved",
+                        "type": "bool"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "approvalCount",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "creator",
+                        "type": "address"
+                    }
+                ],
+                "internalType": "struct Ecosystem.Course[]",
+                "name": "",
+                "type": "tuple[]"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "getAllLessons",
+        "outputs": 
+        [
+            {
+                "components": 
+                [
+                    {
+                        "internalType": "uint256",
+                        "name": "lessonId",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "lessonName",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "lessonContent",
+                        "type": "string"
+                    },
+                    {
+                        "components": 
+                        [
+                            {
+                                "internalType": "string",
+                                "name": "contentType",
+                                "type": "string"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "url",
+                                "type": "string"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "description",
+                                "type": "string"
+                            }
+                        ],
+                        "internalType": "struct Ecosystem.Resource[10]",
+                        "name": "additionalResources",
+                        "type": "tuple[10]"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "resourceCount",
+                        "type": "uint256"
+                    }
+                ],
+                "internalType": "struct Ecosystem.Lesson[]",
+                "name": "",
+                "type": "tuple[]"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "_courseId",
+                "type": "uint256"
+            }
+        ],
+        "name": "getChapters",
+        "outputs": 
+        [
+            {
+                "components": 
+                [
+                    {
+                        "internalType": "uint256",
+                        "name": "chapterId",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "chapterName",
+                        "type": "string"
+                    }
+                ],
+                "internalType": "struct Ecosystem.Chapter[]",
+                "name": "",
+                "type": "tuple[]"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "courseId",
+                "type": "uint256"
+            }
+        ],
+        "name": "getCourseReviewers",
+        "outputs": 
+        [
+            {
+                "internalType": "address[]",
+                "name": "",
+                "type": "address[]"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "getCurrentEcosystemPoolSupply",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "_quizId",
+                "type": "uint256"
+            }
+        ],
+        "name": "getQuiz",
+        "outputs": 
+        [
+            {
+                "components": 
+                [
+                    {
+                        "internalType": "uint256",
+                        "name": "quizId",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "quizTitle",
+                        "type": "string"
+                    },
+                    {
+                        "components": 
+                        [
+                            {
+                                "internalType": "uint256",
+                                "name": "questionId",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "questionText",
+                                "type": "string"
+                            },
+                            {
+                                "components": 
+                                [
+                                    {
+                                        "internalType": "string",
+                                        "name": "option",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "internalType": "bool",
+                                        "name": "isCorrect",
+                                        "type": "bool"
+                                    }
+                                ],
+                                "internalType": "struct Ecosystem.Choice[]",
+                                "name": "choices",
+                                "type": "tuple[]"
+                            }
+                        ],
+                        "internalType": "struct Ecosystem.Question[]",
+                        "name": "questions",
+                        "type": "tuple[]"
+                    }
+                ],
+                "internalType": "struct Ecosystem.Quiz",
+                "name": "",
+                "type": "tuple"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "bytes32",
+                "name": "role",
+                "type": "bytes32"
+            }
+        ],
+        "name": "getRoleAdmin",
+        "outputs": 
+        [
+            {
+                "internalType": "bytes32",
+                "name": "",
+                "type": "bytes32"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "bytes32",
+                "name": "role",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+            }
+        ],
+        "name": "grantRole",
+        "outputs": 
+        [
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "bytes32",
+                "name": "role",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+            }
+        ],
+        "name": "hasRole",
+        "outputs": 
+        [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            },
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "name": "isEnrolled",
+        "outputs": 
+        [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "name": "isInReviewerPool",
+        "outputs": 
+        [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+            }
+        ],
+        "name": "isReviewer",
+        "outputs": 
+        [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "lesson",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "lessonId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "lessonName",
+                "type": "string"
+            },
+            {
+                "internalType": "string",
+                "name": "lessonContent",
+                "type": "string"
+            },
+            {
+                "internalType": "uint256",
+                "name": "resourceCount",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "listOfChapters",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "chapterId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "chapterName",
+                "type": "string"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "listOfCourses",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "courseId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "courseName",
+                "type": "string"
+            },
+            {
+                "internalType": "string",
+                "name": "description",
+                "type": "string"
+            },
+            {
+                "internalType": "bool",
+                "name": "approved",
+                "type": "bool"
+            },
+            {
+                "internalType": "uint256",
+                "name": "approvalCount",
+                "type": "uint256"
+            },
+            {
+                "internalType": "address",
+                "name": "creator",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "listOfLessons",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "lessonId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "lessonName",
+                "type": "string"
+            },
+            {
+                "internalType": "string",
+                "name": "lessonContent",
+                "type": "string"
+            },
+            {
+                "internalType": "uint256",
+                "name": "resourceCount",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "listOfQuestions",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "questionId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "questionText",
+                "type": "string"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "listOfQuizzes",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "quizId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "quizTitle",
+                "type": "string"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "listOfResource",
+        "outputs": 
+        [
+            {
+                "internalType": "string",
+                "name": "contentType",
+                "type": "string"
+            },
+            {
+                "internalType": "string",
+                "name": "url",
+                "type": "string"
+            },
+            {
+                "internalType": "string",
+                "name": "description",
+                "type": "string"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "multiSigProposals",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "id",
+                "type": "uint256"
+            },
+            {
+                "internalType": "address",
+                "name": "proposer",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "targetContract",
+                "type": "address"
+            },
+            {
+                "internalType": "bytes",
+                "name": "data",
+                "type": "bytes"
+            },
+            {
+                "internalType": "uint256",
+                "name": "approvalCount",
+                "type": "uint256"
+            },
+            {
+                "internalType": "bool",
+                "name": "executed",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "name",
+        "outputs": 
+        [
+            {
+                "internalType": "string",
+                "name": "",
+                "type": "string"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "nextChapterId",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "nextChoiceId",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "nextCourseId",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "nextCourseIdd",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "nextLessonId",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "nextQuestionId",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "nextQuizId",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "questions",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "questionId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "questionText",
+                "type": "string"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "quizzes",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "quizId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "quizTitle",
+                "type": "string"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "reviewer",
+                "type": "address"
+            }
+        ],
+        "name": "removeReviewer",
+        "outputs": 
+        [
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "bytes32",
+                "name": "role",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "address",
+                "name": "callerConfirmation",
+                "type": "address"
+            }
+        ],
+        "name": "renounceRole",
+        "outputs": 
+        [
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "reviewerPool",
+        "outputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            },
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "name": "reviews",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "learnerAgency",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "criticalThinking",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "collaborativeLearning",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "reflectivePractice",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "adaptiveLearning",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "authenticLearning",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "technologyIntegration",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "learnerSupport",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "assessmentForLearning",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "engagementAndMotivation",
+                "type": "uint256"
+            },
+            {
+                "internalType": "bool",
+                "name": "isSubmitted",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "bytes32",
+                "name": "role",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+            }
+        ],
+        "name": "revokeRole",
+        "outputs": 
+        [
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "courseId",
+                "type": "uint256"
+            }
+        ],
+        "name": "selectCourseReviewers",
+        "outputs": 
+        [
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "courseId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "learnerAgency",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "criticalThinking",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "collaborativeLearning",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "reflectivePractice",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "adaptiveLearning",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "authenticLearning",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "technologyIntegration",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "learnerSupport",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "assessmentForLearning",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "engagementAndMotivation",
+                "type": "uint256"
+            }
+        ],
+        "name": "submitReview",
+        "outputs": 
+        [
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "bytes4",
+                "name": "interfaceId",
+                "type": "bytes4"
+            }
+        ],
+        "name": "supportsInterface",
+        "outputs": 
+        [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "symbol",
+        "outputs": 
+        [
+            {
+                "internalType": "string",
+                "name": "",
+                "type": "string"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+        ],
+        "name": "totalSupply",
+        "outputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+            }
+        ],
+        "name": "transfer",
+        "outputs": 
+        [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "address",
+                "name": "from",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+            }
+        ],
+        "name": "transferFrom",
+        "outputs": 
+        [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": 
+        [
+            {
+                "internalType": "uint256",
+                "name": "_courseId",
+                "type": "uint256"
+            }
+        ],
+        "name": "unEnroll",
+        "outputs": 
+        [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    }
+]
