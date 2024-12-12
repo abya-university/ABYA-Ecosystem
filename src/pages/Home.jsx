@@ -275,11 +275,11 @@ const Home = () => {
           </div>
           <div className="relative">
             <div className="absolute -inset-2 bg-yellow-500/20 rounded-full blur-2xl"></div>
-            <div className="relative z-10 rounded-3xl overflow-hidden shadow-2xl">
+            <div className="relative z-10 rounded-3xl overflow-hidden ">
               <img
-                src="/api/placeholder/600/400"
+                src="/3D_image.gif"
                 alt="ABYA Learning Platform"
-                className="w-full h-full object-cover"
+                className="w-[350px] h-[350px] object-cover"
               />
             </div>
           </div>
@@ -341,10 +341,13 @@ const Home = () => {
           <p className="text-xl mb-8 text-gray-200">
             Join thousands of learners transforming education with ABYA
           </p>
-          <button className="bg-yellow-500 text-black px-8 py-4 rounded-lg text-xl flex items-center space-x-3 mx-auto hover:bg-yellow-600 transition-colors">
-            <span>Explore Courses</span>
+          <Link
+            to="/mainpage"
+            className="bg-yellow-500 text-black px-8 py-4 w-[30%] rounded-lg text-xl flex items-center space-x-3 mx-auto hover:bg-yellow-600 transition-colors"
+          >
+            <span className="text-center mx-auto">Explore Courses</span>
             <ArrowRight size={24} />
-          </button>
+          </Link>
         </div>
       </div>
 
