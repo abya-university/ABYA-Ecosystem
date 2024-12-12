@@ -3,6 +3,7 @@ import Home from "./pages/Home";
 // import Navbar from "./components/Navbar";
 import MasterPage from "./pages/MasterPage";
 import CourseCreationPipeline from "./components/courseCreationPipeline";
+import NotFoundPage from "./pages/404Page";
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/mainpage" element={<MasterPage />} />
         <Route path="create-course" element={<CourseCreationPipeline />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </>
   );
