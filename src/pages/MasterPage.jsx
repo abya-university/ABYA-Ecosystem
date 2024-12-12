@@ -6,6 +6,9 @@ import Navbar from "../components/Navbar";
 import AchievementsPage from "./Achievements";
 import CommunityPage from "./Community";
 import SettingsPage from "./Settings";
+import CoursesPage from "./CourseList";
+import AbyaChatbot from "../components/chatbot";
+import DiscussionsPage from "./Discussions";
 
 const MasterPage = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -38,6 +41,10 @@ const MasterPage = () => {
         return <CommunityPage />;
       case "settings":
         return <SettingsPage />;
+      case "courses":
+        return <CoursesPage />;
+      case "discussions":
+        return <DiscussionsPage />;
       default:
         return <HomePage />;
     }
@@ -102,6 +109,8 @@ const MasterPage = () => {
         theme={theme}
         setTheme={setTheme}
       />
+
+      <AbyaChatbot />
 
       <main className="flex-grow p-6 z-10 relative">{renderContent()}</main>
     </div>

@@ -1,7 +1,219 @@
 import React, { useState } from "react";
-import { Globe, BookOpen, Users, Award, Play, ArrowRight } from "lucide-react";
+import {
+  Globe,
+  BookOpen,
+  Users,
+  Award,
+  Play,
+  ArrowRight,
+  Twitter,
+  Linkedin,
+  Github,
+  Mail,
+  Send,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+
+import BitcoinLogo from "/bitcoin.svg";
+import EthereumLogo from "/ethereum3.svg";
+import StellarLogo from "/stellar.svg";
+import LitecoinLogo from "/litecoin.svg";
+import MoneroLogo from "/monero.svg";
+import SolanaLogo from "/solana.svg";
+import TronLogo from "/tron.svg";
+import WorldcoinLogo from "/worldcoin.svg";
+import SkaleLogo from "/skale.svg";
+import PolygonLogo from "/polygon.svg";
+import AvalancheLogo from "/avalanche.svg";
+import ArbitrumLogo from "/arbitrum.svg";
+import BinanceLogo from "/binance.svg";
+import UniswapLogo from "/uniswap.svg";
+import MetamaskLogo from "/metamask.svg";
+
+const BlockchainLogoMarquee = () => {
+  const logos = [
+    { Logo: BitcoinLogo, name: "Bitcoin" },
+    { Logo: EthereumLogo, name: "Ethereum" },
+    { Logo: StellarLogo, name: "Stellar" },
+    { Logo: LitecoinLogo, name: "Litecoin" },
+    { Logo: MoneroLogo, name: "Monero" },
+    { Logo: SolanaLogo, name: "Solana" },
+    { Logo: TronLogo, name: "Tron" },
+    { Logo: WorldcoinLogo, name: "Worldcoin" },
+    { Logo: AvalancheLogo, name: "Avalanche" },
+    { Logo: ArbitrumLogo, name: "Arbitrum" },
+    { Logo: BinanceLogo, name: "Binance" },
+    { Logo: UniswapLogo, name: "Uniswap" },
+    { Logo: MetamaskLogo, name: "Metamask" },
+    { Logo: SkaleLogo, name: "Skale" },
+    { Logo: PolygonLogo, name: "Polygon" },
+  ];
+
+  return (
+    <div className="relative overflow-hidden py-8">
+      <div className="animate-marquee flex">
+        {[...logos, ...logos].map((logo, index) => (
+          <div
+            key={index}
+            className="flex-shrink-0 mx-8 opacity-50 hover:opacity-100 transition-opacity"
+            title={logo.name}
+          >
+            <img
+              src={logo.Logo}
+              alt={logo.name}
+              className="h-12 w-[120px] grayscale hover:grayscale-0 transition-all"
+            />
+          </div>
+        ))}
+      </div>
+      <style jsx>{`
+        @keyframes marquee {
+          from {
+            transform: translateX(0);
+          }
+          to {
+            transform: translateX(-50%);
+          }
+        }
+        .animate-marquee {
+          display: flex;
+          animation: marquee 20s linear infinite;
+        }
+      `}</style>
+    </div>
+  );
+};
+
+const Footer = () => {
+  const socialLinks = [
+    {
+      icon: (
+        <Twitter className="text-white hover:text-yellow-500 transition-colors" />
+      ),
+      href: "https://twitter.com/abya_ecosystem",
+    },
+    {
+      icon: (
+        <Linkedin className="text-white hover:text-yellow-500 transition-colors" />
+      ),
+      href: "https://linkedin.com/company/abya",
+    },
+    {
+      icon: (
+        <Github className="text-white hover:text-yellow-500 transition-colors" />
+      ),
+      href: "https://github.com/abya-ecosystem",
+    },
+  ];
+
+  const footerLinks = [
+    {
+      title: "Product",
+      links: [
+        { name: "Courses", href: "#" },
+        { name: "Community", href: "#" },
+        { name: "Credentials", href: "#" },
+      ],
+    },
+    {
+      title: "Company",
+      links: [
+        { name: "About", href: "#" },
+        { name: "Careers", href: "#" },
+        { name: "Press", href: "#" },
+      ],
+    },
+    {
+      title: "Legal",
+      links: [
+        { name: "Terms", href: "#" },
+        { name: "Privacy", href: "#" },
+        { name: "Cookies", href: "#" },
+      ],
+    },
+  ];
+
+  return (
+    <footer className="bg-black/40 py-12">
+      <div className="container mx-auto px-4">
+        <div className="grid md:grid-cols-4 gap-8">
+          {/* Brand Section */}
+          <div>
+            <div className="flex items-center space-x-2 mb-4">
+              <Globe className="text-yellow-500" size={32} />
+              <span className="text-2xl font-bold text-yellow-500">ABYA</span>
+            </div>
+            <p className="text-gray-400 mb-4">
+              Revolutionizing education through blockchain and decentralized
+              technologies.
+            </p>
+            <div className="flex space-x-4">
+              {socialLinks.map((social, index) => (
+                <a
+                  key={index}
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {social.icon}
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer Links */}
+          {footerLinks.map((section, index) => (
+            <div key={index}>
+              <h4 className="text-lg font-bold text-white mb-4">
+                {section.title}
+              </h4>
+              <ul className="space-y-2">
+                {section.links.map((link, linkIndex) => (
+                  <li key={linkIndex}>
+                    <a
+                      href={link.href}
+                      className="text-gray-400 hover:text-yellow-500 transition-colors"
+                    >
+                      {link.name}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+
+          {/* Newsletter Signup */}
+          <div>
+            <h4 className="text-lg font-bold text-white mb-4">Stay Updated</h4>
+            <div className="flex">
+              <input
+                type="email"
+                placeholder="Enter your email"
+                className="w-full p-2 bg-gray-800 text-white rounded-l-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
+              />
+              <button className="bg-yellow-500 text-black px-4 rounded-r-lg hover:bg-yellow-600 transition-colors">
+                <Send size={20} />
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Subscribe for the latest ABYA updates and insights
+            </p>
+          </div>
+        </div>
+
+        {/* Copyright */}
+        <div className="border-t border-gray-800 mt-8 pt-6 text-center">
+          <p className="text-gray-400">
+            © 2024 ABYA Ecosystem. All rights reserved.
+            <br />
+            Built with ❤️ for a decentralized future.
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
+};
 
 const Home = () => {
   const [activeTab, setActiveTab] = useState("explore");
@@ -136,14 +348,10 @@ const Home = () => {
         </div>
       </div>
 
+      <BlockchainLogoMarquee />
+
       {/* Footer */}
-      <footer className="bg-black/40 py-8">
-        <div className="container mx-auto text-center">
-          <p className="text-gray-400">
-            © 2024 ABYA Ecosystem. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 };

@@ -48,7 +48,7 @@ const SettingsPage = () => {
   ];
 
   const mockDidDocument = {
-    id: "did:web3:0x1234567890abcdef",
+    id: "did:ethr:0x1234567890abcdef",
     controller: "0x1234567890abcdef",
     verificationMethod: [
       {
