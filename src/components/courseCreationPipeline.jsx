@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import {
   Book,
   FileText,
@@ -6,7 +6,18 @@ import {
   ChevronRight,
   Image,
   CheckCircle,
+  AlertCircle,
 } from "lucide-react";
+import Ecosystem2ABI from "../artifacts/contracts/Ecosystem Contracts/Ecosystem2.sol/Ecosystem2.json";
+import { useEthersSigner } from "../components/useClientSigner";
+import { useAccount } from "wagmi";
+import { ethers } from "ethers";
+import { CourseContext } from "../contexts/courseContext";
+import { ChapterContext } from "../contexts/chapterContext";
+
+const Ecosystem2ContractAddress = import.meta.env
+  .VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
+const Ecosystem2_ABI = Ecosystem2ABI.abi;
 
 const CourseCreationPipeline = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -21,6 +32,123 @@ const CourseCreationPipeline = () => {
     quizzes: [],
     resources: [],
   });
+  const signerPromise = useEthersSigner();
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
+  const { isConnected, address } = useAccount();
+  const [loading, setLoading] = useState(false);
+  const { courses } = useContext(CourseContext);
+  const { chapters, fetchChapters, setChapters } = useContext(ChapterContext);
+
+  console.log("Courses Data:", courses);
+
+  const createCourse = async () => {
+    if (isConnected && address) {
+      console.log("Wallet Connection Details:", {
+        isConnected,
+        address,
+        addressType: typeof address,
+        addressLength: address?.length,
+      });
+
+      try {
+        setLoading(true);
+        setError("");
+        setSuccess("");
+
+        const signer = await signerPromise;
+        if (!signer) {
+          throw new Error("Signer is required to access the contract.");
+        }
+
+        // Validate and clean the address
+        const validatedAddress = ethers.getAddress(address);
+        console.log("Validated Contract Address:", validatedAddress);
+
+        const contract = new ethers.Contract(
+          Ecosystem2ContractAddress,
+          Ecosystem2_ABI,
+          signer
+        );
+
+        // Safe logging with optional chaining
+        console.log("Contract Details:", {
+          address: Ecosystem2ContractAddress,
+          methods: contract.interface
+            ? Object.keys(contract.interface.functions || {})
+            : "No interface",
+        });
+
+        // Check if the contract method is callable
+        if (typeof contract.createCourse !== "function") {
+          throw new Error(
+            "createCourse method is not available on the contract."
+          );
+        }
+
+        // Detailed logging before transaction
+        console.log("Transaction Params:", {
+          name: courseData.basicInfo.name,
+          description: courseData.basicInfo.description,
+        });
+
+        // Validate input before transaction
+        if (!courseData.basicInfo.name || !courseData.basicInfo.description) {
+          throw new Error("Course name and description are required");
+        }
+
+        const tx = await contract.createCourse(
+          courseData.basicInfo.name,
+          courseData.basicInfo.description
+        );
+
+        console.log("Transaction Sent:", {
+          hash: tx.hash,
+          from: tx.from,
+          to: tx.to,
+        });
+
+        const receipt = await tx.wait();
+
+        console.log("Transaction Receipt:", {
+          status: receipt.status,
+          blockNumber: receipt.blockNumber,
+          transactionHash: receipt.transactionHash,
+        });
+
+        if (receipt.status === 1) {
+          setSuccess(`${courseData.basicInfo.name} created successfully!`);
+        } else {
+          setError("Transaction failed. Please try again.");
+        }
+      } catch (err) {
+        // Comprehensive error logging with fallback values
+        console.error("Full Error Details:", {
+          name: err.name || "Unknown Error",
+          code: err.code || "No Error Code",
+          message: err.message || "No Error Message",
+          stack: err.stack || "No Stack Trace",
+        });
+
+        // More specific error handling
+        if (err.code === "INVALID_ARGUMENT") {
+          setError("Invalid transaction parameters. Please check your input.");
+        } else if (err.code === "UNSUPPORTED_OPERATION") {
+          setError(
+            "Unsupported network operation. Check your network settings."
+          );
+        } else {
+          setError(
+            `Failed to create course: ${err.message || "Unknown error"}`
+          );
+        }
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      setError("Wallet is not connected or address is missing.");
+    }
+  };
 
   // Step Components
   const CourseBasicInfo = () => {
@@ -37,6 +165,21 @@ const CourseCreationPipeline = () => {
         <h2 className="text-2xl font-bold text-yellow-500">
           Course Basic Information
         </h2>
+        {success ? (
+          <>
+            <div className="bg-green-50 p-4 rounded-lg flex items-center text-green-600">
+              <CheckCircle className="h-5 w-5 mr-2" />
+              <span>{success}</span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="bg-red-50 p-4 rounded-lg flex items-center text-red-700">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              <span>{error}</span>
+            </div>
+          </>
+        )}
         <div className="grid gap-4">
           <input
             type="text"
@@ -76,6 +219,12 @@ const CourseCreationPipeline = () => {
               <span className="text-green-500">Image Selected</span>
             )}
           </div>
+          <button
+            onClick={createCourse}
+            className="rounded-lg bg-yellow-500 p-2 w-[18%]"
+          >
+            Create Course
+          </button>
         </div>
       </div>
     );
@@ -86,6 +235,78 @@ const CourseCreationPipeline = () => {
     const [chapters, setChapters] = useState([]);
     const [courseId, setCourseId] = useState("");
 
+    const createChapter = async () => {
+      if (isConnected) {
+        try {
+          const signer = await signerPromise;
+          if (!signer) {
+            throw new Error("Signer is required to access the contract.");
+          }
+
+          // Ensure courseId is a number
+          const parsedCourseId = Number(courseId);
+
+          if (chapters.length === 0) {
+            throw new Error("Chapters array cannot be empty");
+          }
+
+          const contract = new ethers.Contract(
+            Ecosystem2ContractAddress,
+            Ecosystem2_ABI,
+            signer
+          );
+
+          // Verify course exists before adding chapters
+          try {
+            // Log the raw course object to understand its structure
+            const rawCourseObject = await contract.courseObject(parsedCourseId);
+            console.log("Raw Course Object:", rawCourseObject);
+
+            // Destructure the course object carefully
+            const [
+              contractCourseId,
+              courseName,
+              description,
+              approved,
+              approvalCount,
+              creator,
+            ] = rawCourseObject;
+
+            console.log("Extracted Course Details:", {
+              courseId: contractCourseId.toString(),
+              courseName,
+              description,
+              approved,
+              approvalCount: approvalCount.toString(),
+              creator,
+            });
+
+            // Optional: Additional validation
+            if (contractCourseId.toString() !== parsedCourseId.toString()) {
+              throw new Error("Course ID mismatch!");
+            }
+          } catch (courseCheckError) {
+            console.error("Course Verification Error:", courseCheckError);
+            setError(`Course verification failed: ${courseCheckError.message}`);
+            return;
+          }
+
+          const tx = await contract.addChapters(parsedCourseId, chapters);
+          const receipt = await tx.wait();
+          console.log(receipt);
+          setChapters([]);
+          setCourseId("");
+          setSuccess("Chapters created successfully!");
+        } catch (err) {
+          console.error("Full Error:", err);
+          setError(`Failed to create chapters: ${err.message}`);
+        }
+      }
+    };
+
+    console.log("Course Id: ", courseId);
+    console.log("Chapters: ", chapters);
+
     const addChapter = () => {
       if (chapterName.trim()) {
         setChapters([...chapters, chapterName.trim()]);
@@ -93,17 +314,26 @@ const CourseCreationPipeline = () => {
       }
     };
 
-    const courses = [
-      { id: "course1", name: "Introduction to Programming" },
-      { id: "course2", name: "Data Structures" },
-      { id: "course3", name: "Algorithms" },
-    ];
-
     return (
       <div className="space-y-6">
         <h2 className="text-2xl font-bold text-yellow-500">
           Create Chapters/Modules
         </h2>
+        {success ? (
+          <>
+            <div className="bg-green-50 p-4 rounded-lg flex items-center text-green-600">
+              <CheckCircle className="h-5 w-5 mr-2" />
+              <span>{success}</span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="bg-red-50 p-4 rounded-lg flex items-center text-red-700">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              <span>{error}</span>
+            </div>
+          </>
+        )}
         <div className="flex space-x-4">
           <input
             type="text"
@@ -133,8 +363,8 @@ const CourseCreationPipeline = () => {
           >
             <option value="">Choose a course</option>
             {courses.map((course) => (
-              <option key={course.id} value={course.id}>
-                {course.name}
+              <option key={course.courseId} value={course.courseId}>
+                {course.courseName}
               </option>
             ))}
           </select>
@@ -164,7 +394,7 @@ const CourseCreationPipeline = () => {
               ))}
             </div>
             <button
-              onClick={addChapter}
+              onClick={createChapter}
               className="bg-yellow-500 mt-4 text-black px-4 py-2 rounded-lg flex items-center"
             >
               Create Chapters
@@ -181,6 +411,39 @@ const CourseCreationPipeline = () => {
     const [lessonContent, setLessonContent] = useState("");
     const [lessons, setLessons] = useState([]);
     const [chapterId, setChapterId] = useState("");
+    const [courseId, setCourseId] = useState("");
+
+    const createLesson = async () => {
+      if (!isConnected) {
+        setError("Wallet is not connected");
+        return;
+      } else {
+        try {
+          const signer = await signerPromise;
+          if (!signer) {
+            throw new Error("Signer is required to access the contract.");
+          }
+
+          const contract = new ethers.Contract(
+            Ecosystem2ContractAddress,
+            Ecosystem2_ABI,
+            signer
+          );
+
+          const tx = await contract.addLessons(
+            chapterId,
+            lessonName,
+            lessonContent
+          );
+          const receipt = await tx.wait();
+          console.log(receipt);
+          setSuccess("Lessons created successfully!");
+        } catch (err) {
+          console.error("Full Error:", err);
+          setError(`Failed to create lessons: ${err.message}`);
+        }
+      }
+    };
 
     const addLesson = () => {
       if (lessonName.trim() && lessonContent.trim()) {
@@ -194,11 +457,20 @@ const CourseCreationPipeline = () => {
       }
     };
 
-    const chapters = [
-      { id: "chapter1", name: "Introduction to Programming" },
-      { id: "chapter2", name: "Data Structures" },
-      { id: "chapter3", name: "Algorithms" },
-    ];
+    useEffect(() => {
+      const courseId = courses?.courseId;
+      console.log("course id type: ", typeof courseId);
+      console.log("course id type: ", courseId);
+
+      if (courseId) {
+        console.log("Fetching chapters for courseId:", courses.courseId);
+        fetchChapters(courses.courseId);
+      }
+    }, [courses.courseId, fetchChapters]);
+
+    // useEffect(() => {
+    console.log("Course Chapters: ", chapters);
+    // }, [chapters]);
 
     return (
       <div className="space-y-6">
@@ -219,6 +491,25 @@ const CourseCreationPipeline = () => {
           />
         </div>
 
+        {/* Course Selection */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Select Course
+          </label>
+          <select
+            value={courseId}
+            onChange={(e) => setCourseId(e.target.value)}
+            className="w-full p-3 border rounded-lg"
+          >
+            <option value="">Choose a course</option>
+            {courses.map((course) => (
+              <option key={course.courseId} value={course.courseId}>
+                {course.courseName}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Chapter Selection */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -230,47 +521,20 @@ const CourseCreationPipeline = () => {
             className="w-full p-3 border rounded-lg"
           >
             <option value="">Choose a chapter</option>
-            {chapters.map((chapter) => (
-              <option key={chapter.id} value={chapter.id}>
-                {chapter.name}
+            {chapters?.map((chapter) => (
+              <option key={chapter.chapterId} value={chapter.chapterId}>
+                {chapter.chapterName}
               </option>
             ))}
           </select>
         </div>
 
         <button
-          onClick={addLesson}
+          onClick={createLesson}
           className="bg-yellow-500 text-black px-4 py-2 rounded-lg flex items-center"
         >
           Create Lesson
         </button>
-
-        {/* {lessons.length > 0 && (
-          <div className="mt-4">
-            <h3 className="font-semibold mb-2">Added Lessons:</h3>
-            <div className="space-y-2">
-              {lessons.map((lesson, index) => (
-                <div
-                  key={index}
-                  className="bg-gray-100 p-2 rounded-lg flex justify-between items-center"
-                >
-                  <div>
-                    <h3 className="font-semibold">{lesson.name}</h3>
-                    <p>{lesson.content}</p>
-                  </div>
-                  <button
-                    onClick={() =>
-                      setLessons(lessons.filter((_, i) => i !== index))
-                    }
-                    className="text-red-500"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )} */}
       </div>
     );
   };

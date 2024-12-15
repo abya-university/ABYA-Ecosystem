@@ -3,7 +3,19 @@ import { useDisconnect, useAccount, useBalance } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Globe, BookOpen, Moon, Sun } from "lucide-react";
+import {
+  Globe,
+  BookOpen,
+  Moon,
+  Sun,
+  Power,
+  Wallet,
+  Check,
+  Copy,
+  UserCircle,
+  CopyCheckIcon,
+  CopyIcon,
+} from "lucide-react";
 
 const Navbar = () => {
   const logo = "/abya_logo.jpg";
@@ -11,6 +23,7 @@ const Navbar = () => {
   const { disconnect } = useDisconnect();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const navigate = useNavigate();
+  const [isCopied, setIsCopied] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const { data: balanceData } = useBalance({
@@ -27,6 +40,22 @@ const Navbar = () => {
 
   const toggleDropdown = () => {
     setDropdownVisible(!dropdownVisible);
+  };
+
+  const copyToClipboard = () => {
+    if (address) {
+      navigator.clipboard
+        .writeText(address)
+        .then(() => {
+          setIsCopied(true);
+          setTimeout(() => {
+            setIsCopied(false);
+          }, 2000);
+        })
+        .catch((err) => {
+          console.error("Failed to copy: ", err);
+        });
+    }
   };
 
   const signOut = async () => {
@@ -98,40 +127,83 @@ const Navbar = () => {
               </button>
 
               {dropdownVisible && (
-                <div className="absolute right-0 mt-2 w-64 bg-white text-gray-800 dark:text-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-lg p-4 space-y-2">
-                  <p className="font-semibold text-lg mb-2 dark:text-white">
-                    Wallet Details
-                  </p>
-                  <p>
-                    Status:{" "}
-                    <span
-                      className={
-                        isConnected ? "text-green-500" : "text-red-500"
-                      }
+                <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden">
+                  <div className="bg-yellow-500/10 p-4 flex items-center space-x-3 border-b dark:border-gray-700">
+                    <UserCircle className="w-10 h-10 text-yellow-600 dark:text-yellow-400" />
+                    <div>
+                      <h3 className="font-bold text-lg text-gray-800 dark:text-white">
+                        Wallet Details
+                      </h3>
+                      <p className="text-xs text-gray-600 dark:text-gray-300 truncate max-w-[200px]">
+                        {address}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 dark:text-white">
+                        <Wallet className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                        <span>Status</span>
+                      </div>
+                      <span
+                        className={`flex items-center space-x-1 ${
+                          isConnected ? "text-green-500" : "text-red-500"
+                        }`}
+                      >
+                        <Check
+                          className={`w-4 h-4 ${
+                            isConnected ? "visible" : "invisible"
+                          }`}
+                        />
+                        <span className="font-semibold">
+                          {isConnected ? "Connected" : "Disconnected"}
+                        </span>
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 dark:text-white">
+                        <button
+                          onClick={copyToClipboard}
+                          className="text-gray-500 hover:underline"
+                          disabled={!address}
+                        >
+                          {isCopied ? (
+                            <CopyCheckIcon className="w-5 h-5 text-yellow-500" />
+                          ) : (
+                            <CopyIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                          )}
+                        </button>
+                        <span>Address</span>
+                      </div>
+                      <span className="font-semibold text-sm truncate max-w-[150px] dark:text-gray-300">
+                        {address?.substring(0, 6)}...
+                        {address?.substring(address.length - 4)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 dark:text-white">
+                        <Wallet className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                        <span>Balance</span>
+                      </div>
+                      <span className="font-semibold dark:text-yellow-500">
+                        {balanceData
+                          ? parseFloat(balanceData.formatted).toFixed(5)
+                          : "0.0000"}{" "}
+                        {balanceData?.symbol}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={signOut}
+                      className="w-full flex items-center justify-center space-x-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950 p-2 rounded-lg transition-colors"
                     >
-                      {isConnected ? (
-                        <span className="font-semibold">Connected</span>
-                      ) : (
-                        <span className="font-semibold">Disconnected</span>
-                      )}
-                    </span>
-                  </p>
-                  <p className="break-words">
-                    Address: <span className="font-semibold">{address}</span>
-                  </p>
-                  <p>
-                    Balance:{" "}
-                    <span className="font-semibold">
-                      {balanceData?.formatted}
-                    </span>{" "}
-                    {balanceData?.symbol}
-                  </p>
-                  <button
-                    onClick={signOut}
-                    className="w-full text-red-500 hover:text-red-600 font-semibold text-left mt-2"
-                  >
-                    Disconnect
-                  </button>
+                      <Power className="w-5 h-5" />
+                      <span className="font-semibold">Disconnect</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

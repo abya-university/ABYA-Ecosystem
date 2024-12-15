@@ -9,10 +9,15 @@ import {
   Key,
   QrCode,
   Link2,
+  CopyIcon,
+  CopyCheckIcon,
 } from "lucide-react";
+import { useAccount } from "wagmi";
 
 const SettingsPage = () => {
   const [activeSection, setActiveSection] = useState("did");
+  const { address } = useAccount();
+  const [isCopied, setIsCopied] = useState(false);
   const [didManagement, setDidManagement] = useState({
     didDocument: null,
     verifiableCredentials: [],
@@ -23,6 +28,27 @@ const SettingsPage = () => {
     push: false,
     sms: false,
   });
+
+  const formatAddress = (addr) => {
+    if (!addr) return "Not Connected";
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  };
+
+  const copyToClipboard = () => {
+    if (address) {
+      navigator.clipboard
+        .writeText(address)
+        .then(() => {
+          setIsCopied(true);
+          setTimeout(() => {
+            setIsCopied(false);
+          }, 2000);
+        })
+        .catch((err) => {
+          console.error("Failed to copy: ", err);
+        });
+    }
+  };
 
   const settingsSections = [
     {
@@ -273,7 +299,22 @@ const SettingsPage = () => {
                           <Wallet className="w-6 h-6 text-yellow-500" />
                           <span>Metamask</span>
                         </div>
-                        <span className="text-gray-400">0x1234...5678</span>
+                        <div className="flex items-center space-x-3">
+                          <span className="text-gray-400">
+                            {formatAddress(address)}
+                          </span>
+                          <button
+                            onClick={copyToClipboard}
+                            className="ml-2 text-gray-500 hover:underline"
+                            disabled={!address}
+                          >
+                            {isCopied ? (
+                              <CopyCheckIcon className="w-5 h-5 text-yellow-500" />
+                            ) : (
+                              <CopyIcon className="w-5 h-5" />
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
