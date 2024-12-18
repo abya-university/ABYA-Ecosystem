@@ -14,10 +14,10 @@ const ChapterProvider = ({ children }) => {
   const { address } = useAccount();
   const signer = useEthersSigner();
   const [chapters, setChapters] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // const [loading, setLoading] = useState(false);
 
   const fetchChapters = async (courseId) => {
-    setLoading(true);
+    // setLoading(true);
     const resolvedSigner = await signer;
 
     if (resolvedSigner) {
@@ -29,22 +29,23 @@ const ChapterProvider = ({ children }) => {
         );
 
         // Call the function to get chapters from the mapping
-        const chaptersData = await contract.courseChapters(courseId);
+        const chaptersData = await contract.getChapters(courseId);
         setChapters(chaptersData);
+        return chaptersData; // Return the fetched chapters
       } catch (fetchError) {
         console.error("Error fetching chapters:", fetchError);
       } finally {
-        setLoading(false);
+        // setLoading(false);
       }
     } else {
       console.warn("No signer available");
-      setLoading(false);
+      // setLoading(false);
     }
   };
 
-  if (loading) {
-    return <div>Loading...</div>;
-  }
+  // if (loading) {
+  //   return <div>Loading...</div>;
+  // }
 
   return (
     <ChapterContext.Provider value={{ chapters, fetchChapters, setChapters }}>

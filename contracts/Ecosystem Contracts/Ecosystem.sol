@@ -65,6 +65,7 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
     struct Chapter {
         uint256 chapterId;
         string chapterName;
+        bool exists;
     }
 
     struct Lesson {
@@ -104,7 +105,7 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
     mapping(address => Account) public accountCourses;
     mapping(address => mapping(uint256 => bool)) public approvals;
     mapping(uint256 => Chapter) public chapter;
-    mapping(uint256 => string[]) public courseChapters;
+    mapping(uint256 => Chapter[]) public courseChapters;
     mapping(uint256 => Lesson) public lesson;
     mapping(uint256 => string[]) public chapterLessons;
     mapping(uint256 => Quiz) public quizzes;

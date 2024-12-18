@@ -405,13 +405,16 @@ const CourseCreationPipeline = () => {
     );
   };
 
-  //Lesson creation
   const LessonCreation = () => {
     const [lessonName, setLessonName] = useState("");
     const [lessonContent, setLessonContent] = useState("");
     const [lessons, setLessons] = useState([]);
     const [chapterId, setChapterId] = useState("");
     const [courseId, setCourseId] = useState("");
+    const { fetchChapters, chapters, setChapters } = useContext(ChapterContext);
+    const { isConnected } = useAccount();
+    const [success, setSuccess] = useState("");
+    const [error, setError] = useState("");
 
     const createLesson = async () => {
       if (!isConnected) {
@@ -429,9 +432,12 @@ const CourseCreationPipeline = () => {
             Ecosystem2_ABI,
             signer
           );
+          console.log("Chapter ID: ", chapterId);
+          console.log("Lesson Name: ", lessonName);
+          console.log("Lesson Content: ", lessonContent);
 
-          const tx = await contract.addLessons(
-            chapterId,
+          const tx = await contract.addLesson(
+            chapterId.toString(),
             lessonName,
             lessonContent
           );
@@ -458,23 +464,41 @@ const CourseCreationPipeline = () => {
     };
 
     useEffect(() => {
-      const courseId = courses?.courseId;
-      console.log("course id type: ", typeof courseId);
-      console.log("course id type: ", courseId);
-
       if (courseId) {
-        console.log("Fetching chapters for courseId:", courses.courseId);
-        fetchChapters(courses.courseId);
+        console.log("Fetching chapters for courseId:", courseId);
+        fetchChapters(courseId).then((fetchedChapters) => {
+          if (fetchedChapters) {
+            const formattedChapters = fetchedChapters.map((chapter) => ({
+              chapterId: Number(chapter.chapterId),
+              chapterName: chapter.chapterName,
+            }));
+            setChapters(formattedChapters);
+            console.log("Chapters: ", formattedChapters);
+          } else {
+            setChapters([]);
+          }
+        });
       }
-    }, [courses.courseId, fetchChapters]);
-
-    // useEffect(() => {
-    console.log("Course Chapters: ", chapters);
-    // }, [chapters]);
+    }, [courseId, fetchChapters]);
 
     return (
       <div className="space-y-6">
         <h2 className="text-2xl font-bold text-yellow-500">Create Lessons</h2>
+        {success ? (
+          <>
+            <div className="bg-green-50 p-4 rounded-lg flex items-center text-green-600">
+              <CheckCircle className="h-5 w-5 mr-2" />
+              <span>{success}</span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="bg-red-50 p-4 rounded-lg flex items-center text-red-700">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              <span>{error}</span>
+            </div>
+          </>
+        )}
         <div className="grid gap-4">
           <input
             type="text"
@@ -508,6 +532,7 @@ const CourseCreationPipeline = () => {
               </option>
             ))}
           </select>
+          <p>{courseId}</p>
         </div>
 
         {/* Chapter Selection */}

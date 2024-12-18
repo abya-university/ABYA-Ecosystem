@@ -45,49 +45,40 @@ contract Ecosystem2 is Ecosystem {
     }
 
 
-    //function to add a chapter
-    function addChapters(uint256 _courseId, string[] memory _chapters) external returns(bool) {
-        require(courseObject[_courseId].creator != address(0), "Course does not exist!");
+    // Function to add a chapter
+function addChapters(uint256 _courseId, string[] memory _chapters) external returns (bool) {
+    require(courseObject[_courseId].creator != address(0), "Course does not exist!");
 
-        for (uint i = 0; i < _chapters.length; i++) {
-            Chapter memory newChapter = Chapter(nextChapterId, _chapters[i]);
-            listOfChapters.push(newChapter);
+    // Clear the existing chapters for the course
+    // delete courseChapters[_courseId];
 
-            uint256 _chapterId = nextChapterId;
-            chapter[_chapterId] = newChapter;
+    for (uint i = 0; i < _chapters.length; i++) {      
+        Chapter memory newChapter = Chapter(nextChapterId, _chapters[i], true);
+        listOfChapters.push(newChapter);
 
-            nextChapterId++;
-        }
+        // uint256 _chapterId = nextChapterId;
+        chapter[nextChapterId] = newChapter;
 
-        // Clear the existing chapters for the course
-        delete courseChapters[_courseId];
+        // Add the chapter ID to the courseChapters mapping
+        courseChapters[_courseId].push(newChapter);
 
-        // Copy each chapter from memory to storage
-        for (uint i = 0; i < _chapters.length; i++) {
-            courseChapters[_courseId].push(_chapters[i]);
-        }
-
-        emit ChaptersAddedSuccessfully(_courseId, _chapters.length);
-
-        return true;
+        nextChapterId++;
     }
+
+    emit ChaptersAddedSuccessfully(_courseId, _chapters.length);
+
+    return true;
+}
 
     //function to get all course chapters
     function getChapters(uint256 _courseId) external view returns (Chapter[] memory) {
-        uint256 chapterCount = courseChapters[_courseId].length;
-        Chapter[] memory chapters = new Chapter[](chapterCount);
-    
-        for (uint i = 0; i < chapterCount; i++) {
-            chapters[i] = Chapter(chapter[_courseId].chapterId, courseChapters[_courseId][i]);
-        }
-    
-        return chapters;
+        return courseChapters[_courseId];
     }
 
     //function to add a lesson
     function addLesson(uint256 _chapterId, string memory _lessonName, string memory _lessonContent) external {
         uint256 lessonId = nextLessonId;
-        require(chapter[_chapterId].chapterId != 0, "Chapter does not exist!");
+        require(chapter[_chapterId].exists, "Chapter does not exist!");
 
         // Initialize a new Lesson directly in storage
         Lesson storage newLesson = lesson[lessonId];
