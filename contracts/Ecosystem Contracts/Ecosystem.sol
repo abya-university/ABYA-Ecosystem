@@ -74,10 +74,11 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
         string lessonContent;
         Resource[10] additionalResources;
         uint256 resourceCount;
+        bool exists;
     }
 
     struct Resource {
-        string contentType; // "video" or "document"
+        string contentType;
         string url;
         string description;
     }
@@ -86,6 +87,7 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
         uint256 quizId;
         string quizTitle;
         Question[] questions;
+        bool exists;
     }
 
     struct Question {

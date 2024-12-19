@@ -85,6 +85,7 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
         newLesson.lessonId = lessonId;
         newLesson.lessonName = _lessonName;
         newLesson.lessonContent = _lessonContent;
+        newLesson.exists = true;
         newLesson.resourceCount = 0;
 
         // Push a copy to the array
@@ -110,10 +111,11 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
     //function to add a quiz
     function createQuiz(uint256 _lessonId, string memory _title) external returns(uint256) {
         uint256 _quizId = nextQuizId;
-        require(lesson[_lessonId].lessonId != 0, "Lesson Does not exist!");
+        require(lesson[_lessonId].exists, "Lesson Does not exist!");
         Quiz storage newQuiz = quizzes[_quizId];
         newQuiz.quizId = _quizId;
         newQuiz.quizTitle = _title;
+        newQuiz.exists = true;
 
         nextQuizId++;
         listOfQuizzes.push(newQuiz);
@@ -131,7 +133,7 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
         uint8 _correctChoiceIndex
         ) external {
         // Validate quiz exists
-        require(quizzes[_quizId].quizId != 0, "Quiz does not exist");
+        require(quizzes[_quizId].exists, "Quiz does not exist");
         require(_options.length > 0 && _options.length <= 4, "Invalid number of choices");
         require(_correctChoiceIndex < _options.length, "Invalid correct choice index");
 

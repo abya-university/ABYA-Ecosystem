@@ -14,6 +14,7 @@ import { useAccount } from "wagmi";
 import { ethers } from "ethers";
 import { CourseContext } from "../contexts/courseContext";
 import { ChapterContext } from "../contexts/chapterContext";
+import { LessonContext } from "../contexts/lessonContext";
 
 const Ecosystem2ContractAddress = import.meta.env
   .VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
@@ -176,16 +177,18 @@ const CourseCreationPipeline = () => {
         </h2>
 
         {(success || error) && (
-          <Alert variant={success ? "success" : "destructive"} className="mb-6">
-            <div className="flex items-center gap-2">
-              {success ? (
-                <CheckCircle className="h-5 w-5" />
-              ) : (
-                <AlertCircle className="h-5 w-5" />
-              )}
-              <AlertDescription>{success || error}</AlertDescription>
-            </div>
-          </Alert>
+          <div
+            className={`mb-4 p-4 rounded-lg flex items-center ${
+              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
+            }`}
+          >
+            {success ? (
+              <CheckCircle className="h-5 w-5 mr-2" />
+            ) : (
+              <AlertCircle className="h-5 w-5 mr-2" />
+            )}
+            <span>{success || error}</span>
+          </div>
         )}
 
         <div className="flex gap-6">
@@ -596,7 +599,7 @@ const CourseCreationPipeline = () => {
   };
 
   const QuizCreation = ({ onNextStep }) => {
-    const [quizName, setQuizName] = useState("");
+    const [quizTitle, setQuizTitle] = useState("");
     const [lessonId, setLessonId] = useState("");
     const [quizId, setQuizId] = useState("");
     const [questions, setQuestions] = useState([]);
@@ -607,19 +610,47 @@ const CourseCreationPipeline = () => {
       { text: "", isCorrect: false },
       { text: "", isCorrect: false },
     ]);
+    const { lessons } = useContext(LessonContext);
+    const [success, setSuccess] = useState("");
+    const [error, setError] = useState("");
 
-    // Lessons could be fetched from an API or defined statically
-    const lessons = [
-      { id: "lesson1", name: "Introduction to Programming" },
-      { id: "lesson2", name: "Data Structures" },
-      { id: "lesson3", name: "Algorithms" },
-    ];
+    console.log("Lessons: ", lessons);
 
     const quizzes = [
       { id: "quiz1", name: "Introduction to Programming" },
       { id: "quiz2", name: "Data Structures" },
       { id: "quiz3", name: "Algorithms" },
     ];
+
+    const createQuiz = async () => {
+      if (!isConnected || !address) {
+        throw new Error("Please connect to a blockchain network");
+      }
+
+      try {
+        // const lesson = lessons.find((lesson) => lesson.lessonId === lessonId);
+        const signer = await signerPromise;
+
+        const contract = new ethers.Contract(
+          Ecosystem2ContractAddress,
+          Ecosystem2_ABI,
+          signer
+        );
+
+        console.log("Lesson Id: ", lessonId);
+        console.log("Quiz Title: ", quizTitle);
+
+        const tx = await contract.createQuiz(lessonId, quizTitle);
+        const receipt = await tx.wait();
+        console.log("Quiz created: ", receipt);
+        setLessonId("");
+        setQuizTitle("");
+        setSuccess("Quiz created successfully!!");
+      } catch (error) {
+        console.error("Error creating quiz: ", error);
+        setError("Error creating quiz");
+      }
+    };
 
     const addQuestion = () => {
       // Validate that there's a question, all options are filled, and exactly one correct option
@@ -693,13 +724,27 @@ const CourseCreationPipeline = () => {
     return (
       <div className="space-y-6 p-4">
         <h2 className="text-2xl font-bold text-yellow-500">Create Quiz</h2>
+        {(success || error) && (
+          <div
+            className={`mb-4 p-4 rounded-lg flex items-center ${
+              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
+            }`}
+          >
+            {success ? (
+              <CheckCircle className="h-5 w-5 mr-2" />
+            ) : (
+              <AlertCircle className="h-5 w-5 mr-2" />
+            )}
+            <span>{success || error}</span>
+          </div>
+        )}
         <div className="grid gap-4">
           <input
             type="text"
             placeholder="Quiz Title"
             className="w-full p-3 border rounded-lg"
-            value={quizName}
-            onChange={(e) => setQuizName(e.target.value)}
+            value={quizTitle}
+            onChange={(e) => setQuizTitle(e.target.value)}
           />
 
           {/* Lesson Selection */}
@@ -714,15 +759,15 @@ const CourseCreationPipeline = () => {
             >
               <option value="">Choose a lesson</option>
               {lessons.map((lesson) => (
-                <option key={lesson.id} value={lesson.id}>
-                  {lesson.name}
+                <option key={lesson.lessonId} value={lesson.lessonId}>
+                  {lesson.lessonName}
                 </option>
               ))}
             </select>
           </div>
 
           <button
-            // onClick={}
+            onClick={createQuiz}
             className="bg-yellow-500 text-black px-4 py-2 w-[120px] rounded-lg flex items-center"
           >
             Create Quiz
