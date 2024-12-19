@@ -39,6 +39,7 @@ const CourseCreationPipeline = () => {
   const [loading, setLoading] = useState(false);
   const { courses } = useContext(CourseContext);
   const { chapters, fetchChapters, setChapters } = useContext(ChapterContext);
+  const [imagePreview, setImagePreview] = useState(null);
 
   console.log("Courses Data:", courses);
 
@@ -154,77 +155,109 @@ const CourseCreationPipeline = () => {
   const CourseBasicInfo = () => {
     const handleImageUpload = (e) => {
       const file = e.target.files[0];
-      setCourseData((prev) => ({
-        ...prev,
-        basicInfo: { ...prev.basicInfo, image: file },
-      }));
+      if (file) {
+        setCourseData((prev) => ({
+          ...prev,
+          basicInfo: { ...prev.basicInfo, image: file },
+        }));
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImagePreview(reader.result);
+        };
+        reader.readAsDataURL(file);
+      }
     };
 
     return (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-yellow-500">
+      <div className="max-w-4xl mx-auto p-6">
+        <h2 className="text-2xl font-bold text-yellow-500 mb-6">
           Course Basic Information
         </h2>
-        {success ? (
-          <>
-            <div className="bg-green-50 p-4 rounded-lg flex items-center text-green-600">
-              <CheckCircle className="h-5 w-5 mr-2" />
-              <span>{success}</span>
+
+        {(success || error) && (
+          <Alert variant={success ? "success" : "destructive"} className="mb-6">
+            <div className="flex items-center gap-2">
+              {success ? (
+                <CheckCircle className="h-5 w-5" />
+              ) : (
+                <AlertCircle className="h-5 w-5" />
+              )}
+              <AlertDescription>{success || error}</AlertDescription>
             </div>
-          </>
-        ) : (
-          <>
-            <div className="bg-red-50 p-4 rounded-lg flex items-center text-red-700">
-              <AlertCircle className="h-5 w-5 mr-2" />
-              <span>{error}</span>
-            </div>
-          </>
+          </Alert>
         )}
-        <div className="grid gap-4">
-          <input
-            type="text"
-            placeholder="Course Name"
-            className="w-full p-3 border rounded-lg"
-            value={courseData.basicInfo.name}
-            onChange={(e) =>
-              setCourseData((prev) => ({
-                ...prev,
-                basicInfo: { ...prev.basicInfo, name: e.target.value },
-              }))
-            }
-          />
-          <textarea
-            placeholder="Course Description"
-            className="w-full p-3 border rounded-lg h-32"
-            value={courseData.basicInfo.description}
-            onChange={(e) =>
-              setCourseData((prev) => ({
-                ...prev,
-                basicInfo: { ...prev.basicInfo, description: e.target.value },
-              }))
-            }
-          />
-          <div className="flex items-center space-x-4">
-            <label className="flex items-center space-x-2 bg-yellow-500 text-black px-4 py-2 rounded-lg cursor-pointer">
-              <Image size={20} />
-              <span>Upload Course Image</span>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleImageUpload}
-              />
-            </label>
-            {courseData.basicInfo.image && (
-              <span className="text-green-500">Image Selected</span>
-            )}
+
+        <div className="flex gap-6">
+          {/* Left side - Form inputs */}
+          <div className="flex-1 space-y-4">
+            <input
+              type="text"
+              placeholder="Course Name"
+              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+              value={courseData.basicInfo.name}
+              onChange={(e) =>
+                setCourseData((prev) => ({
+                  ...prev,
+                  basicInfo: { ...prev.basicInfo, name: e.target.value },
+                }))
+              }
+            />
+
+            <textarea
+              placeholder="Course Description"
+              className="w-full p-3 border rounded-lg h-32 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+              value={courseData.basicInfo.description}
+              onChange={(e) =>
+                setCourseData((prev) => ({
+                  ...prev,
+                  basicInfo: { ...prev.basicInfo, description: e.target.value },
+                }))
+              }
+            />
+
+            <div className="flex items-center gap-4">
+              <label className="inline-flex items-center space-x-2 bg-yellow-500 text-black px-4 py-2 rounded-lg cursor-pointer hover:bg-yellow-600 transition-colors">
+                <Image size={20} />
+                <span>Upload Course Image</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
+                />
+              </label>
+
+              <button
+                onClick={createCourse}
+                className="rounded-lg bg-yellow-500 p-2 px-6 hover:bg-yellow-600 transition-colors"
+              >
+                Create Course
+              </button>
+            </div>
           </div>
-          <button
-            onClick={createCourse}
-            className="rounded-lg bg-yellow-500 p-2 w-[18%]"
-          >
-            Create Course
-          </button>
+
+          {/* Right side - Image preview */}
+          <div className="w-64 flex-shrink-0">
+            <div className="p-4">
+              {imagePreview ? (
+                <div className="relative w-full h-48 rounded-lg overflow-hidden">
+                  <img
+                    src={imagePreview}
+                    alt="Course preview"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-full h-48 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <div className="text-gray-400 text-center">
+                    <Image className="mx-auto mb-2 h-8 w-8" />
+                    <p className="text-sm">Course Image</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -319,20 +352,19 @@ const CourseCreationPipeline = () => {
         <h2 className="text-2xl font-bold text-yellow-500">
           Create Chapters/Modules
         </h2>
-        {success ? (
-          <>
-            <div className="bg-green-50 p-4 rounded-lg flex items-center text-green-600">
+        {(success || error) && (
+          <div
+            className={`mb-4 p-4 rounded-lg flex items-center ${
+              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
+            }`}
+          >
+            {success ? (
               <CheckCircle className="h-5 w-5 mr-2" />
-              <span>{success}</span>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="bg-red-50 p-4 rounded-lg flex items-center text-red-700">
+            ) : (
               <AlertCircle className="h-5 w-5 mr-2" />
-              <span>{error}</span>
-            </div>
-          </>
+            )}
+            <span>{success || error}</span>
+          </div>
         )}
         <div className="flex space-x-4">
           <input
@@ -484,20 +516,19 @@ const CourseCreationPipeline = () => {
     return (
       <div className="space-y-6">
         <h2 className="text-2xl font-bold text-yellow-500">Create Lessons</h2>
-        {success ? (
-          <>
-            <div className="bg-green-50 p-4 rounded-lg flex items-center text-green-600">
+        {(success || error) && (
+          <div
+            className={`mb-4 p-4 rounded-lg flex items-center ${
+              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
+            }`}
+          >
+            {success ? (
               <CheckCircle className="h-5 w-5 mr-2" />
-              <span>{success}</span>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="bg-red-50 p-4 rounded-lg flex items-center text-red-700">
+            ) : (
               <AlertCircle className="h-5 w-5 mr-2" />
-              <span>{error}</span>
-            </div>
-          </>
+            )}
+            <span>{success || error}</span>
+          </div>
         )}
         <div className="grid gap-4">
           <input
