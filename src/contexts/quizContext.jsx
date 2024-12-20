@@ -39,6 +39,14 @@ const QuizProvider = ({ children }) => {
         const quizzesArray = quizzesData.map((quiz) => ({
           quizId: Number(quiz.quizId),
           quizTitle: quiz.quizTitle,
+          questions: quiz.questions.map((question) => ({
+            questionId: Number(question.questionId),
+            questionText: question.questionText,
+            choices: question.choices.map((choice) => ({
+              option: choice.option,
+              isCorrect: choice.isCorrect,
+            })),
+          })),
         }));
         console.log("Processed quizzes array:", quizzesArray);
 

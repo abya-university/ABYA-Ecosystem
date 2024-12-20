@@ -126,7 +126,7 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
     }
 
     // Function to add questions with choices
-        function createQuestionWithChoices(
+    function createQuestionWithChoices(
         uint256 _quizId, 
         string memory _questionText, 
         string[] memory _options, 
@@ -139,39 +139,55 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
 
         // Create question
         uint256 _questionId = nextQuestionId;
-        Question memory newQuestion = Question({
-            questionId: _questionId,
-            questionText: _questionText,
-            choices: new Choice[](_options.length)
-        });
+    
+        // Create new Question struct in storage
+        Question storage newQuestion = questions[_questionId];
+        newQuestion.questionId = _questionId;
+        newQuestion.questionText = _questionText;
 
-        // Add choices
+        // Add choices to the question
         for (uint8 i = 0; i < _options.length; i++) {
-            newQuestion.choices[i] = Choice({
+            Choice memory newChoice = Choice({
                 option: _options[i],
                 isCorrect: (i == _correctChoiceIndex)
             });
-
-            uint256 _choiceId = nextChoiceId;
-            nextChoiceId++;
-            emit ChoiceAdded(_questionId, _choiceId, _options[i]);
+            newQuestion.choices.push(newChoice);
         }
 
-        // Add question to the quiz
+        // Add question to the quiz's questions array
         quizzes[_quizId].questions.push(newQuestion);
-
-        // Add question to other mappings
-        questions[_questionId] = newQuestion;
-        listOfQuestions.push(newQuestion);
+    
+        // Update question tracking
         nextQuestionId++;
+        listOfQuestions.push(newQuestion);
 
+        // Emit events
         emit QuestionAdded(_quizId, _questionId, _questionText);
+    
+        // Emit choice events
+        for (uint8 i = 0; i < _options.length; i++) {
+            emit ChoiceAdded(_questionId, nextChoiceId + i, _options[i]);
+        }
+        nextChoiceId += _options.length;
     }
 
-    //function to get all quizzes
+    // Function to get all quizzes
     function getAllQuizzes() external view returns (Quiz[] memory) {
-        return listOfQuizzes;
+        uint256 quizCount = nextQuizId;
+        Quiz[] memory allQuizzes = new Quiz[](quizCount);
+    
+        for (uint i = 0; i < quizCount; i++) {
+            allQuizzes[i] = quizzes[i];
         }
+    
+        return allQuizzes;
+    }
+
+    // Function to get questions for a specific quiz
+    function getQuestionsForQuiz(uint256 _quizId) external view returns (Question[] memory) {
+        require(quizzes[_quizId].exists, "Quiz does not exist");
+        return quizzes[_quizId].questions;
+    }
 
      // Retrieve quiz details
     function getQuiz(uint256 _quizId) external view returns (Quiz memory) {
