@@ -126,12 +126,12 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
     }
 
     // Function to add questions with choices
-    function createQuestionWithChoices(
+        function createQuestionWithChoices(
         uint256 _quizId, 
         string memory _questionText, 
         string[] memory _options, 
         uint8 _correctChoiceIndex
-        ) external {
+    ) external {
         // Validate quiz exists
         require(quizzes[_quizId].exists, "Quiz does not exist");
         require(_options.length > 0 && _options.length <= 4, "Invalid number of choices");
@@ -139,45 +139,50 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
 
         // Create question
         uint256 _questionId = nextQuestionId;
-        Question storage newQuestion = quizzes[_quizId].questions.push();
-        newQuestion.questionId = _questionId;
-        newQuestion.questionText = _questionText;
-
-        // Add question to other mappings
-        questions[_questionId] = newQuestion;
-        nextQuestionId++;
-
-        listOfQuestions.push(newQuestion);
-
-        emit QuestionAdded(_quizId, _questionId, _questionText);
+        Question memory newQuestion = Question({
+            questionId: _questionId,
+            questionText: _questionText,
+            choices: new Choice[](_options.length)
+        });
 
         // Add choices
         for (uint8 i = 0; i < _options.length; i++) {
-            uint256 _choiceId = nextChoiceId;
-            Choice memory newChoice = Choice({
+            newQuestion.choices[i] = Choice({
                 option: _options[i],
                 isCorrect: (i == _correctChoiceIndex)
             });
 
-            // Push choices directly to storage
-            newQuestion.choices.push(newChoice);
-            questions[_questionId].choices.push(newChoice);
-        
+            uint256 _choiceId = nextChoiceId;
             nextChoiceId++;
             emit ChoiceAdded(_questionId, _choiceId, _options[i]);
         }
+
+        // Add question to the quiz
+        quizzes[_quizId].questions.push(newQuestion);
+
+        // Add question to other mappings
+        questions[_questionId] = newQuestion;
+        listOfQuestions.push(newQuestion);
+        nextQuestionId++;
+
+        emit QuestionAdded(_quizId, _questionId, _questionText);
     }
+
+    //function to get all quizzes
+    function getAllQuizzes() external view returns (Quiz[] memory) {
+        return listOfQuizzes;
+        }
 
      // Retrieve quiz details
     function getQuiz(uint256 _quizId) external view returns (Quiz memory) {
-        require(quizzes[_quizId].quizId != 0, "Quiz does not exist");
+        require(quizzes[_quizId].exists, "Quiz does not exist");
         return quizzes[_quizId];
     }
 
     //function to add resources
     function addResourcesToLesson(uint256 _lessonId, Resource[] calldata _resources) external {
         Lesson storage lessonStorage = lesson[_lessonId];
-        require(lessonStorage.lessonId != 0, "Lesson does not exist!");
+        require(lessonStorage.exists, "Lesson does not exist!");
 
         uint256 currentCount = lessonStorage.resourceCount;
         require(currentCount + _resources.length <= 10, "Exceeds maximum resources!");

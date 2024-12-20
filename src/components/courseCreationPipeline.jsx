@@ -15,6 +15,7 @@ import { ethers } from "ethers";
 import { CourseContext } from "../contexts/courseContext";
 import { ChapterContext } from "../contexts/chapterContext";
 import { LessonContext } from "../contexts/lessonContext";
+import { QuizContext } from "../contexts/quizContext";
 
 const Ecosystem2ContractAddress = import.meta.env
   .VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
@@ -598,29 +599,27 @@ const CourseCreationPipeline = () => {
     );
   };
 
-  const QuizCreation = ({ onNextStep }) => {
+  const QuizCreation = () => {
     const [quizTitle, setQuizTitle] = useState("");
     const [lessonId, setLessonId] = useState("");
     const [quizId, setQuizId] = useState("");
     const [questions, setQuestions] = useState([]);
     const [question, setQuestion] = useState("");
     const [options, setOptions] = useState([
-      { text: "", isCorrect: false },
-      { text: "", isCorrect: false },
-      { text: "", isCorrect: false },
-      { text: "", isCorrect: false },
+      { option: "", isCorrect: false },
+      { option: "", isCorrect: false },
+      { option: "", isCorrect: false },
+      { option: "", isCorrect: false },
     ]);
     const { lessons } = useContext(LessonContext);
-    const [success, setSuccess] = useState("");
-    const [error, setError] = useState("");
+    const { quizzes } = useContext(QuizContext);
+    const [quizSuccess, setQuizSuccess] = useState("");
+    const [quizError, setQuizError] = useState("");
+    const [questionSuccess, setQuestionSuccess] = useState("");
+    const [questionError, setQuestionError] = useState("");
 
     console.log("Lessons: ", lessons);
-
-    const quizzes = [
-      { id: "quiz1", name: "Introduction to Programming" },
-      { id: "quiz2", name: "Data Structures" },
-      { id: "quiz3", name: "Algorithms" },
-    ];
+    console.log("Quizzes: ", quizzes);
 
     const createQuiz = async () => {
       if (!isConnected || !address) {
@@ -645,19 +644,21 @@ const CourseCreationPipeline = () => {
         console.log("Quiz created: ", receipt);
         setLessonId("");
         setQuizTitle("");
-        setSuccess("Quiz created successfully!!");
+        setQuizSuccess("Quiz created successfully!!");
       } catch (error) {
         console.error("Error creating quiz: ", error);
-        setError("Error creating quiz");
+        setQuizError("Error creating quiz");
       }
     };
 
-    const addQuestion = () => {
+    const createQuestion = async () => {
       // Validate that there's a question, all options are filled, and exactly one correct option
       const hasQuestion = question.trim();
-      const hasFilledOptions = options.every((option) => option.text.trim());
-      const hasOneCorrectOption =
-        options.filter((option) => option.isCorrect).length === 1;
+      const hasFilledOptions = options.every((option) => option.text?.trim());
+      const correctOptionIndex = options.findIndex(
+        (option) => option.isCorrect
+      );
+      const hasOneCorrectOption = correctOptionIndex !== -1;
 
       if (hasQuestion && hasFilledOptions && hasOneCorrectOption) {
         setQuestions([
@@ -671,14 +672,48 @@ const CourseCreationPipeline = () => {
           },
         ]);
 
-        // Reset inputs after adding
-        setQuestion("");
-        setOptions([
-          { text: "", isCorrect: false },
-          { text: "", isCorrect: false },
-          { text: "", isCorrect: false },
-          { text: "", isCorrect: false },
-        ]);
+        if (!isConnected || !address) {
+          throw new Error("Please connect to a blockchain network");
+        }
+
+        try {
+          const signer = await signerPromise;
+          const contract = new ethers.Contract(
+            Ecosystem2ContractAddress,
+            Ecosystem2_ABI,
+            signer
+          );
+
+          console.log("Quiz Id: ", quizId);
+          console.log("Question: ", question);
+          console.log(
+            "Options: ",
+            options.map((option) => option.text)
+          );
+          console.log("Correct Option Index: ", correctOptionIndex);
+
+          const tx = await contract.createQuestionWithChoices(
+            quizId,
+            question,
+            options.map((option) => option.text),
+            correctOptionIndex // Send the index of the correct option instead of boolean array
+          );
+
+          const receipt = await tx.wait();
+          setQuestionSuccess("Question created successfully!!");
+
+          // Reset inputs after adding
+          setQuestion("");
+          setOptions([
+            { text: "", isCorrect: false },
+            { text: "", isCorrect: false },
+            { text: "", isCorrect: false },
+            { text: "", isCorrect: false },
+          ]);
+        } catch (err) {
+          console.error("Error creating question: ", err);
+          setQuestionError("Error creating question");
+        }
       } else {
         alert(
           "Please ensure: \n- Question is filled\n- All options are filled\n- Exactly one option is marked as correct"
@@ -698,44 +733,23 @@ const CourseCreationPipeline = () => {
       );
     };
 
-    const handleNextStep = () => {
-      // Validate before moving to next step
-      if (!quizName.trim()) {
-        alert("Please enter a quiz name");
-        return;
-      }
-      if (!lessonId) {
-        alert("Please select a lesson");
-        return;
-      }
-      if (questions.length === 0) {
-        alert("Please add at least one question");
-        return;
-      }
-
-      // If validation passes, call onNextStep with quiz data
-      onNextStep({
-        quizName,
-        lessonId,
-        questions,
-      });
-    };
-
     return (
       <div className="space-y-6 p-4">
         <h2 className="text-2xl font-bold text-yellow-500">Create Quiz</h2>
-        {(success || error) && (
+        {(quizSuccess || quizError) && (
           <div
             className={`mb-4 p-4 rounded-lg flex items-center ${
-              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
+              quizSuccess
+                ? "bg-green-50 text-green-600"
+                : "bg-red-50 text-red-700"
             }`}
           >
-            {success ? (
+            {quizSuccess ? (
               <CheckCircle className="h-5 w-5 mr-2" />
             ) : (
               <AlertCircle className="h-5 w-5 mr-2" />
             )}
-            <span>{success || error}</span>
+            <span>{quizSuccess || quizError}</span>
           </div>
         )}
         <div className="grid gap-4">
@@ -773,6 +787,23 @@ const CourseCreationPipeline = () => {
             Create Quiz
           </button>
 
+          {(questionSuccess || questionError) && (
+            <div
+              className={`mb-4 p-4 rounded-lg flex items-center ${
+                questionSuccess
+                  ? "bg-green-50 text-green-600"
+                  : "bg-red-50 text-red-700"
+              }`}
+            >
+              {questionSuccess ? (
+                <CheckCircle className="h-5 w-5 mr-2" />
+              ) : (
+                <AlertCircle className="h-5 w-5 mr-2" />
+              )}
+              <span>{questionSuccess || questionError}</span>
+            </div>
+          )}
+
           {/* Quiz Selection */}
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -785,8 +816,8 @@ const CourseCreationPipeline = () => {
             >
               <option value="">Choose a Quiz</option>
               {quizzes.map((quiz) => (
-                <option key={quiz.id} value={quiz.id}>
-                  {quiz.name}
+                <option key={quiz.quizId} value={quiz.quizId}>
+                  {quiz.quizTitle}
                 </option>
               ))}
             </select>
@@ -832,10 +863,10 @@ const CourseCreationPipeline = () => {
             ))}
 
             <button
-              onClick={addQuestion}
+              onClick={createQuestion}
               className="bg-yellow-500 text-black px-4 py-2 rounded-lg flex items-center"
             >
-              Add Question
+              Create Question
             </button>
 
             {/* Added Questions List */}
@@ -876,18 +907,6 @@ const CourseCreationPipeline = () => {
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* Next Step Button */}
-            {questions.length > 0 && (
-              <div className="mt-4">
-                <button
-                  onClick={handleNextStep}
-                  className="bg-yellow-500 text-black px-4 py-2 rounded-lg w-full"
-                >
-                  Next Step
-                </button>
               </div>
             )}
           </div>

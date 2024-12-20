@@ -7,6 +7,7 @@ import Providers from "./providers/Providers.jsx";
 import CourseProvider from "./contexts/courseContext.jsx";
 import ChapterProvider from "./contexts/chapterContext.jsx";
 import LessonProvider from "./contexts/lessonContext.jsx";
+import QuizProvider from "./contexts/quizContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -15,7 +16,9 @@ createRoot(document.getElementById("root")).render(
         <CourseProvider>
           <ChapterProvider>
             <LessonProvider>
-              <App />
+              <QuizProvider>
+                <App />
+              </QuizProvider>
             </LessonProvider>
           </ChapterProvider>
         </CourseProvider>
