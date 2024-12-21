@@ -196,7 +196,7 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
     }
 
     //function to add resources
-    function addResourcesToLesson(uint256 _lessonId, Resource[] calldata _resources) external {
+    function addResourcesToLesson(uint256 _lessonId, ContentType contentType ,Resource[] calldata _resources) external onlyRole(COURSE_OWNER_ROLE) {
         Lesson storage lessonStorage = lesson[_lessonId];
         require(lessonStorage.exists, "Lesson does not exist!");
 
@@ -208,7 +208,7 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
             lessonStorage.additionalResources[currentCount] = Resource({
                 contentType: _resources[i].contentType,
                 url: _resources[i].url,
-                description: _resources[i].description
+                name: _resources[i].name
             });
             currentCount++;
         }

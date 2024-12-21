@@ -77,10 +77,12 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
         bool exists;
     }
 
+    enum ContentType { Video, Image, Document }
+
     struct Resource {
-        string contentType;
+        ContentType contentType;
         string url;
-        string description;
+        string name;
     }
 
     struct Quiz {

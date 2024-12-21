@@ -40,6 +40,11 @@ const LessonProvider = ({ children }) => {
           lessonId: Number(lesson.lessonId),
           lessonName: lesson.lessonName,
           lessonContent: lesson.lessonContent,
+          additionalResources: lesson.additionalResources.map((resource) => ({
+            name: resource.name,
+            url: resource.url,
+            contentType: Number(resource.contentType),
+          })),
         }));
         console.log("Processed lessons array:", lessonsArray);
 

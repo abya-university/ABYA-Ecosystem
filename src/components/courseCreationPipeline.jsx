@@ -16,6 +16,8 @@ import { CourseContext } from "../contexts/courseContext";
 import { ChapterContext } from "../contexts/chapterContext";
 import { LessonContext } from "../contexts/lessonContext";
 import { QuizContext } from "../contexts/quizContext";
+import { uploadFileToPinata, uploadMetadataToIPFS } from "../components/pinata";
+import PreviewCourse from "../pages/PreviewCourse";
 
 const Ecosystem2ContractAddress = import.meta.env
   .VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
@@ -42,6 +44,7 @@ const CourseCreationPipeline = () => {
   const { courses } = useContext(CourseContext);
   const { chapters, fetchChapters, setChapters } = useContext(ChapterContext);
   const [imagePreview, setImagePreview] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   console.log("Courses Data:", courses);
 
@@ -479,7 +482,9 @@ const CourseCreationPipeline = () => {
           );
           const receipt = await tx.wait();
           console.log(receipt);
-          setSuccess("Lessons created successfully!");
+          setSuccess(`${lessonName} lesson created successfully!`);
+          setLessonName("");
+          setLessonContent("");
         } catch (err) {
           console.error("Full Error:", err);
           setError(`Failed to create lessons: ${err.message}`);
@@ -644,7 +649,7 @@ const CourseCreationPipeline = () => {
         console.log("Quiz created: ", receipt);
         setLessonId("");
         setQuizTitle("");
-        setQuizSuccess("Quiz created successfully!!");
+        setQuizSuccess(`${quizTitle} created successfully!!`);
       } catch (error) {
         console.error("Error creating quiz: ", error);
         setQuizError("Error creating quiz");
@@ -915,27 +920,163 @@ const CourseCreationPipeline = () => {
     );
   };
 
-  //add resources
   const ResourcesCreation = () => {
     const [resourceName, setResourceName] = useState("");
     const [resourceLink, setResourceLink] = useState("");
+    const [contentType, setContentType] = useState("");
+    const [file, setFile] = useState(null);
     const [resources, setResources] = useState([]);
+    const { lessons } = useContext(LessonContext);
+    const [lessonId, setLessonId] = useState("");
+    const [isUploading, setIsUploading] = useState(false);
+    const [success, setSuccess] = useState("");
+    const [error, setError] = useState("");
 
-    const addResource = () => {
-      if (resourceName.trim() && resourceLink.trim()) {
+    // Enum mapping matching the contract
+    const ContentTypeEnum = {
+      Video: 0,
+      Image: 1,
+      Document: 2,
+    };
+
+    const addResource = async () => {
+      try {
+        if (!lessonId || !contentType || !resourceName) {
+          alert("Please fill in all required fields");
+          return;
+        }
+
+        if (!isConnected || !address) {
+          setError("Wallet is not connected");
+          return;
+        }
+
+        setIsUploading(true);
+        let finalLink = "";
+
+        // Handle file upload for Image/Document
+        if (contentType !== "Video") {
+          if (!file) {
+            alert("Please upload a file");
+            return;
+          }
+          // Upload to Pinata
+          const fileCid = await uploadFileToPinata(file);
+          console.log("File uploaded to Pinata with CID:", fileCid);
+
+          // Create and upload metadata
+          const metadata = {
+            type: contentType.toLowerCase(),
+            file: fileCid,
+          };
+          finalLink = await uploadMetadataToIPFS(metadata);
+        } else {
+          finalLink = resourceLink;
+        }
+
+        // Create resource object matching contract structure
+        const newResource = {
+          contentType: ContentTypeEnum[contentType],
+          url: finalLink,
+          name: resourceName,
+        };
+
+        const signer = await signerPromise;
+        const contract = new ethers.Contract(
+          Ecosystem2ContractAddress,
+          Ecosystem2_ABI,
+          signer
+        );
+
+        // Call contract with the new parameters
+        const tx = await contract.addResourcesToLesson(
+          lessonId,
+          ContentTypeEnum[contentType],
+          [newResource] // Pass as array to match contract function
+        );
+
+        const receipt = await tx.wait();
+        console.log("Resources added to lesson:", receipt);
+
+        // Update local state
         setResources([
           ...resources,
-          { name: resourceName.trim(), link: resourceLink.trim() },
+          {
+            name: resourceName,
+            link: finalLink,
+            contentType,
+          },
         ]);
+
+        setSuccess("Resource added successfully!");
+
+        // Reset form
         setResourceName("");
         setResourceLink("");
+        setFile(null);
+        setContentType("");
+      } catch (error) {
+        console.error("Error adding resource:", error);
+        setError("Error adding resource. Please try again.");
+      } finally {
+        setIsUploading(false);
       }
     };
 
     return (
       <div className="space-y-6">
         <h2 className="text-2xl font-bold text-yellow-500">Add Resources</h2>
+        {(success || error) && (
+          <div
+            className={`mb-4 p-4 rounded-lg flex items-center ${
+              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
+            }`}
+          >
+            {success ? (
+              <CheckCircle className="h-5 w-5 mr-2" />
+            ) : (
+              <AlertCircle className="h-5 w-5 mr-2" />
+            )}
+            <span>{success || error}</span>
+          </div>
+        )}
         <div className="grid gap-4">
+          {/* Lesson Selection */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Select Lesson
+            </label>
+            <select
+              value={lessonId}
+              onChange={(e) => setLessonId(e.target.value)}
+              className="w-full p-3 border rounded-lg"
+            >
+              <option value="">Choose a lesson</option>
+              {lessons.map((lesson) => (
+                <option key={lesson.lessonId} value={lesson.lessonId}>
+                  {lesson.lessonName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Content Type Selection */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Content Type
+            </label>
+            <select
+              value={contentType}
+              onChange={(e) => setContentType(e.target.value)}
+              className="w-full p-3 border rounded-lg"
+            >
+              <option value="">Select content type</option>
+              <option value="Video">Video</option>
+              <option value="Image">Image</option>
+              <option value="Document">Document</option>
+            </select>
+          </div>
+
           <input
             type="text"
             placeholder="Resource Name"
@@ -943,21 +1084,52 @@ const CourseCreationPipeline = () => {
             value={resourceName}
             onChange={(e) => setResourceName(e.target.value)}
           />
-          <input
-            type="text"
-            placeholder="Resource Link"
-            className="w-full p-3 border rounded-lg"
-            value={resourceLink}
-            onChange={(e) => setResourceLink(e.target.value)}
-          />
+
+          {contentType === "Video" ? (
+            <input
+              type="text"
+              placeholder="YouTube Video URL"
+              className="w-full p-3 border rounded-lg"
+              value={resourceLink}
+              onChange={(e) => setResourceLink(e.target.value)}
+            />
+          ) : contentType ? (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Upload {contentType}
+              </label>
+              <input
+                type="file"
+                accept={
+                  contentType === "Image"
+                    ? "image/*"
+                    : "application/pdf,.doc,.docx"
+                }
+                onChange={(e) => setFile(e.target.files[0])}
+                className="w-full p-3 border rounded-lg dark:text-gray-300"
+              />
+            </div>
+          ) : null}
+
           <button
             onClick={addResource}
-            className="bg-yellow-500 text-black px-4 py-2 w-[160px] rounded-lg flex items-center"
+            disabled={isUploading}
+            className={`bg-yellow-500 text-black px-4 py-2 w-[160px] rounded-lg flex items-center ${
+              isUploading ? "opacity-50 cursor-not-allowed" : ""
+            }`}
           >
-            <Plus size={20} />
-            Add Resource
+            {isUploading ? (
+              <span>Uploading...</span>
+            ) : (
+              <>
+                <Plus size={20} />
+                Add Resource
+              </>
+            )}
           </button>
         </div>
+
+        {/* Display Added Resources */}
         {resources.length > 0 && (
           <div className="mt-4">
             <h3 className="font-semibold mb-2">Added Resources:</h3>
@@ -969,9 +1141,21 @@ const CourseCreationPipeline = () => {
                 >
                   <div>
                     <h3 className="font-semibold">{resource.name}</h3>
-                    <a href={resource.link} target="_blank" rel="noreferrer">
-                      {resource.link}
-                    </a>
+                    <div className="text-sm">
+                      <span className="text-gray-500">
+                        Type: {resource.contentType}
+                      </span>
+                      <a
+                        href={resource.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="ml-2 text-blue-500"
+                      >
+                        {resource.contentType === "Video"
+                          ? "Watch Video"
+                          : "View Resource"}
+                      </a>
+                    </div>
                   </div>
                   <button
                     onClick={() =>
@@ -1043,13 +1227,17 @@ const CourseCreationPipeline = () => {
     <div className="w-[90%] md:w-[60%] lg:w-[50%] mx-auto p-8 bg-white dark:bg-gray-900 rounded-lg shadow-lg mt-[100px]">
       <ProgressBar />
 
-      <div className="mb-8">
-        {currentStep === 1 && <CourseBasicInfo />}
-        {currentStep === 2 && <ChapterCreation />}
-        {currentStep === 3 && <LessonCreation />}
-        {currentStep === 4 && <QuizCreation />}
-        {currentStep === 5 && <ResourcesCreation />}
-      </div>
+      {showPreview ? (
+        <PreviewCourse />
+      ) : (
+        <div className="mb-8">
+          {currentStep === 1 && <CourseBasicInfo />}
+          {currentStep === 2 && <ChapterCreation />}
+          {currentStep === 3 && <LessonCreation />}
+          {currentStep === 4 && <QuizCreation />}
+          {currentStep === 5 && <ResourcesCreation />}
+        </div>
+      )}
 
       <div className="flex justify-between">
         {currentStep > 1 && (
@@ -1069,7 +1257,10 @@ const CourseCreationPipeline = () => {
             <ChevronRight size={20} className="ml-2" />
           </button>
         ) : (
-          <button className="bg-green-500 text-white px-6 py-2 rounded-lg">
+          <button
+            onClick={() => setShowPreview(true)}
+            className="bg-green-500 text-white px-6 py-2 rounded-lg"
+          >
             Preview Course
           </button>
         )}
