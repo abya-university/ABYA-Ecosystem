@@ -1,51 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import { Book, Eye, Clock, Check, AlertCircle } from "lucide-react";
+import { CourseContext } from "../contexts/courseContext";
 
-const CoursesPage = () => {
-  const [courses, setCourses] = useState([
-    {
-      id: 1,
-      image: "/Mission.jpg",
-      name: "Intro to Web3",
-      description:
-        "Understand the fundamentals of decentralized technologies and blockchain.",
-      instructor: "Alice Blockchain",
-      duration: "4 weeks",
-      approvalStatus: "pending",
-      price: "Free",
-    },
-    {
-      id: 2,
-      image: "/landing5.jpg",
-      name: "Smart Contract Development",
-      description: "Learn to build and deploy smart contracts on Ethereum.",
-      instructor: "Bob Solidity",
-      duration: "6 weeks",
-      approvalStatus: "approved",
-      price: "0.1 ETH",
-    },
-    {
-      id: 3,
-      image: "/Vision.jpg",
-      name: "Decentralized Identity Basics",
-      description:
-        "Explore the world of DIDs, VCs, and self-sovereign identity.",
-      instructor: "Charlie Web3",
-      duration: "3 weeks",
-      approvalStatus: "pending",
-      price: "Free",
-    },
-    {
-      id: 4,
-      image: "/landing17.jpg",
-      name: "Bitcoin Development",
-      description: "Dip dive into the world of Bitcoin Development.",
-      instructor: "Pierre Bitcoin",
-      duration: "12 weeks",
-      approvalStatus: "pending",
-      price: "0.15 ETH",
-    },
-  ]);
+const CoursesPage = ({ onCourseSelect }) => {
+  const { courses } = useContext(CourseContext);
 
   const getApprovalStatusStyle = (status) => {
     switch (status) {
@@ -56,6 +14,11 @@ const CoursesPage = () => {
       default:
         return "bg-gray-500/20 text-gray-500";
     }
+  };
+
+  const viewCourse = (courseId) => {
+    console.log("Viewing course:", courseId);
+    onCourseSelect(courseId);
   };
 
   return (
@@ -84,24 +47,24 @@ const CoursesPage = () => {
         <div className="grid md:grid-cols-3 gap-6">
           {courses.map((course) => (
             <div
-              key={course.id}
+              key={course.courseId}
               className="p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200
                 transform hover:scale-105 transition-transform duration-1000"
             >
               {/* Course Image */}
               <div className="relative">
                 <img
-                  src={course.image}
-                  alt={course.name}
+                  src="/Vision.jpg"
+                  alt={course.courseName}
                   className="w-full h-48 object-cover rounded-xl"
                 />
                 {/* Approval Status Badge */}
                 <div
-                  className={`absolute top-3 right-3 px-3 py-1 bg-opacity-50 bg-black rounded-full text-xs uppercase ${getApprovalStatusStyle(
+                  className={`absolute bottom-3 right-3 px-3 text-yellow-700 py-1 bg-opacity-50 bg-black rounded-full text-xs uppercase ${getApprovalStatusStyle(
                     course.approvalStatus
                   )}`}
                 >
-                  {course.approvalStatus === "pending" ? (
+                  {!course.approval ? (
                     <>
                       <Clock className="inline-block w-4 h-4 mr-1 -mt-1" />
                       Approval Pending
@@ -118,7 +81,7 @@ const CoursesPage = () => {
               {/* Course Details */}
               <div className="p-5">
                 <h2 className="text-xl font-bold mb-2 text-yellow-500">
-                  {course.name}
+                  {course.courseName}
                 </h2>
                 <p className="text-gray-400 mb-4 line-clamp-2">
                   {course.description}
@@ -127,27 +90,30 @@ const CoursesPage = () => {
                 {/* Course Meta Information */}
                 <div className="flex justify-between items-center mb-4">
                   <div className="text-sm text-gray-500">
-                    <span className="mr-2">
+                    <span className="mr-2 flex items-center">
                       <Book className="inline-block w-4 h-4 mr-1 -mt-1" />
-                      {course.instructor}
+                      <span className="truncate w-[100px] overflow-hidden text-ellipsis whitespace-nowrap">
+                        {course.creator}
+                      </span>
                     </span>
                     <span>
                       <Clock className="inline-block w-4 h-4 mr-1 -mt-1" />
-                      {course.duration}
+                      12 Weeks
                     </span>
                   </div>
-                  <div className="text-yellow-500 font-semibold">
-                    {course.price}
-                  </div>
+                  <div className="text-yellow-500 font-semibold">10 ETH</div>
                 </div>
 
                 {/* Action Buttons */}
                 <div className="flex space-x-3">
-                  <button className="flex-1 bg-yellow-500 text-sm text-black py-2 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center">
+                  <button
+                    onClick={() => viewCourse(course.courseId)}
+                    className="flex-1 bg-yellow-500 text-sm text-black py-2 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center"
+                  >
                     <Eye className="w-5 h-5 mr-2" />
                     View Course
                   </button>
-                  {course.approvalStatus === "pending" && (
+                  {!course.approval && (
                     <button className="flex-1 bg-gray-700 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center">
                       <AlertCircle className="w-5 h-5 mr-2" />
                       Request Review
