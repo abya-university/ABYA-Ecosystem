@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, memo } from "react";
 import { CourseContext } from "../contexts/courseContext";
 import { ChapterContext } from "../contexts/chapterContext";
 import { LessonContext } from "../contexts/lessonContext";
@@ -11,43 +11,95 @@ import {
   ChevronLeft,
   ChevronRight,
   BookOpen,
+  Book,
+  CheckCircle2,
 } from "lucide-react";
 
-// Separate Resource component
-const Resource = ({ resource }) => {
+// Separate Video component to prevent re-renders
+const VideoResource = memo(({ url, name }) => (
+  <div className="mt-2">
+    <div className="relative w-full pt-[56.25%] rounded-xl overflow-hidden">
+      <iframe
+        className="absolute top-0 left-0 w-full h-full"
+        src={`https://www.youtube.com/embed/${url}`}
+        title={name}
+        frameBorder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+      />
+    </div>
+    <span className="italic text-gray-700 text-sm dark:text-gray-300 mt-2 block">
+      {name}
+    </span>
+  </div>
+));
+
+VideoResource.displayName = "VideoResource";
+
+// Separate Image component
+const ImageResource = memo(({ url, name, metadata }) => (
+  <div className="mt-2">
+    <div className="rounded-xl overflow-hidden">
+      <img
+        src={`https://gateway.pinata.cloud/ipfs/${metadata?.file || url}`}
+        alt={name}
+        className="w-full h-auto"
+        onError={(e) => {
+          e.target.onerror = null;
+          e.target.src = "/placeholder-image.jpg";
+        }}
+      />
+    </div>
+    <span className="italic text-gray-700 text-sm dark:text-gray-300 mt-2 block">
+      {name}
+    </span>
+  </div>
+));
+
+ImageResource.displayName = "ImageResource";
+
+// Separate Document component
+const DocumentResource = memo(({ url, name, metadata, contentType }) => (
+  <div className="mt-2">
+    <a
+      href={`https://gateway.pinata.cloud/ipfs/${metadata?.file || url}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 p-3 rounded-lg bg-gradient-to-r from-blue-500/10 to-purple-500/10 hover:from-blue-500/20 hover:to-purple-500/20 transition-all duration-300 border border-gray-700/20 dark:border-gray-700"
+    >
+      {contentType === 2 ? (
+        <FileText className="w-5 h-5 text-green-500" />
+      ) : (
+        <File className="w-5 h-5" />
+      )}
+      <span className="text-gray-700 dark:text-gray-300">{name}</span>
+    </a>
+  </div>
+));
+
+DocumentResource.displayName = "DocumentResource";
+
+const Resource = memo(({ resource }) => {
   const [metadata, setMetadata] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const renderResourceIcon = (contentType) => {
-    switch (contentType) {
-      case 0:
-        return <Youtube className="w-5 h-5 text-red-500" />;
-      case 1:
-        return <ImageIcon className="w-5 h-5 text-blue-500" />;
-      case 2:
-        return <FileText className="w-5 h-5 text-green-500" />;
-      default:
-        return <File className="w-5 h-5" />;
-    }
-  };
-
-  const renderVideo = (url) => {
-    return (
-      <div className="relative w-full pt-[56.25%] mt-2 rounded-xl overflow-hidden">
-        <iframe
-          className="absolute top-0 left-0 w-full h-full"
-          src={`https://www.youtube.com/embed/${url}`}
-          allowFullScreen
-        />
-      </div>
-    );
-  };
-
   useEffect(() => {
+    let isSubscribed = true;
+
     const fetchMetadata = async () => {
+      // Skip fetch for video content
+      if (resource.contentType === 0) {
+        return;
+      }
+
+      // Skip if we already have metadata
+      if (metadata) {
+        return;
+      }
+
+      setLoading(true);
       try {
-        setLoading(true);
         const response = await fetch(
           `https://gateway.pinata.cloud/ipfs/${resource.url}`
         );
@@ -55,20 +107,25 @@ const Resource = ({ resource }) => {
           throw new Error("Failed to fetch resource");
         }
         const data = await response.json();
-        setMetadata(data);
-      } catch (error) {
-        console.error("Error fetching metadata:", error);
-        setError(error.message);
+        if (isSubscribed) {
+          setMetadata(data);
+        }
+      } catch (err) {
+        if (isSubscribed) {
+          setError(err.message);
+        }
       } finally {
-        setLoading(false);
+        if (isSubscribed) {
+          setLoading(false);
+        }
       }
     };
 
-    if (resource.contentType !== 0) {
-      fetchMetadata();
-    } else {
-      setLoading(false);
-    }
+    fetchMetadata();
+
+    return () => {
+      isSubscribed = false;
+    };
   }, [resource.url, resource.contentType]);
 
   if (loading) {
@@ -87,43 +144,30 @@ const Resource = ({ resource }) => {
 
   switch (resource.contentType) {
     case 0:
-      return renderVideo(resource.url);
+      return <VideoResource url={resource.url} name={resource.name} />;
     case 1:
       return (
-        <div className="mt-2 rounded-xl overflow-hidden">
-          <img
-            src={`https://gateway.pinata.cloud/ipfs/${
-              metadata?.file || resource.url
-            }`}
-            alt={resource.name}
-            className="w-full h-auto"
-            onError={(e) => {
-              e.target.onerror = null;
-              e.target.src = "/placeholder-image.jpg";
-            }}
-          />
-        </div>
+        <ImageResource
+          url={resource.url}
+          name={resource.name}
+          metadata={metadata}
+        />
       );
     case 2:
       return (
-        <a
-          href={`https://gateway.pinata.cloud/ipfs/${
-            metadata?.file || resource.url
-          }`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 p-3 mt-2 rounded-lg bg-gradient-to-r from-blue-500/10 to-purple-500/10 hover:from-blue-500/20 hover:to-purple-500/20 transition-all duration-300 border border-gray-700/20 dark:border-gray-700"
-        >
-          {renderResourceIcon(resource.contentType)}
-          <span className="text-gray-700 dark:text-gray-300">
-            {resource.name}
-          </span>
-        </a>
+        <DocumentResource
+          url={resource.url}
+          name={resource.name}
+          metadata={metadata}
+          contentType={resource.contentType}
+        />
       );
     default:
       return <div className="text-gray-500 p-4">Unsupported resource type</div>;
   }
-};
+});
+
+Resource.displayName = "Resource";
 
 // Quiz component with navigation
 const Quiz = ({ quiz }) => {
@@ -226,6 +270,7 @@ const CourseDetails = ({ courseId }) => {
   const { lessons } = useContext(LessonContext);
   const { quizzes } = useContext(QuizContext);
   const [openQuizIds, setOpenQuizIds] = useState(new Set());
+  const [activeChapterId, setActiveChapterId] = useState(null);
 
   useEffect(() => {
     if (courseId) {
@@ -237,6 +282,11 @@ const CourseDetails = ({ courseId }) => {
         chapterName: chapter.chapterName,
       }));
       setChapters(formattedChapters);
+
+      // Set the first chapter as active by default
+      if (formattedChapters.length > 0 && !activeChapterId) {
+        setActiveChapterId(formattedChapters[0].chapterId);
+      }
     }
   }, [courseId, fetchChapters]);
 
@@ -252,24 +302,27 @@ const CourseDetails = ({ courseId }) => {
     });
   };
 
+  const currentCourse = courses.find((course) => course.courseId === courseId);
+  const filteredChapters = chapters.filter(
+    (chapter) => chapter.courseID === courseId
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 pt-[100px]">
-      {courses.map((course) =>
-        course.courseId === courseId ? (
-          <div
-            key={course.courseId}
-            className="max-w-7xl mx-auto w-full lg:w-[60%]"
-          >
+      <div className="max-w-7xl mx-auto">
+        <div className="flex gap-8">
+          {/* Main Content Area (80%) */}
+          <div className="w-[80%]">
             <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              {course.courseName}
+              {currentCourse?.courseName}
             </h1>
             <p className="text-gray-700 dark:text-gray-300 mb-8">
-              {course.description}
+              {currentCourse?.description}
             </p>
 
             <div className="space-y-8">
-              {chapters
-                .filter((chapter) => chapter.courseID === courseId)
+              {filteredChapters
+                .filter((chapter) => chapter.chapterId === activeChapterId)
                 .map((chapter, chapterIndex) => (
                   <div key={chapter.chapterId} className="p-6">
                     <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
@@ -315,9 +368,9 @@ const CourseDetails = ({ courseId }) => {
                                       .map((resource, index) => (
                                         <div key={index}>
                                           <Resource resource={resource} />
-                                          <span className="italic text-gray-700 text-sm dark:text-gray-300">
+                                          {/* <span className="italic text-gray-700 text-sm dark:text-gray-300">
                                             {resource.name}
-                                          </span>
+                                          </span> */}
                                         </div>
                                       ))}
                                   </div>
@@ -326,25 +379,20 @@ const CourseDetails = ({ courseId }) => {
 
                               {lessonQuiz && (
                                 <div className="mt-6 p-6 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg dark:text-gray-300">
-                                  <div asChild>
-                                    <div
-                                      variant="outline"
-                                      className="w-full justify-between"
-                                      onClick={() =>
-                                        toggleQuiz(lesson.lessonId)
-                                      }
-                                    >
-                                      <span className="dark:text-gray-300">
-                                        {lessonQuiz.quizTitle}
-                                      </span>
-                                      <ChevronRight
-                                        className={`w-4 h-4 dark:text-yellow-500 transform transition-transform ${
-                                          openQuizIds.has(lesson.lessonId)
-                                            ? "rotate-90"
-                                            : ""
-                                        }`}
-                                      />
-                                    </div>
+                                  <div
+                                    className="w-full justify-between cursor-pointer"
+                                    onClick={() => toggleQuiz(lesson.lessonId)}
+                                  >
+                                    <span className="dark:text-gray-300">
+                                      {lessonQuiz.quizTitle}
+                                    </span>
+                                    <ChevronRight
+                                      className={`w-4 h-4 dark:text-yellow-500 transform transition-transform ${
+                                        openQuizIds.has(lesson.lessonId)
+                                          ? "rotate-90"
+                                          : ""
+                                      }`}
+                                    />
                                   </div>
                                   <div>
                                     {openQuizIds.has(lesson.lessonId) && (
@@ -361,8 +409,36 @@ const CourseDetails = ({ courseId }) => {
                 ))}
             </div>
           </div>
-        ) : null
-      )}
+
+          {/* Right Sidebar Navigation (20%) */}
+          <div className="w-[20%] bg-white dark:bg-gray-800 p-6 rounded-lg h-fit sticky top-[100px]">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Course Navigation
+            </h3>
+            <div className="space-y-2">
+              {filteredChapters.map((chapter, index) => (
+                <div
+                  key={chapter.chapterId}
+                  onClick={() => setActiveChapterId(chapter.chapterId)}
+                  className={`p-3 rounded-lg cursor-pointer transition-all duration-200 flex items-center gap-2 ${
+                    activeChapterId === chapter.chapterId
+                      ? "bg-gradient-to-r from-yellow-500/20 to-green-500/20 dark:text-white"
+                      : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  }`}
+                >
+                  <Book className="w-4 h-4" />
+                  <span className="text-sm">
+                    Module {index + 1}: {chapter.chapterName}
+                  </span>
+                  {activeChapterId === chapter.chapterId && (
+                    <CheckCircle2 className="w-4 h-4 ml-auto text-yellow-500" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
