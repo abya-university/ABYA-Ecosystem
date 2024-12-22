@@ -37,6 +37,7 @@ const LessonProvider = ({ children }) => {
         console.log("Raw lessons data:", lessonsData);
 
         const lessonsArray = lessonsData.map((lesson) => ({
+          chapterId: Number(lesson.chapterId),
           lessonId: Number(lesson.lessonId),
           lessonName: lesson.lessonName,
           lessonContent: lesson.lessonContent,

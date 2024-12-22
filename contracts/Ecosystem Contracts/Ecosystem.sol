@@ -63,12 +63,14 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
     }
 
     struct Chapter {
+        uint256 courseId;
         uint256 chapterId;
         string chapterName;
         bool exists;
     }
 
     struct Lesson {
+        uint256 chapterId;
         uint256 lessonId;
         string lessonName;
         string lessonContent;
@@ -86,6 +88,7 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
     }
 
     struct Quiz {
+        uint256 lessonId;
         uint256 quizId;
         string quizTitle;
         Question[] questions;
@@ -93,6 +96,7 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
     }
 
     struct Question {
+        uint256 quizId;
         uint256 questionId;
         string questionText;
         Choice[] choices;

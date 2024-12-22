@@ -53,7 +53,7 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
     // delete courseChapters[_courseId];
 
     for (uint i = 0; i < _chapters.length; i++) {      
-        Chapter memory newChapter = Chapter(nextChapterId, _chapters[i], true);
+        Chapter memory newChapter = Chapter(_courseId, nextChapterId, _chapters[i], true);
         listOfChapters.push(newChapter);
 
         // uint256 _chapterId = nextChapterId;
@@ -82,6 +82,7 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
 
         // Initialize a new Lesson directly in storage
         Lesson storage newLesson = lesson[lessonId];
+        newLesson.chapterId = _chapterId;
         newLesson.lessonId = lessonId;
         newLesson.lessonName = _lessonName;
         newLesson.lessonContent = _lessonContent;
@@ -113,6 +114,7 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
         uint256 _quizId = nextQuizId;
         require(lesson[_lessonId].exists, "Lesson Does not exist!");
         Quiz storage newQuiz = quizzes[_quizId];
+        newQuiz.lessonId = _lessonId;
         newQuiz.quizId = _quizId;
         newQuiz.quizTitle = _title;
         newQuiz.exists = true;
@@ -142,6 +144,7 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
     
         // Create new Question struct in storage
         Question storage newQuestion = questions[_questionId];
+        newQuestion.quizId = _quizId;
         newQuestion.questionId = _questionId;
         newQuestion.questionText = _questionText;
 
