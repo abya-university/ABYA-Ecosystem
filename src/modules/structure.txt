@@ -1,0 +1,19 @@
+DID-Project/
+├── .env                     # Environment variables
+├── package.json             # Node.js dependencies and scripts
+├── src/
+│   ├── config/
+│   │   └── ethers.js        # Ethers.js configuration for blockchain interaction
+│   ├── modules/
+│   │   ├── didCreation.js   # Logic for DID creation
+│   │   ├── didDocument.js   # Logic for DID Document creation
+│   │   ├── didResolver.js   # DID resolution logic
+│   │   ├── didUsage.js      # Logic for DID usage
+│   │   ├── didUpdate.js     # Logic for DID updates
+│   │   ├── didDeactivate.js # Logic for DID deactivation
+│   │   ├── didVerify.js     # Logic for DID verification
+│   │   ├── didregister.js   # Logic for registering the DID
+│   │   └── dids/
+│   │       └── dids.json    # Storage for generated DIDs
+│   └── index.js             # Main entry point
+├── README.md                # Documentation

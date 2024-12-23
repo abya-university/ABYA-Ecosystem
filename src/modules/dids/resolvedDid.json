@@ -1,0 +1,28 @@
+{
+  "didDocumentMetadata": {},
+  "didResolutionMetadata": {
+    "contentType": "application/did+ld+json"
+  },
+  "didDocument": {
+    "id": "did:ethr:sepolia:0xeDB147c7fb742a5648359818EE0936a68Fce173d",
+    "verificationMethod": [
+      {
+        "id": "did:ethr:sepolia:0xeDB147c7fb742a5648359818EE0936a68Fce173d#controller",
+        "type": "EcdsaSecp256k1RecoveryMethod2020",
+        "controller": "did:ethr:sepolia:0xeDB147c7fb742a5648359818EE0936a68Fce173d",
+        "blockchainAccountId": "eip155:11155111:0xeDB147c7fb742a5648359818EE0936a68Fce173d"
+      }
+    ],
+    "authentication": [
+      "did:ethr:sepolia:0xeDB147c7fb742a5648359818EE0936a68Fce173d#controller"
+    ],
+    "assertionMethod": [
+      "did:ethr:sepolia:0xeDB147c7fb742a5648359818EE0936a68Fce173d#controller"
+    ],
+    "@context": [
+      "https://www.w3.org/ns/did/v1",
+      "https://w3id.org/security/suites/secp256k1recovery-2020/v2",
+      "https://w3id.org/security/v3-unstable"
+    ]
+  }
+}
