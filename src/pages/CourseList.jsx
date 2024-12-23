@@ -1,9 +1,53 @@
-import React, { useState, useContext } from "react";
-import { Book, Eye, Clock, Check, AlertCircle } from "lucide-react";
+import React, { useState, useContext, useRef, useEffect } from "react";
+import {
+  Book,
+  Eye,
+  Clock,
+  Check,
+  AlertCircle,
+  Wifi,
+  Info,
+  X,
+  Loader,
+  Users,
+} from "lucide-react";
 import { CourseContext } from "../contexts/courseContext";
+import { useUser } from "../contexts/userContext";
+import { ChapterContext } from "../contexts/chapterContext";
+import { LessonContext } from "../contexts/lessonContext";
+import { QuizContext } from "../contexts/quizContext";
 
 const CoursesPage = ({ onCourseSelect }) => {
   const { courses } = useContext(CourseContext);
+  const { role } = useUser();
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [detailsPosition, setDetailsPosition] = useState({ top: 0, left: 0 });
+  const detailsRef = useRef(null);
+  const { chapters, fetchChapters } = useContext(ChapterContext);
+  const { lessons } = useContext(LessonContext);
+  const { quizzes } = useContext(QuizContext);
+  const [isLoading, setIsLoading] = useState(false);
+  const [courseStats, setCourseStats] = useState({
+    totalLessons: 0,
+    totalQuizzes: 0,
+  });
+
+  const calculateCourseStats = (courseChapters) => {
+    // Get all lesson IDs that belong to the course chapters
+    const courseLessons = lessons.filter((lesson) =>
+      courseChapters.some((chapter) => chapter.chapterId === lesson.chapterId)
+    );
+
+    // Count quizzes that belong to the course lessons
+    const courseQuizzes = quizzes.filter((quiz) =>
+      courseLessons.some((lesson) => lesson.lessonId === quiz.lessonId)
+    );
+
+    setCourseStats({
+      totalLessons: courseLessons.length,
+      totalQuizzes: courseQuizzes.length,
+    });
+  };
 
   const getApprovalStatusStyle = (status) => {
     switch (status) {
@@ -21,20 +65,54 @@ const CoursesPage = ({ onCourseSelect }) => {
     onCourseSelect(courseId);
   };
 
+  const openCourseDetails = async (course, event) => {
+    setIsLoading(true);
+    const button = event.currentTarget;
+    const rect = button.getBoundingClientRect();
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+
+    setDetailsPosition({
+      top: rect.top + scrollY - 400,
+      left: rect.left + scrollX + 40,
+    });
+
+    setSelectedCourse(course);
+
+    try {
+      // Fetch chapters for the selected course
+      await fetchChapters(course.courseId);
+      // Calculate lessons and quizzes based on the fetched chapters
+      const courseChapters = chapters.filter(
+        (chapter) => chapter.courseId === course.courseId
+      );
+      calculateCourseStats(courseChapters);
+    } catch (error) {
+      console.error("Error fetching course details:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (detailsRef.current && !detailsRef.current.contains(event.target)) {
+        setSelectedCourse(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   return (
-    <div
-      className="dark:bg-gray-900 dark:text-gray-100 bg-white text-gray-900
-      min-h-screen p-6 transition-colors duration-300 pt-[100px]"
-    >
+    <div className="dark:bg-gray-900 dark:text-gray-100 bg-white text-gray-900 min-h-screen p-6 transition-colors duration-300 pt-[100px]">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center space-x-4">
             <Book className="w-8 h-8 text-yellow-500" />
-            <h1
-              className="text-3xl font-bold 
-              dark:text-yellow-400 text-yellow-500"
-            >
+            <h1 className="text-3xl font-bold dark:text-yellow-400 text-yellow-500">
               Available Courses
             </h1>
           </div>
@@ -48,9 +126,16 @@ const CoursesPage = ({ onCourseSelect }) => {
           {courses.map((course) => (
             <div
               key={course.courseId}
-              className="p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200
-                transform hover:scale-105 transition-transform duration-1000"
+              className="relative p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200 transform hover:scale-105 transition-transform duration-1000"
             >
+              {/* Info Icon */}
+              <button
+                onClick={(e) => openCourseDetails(course, e)}
+                className="absolute bottom-4 right-4 z-10 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-yellow-500 hover:bg-gray-400 mt-3 dark:hover:bg-gray-600 transition-colors"
+              >
+                <Info className="w-5 h-5" />
+              </button>
+
               {/* Course Image */}
               <div className="relative">
                 <img
@@ -80,7 +165,7 @@ const CoursesPage = ({ onCourseSelect }) => {
 
               {/* Course Details */}
               <div className="p-5">
-                <h2 className="text-xl font-bold mb-2 text-yellow-500">
+                <h2 className="text-xl font-bold mb-2 text-yellow-500 truncate w-[300px]">
                   {course.courseName}
                 </h2>
                 <p className="text-gray-400 mb-4 line-clamp-2">
@@ -106,17 +191,21 @@ const CoursesPage = ({ onCourseSelect }) => {
 
                 {/* Action Buttons */}
                 <div className="flex space-x-3">
-                  <button
-                    onClick={() => viewCourse(course.courseId)}
-                    className="flex-1 bg-yellow-500 text-sm text-black py-2 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center"
-                  >
-                    <Eye className="w-5 h-5 mr-2" />
-                    View Course
-                  </button>
-                  {!course.approval && (
-                    <button className="flex-1 bg-gray-700 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center">
-                      <AlertCircle className="w-5 h-5 mr-2" />
-                      Request Review
+                  {(role === "ADMIN" ||
+                    role === "Course Owner" ||
+                    role === "Reviewer") && (
+                    <button
+                      onClick={() => viewCourse(course.courseId)}
+                      className="flex-1 bg-yellow-500 text-sm text-black py-2 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center"
+                    >
+                      <Eye className="w-5 h-5 mr-2" />
+                      View Course
+                    </button>
+                  )}
+                  {role === "USER" && (
+                    <button className="flex-1 bg-gray-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center">
+                      <Wifi className="w-5 h-5 mr-2" />
+                      Enroll
                     </button>
                   )}
                 </div>
@@ -124,6 +213,101 @@ const CoursesPage = ({ onCourseSelect }) => {
             </div>
           ))}
         </div>
+
+        {/* Absolute Course Details Panel */}
+        {selectedCourse && (
+          <div
+            ref={detailsRef}
+            style={{
+              top: `${detailsPosition.top}px`,
+              left: `${detailsPosition.left}px`,
+            }}
+            className="fixed w-80 dark:bg-gray-900 bg-gray-100 dark:text-gray-100 text-gray-800 rounded-lg h-[400px] overflow-x-hidden shadow-xl p-4 z-50 dark:border dark:border-gray-700 border-none"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-yellow-500">
+                Course Details
+              </h3>
+              <button
+                onClick={() => setSelectedCourse(null)}
+                className="text-gray-400 hover:text-gray-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-[300px]">
+                <Loader className="w-8 h-8 text-yellow-500 animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-semibold text-yellow-500">Course Name</h4>
+                  <p className="dark:text-gray-300 text-gray-700">
+                    {selectedCourse.courseName}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-yellow-500">Description</h4>
+                  <p className="dark:text-gray-300 text-gray-700">
+                    {selectedCourse.description}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="font-semibold text-yellow-500">Chapters</h4>
+                    <p className="dark:text-gray-300 text-gray-700">
+                      {/* {
+                        chapters.filter(
+                          (chapter) =>
+                            chapter.courseId === selectedCourse.courseId
+                        ).length
+                      } */}
+                      {chapters?.length}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-yellow-500">Lessons</h4>
+                    <p className="dark:text-gray-300 text-gray-700">
+                      {/* {courseStats.totalLessons} */}
+                      {lessons?.length}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-yellow-500">Quizzes</h4>
+                    <p className="dark:text-gray-300 text-gray-700">
+                      {/* {courseStats.totalQuizzes} */}
+                      {quizzes?.length}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-yellow-500">Duration</h4>
+                    <p className="dark:text-gray-300 text-gray-700">12 Weeks</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-yellow-500">
+                      Prerequisites
+                    </h4>
+                    <p className="dark:text-gray-300 text-gray-700">None</p>
+                  </div>
+                  <div className="flex gap-2 flex-col">
+                    <h4 className="font-semibold text-yellow-500">Enrolled</h4>
+                    <span>
+                      {selectedCourse?.enrolledStudents || 0} Learners
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-yellow-500">Creator</h4>
+                  <p className="dark:text-gray-300 text-gray-700 truncate w-[250px]">
+                    {selectedCourse.creator}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
