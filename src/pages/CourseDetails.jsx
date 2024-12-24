@@ -14,6 +14,8 @@ import {
   Book,
   CheckCircle2,
 } from "lucide-react";
+import ReviewModal from "../components/ReviewModal";
+import { useUser } from "../contexts/userContext";
 
 // Separate Video component to prevent re-renders
 const VideoResource = memo(({ url, name }) => (
@@ -271,6 +273,8 @@ const CourseDetails = ({ courseId }) => {
   const { quizzes } = useContext(QuizContext);
   const [openQuizIds, setOpenQuizIds] = useState(new Set());
   const [activeChapterId, setActiveChapterId] = useState(null);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const { role } = useUser();
 
   useEffect(() => {
     if (courseId) {
@@ -306,6 +310,23 @@ const CourseDetails = ({ courseId }) => {
   const filteredChapters = chapters.filter(
     (chapter) => chapter.courseID === courseId
   );
+
+  const handleSubmitReview = (courseId, ratings) => {
+    // Call your smart contract function here with the ratings
+    submitReview(
+      courseId,
+      ratings.learnerAgency,
+      ratings.criticalThinking,
+      ratings.collaborativeLearning,
+      ratings.reflectivePractice,
+      ratings.adaptiveLearning,
+      ratings.authenticLearning,
+      ratings.technologyIntegration,
+      ratings.learnerSupport,
+      ratings.assessmentForLearning,
+      ratings.engagementAndMotivation
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 pt-[100px]">
@@ -438,6 +459,21 @@ const CourseDetails = ({ courseId }) => {
             </div>
           </div>
         </div>
+        {role === "Reviewer" && (
+          <button
+            onClick={() => setIsReviewModalOpen(true)}
+            className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg"
+          >
+            Review Course
+          </button>
+        )}
+
+        <ReviewModal
+          isOpen={isReviewModalOpen}
+          onClose={() => setIsReviewModalOpen(false)}
+          onSubmit={handleSubmitReview}
+          courseId={courseId}
+        />
       </div>
     </div>
   );
