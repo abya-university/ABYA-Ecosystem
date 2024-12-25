@@ -62,14 +62,11 @@ const CoursesPage = ({ onCourseSelect }) => {
 
   console.log("Courses:", courses);
 
-  const getApprovalStatusStyle = (status) => {
-    switch (status) {
-      case "approved":
-        return "bg-green-500/20 text-green-500";
-      case "pending":
-        return "bg-yellow-500/20 text-yellow-500";
-      default:
-        return "bg-gray-500/20 text-gray-500";
+  const getApprovalStatusStyle = (approved) => {
+    if (approved) {
+      return "bg-green-500/20 text-green-500";
+    } else {
+      return "bg-yellow-500/20 text-yellow-500";
     }
   };
 
@@ -179,7 +176,7 @@ const CoursesPage = ({ onCourseSelect }) => {
                   {/* Approval Status Badge */}
                   <div
                     className={`absolute bottom-3 right-3 px-3 text-yellow-700 py-1 bg-opacity-50 bg-black rounded-full text-xs uppercase ${getApprovalStatusStyle(
-                      course.approvalStatus
+                      course.approved
                     )}`}
                   >
                     {!course.approved ? (
