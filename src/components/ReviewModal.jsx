@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { Star, X } from "lucide-react";
+import { AlertCircle, CheckCircle, Star, X } from "lucide-react";
+import Ecosystem2ABI from "../artifacts/contracts/Ecosystem Contracts/Ecosystem2.sol/Ecosystem2.json";
+import { ethers } from "ethers";
+import { useEthersSigner } from "./useClientSigner";
+import { useAccount } from "wagmi";
+
+const ContractABI = Ecosystem2ABI.abi;
+const ContractAddress = import.meta.env.VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
 
 const ReviewModal = ({ isOpen, onClose, onSubmit, courseId }) => {
   const [ratings, setRatings] = useState({
@@ -14,6 +21,11 @@ const ReviewModal = ({ isOpen, onClose, onSubmit, courseId }) => {
     assessmentForLearning: 0,
     engagementAndMotivation: 0,
   });
+  const signerPromise = useEthersSigner();
+  const { address, isConnected } = useAccount();
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
   const metrics = [
     { key: "learnerAgency", label: "Learner Agency" },
@@ -28,6 +40,43 @@ const ReviewModal = ({ isOpen, onClose, onSubmit, courseId }) => {
     { key: "engagementAndMotivation", label: "Engagement and Motivation" },
   ];
 
+  const handleSubmitReview = async (courseId, ratings) => {
+    if (!isConnected || !address) {
+      throw new Error("User is not connected");
+    }
+
+    try {
+      const signer = await signerPromise;
+      const contract = new ethers.Contract(
+        ContractAddress,
+        ContractABI,
+        signer
+      );
+      const transaction = await contract.submitReview(
+        courseId,
+        ratings.learnerAgency,
+        ratings.criticalThinking,
+        ratings.collaborativeLearning,
+        ratings.reflectivePractice,
+        ratings.adaptiveLearning,
+        ratings.authenticLearning,
+        ratings.technologyIntegration,
+        ratings.learnerSupport,
+        ratings.assessmentForLearning,
+        ratings.engagementAndMotivation
+      );
+      await transaction.wait();
+      setSuccess(`Course ${courseId} reviewed successfully`);
+      setReviewSubmitted(true);
+      setTimeout(() => {
+        onClose();
+      }, 3000);
+    } catch (err) {
+      setError(err.message);
+      setReviewSubmitted(false);
+    }
+  };
+
   const handleRatingChange = (metric, value) => {
     setRatings((prev) => ({
       ...prev,
@@ -37,11 +86,6 @@ const ReviewModal = ({ isOpen, onClose, onSubmit, courseId }) => {
 
   const calculateTotal = () => {
     return Object.values(ratings).reduce((a, b) => a + b, 0);
-  };
-
-  const handleSubmit = () => {
-    onSubmit(courseId, ratings);
-    onClose();
   };
 
   const StarRating = ({ value, onChange }) => {
@@ -80,6 +124,20 @@ const ReviewModal = ({ isOpen, onClose, onSubmit, courseId }) => {
             <X className="h-6 w-6 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
+        {(success || error) && (
+          <div
+            className={`mb-4 p-4 rounded-lg flex items-center ${
+              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
+            }`}
+          >
+            {success ? (
+              <CheckCircle className="h-5 w-5 mr-2" />
+            ) : (
+              <AlertCircle className="h-5 w-5 mr-2" />
+            )}
+            <span>{success || error}</span>
+          </div>
+        )}
 
         <div className="space-y-6">
           {metrics.map(({ key, label }) => (
@@ -122,11 +180,11 @@ const ReviewModal = ({ isOpen, onClose, onSubmit, courseId }) => {
             </div>
 
             <button
-              onClick={handleSubmit}
-              disabled={calculateTotal() === 0}
-              className="w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-400 
-                       text-white font-semibold rounded-lg shadow-md transition-colors
-                       disabled:cursor-not-allowed"
+              onClick={() => handleSubmitReview(courseId, ratings)}
+              disabled={calculateTotal() === 0 || reviewSubmitted}
+              className={`w-full py-2 px-4 bg-yellow-500 text-white font-semibold rounded-lg shadow-md transition-colors ${
+                reviewSubmitted ? "disabled:bg-gray-400" : "hover:bg-yellow-600"
+              } flex items-center justify-center`}
             >
               Submit Review
             </button>

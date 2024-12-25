@@ -251,6 +251,7 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
     }
 
     function approveCourse(uint256 _courseId) public onlyRole(REVIEWER_ROLE) {
+        // Update in the mapping
         Course storage course = courseObject[_courseId];
         require(!course.approved, "Course already approved");
         require(!approvals[msg.sender][_courseId], "You have already approved this course");
@@ -260,7 +261,24 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
 
         if (course.approvalCount >= REQUIRED_APPROVALS) {
             course.approved = true;
-            mintToken(course.creator, CREATE_COURSE_REWARD); //mint the course creation reward to the course creator
+        
+            // Update in the array
+            for (uint256 i = 0; i < listOfCourses.length; i++) {
+                if (listOfCourses[i].courseId == _courseId) {
+                    listOfCourses[i].approved = true;
+                    listOfCourses[i].approvalCount = course.approvalCount;
+                    break;
+                }
+            }
+
+            mintToken(course.creator, CREATE_COURSE_REWARD);
+        } else {
+            for (uint256 i = 0; i < listOfCourses.length; i++) {
+                if (listOfCourses[i].courseId == _courseId) {
+                    listOfCourses[i].approvalCount = course.approvalCount;
+                    break;
+                }
+            }
         }
     }
 

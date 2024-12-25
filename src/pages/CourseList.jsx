@@ -16,9 +16,17 @@ import { useUser } from "../contexts/userContext";
 import { ChapterContext } from "../contexts/chapterContext";
 import { LessonContext } from "../contexts/lessonContext";
 import { QuizContext } from "../contexts/quizContext";
+import Ecosystem2ABI from "../artifacts/contracts/Ecosystem Contracts/Ecosystem2.sol/Ecosystem2.json";
+import { ethers } from "ethers";
+import { useEthersSigner } from "../components/useClientSigner";
+import { useAccount } from "wagmi";
+
+const ContractABI = Ecosystem2ABI.abi;
+const ContractAddress = import.meta.env.VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
 
 const CoursesPage = ({ onCourseSelect }) => {
   const { courses } = useContext(CourseContext);
+  const [courseId, setCourseId] = useState(null);
   const { role } = useUser();
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [detailsPosition, setDetailsPosition] = useState({ top: 0, left: 0 });
@@ -31,6 +39,9 @@ const CoursesPage = ({ onCourseSelect }) => {
     totalLessons: 0,
     totalQuizzes: 0,
   });
+  const { address } = useAccount();
+  const signerPromise = useEthersSigner();
+  const [requestSent, setRequestSent] = useState(false);
 
   const calculateCourseStats = (courseChapters) => {
     // Get all lesson IDs that belong to the course chapters
@@ -48,6 +59,8 @@ const CoursesPage = ({ onCourseSelect }) => {
       totalQuizzes: courseQuizzes.length,
     });
   };
+
+  console.log("Courses:", courses);
 
   const getApprovalStatusStyle = (status) => {
     switch (status) {
@@ -78,6 +91,7 @@ const CoursesPage = ({ onCourseSelect }) => {
     });
 
     setSelectedCourse(course);
+    setCourseId(course.courseId);
 
     try {
       // Fetch chapters for the selected course
@@ -105,6 +119,24 @@ const CoursesPage = ({ onCourseSelect }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const requestReview = async (courseId) => {
+    try {
+      const signer = await signerPromise;
+      const contract = new ethers.Contract(
+        ContractAddress,
+        ContractABI,
+        signer
+      );
+
+      console.log("Requesting review for courseId:", courseId); // Debug log
+      await contract.selectCourseReviewers(courseId);
+      setRequestSent(true);
+    } catch (error) {
+      console.error("Error requesting review:", error);
+      setRequestSent(false);
+    }
+  };
+
   return (
     <div className="dark:bg-gray-900 dark:text-gray-100 bg-white text-gray-900 min-h-screen p-6 transition-colors duration-300 pt-[100px]">
       <div className="max-w-6xl mx-auto">
@@ -123,95 +155,117 @@ const CoursesPage = ({ onCourseSelect }) => {
 
         {/* Courses Grid */}
         <div className="grid md:grid-cols-3 gap-6">
-          {courses.map((course) => (
-            <div
-              key={course.courseId}
-              className="relative p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200 transform hover:scale-105 transition-transform duration-1000"
-            >
-              {/* Info Icon */}
-              <button
-                onClick={(e) => openCourseDetails(course, e)}
-                className="absolute bottom-4 right-4 z-10 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-yellow-500 hover:bg-gray-400 mt-3 dark:hover:bg-gray-600 transition-colors"
+          {courses?.length > 0 ? (
+            courses.map((course) => (
+              <div
+                key={course.courseId}
+                className="relative p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200 transform hover:scale-105 transition-transform duration-1000"
               >
-                <Info className="w-5 h-5" />
-              </button>
-
-              {/* Course Image */}
-              <div className="relative">
-                <img
-                  src="/Vision.jpg"
-                  alt={course.courseName}
-                  className="w-full h-48 object-cover rounded-xl"
-                />
-                {/* Approval Status Badge */}
-                <div
-                  className={`absolute bottom-3 right-3 px-3 text-yellow-700 py-1 bg-opacity-50 bg-black rounded-full text-xs uppercase ${getApprovalStatusStyle(
-                    course.approvalStatus
-                  )}`}
+                {/* Info Icon */}
+                <button
+                  onClick={(e) => openCourseDetails(course, e)}
+                  className="absolute bottom-4 right-4 z-10 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-yellow-500 hover:bg-gray-400 mt-3 dark:hover:bg-gray-600 transition-colors"
                 >
-                  {!course.approval ? (
-                    <>
-                      <Clock className="inline-block w-4 h-4 mr-1 -mt-1" />
-                      Approval Pending
-                    </>
-                  ) : (
-                    <>
-                      <Check className="inline-block w-4 h-4 mr-1 -mt-1" />
-                      Approved
-                    </>
-                  )}
-                </div>
-              </div>
+                  <Info className="w-5 h-5" />
+                </button>
 
-              {/* Course Details */}
-              <div className="p-5">
-                <h2 className="text-xl font-bold mb-2 text-yellow-500 truncate w-[300px]">
-                  {course.courseName}
-                </h2>
-                <p className="text-gray-400 mb-4 line-clamp-2">
-                  {course.description}
-                </p>
-
-                {/* Course Meta Information */}
-                <div className="flex justify-between items-center mb-4">
-                  <div className="text-sm text-gray-500">
-                    <span className="mr-2 flex items-center">
-                      <Book className="inline-block w-4 h-4 mr-1 -mt-1" />
-                      <span className="truncate w-[100px] overflow-hidden text-ellipsis whitespace-nowrap">
-                        {course.creator}
-                      </span>
-                    </span>
-                    <span>
-                      <Clock className="inline-block w-4 h-4 mr-1 -mt-1" />
-                      12 Weeks
-                    </span>
+                {/* Course Image */}
+                <div className="relative">
+                  <img
+                    src="/Vision.jpg"
+                    alt={course.courseName}
+                    className="w-full h-48 object-cover rounded-xl"
+                  />
+                  {/* Approval Status Badge */}
+                  <div
+                    className={`absolute bottom-3 right-3 px-3 text-yellow-700 py-1 bg-opacity-50 bg-black rounded-full text-xs uppercase ${getApprovalStatusStyle(
+                      course.approvalStatus
+                    )}`}
+                  >
+                    {!course.approved ? (
+                      <>
+                        <Clock className="inline-block w-4 h-4 mr-1 -mt-1" />
+                        Approval Pending
+                      </>
+                    ) : (
+                      <>
+                        <Check className="inline-block w-4 h-4 mr-1 -mt-1" />
+                        Approved
+                      </>
+                    )}
                   </div>
-                  <div className="text-yellow-500 font-semibold">10 ETH</div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex space-x-3">
-                  {(role === "ADMIN" ||
-                    role === "Course Owner" ||
-                    role === "Reviewer") && (
-                    <button
-                      onClick={() => viewCourse(course.courseId)}
-                      className="flex-1 bg-yellow-500 text-sm text-black py-2 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center"
-                    >
-                      <Eye className="w-5 h-5 mr-2" />
-                      View Course
-                    </button>
-                  )}
-                  {role === "USER" && course.approved && (
-                    <button className="flex-1 bg-gray-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center">
-                      <Wifi className="w-5 h-5 mr-2" />
-                      Enroll
-                    </button>
-                  )}
+                {/* Course Details */}
+                <div className="p-5">
+                  <h2 className="text-xl font-bold mb-2 text-yellow-500 truncate w-[300px]">
+                    {course.courseName}
+                  </h2>
+                  <p className="text-gray-400 mb-4 line-clamp-2">
+                    {course.description}
+                  </p>
+
+                  {/* Course Meta Information */}
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="text-sm text-gray-500">
+                      <span className="mr-2 flex items-center">
+                        <Book className="inline-block w-4 h-4 mr-1 -mt-1" />
+                        <span className="truncate w-[100px] overflow-hidden text-ellipsis whitespace-nowrap">
+                          {course.creator}
+                        </span>
+                      </span>
+                      <span>
+                        <Clock className="inline-block w-4 h-4 mr-1 -mt-1" />
+                        12 Weeks
+                      </span>
+                    </div>
+                    <div className="text-yellow-500 font-semibold">10 ETH</div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex space-x-3">
+                    {(role === "ADMIN" ||
+                      role === "Course Owner" ||
+                      role === "Reviewer") && (
+                      <button
+                        onClick={() => viewCourse(course.courseId)}
+                        className="flex-1 bg-yellow-500 text-sm text-black py-2 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center"
+                      >
+                        <Eye className="w-5 h-5 mr-2" />
+                        View Course
+                      </button>
+                    )}
+                    {(role === "Course Owner" ||
+                      role === "ADMIN" ||
+                      (role === "Reviewer" &&
+                        !course.approved &&
+                        course.creator === address)) && (
+                      <button
+                        onClick={() => requestReview(course.courseId)}
+                        className={`flex-1 bg-gray-800 text-white px-1 dark:bg-gray-300 text-sm dark:text-black py-2 rounded-lg ${
+                          requestSent ? "" : "hover:bg-gray-600"
+                        } transition-colors flex items-center justify-center`}
+                        disabled={requestSent}
+                      >
+                        <AlertCircle className="w-5 h-5 mr-2" />
+                        Request Review
+                      </button>
+                    )}
+                    {role === "USER" && course.approved && (
+                      <button className="flex-1 bg-gray-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center">
+                        <Wifi className="w-5 h-5 mr-2" />
+                        Enroll
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
+            ))
+          ) : (
+            <div className="text-gray-900 dark:text-gray-300 text-normal">
+              No courses available!
             </div>
-          ))}
+          )}
         </div>
 
         {/* Absolute Course Details Panel */}

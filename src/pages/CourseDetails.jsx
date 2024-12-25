@@ -459,9 +459,12 @@ const CourseDetails = ({ courseId }) => {
             </div>
           </div>
         </div>
-        {role === "Reviewer" && (
+        {role === "Reviewer" && !currentCourse.approved && (
           <button
-            onClick={() => setIsReviewModalOpen(true)}
+            onClick={() => {
+              // setCourseId(currentCourse.courseId);
+              setIsReviewModalOpen(true);
+            }}
             className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg"
           >
             Review Course
