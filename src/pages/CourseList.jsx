@@ -42,6 +42,10 @@ const CoursesPage = ({ onCourseSelect }) => {
   const { address } = useAccount();
   const signerPromise = useEthersSigner();
   const [requestSent, setRequestSent] = useState(false);
+  const [success, setSuccess] = useState(null);
+  const [error, setError] = useState(null);
+  const [enrolled, setEnrolled] = useState(false);
+  const [unEnrolled, setUnEnrolled] = useState(false);
 
   const calculateCourseStats = (courseChapters) => {
     // Get all lesson IDs that belong to the course chapters
@@ -134,6 +138,46 @@ const CoursesPage = ({ onCourseSelect }) => {
     }
   };
 
+  const enroll = async (courseId) => {
+    try {
+      const signer = await signerPromise;
+      const contract = new ethers.Contract(
+        ContractAddress,
+        ContractABI,
+        signer
+      );
+      const tx = await contract.enroll(courseId);
+      await tx.wait();
+      console.log(`Transaction Receipt: ${tx.hash}`);
+      setEnrolled(true);
+      setSuccess(`Enrolled into course ${courseId} successfully!`);
+    } catch (error) {
+      console.error("Error enrolling in course:", error);
+      setError("Error enrolling in course. Please try again!");
+      setEnrolled(false);
+    }
+  };
+
+  const unEnroll = async (courseId) => {
+    try {
+      const signer = await signerPromise;
+      const contract = new ethers.Contract(
+        ContractAddress,
+        ContractABI,
+        signer
+      );
+      const tx = await contract.unEnroll(courseId);
+      await tx.wait();
+      console.log(`Transaction Receipt: ${tx.hash}`);
+      setUnEnrolled(true);
+      setSuccess(`Enrolled into course ${courseId} successfully!`);
+    } catch (error) {
+      console.error("Error enrolling in course:", error);
+      setError("Error enrolling in course. Please try again!");
+      setUnEnrolled(false);
+    }
+  };
+
   return (
     <div className="dark:bg-gray-900 dark:text-gray-100 bg-white text-gray-900 min-h-screen p-6 transition-colors duration-300 pt-[100px]">
       <div className="max-w-6xl mx-auto">
@@ -149,6 +193,20 @@ const CoursesPage = ({ onCourseSelect }) => {
             Create New Course
           </button>
         </div>
+        {(success || error) && (
+          <div
+            className={`mb-4 p-4 rounded-lg flex items-center ${
+              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
+            }`}
+          >
+            {success ? (
+              <CheckCircle className="h-5 w-5 mr-2" />
+            ) : (
+              <AlertCircle className="h-5 w-5 mr-2" />
+            )}
+            <span>{success || error}</span>
+          </div>
+        )}
 
         {/* Courses Grid */}
         <div className="grid md:grid-cols-3 gap-6">
@@ -249,7 +307,13 @@ const CoursesPage = ({ onCourseSelect }) => {
                       </button>
                     )}
                     {role === "USER" && course.approved && (
-                      <button className="flex-1 bg-gray-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center">
+                      <button
+                        onClick={() => enroll(course.courseId)}
+                        className={`flex-1 bg-gray-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center ${
+                          !enrolled ? "" : "hover:bg-gray-500"
+                        }`}
+                        disabled={enrolled}
+                      >
                         <Wifi className="w-5 h-5 mr-2" />
                         Enroll
                       </button>

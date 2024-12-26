@@ -42,6 +42,8 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
         bool approved;
         uint256 approvalCount;
         address creator;
+        bool exists;
+        address[] enrolledStudents;
     }
 
     struct Review {
@@ -173,7 +175,7 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
         // require(nextCourseId > 0, "All course IDs have been assigned");
         require(courseObject[nextCourseId].creator == address(0), "Course ID already exists");
 
-        Course memory newCourse = Course(nextCourseId,_courseName, _description, false, 0, msg.sender);
+        Course memory newCourse = Course(nextCourseId,_courseName, _description, false, 0, msg.sender, true, new address[](0));
         courseObject[nextCourseId] = newCourse;
 
         listOfCourses.push(newCourse);
@@ -199,7 +201,9 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
                 listOfCourses[i].description,
                 listOfCourses[i].approved,
                 listOfCourses[i].approvalCount,
-                listOfCourses[i].creator
+                listOfCourses[i].creator,
+                listOfCourses[i].exists,
+                listOfCourses[i].enrolledStudents
             );
         }
         return courses;

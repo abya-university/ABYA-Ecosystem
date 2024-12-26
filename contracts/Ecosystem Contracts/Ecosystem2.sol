@@ -21,8 +21,10 @@ contract Ecosystem2 is Ecosystem {
     function enroll(uint256 _courseId) external nonReentrant returns(bool) {
         require(courseObject[_courseId].approved, "Course not yet approved!");
         require(!isEnrolled[_courseId][msg.sender], "You are already enrolled into this course");
+        require(courseObject[_courseId].exists, "Course does not exist!");
         
         isEnrolled[_courseId][msg.sender] = true;
+        courseObject[_courseId].enrolledStudents.push(msg.sender);
 
         mintToken(msg.sender, ENROLLMENT_REWARD);
 
@@ -36,6 +38,14 @@ contract Ecosystem2 is Ecosystem {
         require(isEnrolled[_courseId][msg.sender], "You are not enrolled in this course!");
 
         isEnrolled[_courseId][msg.sender] = false;
+        address[] storage students = courseObject[_courseId].enrolledStudents;
+        for (uint256 i = 0; i < students.length; i++) {
+            if (students[i] == msg.sender) {
+                students[i] = students[students.length - 1];
+                students.pop();
+                break;
+            }
+        }
 
         burn(msg.sender, ENROLLMENT_REWARD);
 
@@ -46,33 +56,45 @@ contract Ecosystem2 is Ecosystem {
 
 
     // Function to add a chapter
-function addChapters(uint256 _courseId, string[] memory _chapters) external returns (bool) {
-    require(courseObject[_courseId].creator != address(0), "Course does not exist!");
+    function addChapters(uint256 _courseId, string[] memory _chapters) external returns (bool) {
+        require(courseObject[_courseId].creator != address(0), "Course does not exist!");
 
-    // Clear the existing chapters for the course
-    // delete courseChapters[_courseId];
+        // Clear the existing chapters for the course
+        // delete courseChapters[_courseId];
 
-    for (uint i = 0; i < _chapters.length; i++) {      
-        Chapter memory newChapter = Chapter(_courseId, nextChapterId, _chapters[i], true);
-        listOfChapters.push(newChapter);
+        for (uint i = 0; i < _chapters.length; i++) {      
+            Chapter memory newChapter = Chapter(_courseId, nextChapterId, _chapters[i], true);
+            listOfChapters.push(newChapter);
 
-        // uint256 _chapterId = nextChapterId;
-        chapter[nextChapterId] = newChapter;
+            // uint256 _chapterId = nextChapterId;
+            chapter[nextChapterId] = newChapter;
 
-        // Add the chapter ID to the courseChapters mapping
-        courseChapters[_courseId].push(newChapter);
+            // Add the chapter ID to the courseChapters mapping
+            courseChapters[_courseId].push(newChapter);
 
-        nextChapterId++;
+            nextChapterId++;
+        }
+
+        emit ChaptersAddedSuccessfully(_courseId, _chapters.length);
+
+        return true;
     }
-
-    emit ChaptersAddedSuccessfully(_courseId, _chapters.length);
-
-    return true;
-}
 
     //function to get all course chapters
     function getChapters(uint256 _courseId) external view returns (Chapter[] memory) {
         return courseChapters[_courseId];
+    }
+
+    //function to get all the chapters
+    function getAllChapters() external view returns (Chapter[] memory) {
+        uint256 chapterCount = listOfChapters.length;
+        Chapter[] memory allChapters = new Chapter[](chapterCount);
+    
+        for (uint i = 0; i < chapterCount; i++) {
+            allChapters[i] = listOfChapters[i];
+        }
+    
+        return allChapters;
     }
 
     //function to add a lesson
