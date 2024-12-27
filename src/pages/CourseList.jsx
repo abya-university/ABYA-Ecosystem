@@ -310,13 +310,22 @@ const CoursesPage = ({ onCourseSelect }) => {
                     {role === "USER" && course.approved && (
                       <>
                         {!course.enrolledStudents?.includes(address) ? (
-                          <button
-                            onClick={() => unEnroll(course.courseId)}
-                            className="flex-1 bg-red-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center"
-                          >
-                            <Wifi className="w-5 h-5 mr-2" />
-                            Unenroll
-                          </button>
+                          <>
+                            <button
+                              onClick={() => viewCourse(course.courseId)}
+                              className="flex-1 bg-yellow-500 mt-3 text-gray-800 text-sm py-2 px-1 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center"
+                            >
+                              <Eye className="w-5 h-5 mr-2" />
+                              View Course
+                            </button>
+                            <button
+                              onClick={() => unEnroll(course.courseId)}
+                              className="flex-1 bg-red-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center"
+                            >
+                              <Wifi className="w-5 h-5 mr-2" />
+                              Unenroll
+                            </button>
+                          </>
                         ) : (
                           <button
                             onClick={() => enroll(course.courseId)}
