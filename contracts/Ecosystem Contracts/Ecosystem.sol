@@ -286,7 +286,7 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
         }
     }
 
-    function selectCourseReviewers(uint256 courseId) public onlyRole(REVIEWER_ROLE) {
+    function selectCourseReviewers(uint256 courseId) public onlyRole(COURSE_OWNER_ROLE) {
         require(!courseReviewInitiated[courseId], "Reviewers already selected");
         require(reviewerPool.length >= 3, "Not enough reviewers in the pool");
     

@@ -10,6 +10,7 @@ import {
   X,
   Loader,
   Users,
+  CheckCircle,
 } from "lucide-react";
 import { CourseContext } from "../contexts/courseContext";
 import { useUser } from "../contexts/userContext";
@@ -307,16 +308,25 @@ const CoursesPage = ({ onCourseSelect }) => {
                       </button>
                     )}
                     {role === "USER" && course.approved && (
-                      <button
-                        onClick={() => enroll(course.courseId)}
-                        className={`flex-1 bg-gray-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center ${
-                          !enrolled ? "" : "hover:bg-gray-500"
-                        }`}
-                        disabled={enrolled}
-                      >
-                        <Wifi className="w-5 h-5 mr-2" />
-                        Enroll
-                      </button>
+                      <>
+                        {!course.enrolledStudents?.includes(address) ? (
+                          <button
+                            onClick={() => unEnroll(course.courseId)}
+                            className="flex-1 bg-red-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center"
+                          >
+                            <Wifi className="w-5 h-5 mr-2" />
+                            Unenroll
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => enroll(course.courseId)}
+                            className="flex-1 bg-gray-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center"
+                          >
+                            <Wifi className="w-5 h-5 mr-2" />
+                            Enroll
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

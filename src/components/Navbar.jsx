@@ -70,7 +70,7 @@ const Navbar = () => {
           tokenDecimals
         );
 
-        setTokenBalance(parseFloat(formattedTokenBalance).toFixed(0));
+        setTokenBalance(parseFloat(formattedTokenBalance).toFixed(1));
         setTokenSymbol(tokenSymbol);
 
         console.log("Token Balance: ", formattedTokenBalance);
@@ -254,7 +254,7 @@ const Navbar = () => {
                         <Aperture className="w-5 h-5 text-gray-600 dark:text-gray-300" />
                         <span>Token Balance</span>
                       </div>
-                      <span className="font-semibold dark:text-yellow-500">
+                      <span className="font-semibold dark:text-purple-600">
                         {tokenBalance} {tokenSymbol}
                       </span>
                     </div>

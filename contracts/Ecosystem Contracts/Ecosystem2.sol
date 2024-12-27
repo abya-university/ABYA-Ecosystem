@@ -19,40 +19,50 @@ contract Ecosystem2 is Ecosystem {
 
     //function to enroll into a course
     function enroll(uint256 _courseId) external nonReentrant returns(bool) {
-        require(courseObject[_courseId].approved, "Course not yet approved!");
-        require(!isEnrolled[_courseId][msg.sender], "You are already enrolled into this course");
-        require(courseObject[_courseId].exists, "Course does not exist!");
-        
-        isEnrolled[_courseId][msg.sender] = true;
-        courseObject[_courseId].enrolledStudents.push(msg.sender);
+    require(courseObject[_courseId].approved, "Course not yet approved!");
+    require(!isEnrolled[_courseId][msg.sender], "Already enrolled");
+    require(courseObject[_courseId].exists, "Course does not exist!");
+    
+    Course storage courseFromMapping = courseObject[_courseId];
+    Course storage courseFromArray = listOfCourses[_courseId];
+    
+    courseFromMapping.enrolledStudents.push(msg.sender);
+    courseFromArray.enrolledStudents.push(msg.sender);
+    isEnrolled[_courseId][msg.sender] = true;
 
-        mintToken(msg.sender, ENROLLMENT_REWARD);
+    mintToken(msg.sender, ENROLLMENT_REWARD);
+    emit EnrollmentSuccess(_courseId, msg.sender);
+    return true;
+}
 
-        emit EnrollmentSuccess(_courseId, msg.sender);
+function unEnroll(uint256 _courseId) external nonReentrant returns(bool) {
+    require(isEnrolled[_courseId][msg.sender], "Not enrolled!");
+    
+    Course storage courseFromMapping = courseObject[_courseId];
+    Course storage courseFromArray = listOfCourses[_courseId];
+    
+    // Remove from mapping-based course
+    removeStudentFromList(courseFromMapping.enrolledStudents, msg.sender);
+    // Remove from array-based course
+    removeStudentFromList(courseFromArray.enrolledStudents, msg.sender);
+    
+    isEnrolled[_courseId][msg.sender] = false;
+    burn(msg.sender, ENROLLMENT_REWARD);
+    emit unEnrollmentSuccess(_courseId, msg.sender);
+    return true;
+}
 
-        return true;
-    }
-
-    //function to unEnroll from a course
-    function unEnroll(uint256 _courseId) external nonReentrant returns(bool) {
-        require(isEnrolled[_courseId][msg.sender], "You are not enrolled in this course!");
-
-        isEnrolled[_courseId][msg.sender] = false;
-        address[] storage students = courseObject[_courseId].enrolledStudents;
-        for (uint256 i = 0; i < students.length; i++) {
-            if (students[i] == msg.sender) {
+function removeStudentFromList(address[] storage students, address student) private {
+    for (uint256 i = 0; i < students.length; i++) {
+        if (students[i] == student) {
+            if (i != students.length - 1) {
                 students[i] = students[students.length - 1];
-                students.pop();
-                break;
             }
+            students.pop();
+            break;
         }
-
-        burn(msg.sender, ENROLLMENT_REWARD);
-
-        emit unEnrollmentSuccess(_courseId, msg.sender);
-
-        return true;
     }
+}
 
 
     // Function to add a chapter
