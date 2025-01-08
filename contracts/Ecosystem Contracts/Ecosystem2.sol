@@ -19,60 +19,92 @@ contract Ecosystem2 is Ecosystem {
 
     //function to enroll into a course
     function enroll(uint256 _courseId) external nonReentrant returns(bool) {
-        require(courseObject[_courseId].approved, "Course not yet approved!");
-        require(!isEnrolled[_courseId][msg.sender], "You are already enrolled into this course");
-        
-        isEnrolled[_courseId][msg.sender] = true;
+    require(courseObject[_courseId].approved, "Course not yet approved!");
+    require(!isEnrolled[_courseId][msg.sender], "Already enrolled");
+    require(courseObject[_courseId].exists, "Course does not exist!");
+    
+    Course storage courseFromMapping = courseObject[_courseId];
+    Course storage courseFromArray = listOfCourses[_courseId];
+    
+    courseFromMapping.enrolledStudents.push(msg.sender);
+    courseFromArray.enrolledStudents.push(msg.sender);
+    isEnrolled[_courseId][msg.sender] = true;
 
-        mintToken(msg.sender, ENROLLMENT_REWARD);
+    mintToken(msg.sender, ENROLLMENT_REWARD);
+    emit EnrollmentSuccess(_courseId, msg.sender);
+    return true;
+}
 
-        emit EnrollmentSuccess(_courseId, msg.sender);
+function unEnroll(uint256 _courseId) external nonReentrant returns(bool) {
+    require(isEnrolled[_courseId][msg.sender], "Not enrolled!");
+    
+    Course storage courseFromMapping = courseObject[_courseId];
+    Course storage courseFromArray = listOfCourses[_courseId];
+    
+    // Remove from mapping-based course
+    removeStudentFromList(courseFromMapping.enrolledStudents, msg.sender);
+    // Remove from array-based course
+    removeStudentFromList(courseFromArray.enrolledStudents, msg.sender);
+    
+    isEnrolled[_courseId][msg.sender] = false;
+    burn(msg.sender, ENROLLMENT_REWARD);
+    emit unEnrollmentSuccess(_courseId, msg.sender);
+    return true;
+}
 
-        return true;
+function removeStudentFromList(address[] storage students, address student) private {
+    for (uint256 i = 0; i < students.length; i++) {
+        if (students[i] == student) {
+            if (i != students.length - 1) {
+                students[i] = students[students.length - 1];
+            }
+            students.pop();
+            break;
+        }
     }
-
-    //function to unEnroll from a course
-    function unEnroll(uint256 _courseId) external nonReentrant returns(bool) {
-        require(isEnrolled[_courseId][msg.sender], "You are not enrolled in this course!");
-
-        isEnrolled[_courseId][msg.sender] = false;
-
-        burn(msg.sender, ENROLLMENT_REWARD);
-
-        emit unEnrollmentSuccess(_courseId, msg.sender);
-
-        return true;
-    }
+}
 
 
     // Function to add a chapter
-function addChapters(uint256 _courseId, string[] memory _chapters) external returns (bool) {
-    require(courseObject[_courseId].creator != address(0), "Course does not exist!");
+    function addChapters(uint256 _courseId, string[] memory _chapters) external returns (bool) {
+        require(courseObject[_courseId].creator != address(0), "Course does not exist!");
 
-    // Clear the existing chapters for the course
-    // delete courseChapters[_courseId];
+        // Clear the existing chapters for the course
+        // delete courseChapters[_courseId];
 
-    for (uint i = 0; i < _chapters.length; i++) {      
-        Chapter memory newChapter = Chapter(nextChapterId, _chapters[i], true);
-        listOfChapters.push(newChapter);
+        for (uint i = 0; i < _chapters.length; i++) {      
+            Chapter memory newChapter = Chapter(_courseId, nextChapterId, _chapters[i], true);
+            listOfChapters.push(newChapter);
 
-        // uint256 _chapterId = nextChapterId;
-        chapter[nextChapterId] = newChapter;
+            // uint256 _chapterId = nextChapterId;
+            chapter[nextChapterId] = newChapter;
 
-        // Add the chapter ID to the courseChapters mapping
-        courseChapters[_courseId].push(newChapter);
+            // Add the chapter ID to the courseChapters mapping
+            courseChapters[_courseId].push(newChapter);
 
-        nextChapterId++;
+            nextChapterId++;
+        }
+
+        emit ChaptersAddedSuccessfully(_courseId, _chapters.length);
+
+        return true;
     }
-
-    emit ChaptersAddedSuccessfully(_courseId, _chapters.length);
-
-    return true;
-}
 
     //function to get all course chapters
     function getChapters(uint256 _courseId) external view returns (Chapter[] memory) {
         return courseChapters[_courseId];
+    }
+
+    //function to get all the chapters
+    function getAllChapters() external view returns (Chapter[] memory) {
+        uint256 chapterCount = listOfChapters.length;
+        Chapter[] memory allChapters = new Chapter[](chapterCount);
+    
+        for (uint i = 0; i < chapterCount; i++) {
+            allChapters[i] = listOfChapters[i];
+        }
+    
+        return allChapters;
     }
 
     //function to add a lesson
@@ -82,6 +114,7 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
 
         // Initialize a new Lesson directly in storage
         Lesson storage newLesson = lesson[lessonId];
+        newLesson.chapterId = _chapterId;
         newLesson.lessonId = lessonId;
         newLesson.lessonName = _lessonName;
         newLesson.lessonContent = _lessonContent;
@@ -113,6 +146,7 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
         uint256 _quizId = nextQuizId;
         require(lesson[_lessonId].exists, "Lesson Does not exist!");
         Quiz storage newQuiz = quizzes[_quizId];
+        newQuiz.lessonId = _lessonId;
         newQuiz.quizId = _quizId;
         newQuiz.quizTitle = _title;
         newQuiz.exists = true;
@@ -142,6 +176,7 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
     
         // Create new Question struct in storage
         Question storage newQuestion = questions[_questionId];
+        newQuestion.quizId = _quizId;
         newQuestion.questionId = _questionId;
         newQuestion.questionText = _questionText;
 
@@ -196,7 +231,7 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
     }
 
     //function to add resources
-    function addResourcesToLesson(uint256 _lessonId, Resource[] calldata _resources) external {
+    function addResourcesToLesson(uint256 _lessonId, ContentType contentType ,Resource[] calldata _resources) external onlyRole(COURSE_OWNER_ROLE) {
         Lesson storage lessonStorage = lesson[_lessonId];
         require(lessonStorage.exists, "Lesson does not exist!");
 
@@ -208,7 +243,7 @@ function addChapters(uint256 _courseId, string[] memory _chapters) external retu
             lessonStorage.additionalResources[currentCount] = Resource({
                 contentType: _resources[i].contentType,
                 url: _resources[i].url,
-                description: _resources[i].description
+                name: _resources[i].name
             });
             currentCount++;
         }

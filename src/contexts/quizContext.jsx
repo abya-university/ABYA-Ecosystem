@@ -37,9 +37,11 @@ const QuizProvider = ({ children }) => {
         console.log("Raw quizzes data:", quizzesData);
 
         const quizzesArray = quizzesData.map((quiz) => ({
+          lessonId: Number(quiz.lessonId),
           quizId: Number(quiz.quizId),
           quizTitle: quiz.quizTitle,
           questions: quiz.questions.map((question) => ({
+            quizId: Number(question.quizId),
             questionId: Number(question.questionId),
             questionText: question.questionText,
             choices: question.choices.map((choice) => ({
