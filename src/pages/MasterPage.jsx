@@ -10,6 +10,8 @@ import CoursesPage from "./CourseList";
 import AbyaChatbot from "../components/chatbot";
 import DiscussionsPage from "./Discussions";
 import CourseDetails from "./CourseDetails";
+import LiquidityPage from "./LiquidityPage";
+import AnalyticsPage from "./AnalyticsPage";
 
 const MasterPage = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -56,6 +58,10 @@ const MasterPage = () => {
         return <CoursesPage onCourseSelect={onCourseSelect} />;
       case "discussions":
         return <DiscussionsPage />;
+      case "liquidity":
+        return <LiquidityPage />;
+      case "analytics":
+        return <AnalyticsPage />;
       // case "course-details":
       //   return <CourseDetails courseId={selectedCourseId} />;
       // case "courses":
