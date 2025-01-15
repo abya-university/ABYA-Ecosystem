@@ -12,6 +12,7 @@ import DiscussionsPage from "./Discussions";
 import CourseDetails from "./CourseDetails";
 import LiquidityPage from "./LiquidityPage";
 import AnalyticsPage from "./AnalyticsPage";
+import PortfolioPage from "./PortfolioPage";
 
 const MasterPage = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -62,6 +63,8 @@ const MasterPage = () => {
         return <LiquidityPage />;
       case "analytics":
         return <AnalyticsPage />;
+      case "portfolio":
+        return <PortfolioPage />;
       // case "course-details":
       //   return <CourseDetails courseId={selectedCourseId} />;
       // case "courses":
