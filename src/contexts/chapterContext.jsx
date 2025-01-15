@@ -28,13 +28,25 @@ const ChapterProvider = ({ children }) => {
 
         // Call the function to get chapters from the mapping
         const chaptersData = await contract.getAllChapters();
-        setChapters(chaptersData);
-        return chaptersData; // Return the fetched chapters
+
+        // Convert the response to a more manageable format
+        const formattedChapters = chaptersData.map((chapter) => ({
+          courseId: Number(chapter.courseId),
+          chapterId: Number(chapter.chapterId),
+          chapterName: chapter.chapterName,
+          exists: chapter.exists,
+        }));
+
+        console.log("Formatted contract data:", formattedChapters);
+        setChapters(formattedChapters);
+        return formattedChapters; // Return the formatted chapters
       } catch (fetchError) {
         console.error("Error fetching chapters:", fetchError);
+        return null;
       }
     } else {
       console.warn("No signer available");
+      return null;
     }
   };
 

@@ -66,7 +66,7 @@ const QuizProvider = ({ children }) => {
     if (signer) {
       fetchQuizzes();
     }
-  }, [signer, address]);
+  }, [signer, address, quizzes]);
 
   return (
     <QuizContext.Provider value={{ quizzes, fetchQuizzes, setQuizzes }}>

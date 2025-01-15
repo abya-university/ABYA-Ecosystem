@@ -510,20 +510,32 @@ const CourseCreationPipeline = () => {
     useEffect(() => {
       if (courseId) {
         console.log("Fetching chapters for courseId:", courseId);
-        fetchChapters(courseId).then((fetchedChapters) => {
+        fetchChapters().then((fetchedChapters) => {
           if (fetchedChapters) {
-            const formattedChapters = fetchedChapters.map((chapter) => ({
-              chapterId: Number(chapter.chapterId),
-              chapterName: chapter.chapterName,
-            }));
+            // Add debug logs
+            console.log("Raw fetched chapters:", fetchedChapters);
+
+            const formattedChapters = fetchedChapters
+              .filter((chapter) => {
+                // Convert both to strings or numbers for comparison
+                const chapterCourseId = Number(chapter.courseId);
+                const targetCourseId = Number(courseId);
+                console.log("Comparing:", chapterCourseId, targetCourseId);
+                return chapterCourseId === targetCourseId;
+              })
+              .map((chapter) => ({
+                chapterId: Number(chapter.chapterId),
+                chapterName: chapter.chapterName,
+              }));
+
+            console.log("Formatted chapters:", formattedChapters);
             setChapters(formattedChapters);
-            console.log("Chapters: ", formattedChapters);
           } else {
             setChapters([]);
           }
         });
       }
-    }, [courseId, fetchChapters]);
+    }, [courseId, fetchChapters, chapters]);
 
     return (
       <div className="space-y-6">
@@ -569,13 +581,16 @@ const CourseCreationPipeline = () => {
             className="w-full p-3 border rounded-lg"
           >
             <option value="">Choose a course</option>
-            {courses.map((course) => (
-              <option key={course.courseId} value={course.courseId}>
-                {course.courseName}
-              </option>
-            ))}
+            {courses.map(
+              (course) =>
+                course.creator === address && (
+                  <option key={course.courseId} value={course.courseId}>
+                    {course.courseName}
+                  </option>
+                )
+            )}
           </select>
-          <p>{courseId}</p>
+          {/* <p>{courseId}</p> */}
         </div>
 
         {/* Chapter Selection */}
