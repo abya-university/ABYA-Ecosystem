@@ -401,11 +401,14 @@ const CourseCreationPipeline = () => {
             className="w-full p-3 border rounded-lg"
           >
             <option value="">Choose a course</option>
-            {courses.map((course) => (
-              <option key={course.courseId} value={course.courseId}>
-                {course.courseName}
-              </option>
-            ))}
+            {courses.map(
+              (course) =>
+                course.creator === address && (
+                  <option key={course.courseId} value={course.courseId}>
+                    {course.courseName}
+                  </option>
+                )
+            )}
           </select>
         </div>
 

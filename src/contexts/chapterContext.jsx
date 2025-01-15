@@ -15,7 +15,7 @@ const ChapterProvider = ({ children }) => {
   const signer = useEthersSigner();
   const [chapters, setChapters] = useState([]);
 
-  const fetchChapters = async (courseId) => {
+  const fetchChapters = async () => {
     const resolvedSigner = await signer;
 
     if (resolvedSigner) {
@@ -27,7 +27,7 @@ const ChapterProvider = ({ children }) => {
         );
 
         // Call the function to get chapters from the mapping
-        const chaptersData = await contract.getChapters(courseId);
+        const chaptersData = await contract.getAllChapters();
         setChapters(chaptersData);
         return chaptersData; // Return the fetched chapters
       } catch (fetchError) {
