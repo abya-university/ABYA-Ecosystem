@@ -11,6 +11,7 @@ import {
   Loader,
   Users,
   CheckCircle,
+  WifiOff,
 } from "lucide-react";
 import { CourseContext } from "../contexts/courseContext";
 import { useUser } from "../contexts/userContext";
@@ -40,7 +41,7 @@ const CoursesPage = ({ onCourseSelect }) => {
     totalLessons: 0,
     totalQuizzes: 0,
   });
-  const { address } = useAccount();
+  const { address, isConnected } = useAccount();
   const signerPromise = useEthersSigner();
   const [requestSent, setRequestSent] = useState(false);
   const [success, setSuccess] = useState(null);
@@ -179,6 +180,22 @@ const CoursesPage = ({ onCourseSelect }) => {
     }
   };
 
+  const getEnrolledStudentsCount = (enrolledStudentsString) => {
+    // If empty or undefined, return 0
+    if (!enrolledStudentsString) return 0;
+
+    // If it's a single address, return 1
+    if (
+      enrolledStudentsString.startsWith("0x") &&
+      !enrolledStudentsString.includes(",")
+    ) {
+      return 1;
+    }
+
+    // If multiple addresses, split and count
+    return enrolledStudentsString.split(",").length;
+  };
+
   return (
     <div className="dark:bg-gray-900 dark:text-gray-100 bg-white text-gray-900 min-h-screen p-6 transition-colors duration-300 pt-[100px]">
       <div className="max-w-6xl mx-auto">
@@ -307,9 +324,9 @@ const CoursesPage = ({ onCourseSelect }) => {
                         Request Review
                       </button>
                     )}
-                    {role === "USER" && course.approved && (
+                    {role === "USER" && course.approved && address && (
                       <>
-                        {!course.enrolledStudents?.includes(address) ? (
+                        {course.enrolledStudents?.includes(address) ? (
                           <>
                             <button
                               onClick={() => viewCourse(course.courseId)}
@@ -322,7 +339,7 @@ const CoursesPage = ({ onCourseSelect }) => {
                               onClick={() => unEnroll(course.courseId)}
                               className="flex-1 bg-red-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center"
                             >
-                              <Wifi className="w-5 h-5 mr-2" />
+                              <WifiOff className="w-5 h-5 mr-2" />
                               Unenroll
                             </button>
                           </>
@@ -364,7 +381,7 @@ const CoursesPage = ({ onCourseSelect }) => {
               </h3>
               <button
                 onClick={() => setSelectedCourse(null)}
-                className="text-gray-400 hover:text-gray-200"
+                className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-200"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -427,7 +444,11 @@ const CoursesPage = ({ onCourseSelect }) => {
                   <div className="flex gap-2 flex-col">
                     <h4 className="font-semibold text-yellow-500">Enrolled</h4>
                     <span>
-                      {selectedCourse?.enrolledStudents || 0} Learners
+                      {/* {selectedCourse?.enrolledStudents || 0} Learners */}
+                      {getEnrolledStudentsCount(
+                        selectedCourse?.enrolledStudents
+                      ) || 0}{" "}
+                      Student(s)
                     </span>
                   </div>
                 </div>
