@@ -342,92 +342,99 @@ const CourseDetails = ({ courseId }) => {
             </p>
 
             <div className="space-y-8">
-              {filteredChapters
-                .filter((chapter) => chapter.chapterId === activeChapterId)
-                .map((chapter, chapterIndex) => (
-                  <div key={chapter.chapterId} className="p-6">
-                    <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                      <BookOpen className="w-6 h-6 text-yellow-500" />
-                      Module {chapterIndex + 1}: {chapter.chapterName}
-                    </h2>
+              {filteredChapters.map((chapter, chapterIndex) => {
+                if (chapter.chapterId === activeChapterId) {
+                  return (
+                    <div key={chapter.chapterId} className="p-6">
+                      <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+                        <BookOpen className="w-6 h-6 text-yellow-500" />
+                        Module {chapterIndex + 1}: {chapter.chapterName}
+                      </h2>
 
-                    <div className="space-y-6">
-                      {lessons
-                        .filter(
-                          (lesson) =>
-                            lesson.chapterId.toString() === chapter.chapterId
-                        )
-                        .map((lesson) => {
-                          const lessonQuiz = quizzes.find(
-                            (quiz) =>
-                              quiz.lessonId.toString() ===
-                              lesson.lessonId.toString()
-                          );
+                      <div className="space-y-6">
+                        {lessons
+                          .filter(
+                            (lesson) =>
+                              lesson.chapterId.toString() === chapter.chapterId
+                          )
+                          .map((lesson) => {
+                            const lessonQuiz = quizzes.find(
+                              (quiz) =>
+                                quiz.lessonId.toString() ===
+                                lesson.lessonId.toString()
+                            );
 
-                          return (
-                            <div
-                              key={lesson.lessonId}
-                              className="border-t border-gray-200 dark:border-gray-700 pt-6 first:border-0 first:pt-0"
-                            >
-                              <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-3">
-                                {lesson.lessonName}
-                              </h3>
-                              <p className="text-gray-700 dark:text-gray-300 mb-4">
-                                {lesson.lessonContent}
-                              </p>
+                            return (
+                              <div
+                                key={lesson.lessonId}
+                                className="border-t border-gray-200 dark:border-gray-700 pt-6 first:border-0 first:pt-0"
+                              >
+                                <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-3">
+                                  {/* <span className="text-lg font-semibold pr-1">
+                                    Lesson: {lesson.lessonId}
+                                  </span> */}
+                                  {lesson.lessonName}
+                                </h3>
+                                <p className="text-gray-700 dark:text-gray-300 mb-4">
+                                  {lesson.lessonContent}
+                                </p>
 
-                              {lesson.additionalResources?.some(
-                                (r) => r.url
-                              ) && (
-                                <div className="mt-4 space-y-4">
-                                  <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                                    Additional Resources
-                                  </h4>
-                                  <div className="grid gap-4">
-                                    {lesson.additionalResources
-                                      .filter((r) => r.url)
-                                      .map((resource, index) => (
-                                        <div key={index}>
-                                          <Resource resource={resource} />
-                                          {/* <span className="italic text-gray-700 text-sm dark:text-gray-300">
+                                {lesson.additionalResources?.some(
+                                  (r) => r.url
+                                ) && (
+                                  <div className="mt-4 space-y-4">
+                                    <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                                      Additional Resources
+                                    </h4>
+                                    <div className="grid gap-4">
+                                      {lesson.additionalResources
+                                        .filter((r) => r.url)
+                                        .map((resource, index) => (
+                                          <div key={index}>
+                                            <Resource resource={resource} />
+                                            {/* <span className="italic text-gray-700 text-sm dark:text-gray-300">
                                             {resource.name}
                                           </span> */}
-                                        </div>
-                                      ))}
+                                          </div>
+                                        ))}
+                                    </div>
                                   </div>
-                                </div>
-                              )}
+                                )}
 
-                              {lessonQuiz && (
-                                <div className="mt-6 p-6 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg dark:text-gray-300">
-                                  <div
-                                    className="w-full justify-between cursor-pointer"
-                                    onClick={() => toggleQuiz(lesson.lessonId)}
-                                  >
-                                    <span className="dark:text-gray-300">
-                                      {lessonQuiz.quizTitle}
-                                    </span>
-                                    <ChevronRight
-                                      className={`w-4 h-4 dark:text-yellow-500 transform transition-transform ${
-                                        openQuizIds.has(lesson.lessonId)
-                                          ? "rotate-90"
-                                          : ""
-                                      }`}
-                                    />
+                                {lessonQuiz && (
+                                  <div className="mt-6 p-6 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg dark:text-gray-300">
+                                    <div
+                                      className="w-full justify-between cursor-pointer"
+                                      onClick={() =>
+                                        toggleQuiz(lesson.lessonId)
+                                      }
+                                    >
+                                      <span className="dark:text-gray-300">
+                                        {lessonQuiz.quizTitle}
+                                      </span>
+                                      <ChevronRight
+                                        className={`w-4 h-4 dark:text-yellow-500 transform transition-transform ${
+                                          openQuizIds.has(lesson.lessonId)
+                                            ? "rotate-90"
+                                            : ""
+                                        }`}
+                                      />
+                                    </div>
+                                    <div>
+                                      {openQuizIds.has(lesson.lessonId) && (
+                                        <Quiz quiz={lessonQuiz} />
+                                      )}
+                                    </div>
                                   </div>
-                                  <div>
-                                    {openQuizIds.has(lesson.lessonId) && (
-                                      <Quiz quiz={lessonQuiz} />
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                }
+              })}
             </div>
           </div>
 
