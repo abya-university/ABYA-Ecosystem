@@ -49,6 +49,55 @@ const CoursesPage = ({ onCourseSelect }) => {
   const [enrolled, setEnrolled] = useState(false);
   const [unEnrolled, setUnEnrolled] = useState(false);
 
+  const getDifficultyLabel = (level) => {
+    switch (Number(level)) {
+      case 0:
+        return "Beginner";
+      case 1:
+        return "Intermediate";
+      case 2:
+        return "Advanced";
+      default:
+        return "Unknown";
+    }
+  };
+
+  const getDifficultyColor = (level) => {
+    switch (Number(level)) {
+      case 0:
+        return "text-green-500 bg-green-100";
+      case 1:
+        return "text-blue-500 bg-blue-100";
+      case 2:
+        return "text-red-500 bg-red-100";
+      default:
+        return "text-gray-500 bg-gray-100";
+    }
+  };
+
+  // Add this inside the component before the return statement
+  const calculateTotalDuration = (courseId) => {
+    // Convert courseId to number for comparison since it comes as string from the course object
+    const numericCourseId = Number(courseId);
+
+    const courseChapters = chapters.filter(
+      (chapter) => chapter.courseId === numericCourseId
+    );
+
+    const totalDuration = courseChapters.reduce(
+      (total, chapter) => total + Number(chapter.duration),
+      0
+    );
+
+    console.log("Course ID:", numericCourseId);
+    console.log("Filtered Chapters:", courseChapters);
+    console.log("Total Duration:", totalDuration);
+
+    return totalDuration;
+  };
+
+  console.log("Chapters s:", chapters);
+
   const calculateCourseStats = (courseChapters) => {
     // Get all lesson IDs that belong to the course chapters
     const courseLessons = lessons.filter((lesson) =>
@@ -248,24 +297,37 @@ const CoursesPage = ({ onCourseSelect }) => {
                     src="/Vision.jpg"
                     alt={course.courseName}
                     className="w-full h-48 object-cover rounded-xl"
+                    style={{ opacity: 0.75 }}
                   />
-                  {/* Approval Status Badge */}
-                  <div
-                    className={`absolute bottom-3 right-3 px-3 text-yellow-700 py-1 bg-opacity-50 bg-black rounded-full text-xs uppercase ${getApprovalStatusStyle(
-                      course.approved
-                    )}`}
-                  >
-                    {!course.approved ? (
-                      <>
-                        <Clock className="inline-block w-4 h-4 mr-1 -mt-1" />
-                        Approval Pending
-                      </>
-                    ) : (
-                      <>
-                        <Check className="inline-block w-4 h-4 mr-1 -mt-1" />
-                        Approved
-                      </>
-                    )}
+
+                  <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
+                    {/* Difficulty Level Tag */}
+                    <div
+                      className={`px-3 py-1 rounded-full text-sm font-medium shadow-sm ${getDifficultyColor(
+                        course.difficulty_level
+                      )}`}
+                    >
+                      {getDifficultyLabel(course.difficulty_level)}
+                    </div>
+
+                    {/* Approval Status Badge */}
+                    <div
+                      className={`px-3 py-1 rounded-full text-sm font-medium shadow-sm flex items-center ${getApprovalStatusStyle(
+                        course.approved
+                      )}`}
+                    >
+                      {!course.approved ? (
+                        <>
+                          <Clock className="w-4 h-4 mr-1" />
+                          <span>Pending</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4 mr-1" />
+                          <span>Approved</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -289,7 +351,7 @@ const CoursesPage = ({ onCourseSelect }) => {
                       </span>
                       <span>
                         <Clock className="inline-block w-4 h-4 mr-1 -mt-1" />
-                        12 Weeks
+                        {calculateTotalDuration(course.courseId)} Weeks
                       </span>
                     </div>
                     <div className="text-yellow-500 font-semibold">10 ETH</div>
@@ -399,6 +461,18 @@ const CoursesPage = ({ onCourseSelect }) => {
                   </p>
                 </div>
                 <div>
+                  <h4 className="font-semibold text-yellow-500">
+                    Difficulty Level
+                  </h4>
+                  <div
+                    className={`inline-block px-3 py-1 rounded-full text-sm font-medium mt-1 ${getDifficultyColor(
+                      selectedCourse.difficulty_level
+                    )}`}
+                  >
+                    {getDifficultyLabel(selectedCourse.difficulty_level)}
+                  </div>
+                </div>
+                <div>
                   <h4 className="font-semibold text-yellow-500">Description</h4>
                   <p className="dark:text-gray-300 text-gray-700">
                     {selectedCourse.description}
@@ -433,7 +507,9 @@ const CoursesPage = ({ onCourseSelect }) => {
                   </div>
                   <div>
                     <h4 className="font-semibold text-yellow-500">Duration</h4>
-                    <p className="dark:text-gray-300 text-gray-700">12 Weeks</p>
+                    <p className="dark:text-gray-300 text-gray-700">
+                      {calculateTotalDuration(selectedCourse.courseId)} Weeks
+                    </p>
                   </div>
                   <div>
                     <h4 className="font-semibold text-yellow-500">

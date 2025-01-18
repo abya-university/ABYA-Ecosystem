@@ -29,6 +29,7 @@ const CourseCreationPipeline = () => {
     basicInfo: {
       name: "",
       description: "",
+      difficulty_level: 0,
       image: null,
     },
     chapters: [],
@@ -105,7 +106,8 @@ const CourseCreationPipeline = () => {
 
         const tx = await contract.createCourse(
           courseData.basicInfo.name,
-          courseData.basicInfo.description
+          courseData.basicInfo.description,
+          courseData.basicInfo.difficulty_level
         );
 
         console.log("Transaction Sent:", {
@@ -124,6 +126,14 @@ const CourseCreationPipeline = () => {
 
         if (receipt.status === 1) {
           setSuccess(`${courseData.basicInfo.name} created successfully!`);
+          setCourseData({
+            basicInfo: {
+              name: "",
+              description: "",
+              image: null,
+              difficulty_level: 0,
+            },
+          });
         } else {
           setError("Transaction failed. Please try again.");
         }
@@ -211,7 +221,7 @@ const CourseCreationPipeline = () => {
               }
             />
 
-            {/* <select
+            <select
               className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
               value={courseData.basicInfo.difficulty_level}
               onChange={(e) =>
@@ -219,15 +229,15 @@ const CourseCreationPipeline = () => {
                   ...prev,
                   basicInfo: {
                     ...prev.basicInfo,
-                    difficulty_level: e.target.value,
+                    difficulty_level: Number(e.target.value),
                   },
                 }))
               }
             >
-              <option value="Beginner">Beginner</option>
-              <option value="Intermediate">Intermediate</option>
-              <option value="Advanced">Advanced</option>
-            </select> */}
+              <option value={0}>Beginner</option>
+              <option value={1}>Intermediate</option>
+              <option value={2}>Advanced</option>
+            </select>
 
             <textarea
               placeholder="Course Description"
@@ -255,9 +265,12 @@ const CourseCreationPipeline = () => {
 
               <button
                 onClick={createCourse}
-                className="rounded-lg bg-yellow-500 p-2 px-6 hover:bg-yellow-600 transition-colors"
+                disabled={loading}
+                className={`rounded-lg bg-yellow-500 p-2 px-6 hover:bg-yellow-600 transition-colors ${
+                  loading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               >
-                Create Course
+                {loading ? "Creating..." : "Create Course"}
               </button>
             </div>
           </div>

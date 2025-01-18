@@ -35,6 +35,7 @@ const ChapterProvider = ({ children }) => {
           chapterId: Number(chapter.chapterId),
           chapterName: chapter.chapterName,
           exists: chapter.exists,
+          duration: Number(chapter.duration),
         }));
 
         console.log("Formatted contract data:", formattedChapters);

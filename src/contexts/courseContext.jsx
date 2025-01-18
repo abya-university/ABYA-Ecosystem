@@ -44,6 +44,7 @@ const CourseProvider = ({ children }) => {
               approvalCount: course.approvalCount.toString(),
               creator: course.creator,
               enrolledStudents: course.enrolledStudents.toString(),
+              difficulty_level: Number(course.difficultyLevel),
             }));
 
             console.log("Formatted Courses:", formattedCourses);
