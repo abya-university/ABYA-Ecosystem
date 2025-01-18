@@ -60,7 +60,7 @@ const CourseProvider = ({ children }) => {
     };
 
     fetchCourses();
-  }, [signer, courses]); // Dependency on signer ensures it runs when signer is ready
+  }, [signer]); // Dependency on signer ensures it runs when signer is ready
 
   return (
     <CourseContext.Provider value={{ courses }}>

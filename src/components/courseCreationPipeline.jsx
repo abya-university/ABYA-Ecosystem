@@ -211,6 +211,24 @@ const CourseCreationPipeline = () => {
               }
             />
 
+            {/* <select
+              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+              value={courseData.basicInfo.difficulty_level}
+              onChange={(e) =>
+                setCourseData((prev) => ({
+                  ...prev,
+                  basicInfo: {
+                    ...prev.basicInfo,
+                    difficulty_level: e.target.value,
+                  },
+                }))
+              }
+            >
+              <option value="Beginner">Beginner</option>
+              <option value="Intermediate">Intermediate</option>
+              <option value="Advanced">Advanced</option>
+            </select> */}
+
             <textarea
               placeholder="Course Description"
               className="w-full p-3 border rounded-lg h-32 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
@@ -272,8 +290,12 @@ const CourseCreationPipeline = () => {
 
   const ChapterCreation = () => {
     const [chapterName, setChapterName] = useState("");
+    const [duration, setDuration] = useState(""); // Changed from durations array to single duration
     const [chapters, setChapters] = useState([]);
+    const [durations, setDurations] = useState([]); // Separate array for all durations
     const [courseId, setCourseId] = useState("");
+    const [success, setSuccess] = useState(""); // Added missing state
+    const [error, setError] = useState(""); // Added missing state
 
     const createChapter = async () => {
       if (isConnected) {
@@ -283,11 +305,15 @@ const CourseCreationPipeline = () => {
             throw new Error("Signer is required to access the contract.");
           }
 
-          // Ensure courseId is a number
           const parsedCourseId = Number(courseId);
 
           if (chapters.length === 0) {
             throw new Error("Chapters array cannot be empty");
+          }
+
+          // Verify that chapters and durations arrays have the same length
+          if (chapters.length !== durations.length) {
+            throw new Error("Number of chapters and durations must match");
           }
 
           const contract = new ethers.Contract(
@@ -296,32 +322,11 @@ const CourseCreationPipeline = () => {
             signer
           );
 
-          // Verify course exists before adding chapters
+          // Verify course exists
           try {
-            // Log the raw course object to understand its structure
             const rawCourseObject = await contract.courseObject(parsedCourseId);
-            console.log("Raw Course Object:", rawCourseObject);
+            const [contractCourseId] = rawCourseObject;
 
-            // Destructure the course object carefully
-            const [
-              contractCourseId,
-              courseName,
-              description,
-              approved,
-              approvalCount,
-              creator,
-            ] = rawCourseObject;
-
-            console.log("Extracted Course Details:", {
-              courseId: contractCourseId.toString(),
-              courseName,
-              description,
-              approved,
-              approvalCount: approvalCount.toString(),
-              creator,
-            });
-
-            // Optional: Additional validation
             if (contractCourseId.toString() !== parsedCourseId.toString()) {
               throw new Error("Course ID mismatch!");
             }
@@ -331,10 +336,15 @@ const CourseCreationPipeline = () => {
             return;
           }
 
-          const tx = await contract.addChapters(parsedCourseId, chapters);
+          const tx = await contract.addChapters(
+            parsedCourseId,
+            chapters,
+            durations
+          );
           const receipt = await tx.wait();
           console.log(receipt);
           setChapters([]);
+          setDurations([]);
           setCourseId("");
           setSuccess("Chapters created successfully!");
         } catch (err) {
@@ -344,13 +354,12 @@ const CourseCreationPipeline = () => {
       }
     };
 
-    console.log("Course Id: ", courseId);
-    console.log("Chapters: ", chapters);
-
     const addChapter = () => {
-      if (chapterName.trim()) {
+      if (chapterName.trim() && duration) {
         setChapters([...chapters, chapterName.trim()]);
+        setDurations([...durations, Number(duration)]); // Convert duration to number
         setChapterName("");
+        setDuration(""); // Reset single duration input
       }
     };
 
@@ -380,6 +389,13 @@ const CourseCreationPipeline = () => {
             className="flex-grow p-3 border rounded-lg"
             value={chapterName}
             onChange={(e) => setChapterName(e.target.value)}
+          />
+          <input
+            type="number"
+            placeholder="Duration in Weeks"
+            className="flex-grow p-3 border rounded-lg"
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
           />
           <button
             onClick={addChapter}
@@ -423,11 +439,19 @@ const CourseCreationPipeline = () => {
                   key={index}
                   className="bg-gray-100 p-2 rounded-lg flex justify-between items-center"
                 >
-                  {chapter}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {chapter}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Duration: {durations[index]} weeks
+                    </p>
+                  </div>
                   <button
-                    onClick={() =>
-                      setChapters(chapters.filter((_, i) => i !== index))
-                    }
+                    onClick={() => {
+                      setChapters(chapters.filter((_, i) => i !== index));
+                      setDurations(durations.filter((_, i) => i !== index));
+                    }}
                     className="text-red-500"
                   >
                     Remove

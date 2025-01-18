@@ -68,6 +68,7 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
         uint256 courseId;
         uint256 chapterId;
         string chapterName;
+        uint256 duration; //Duration in weeks
         bool exists;
     }
 
@@ -173,7 +174,7 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
     // function to create course
     function createCourse(string memory _courseName, string memory _description) external returns(bool) {
         // require(nextCourseId > 0, "All course IDs have been assigned");
-        require(courseObject[nextCourseId].creator == address(0), "Course ID already exists");
+        require(!courseObject[nextCourseId].exists, "Course already exists");
 
         Course memory newCourse = Course(nextCourseId,_courseName, _description, false, 0, msg.sender, true, new address[](0));
         courseObject[nextCourseId] = newCourse;

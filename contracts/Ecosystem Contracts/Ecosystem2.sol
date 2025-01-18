@@ -66,14 +66,14 @@ function removeStudentFromList(address[] storage students, address student) priv
 
 
     // Function to add a chapter
-    function addChapters(uint256 _courseId, string[] memory _chapters) external returns (bool) {
+    function addChapters(uint256 _courseId, string[] memory _chapters, uint256[] memory _durations) external returns (bool) {
         require(courseObject[_courseId].creator != address(0), "Course does not exist!");
 
         // Clear the existing chapters for the course
         // delete courseChapters[_courseId];
 
         for (uint i = 0; i < _chapters.length; i++) {      
-            Chapter memory newChapter = Chapter(_courseId, nextChapterId, _chapters[i], true);
+            Chapter memory newChapter = Chapter(_courseId, nextChapterId, _chapters[i], _durations[i], true);
             listOfChapters.push(newChapter);
 
             // uint256 _chapterId = nextChapterId;
