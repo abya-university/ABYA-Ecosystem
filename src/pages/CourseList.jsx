@@ -172,7 +172,7 @@ const CoursesPage = ({ onCourseSelect }) => {
       await tx.wait();
       console.log(`Transaction Receipt: ${tx.hash}`);
       setUnEnrolled(true);
-      setSuccess(`Enrolled into course ${courseId} successfully!`);
+      setSuccess(`Unenrolled into course ${courseId} successfully!`);
     } catch (error) {
       console.error("Error enrolling in course:", error);
       setError("Error enrolling in course. Please try again!");

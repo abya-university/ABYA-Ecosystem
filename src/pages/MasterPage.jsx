@@ -13,6 +13,7 @@ import CourseDetails from "./CourseDetails";
 import LiquidityPage from "./LiquidityPage";
 import AnalyticsPage from "./AnalyticsPage";
 import PortfolioPage from "./PortfolioPage";
+import LearningPath from "./LearningPath";
 
 const MasterPage = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -65,6 +66,8 @@ const MasterPage = () => {
         return <AnalyticsPage />;
       case "portfolio":
         return <PortfolioPage />;
+      case "learning-path":
+        return <LearningPath />;
       // case "course-details":
       //   return <CourseDetails courseId={selectedCourseId} />;
       // case "courses":
