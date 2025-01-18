@@ -1,4 +1,11 @@
-import { useContext, useEffect, useState, memo } from "react";
+import {
+  useContext,
+  useEffect,
+  useState,
+  memo,
+  useCallback,
+  useMemo,
+} from "react";
 import { CourseContext } from "../contexts/courseContext";
 import { ChapterContext } from "../contexts/chapterContext";
 import { LessonContext } from "../contexts/lessonContext";
@@ -16,6 +23,7 @@ import {
 } from "lucide-react";
 import ReviewModal from "../components/ReviewModal";
 import { useUser } from "../contexts/userContext";
+import { useAccount } from "wagmi";
 
 // Separate Video component to prevent re-renders
 const VideoResource = memo(({ url, name }) => (
@@ -172,28 +180,37 @@ const Resource = memo(({ resource }) => {
 Resource.displayName = "Resource";
 
 // Quiz component with navigation
-const Quiz = ({ quiz }) => {
+const Quiz = memo(({ quiz }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState({});
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     if (currentQuestionIndex < quiz.questions.length - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
     }
-  };
+  }, [currentQuestionIndex, quiz.questions.length]);
 
-  const handlePrevious = () => {
+  const handlePrevious = useCallback(() => {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex((prev) => prev - 1);
     }
-  };
+  }, [currentQuestionIndex]);
 
-  const handleSubmit = () => {
-    // Implement quiz submission logic here
+  const handleSubmit = useCallback(() => {
     console.log("Quiz answers:", selectedAnswers);
-  };
+  }, [selectedAnswers]);
 
-  const currentQuestion = quiz.questions[currentQuestionIndex];
+  const handleAnswerSelect = useCallback((questionId, index) => {
+    setSelectedAnswers((prev) => ({
+      ...prev,
+      [questionId]: index,
+    }));
+  }, []);
+
+  const currentQuestion = useMemo(
+    () => quiz.questions[currentQuestionIndex],
+    [quiz.questions, currentQuestionIndex]
+  );
 
   return (
     <div className="mt-4">
@@ -222,7 +239,7 @@ const Quiz = ({ quiz }) => {
               <div
                 className={`w-4 h-4 rounded-full border-2 ${
                   selectedAnswers[currentQuestion.questionId] === index
-                    ? "border-blue-500 bg-yellow-500"
+                    ? "border-yellow-500 bg-yellow-500"
                     : "border-gray-300"
                 }`}
               />
@@ -254,7 +271,7 @@ const Quiz = ({ quiz }) => {
           ) : (
             <div
               onClick={handleNext}
-              className="flex items-center gap-2 bg-yellow-500 dark:text-gray-900 hover:bg-yellow-600 p-2 px-4 rounded-lg hover:cursor"
+              className="flex items-center gap-2 bg-yellow-500 dark:text-gray-900 hover:bg-yellow-600 p-2 px-4 rounded-lg hover:cursor-pointer"
             >
               Next
               <ChevronRight className="w-4 h-4" />
@@ -264,7 +281,9 @@ const Quiz = ({ quiz }) => {
       </div>
     </div>
   );
-};
+});
+
+Quiz.displayName = "Quiz";
 
 const CourseDetails = ({ courseId }) => {
   const { courses } = useContext(CourseContext);
@@ -275,6 +294,7 @@ const CourseDetails = ({ courseId }) => {
   const [activeChapterId, setActiveChapterId] = useState(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const { role } = useUser();
+  const { address } = useAccount();
 
   useEffect(() => {
     if (courseId) {
@@ -294,7 +314,7 @@ const CourseDetails = ({ courseId }) => {
     }
   }, [courseId, fetchChapters]);
 
-  const toggleQuiz = (lessonId) => {
+  const toggleQuiz = useCallback((lessonId) => {
     setOpenQuizIds((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(lessonId)) {
@@ -304,7 +324,7 @@ const CourseDetails = ({ courseId }) => {
       }
       return newSet;
     });
-  };
+  }, []);
 
   const currentCourse = courses.find((course) => course.courseId === courseId);
   const filteredChapters = chapters.filter(
@@ -400,6 +420,22 @@ const CourseDetails = ({ courseId }) => {
                                     </div>
                                   </div>
                                 )}
+
+                                {/* add a mark as read btn */}
+                                {role === "USER" &&
+                                currentCourse.approved &&
+                                currentCourse.enrolledStudents?.includes(
+                                  address
+                                ) ? (
+                                  <div className="flex justify-between items-center">
+                                    <button
+                                      className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 p-2 my-3 rounded-lg font-normal"
+                                      onClick={() => {}}
+                                    >
+                                      Mark as Read
+                                    </button>
+                                  </div>
+                                ) : null}
 
                                 {lessonQuiz && (
                                   <div className="mt-6 p-6 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg dark:text-gray-300">
