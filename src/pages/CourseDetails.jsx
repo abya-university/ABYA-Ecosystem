@@ -5,6 +5,7 @@ import {
   memo,
   useCallback,
   useMemo,
+  useRef,
 } from "react";
 import { CourseContext } from "../contexts/courseContext";
 import { ChapterContext } from "../contexts/chapterContext";
@@ -24,6 +25,7 @@ import {
 import ReviewModal from "../components/ReviewModal";
 import { useUser } from "../contexts/userContext";
 import { useAccount } from "wagmi";
+import PropTypes from "prop-types";
 
 // Separate Video component to prevent re-renders
 const VideoResource = memo(({ url, name }) => (
@@ -285,7 +287,113 @@ const Quiz = memo(({ quiz }) => {
 
 Quiz.displayName = "Quiz";
 
-const CourseDetails = ({ courseId }) => {
+const LessonContent = memo(
+  ({
+    lesson,
+    quiz,
+    isQuizOpen,
+    onToggleQuiz,
+    role,
+    currentCourse,
+    address,
+  }) => {
+    return (
+      <div className="border-t border-gray-200 dark:border-gray-700 pt-6 first:border-0 first:pt-0">
+        <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-3">
+          {lesson.lessonName}
+        </h3>
+
+        <p className="text-gray-700 dark:text-gray-300 mb-4">
+          {lesson.lessonContent}
+        </p>
+
+        {/* Additional Resources Section */}
+        {lesson.additionalResources?.some((r) => r.url) && (
+          <div className="mt-4 space-y-4">
+            <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              Additional Resources
+            </h4>
+            <div className="grid gap-4">
+              {lesson.additionalResources
+                .filter((r) => r.url)
+                .map((resource, index) => (
+                  <div key={index}>
+                    <Resource resource={resource} />
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* Mark as Read Button */}
+        {role === "USER" &&
+          currentCourse.approved &&
+          currentCourse.enrolledStudents?.includes(address) && (
+            <div className="flex justify-between items-center">
+              <button
+                className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 p-2 my-3 rounded-lg font-normal"
+                onClick={() => {}}
+              >
+                Mark as Read
+              </button>
+            </div>
+          )}
+
+        {/* Quiz Section */}
+        {quiz && (
+          <div className="mt-6 p-6 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg dark:text-gray-300">
+            <div
+              className="w-full flex justify-between cursor-pointer"
+              onClick={() => onToggleQuiz(lesson.lessonId)}
+            >
+              <span className="dark:text-gray-300">{quiz.quizTitle}</span>
+              <ChevronRight
+                className={`w-4 h-4 dark:text-yellow-500 transform transition-transform ${
+                  isQuizOpen ? "rotate-90" : ""
+                }`}
+              />
+            </div>
+
+            <div>{isQuizOpen && <Quiz quiz={quiz} />}</div>
+          </div>
+        )}
+      </div>
+    );
+  }
+);
+
+LessonContent.displayName = "LessonContent";
+
+// PropTypes for better development experience and documentation
+LessonContent.propTypes = {
+  lesson: PropTypes.shape({
+    lessonId: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+      .isRequired,
+    lessonName: PropTypes.string.isRequired,
+    lessonContent: PropTypes.string.isRequired,
+    additionalResources: PropTypes.arrayOf(
+      PropTypes.shape({
+        url: PropTypes.string,
+        name: PropTypes.string,
+        contentType: PropTypes.number,
+      })
+    ),
+  }).isRequired,
+  quiz: PropTypes.shape({
+    quizTitle: PropTypes.string.isRequired,
+    questions: PropTypes.array.isRequired,
+  }),
+  isQuizOpen: PropTypes.bool.isRequired,
+  onToggleQuiz: PropTypes.func.isRequired,
+  role: PropTypes.string.isRequired,
+  currentCourse: PropTypes.shape({
+    approved: PropTypes.bool.isRequired,
+    enrolledStudents: PropTypes.array,
+  }).isRequired,
+  address: PropTypes.string.isRequired,
+};
+
+const CourseDetails = memo(({ courseId }) => {
   const { courses } = useContext(CourseContext);
   const { chapters, fetchChapters, setChapters } = useContext(ChapterContext);
   const { lessons } = useContext(LessonContext);
@@ -296,23 +404,68 @@ const CourseDetails = ({ courseId }) => {
   const { role } = useUser();
   const { address } = useAccount();
 
+  // Use refs to store previous values
+  const prevCourseIdRef = useRef(courseId);
+  const prevChaptersRef = useRef(chapters);
+
+  // Memoize current course
+  const currentCourse = useMemo(
+    () => courses.find((course) => course.courseId === courseId),
+    [courses, courseId]
+  );
+
+  // Memoize filtered chapters
+  const filteredChapters = useMemo(
+    () => chapters.filter((chapter) => chapter.courseID === courseId),
+    [chapters, courseId]
+  );
+
+  // Fetch chapters only when courseId changes or when chapters are empty
   useEffect(() => {
-    if (courseId) {
+    const shouldFetchChapters =
+      courseId &&
+      (prevCourseIdRef.current !== courseId || chapters.length === 0);
+
+    if (shouldFetchChapters) {
       fetchChapters(courseId);
+      prevCourseIdRef.current = courseId;
+    }
+  }, [courseId, fetchChapters]);
+
+  // Update chapters only when the chapters array actually changes
+  useEffect(() => {
+    if (chapters !== prevChaptersRef.current) {
       const formattedChapters = chapters.map((chapter) => ({
         courseID: chapter.courseId.toString(),
         chapterId: chapter.chapterId.toString(),
         courseId: chapter.courseId.toString(),
         chapterName: chapter.chapterName,
       }));
+
       setChapters(formattedChapters);
 
-      // Set the first chapter as active by default
+      // Set first chapter as active only if there's no active chapter
       if (formattedChapters.length > 0 && !activeChapterId) {
         setActiveChapterId(formattedChapters[0].chapterId);
       }
+
+      prevChaptersRef.current = chapters;
     }
-  }, [courseId, fetchChapters]);
+  }, [chapters, setChapters, activeChapterId]);
+
+  // Memoize lesson filtering function
+  const getLessonsForChapter = useCallback(
+    (chapterId) =>
+      lessons.filter((lesson) => lesson.chapterId.toString() === chapterId),
+    [lessons]
+  );
+
+  // Memoize quiz finding function
+  const getQuizForLesson = useCallback(
+    (lessonId) =>
+      quizzes.find((quiz) => quiz.lessonId.toString() === lessonId.toString()),
+    [quizzes]
+  );
 
   const toggleQuiz = useCallback((lessonId) => {
     setOpenQuizIds((prev) => {
@@ -326,13 +479,7 @@ const CourseDetails = ({ courseId }) => {
     });
   }, []);
 
-  const currentCourse = courses.find((course) => course.courseId === courseId);
-  const filteredChapters = chapters.filter(
-    (chapter) => chapter.courseID === courseId
-  );
-
-  const handleSubmitReview = (courseId, ratings) => {
-    // Call your smart contract function here with the ratings
+  const handleSubmitReview = useCallback((courseId, ratings) => {
     submitReview(
       courseId,
       ratings.learnerAgency,
@@ -346,7 +493,55 @@ const CourseDetails = ({ courseId }) => {
       ratings.assessmentForLearning,
       ratings.engagementAndMotivation
     );
-  };
+  }, []);
+
+  // Memoize chapter content rendering
+  const renderChapterContent = useCallback(
+    (chapter, chapterIndex) => {
+      if (chapter.chapterId !== activeChapterId) return null;
+
+      const chapterLessons = getLessonsForChapter(chapter.chapterId);
+
+      return (
+        <div key={chapter.chapterId} className="p-6">
+          {/* Chapter header */}
+          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+            <BookOpen className="w-6 h-6 text-yellow-500" />
+            Module {chapterIndex + 1}: {chapter.chapterName}
+          </h2>
+
+          {/* Lessons */}
+          <div className="space-y-6">
+            {chapterLessons.map((lesson) => {
+              const lessonQuiz = getQuizForLesson(lesson.lessonId);
+              return (
+                <LessonContent
+                  key={lesson.lessonId}
+                  lesson={lesson}
+                  quiz={lessonQuiz}
+                  isQuizOpen={openQuizIds.has(lesson.lessonId)}
+                  onToggleQuiz={toggleQuiz}
+                  role={role}
+                  currentCourse={currentCourse}
+                  address={address}
+                />
+              );
+            })}
+          </div>
+        </div>
+      );
+    },
+    [
+      activeChapterId,
+      getLessonsForChapter,
+      getQuizForLesson,
+      openQuizIds,
+      toggleQuiz,
+      role,
+      currentCourse,
+      address,
+    ]
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 pt-[100px]">
@@ -523,6 +718,8 @@ const CourseDetails = ({ courseId }) => {
       </div>
     </div>
   );
-};
+});
+
+CourseDetails.displayName = "CourseDetails";
 
 export default CourseDetails;
