@@ -6,6 +6,10 @@ import { Ecosystem } from "./Ecosystem.sol";
 
 contract Ecosystem2 is Ecosystem {
 
+    mapping(uint256 => mapping(address => bool)) public lessonRead;
+    mapping(address => uint256[]) public userCompletedLessons;
+    mapping(address => mapping(uint256 => uint256[])) public userCompletedLessonsByCourse;
+
     event QuizCreatedSuccess(uint256 indexed _quizId, string indexed _title);
     event QuestionAdded(uint256 quizId, uint256 questionId, string questionText);
     event ChoiceAdded(uint256 questionId, uint256 choiceId, string option);
@@ -14,6 +18,7 @@ contract Ecosystem2 is Ecosystem {
     event ResourceAddSuccess(uint256 indexed _lessonId, uint256 indexed resourceCount);
     event EnrollmentSuccess(uint256 indexed _courseId, address indexed _by);
     event unEnrollmentSuccess(uint256 indexed _courseId, address indexed _by); 
+    event LessonMarkedAsRead(uint256 indexed _chapterId, uint256 indexed _lessonId, address learner);
 
     constructor(address[] memory _reviewers) Ecosystem(_reviewers) {}
 
@@ -258,5 +263,23 @@ function removeStudentFromList(address[] storage students, address student) priv
             }
         }
     }
+
+    //function to mark lesson as read
+    function markAsRead(uint256 _courseId, uint256 _chapterId, uint256 _lessonId) external returns(bool) {
+        require(!lessonRead[_lessonId][msg.sender], "Already marked");
+        require(lesson[_lessonId].lessonId != 0, "Lesson doesn't exist");
+
+        lessonRead[_lessonId][msg.sender] = true;
+        userCompletedLessons[msg.sender].push(_lessonId);
+        userCompletedLessonsByCourse[msg.sender][_courseId].push(_lessonId);
+
+        emit LessonMarkedAsRead(_chapterId, _lessonId, msg.sender);
+        return true;
+    }
+
+function getUserCompletedLessonsByCourse(uint256 _courseId) external view returns(uint256[] memory, uint256) {
+    uint256[] memory completedLessons = userCompletedLessonsByCourse[msg.sender][_courseId];
+    return (completedLessons, completedLessons.length);
+}
 
 }

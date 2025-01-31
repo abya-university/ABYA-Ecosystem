@@ -26,6 +26,13 @@ import ReviewModal from "../components/ReviewModal";
 import { useUser } from "../contexts/userContext";
 import { useAccount } from "wagmi";
 import PropTypes from "prop-types";
+import ProgressBar from "../components/progressBar";
+import Ecosystem2ABI from "../artifacts/contracts/Ecosystem Contracts/Ecosystem2.sol/Ecosystem2.json";
+import { ethers } from "ethers";
+import { useEthersSigner } from "../components/useClientSigner";
+
+const ContractAddress = import.meta.env.VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
+const ContractABI = Ecosystem2ABI.abi;
 
 // Separate Video component to prevent re-renders
 const VideoResource = memo(({ url, name }) => (
@@ -403,6 +410,53 @@ const CourseDetails = memo(({ courseId }) => {
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const { role } = useUser();
   const { address } = useAccount();
+  const [completedLessons, setCompletedLessons] = useState(0);
+  const signerPromise = useEthersSigner();
+  const [completedLessonIds, setCompletedLessonIds] = useState(new Set());
+
+  useEffect(() => {
+    const fetchCompletedLessons = async () => {
+      const signer = await signerPromise;
+      const contract = new ethers.Contract(
+        ContractAddress,
+        ContractABI,
+        signer
+      );
+
+      const completedLessons = await contract.getUserCompletedLessons();
+      setCompletedLessonIds(new Set(completedLessons));
+    };
+
+    fetchCompletedLessons();
+  }, []);
+
+  // Update totalLessons calculation
+  // const totalLessons = useMemo(() => {
+  //   return lessons.filter((lesson) =>
+  //     filteredChapters.some(
+  //       (chapter) => chapter.chapterId === lesson.chapterId.toString()
+  //     )
+  //   ).length;
+  // }, [lessons, filteredChapters]);
+
+  const markAsRead = async (chapterId, lessonId) => {
+    try {
+      const signer = await signerPromise;
+      const contract = new ethers.Contract(
+        ContractAddress,
+        ContractABI,
+        signer
+      );
+
+      const tx = await contract.markAsRead(chapterId, lessonId);
+      await tx.wait();
+
+      // Update local state
+      setCompletedLessonIds((prev) => new Set(prev).add(lessonId));
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   // Use refs to store previous values
   const prevCourseIdRef = useRef(courseId);
@@ -546,9 +600,13 @@ const CourseDetails = memo(({ courseId }) => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 pt-[100px]">
       <div className="max-w-7xl mx-auto">
+        {/* <ProgressBar
+          completedLessons={completedLessons}
+          totalLessons={totalLessons}
+        /> */}
         <div className="flex gap-8">
           {/* Main Content Area (80%) */}
-          <div className="w-[80%]">
+          <div className="w-[80%] mt-4">
             <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
               {currentCourse?.courseName}
             </h1>
@@ -625,7 +683,12 @@ const CourseDetails = memo(({ courseId }) => {
                                   <div className="flex justify-between items-center">
                                     <button
                                       className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 p-2 my-3 rounded-lg font-normal"
-                                      onClick={() => {}}
+                                      onClick={() =>
+                                        markAsRead(
+                                          chapter.chapterId,
+                                          lesson.lessonId
+                                        )
+                                      }
                                     >
                                       Mark as Read
                                     </button>
@@ -671,7 +734,11 @@ const CourseDetails = memo(({ courseId }) => {
 
           {/* Right Sidebar Navigation (20%) */}
           <div className="w-[20%] bg-white dark:bg-gray-800 p-6 rounded-lg h-fit sticky top-[100px]">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            <ProgressBar
+              completedLessons={completedLessonIds.size}
+              // totalLessons={totalLessons}
+            />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 pt-2">
               Course Navigation
             </h3>
             <div className="space-y-2">
