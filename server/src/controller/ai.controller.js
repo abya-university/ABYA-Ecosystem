@@ -1,5 +1,5 @@
 // server/src/api/controllers/ai.controller.js
-const openAIService = require('../../services/openai.service');
+const openAIService = require('../services/openai.service');
 const { validationResult } = require('express-validator');
 
 exports.generateCompletion = async (req, res) => {

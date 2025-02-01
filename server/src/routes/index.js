@@ -1,7 +1,7 @@
 // src/api/routes/index.js
 const express = require('express');
 const router = express.Router();
-const aiRoutes = require('./ai.routes');
+const aiRoutes = require('../routes/ai.routes');
 
 // Health check endpoint
 router.get('/health', (req, res) => {

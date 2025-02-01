@@ -1,7 +1,7 @@
 // server/src/api/routes/ai.routes.js
 const express = require('express');
 const { body } = require('express-validator');
-const aiController = require('../controllers/ai.controller');
+const aiController = require('../controller/ai.controller');
 
 const router = express.Router();
 
