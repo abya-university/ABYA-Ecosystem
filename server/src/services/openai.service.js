@@ -9,7 +9,7 @@ class OpenAIService {
     this.conversationHistory = [];
   }
 
-  async generateCompletion(prompt, model = "gpt-4") {
+  async generateCompletion(prompt, model = "gpt-4o-mini") {
     this.conversationHistory.push({ role: "user", content: prompt });
     try {
       const completion = await this.openai.chat.completions.create({

@@ -13,7 +13,7 @@ app.use(morgan('dev')); // HTTP request logger
 
 // Welcome route
 app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to the API' });
+  res.json({ message: 'Welcome to the AI services API' });
 });
 
 // API Routes
