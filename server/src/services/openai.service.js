@@ -29,6 +29,35 @@ class OpenAIService {
       throw new Error('Failed to generate AI completion');
     }
   }
+
+  // 🔹 Categorization Service
+  async categorizeDiscussion(text) {
+    const CATEGORIES = ["Solidity", "Rust", "Ethereum", "Solana", "Skale Network"];
+
+    const prompt = `
+    Given the following text, classify it into relevant blockchain-related categories. 
+    Select up to 3 categories from this list: ${CATEGORIES.join(", ")}.
+    If the text is not related to blockchain, return an empty list.
+
+    Text: "${text}"
+
+    Respond ONLY with a JSON array, e.g., ["Solidity", "Ethereum"], or [] if no relevant category exists.
+    `;
+
+    try {
+        const response = await this.openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0,
+        });
+  
+        const tags = JSON.parse(response.choices[0].message.content || "[]");
+        return tags;
+      } catch (error) {
+        console.error("OpenAI API Error:", error);
+        throw new Error("Failed to categorize discussion");
+      }
+    }  
 }
 
 module.exports = new OpenAIService();

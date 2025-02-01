@@ -14,5 +14,13 @@ router.post(
   aiController.generateCompletion
 );
 
+// added route here for categorizing discissions
+router.post(
+    '/categorize',
+    [
+      body('text').notEmpty().withMessage('Text is required')
+    ],
+    aiController.categorizeDiscussion
+  );
 module.exports = router;
 
