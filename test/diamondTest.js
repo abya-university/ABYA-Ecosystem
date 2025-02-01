@@ -1,13 +1,13 @@
 import { expect } from "chai";
-import pkg from 'hardhat';
-import { describe, it, beforeEach } from 'mocha';
-const { ethers } = pkg;
+import pkg from 'hardhat'; // Use default import for hardhat
+const { ethers } = pkg; // Destructure ethers from the imported pkg
+import { describe, it, before } from 'mocha';
 
 describe("Diamond Contract Integration Tests", function () {
     let diamond;
     let ecosystem1Facet;
-    let owner;
-    let addr1;
+    let owner, addr1, addr2;
+    let diamondAddress;
 
     const DifficultyLevel = {
         BEGINNER: 0,
@@ -15,43 +15,28 @@ describe("Diamond Contract Integration Tests", function () {
         ADVANCED: 2
     };
 
-    // Helper function to get function selectors with debugging
     function getSelectors(contract) {
-        console.log("Getting selectors for contract:", contract);
-        if (!contract || !contract.interface) {
-            console.error("Contract or interface is undefined:", contract);
-            throw new Error("Invalid contract object");
-        }
-
-        const signatures = Object.keys(contract.interface.functions);
-        console.log("Function signatures:", signatures);
-
-        const selectors = signatures.reduce((acc, val) => {
-            if (val !== 'init(bytes)') {
-                const selector = contract.interface.getSighash(val);
-                console.log(`Selector for ${val}:`, selector);
-                acc.push(selector);
-            }
-            return acc;
-        }, []);
-
-        return selectors;
+        return contract.interface.fragments
+            .filter(fragment => fragment.type === 'function')
+            .map(fragment => contract.interface.getFunction(fragment.name).selector);
     }
 
     before(async function () {
+        this.timeout(60000); // Increase timeout to 60 seconds
         try {
-            [owner, addr1] = await ethers.getSigners();
-            console.log("Deploying contracts with owner:", owner.address);
+            [owner, addr1, addr2] = await ethers.getSigners();
+            console.log("Deploying contracts with account:", owner.address);
 
-            // Deploy DiamondCutFacet
-            console.log("Deploying DiamondCutFacet...");
-            const DiamondCutFacet = await ethers.getContractFactory('DiamondCutFacet');
+            const DiamondCutFacet = await ethers.getContractFactory("DiamondCutFacet");
             const diamondCutFacet = await DiamondCutFacet.deploy();
             await diamondCutFacet.waitForDeployment();
-            console.log("DiamondCutFacet deployed to:", await diamondCutFacet.getAddress());
+            console.log("DiamondCutFacet deployed at:", diamondCutFacet.target);
 
-            // Deploy Diamond
-            console.log("Deploying Diamond...");
+            const DiamondLoupe = await ethers.getContractFactory("DiamondLoupeFacet");
+            const diamondLoupe = await DiamondLoupe.deploy();
+            await diamondLoupe.waitForDeployment();
+            console.log("DiamondLoupeFacet deployed at:", diamondLoupe.target);
+
             const Diamond = await ethers.getContractFactory("EcosystemDiamond");
             const reviewers = [
                 "0x62618De1cA80188FbbeEEaaC99b58Ec9B2e9e72C",
@@ -62,133 +47,110 @@ describe("Diamond Contract Integration Tests", function () {
 
             diamond = await Diamond.deploy(reviewers, owner.address);
             await diamond.waitForDeployment();
-            console.log("Diamond deployed to:", await diamond.getAddress());
+            diamondAddress = diamond.target;
+            console.log("Diamond deployed at:", diamondAddress);
 
-            // Deploy DiamondLoupeFacet
-            console.log("Deploying DiamondLoupeFacet...");
-            const DiamondLoupeFacet = await ethers.getContractFactory('DiamondLoupeFacet');
-            const diamondLoupeFacet = await DiamondLoupeFacet.deploy();
-            await diamondLoupeFacet.waitForDeployment();
-            console.log("DiamondLoupeFacet deployed to:", await diamondLoupeFacet.getAddress());
-
-            // Deploy Ecosystem1Facet
-            console.log("Deploying Ecosystem1Facet...");
-            const Ecosystem1Facet = await ethers.getContractFactory('Ecosystem1Facet');
+            const Ecosystem1Facet = await ethers.getContractFactory("Ecosystem1Facet");
             const ecosystem1FacetContract = await Ecosystem1Facet.deploy();
             await ecosystem1FacetContract.waitForDeployment();
-            console.log("Ecosystem1Facet deployed to:", await ecosystem1FacetContract.getAddress());
+            console.log("Ecosystem1Facet deployed at:", ecosystem1FacetContract.target);
 
-            // Verify contract deployments
-            if (!ecosystem1FacetContract || !ecosystem1FacetContract.interface) {
-                throw new Error("Ecosystem1Facet deployment failed");
-            }
-
-            // Get function selectors
-            console.log("Getting selectors...");
             const selectors1 = getSelectors(ecosystem1FacetContract);
-            console.log("Selectors:", selectors1);
+            const selectorsLoupe = getSelectors(diamondLoupe);
 
-            // Perform diamond cut
-            console.log("Performing diamond cut...");
-            const diamondCut = await ethers.getContractAt('IDiamondCut', await diamond.getAddress());
-            const cut = [
-                {
-                    facetAddress: await ecosystem1FacetContract.getAddress(),
-                    action: 0, // Add
-                    functionSelectors: selectors1
-                }
+            const cuts = [
+                { facetAddress: diamondLoupe.target, action: 0, functionSelectors: selectorsLoupe },
+                { facetAddress: ecosystem1FacetContract.target, action: 0, functionSelectors: selectors1 }
             ];
 
-            const tx = await diamondCut.diamondCut(cut, ethers.ZeroAddress, "0x");
+            const diamondCutInterface = [
+                "function diamondCut((address facetAddress, uint8 action, bytes4[] functionSelectors)[] _diamondCut, address _init, bytes calldata _calldata) external"
+            ];
+            const diamondCutContract = new ethers.Contract(diamondAddress, diamondCutInterface, owner);
+
+            console.log("Diamond Cut Structure:", cuts);
+            console.log("Ecosystem1Facet function selectors:", getSelectors(ecosystem1FacetContract));
+
+            const tx = await diamondCutContract.diamondCut(
+                cuts,
+                ethers.ZeroAddress,
+                "0x"
+            );
+            console.log("Diamond cut transaction sent:", tx.hash);
             await tx.wait();
             console.log("Diamond cut completed");
 
-            // Get Ecosystem1Facet interface
-            ecosystem1Facet = await ethers.getContractAt(
-                "Ecosystem1Facet",
-                await diamond.getAddress()
-            );
+            const loupeSelectors = await diamondLoupe.facetFunctionSelectors(ecosystem1FacetContract.target);
+            console.log("Functions in Ecosystem1Facet after diamondCut:", loupeSelectors);
 
-            console.log("Setup completed successfully");
+            ecosystem1Facet = await ethers.getContractAt("Ecosystem1Facet", diamondAddress);
+            console.log("Ecosystem1Facet connected at Diamond address");
+
         } catch (error) {
             console.error("Setup failed:", error);
             throw error;
         }
     });
 
-    describe("Course Creation Tests", function () {
-        it("Should successfully create a course with BEGINNER difficulty", async function () {
-            const courseName = "Introduction to Blockchain";
-            const courseDescription = "A beginner's guide to blockchain technology";
+    describe("Course Management", function () {
+        it("should create a new course successfully", async function () {
+            const courseName = "Blockchain Basics";
+            const description = "Introduction to blockchain technology";
 
-            const tx = await ecosystem1Facet.createCourse(
-                courseName,
-                courseDescription,
-                DifficultyLevel.BEGINNER
-            );
-
-            // Wait for transaction to be mined
+            const tx = await ecosystem1Facet.createCourse(courseName, description, DifficultyLevel.BEGINNER);
             const receipt = await tx.wait();
-            console.log("Transaction receipt:", receipt);
 
-
-            // Check for CourseCreationSuccess event
-            const event = receipt.events.find(event => event.event === 'CourseCreationSuccess');
+            const event = receipt.logs.find(log => log.fragment.name === "CourseCreationSuccess");
             expect(event).to.not.be.undefined;
-            expect(event.args[1]).to.equal(courseName);
-            expect(event.args[2]).to.be.false; // isApproved should be false initially
+            expect(event.args.courseName).to.equal(courseName);
+            expect(event.args.isApproved).to.be.false;
 
-            // Verify course exists
             const courses = await ecosystem1Facet.getAllCourses();
-            expect(courses.length).to.equal(1);
+            const course = courses[0];
 
-            // Verify course details
-            const latestCourse = courses[0];
-            expect(latestCourse.courseName).to.equal(courseName);
-            expect(latestCourse.description).to.equal(courseDescription);
-            expect(latestCourse.difficultyLevel).to.equal(DifficultyLevel.BEGINNER);
-            expect(latestCourse.owner).to.equal(owner.address);
-            expect(latestCourse.isApproved).to.be.false;
+            expect(course.courseName).to.equal(courseName);
+            expect(course.description).to.equal(description);
+            expect(course.owner).to.equal(owner.address);
+            expect(course.isApproved).to.be.false;
+            expect(course.difficultyLevel).to.equal(DifficultyLevel.BEGINNER);
+            expect(course.exists).to.be.true;
         });
 
-        it("Should grant COURSE_OWNER_ROLE to course creator", async function () {
-            const hasRole = await ecosystem1Facet.hasRole(
-                await ecosystem1Facet.COURSE_OWNER_ROLE(),
-                owner.address
-            );
-            expect(hasRole).to.be.true;
-        });
+        it("should increment course count and nextCourseId", async function () {
+            const initialCourses = await ecosystem1Facet.getAllCourses();
+            const initialCount = initialCourses.length;
 
-        it("Should allow multiple courses with different difficulties", async function () {
-            // Create an intermediate course
             await ecosystem1Facet.createCourse(
-                "Advanced Solidity",
-                "Deep dive into Solidity programming",
+                "Second Course",
+                "Another course description",
                 DifficultyLevel.INTERMEDIATE
             );
 
-            // Create an advanced course
+            const newCourses = await ecosystem1Facet.getAllCourses();
+            expect(newCourses.length).to.equal(initialCount + 1);
+            expect(newCourses[newCourses.length - 1].courseId).to.equal(initialCount);
+        });
+
+        it("should grant COURSE_OWNER_ROLE to course creator", async function () {
+            const role = await ecosystem1Facet.COURSE_OWNER_ROLE();
+            const hasRole = await ecosystem1Facet.hasRole(role, owner.address);
+            expect(hasRole).to.be.true;
+        });
+
+        it("should track per-user course count correctly", async function () {
+            const initialCourseCount = (await ecosystem1Facet.getAccountCourses(owner.address)).courseCount;
+
             await ecosystem1Facet.createCourse(
-                "DeFi Protocols",
-                "Understanding DeFi protocol development",
+                "Third Course",
+                "Yet another course",
                 DifficultyLevel.ADVANCED
             );
 
-            const courses = await ecosystem1Facet.getAllCourses();
-            expect(courses.length).to.equal(3);
-
-            // Verify different difficulty levels
-            expect(courses[1].difficultyLevel).to.equal(DifficultyLevel.INTERMEDIATE);
-            expect(courses[2].difficultyLevel).to.equal(DifficultyLevel.ADVANCED);
+            const newCourseCount = (await ecosystem1Facet.getAccountCourses(owner.address)).courseCount;
+            expect(newCourseCount).to.equal(initialCourseCount + 1);
         });
 
-        it("Should track course count correctly", async function () {
-            const courses = await ecosystem1Facet.getAllCourses();
-            expect(courses.length).to.equal(3);
-        });
-
-        it("Should fail when non-owner tries to create course", async function () {
-            // Try to create course with different address
+        it("should prevent unauthorized users from creating a course", async function () {
             await expect(
                 ecosystem1Facet.connect(addr1).createCourse(
                     "Unauthorized Course",
@@ -197,5 +159,22 @@ describe("Diamond Contract Integration Tests", function () {
                 )
             ).to.be.revertedWith("AccessControlUnauthorizedAccount");
         });
+
+        it("should handle all difficulty levels correctly", async function () {
+            for (const level of Object.values(DifficultyLevel)) {
+                const tx = await ecosystem1Facet.createCourse(
+                    `Course Level ${level}`,
+                    `Description ${level}`,
+                    level
+                );
+                await tx.wait();
+
+                const courses = await ecosystem1Facet.getAllCourses();
+                const latestCourse = courses[courses.length - 1];
+                expect(latestCourse.difficultyLevel).to.equal(level);
+            }
+        });
     });
 });
+
+

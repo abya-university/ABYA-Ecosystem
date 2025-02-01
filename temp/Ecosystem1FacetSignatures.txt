@@ -1,0 +1,15 @@
+createCourse(string memory _courseName, string memory _description, LibDiamond.DifficultyLevel _difficultyLevel)
+getAllCourses() external view returns (LibDiamond.Course[] memory)
+mintToken(address to, uint256 amount) internal returns(bool)
+burn(address account, uint256 amount) internal
+getCurrentEcosystemPoolSupply() public view returns(uint256)
+submitReview(uint256 courseId, uint256[10] memory scores) public onlyRole(LibDiamond.REVIEWER_ROLE)
+validateScores(uint256 learnerAgency,uint256 criticalThinking,uint256 collaborativeLearning,uint256 reflectivePractice,uint256 adaptiveLearning,
+    uint256 authenticLearning,uint256 technologyIntegration,uint256 learnerSupport,uint256 assessmentForLearning,uint256 engagementAndMotivation) internal pure
+getTotalScore(LibDiamond.Review storage review) internal view returns (uint256)
+isReviewer(uint256 courseId, address reviewer) internal view returns (bool)
+selectCourseReviewers(uint256 courseId) public onlyRole(COURSE_OWNER_ROLE)
+approveCourse(uint256 courseId) public onlyRole(LibDiamond.REVIEWER_ROLE)
+getCourseReviewers(uint256 courseId) public view returns (address[] memory)
+editCourse(uint256 _courseId, string memory _courseName) external onlyRole(COURSE_OWNER_ROLE) returns(bool)
+deleteCourse(uint256 _courseId) external onlyRole(COURSE_OWNER_ROLE) returns(bool)
