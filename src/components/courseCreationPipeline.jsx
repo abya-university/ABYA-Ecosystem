@@ -8,7 +8,8 @@ import {
   CheckCircle,
   AlertCircle,
 } from "lucide-react";
-import Ecosystem2ABI from "../artifacts/contracts/Ecosystem Contracts/Ecosystem2.sol/Ecosystem2.json";
+// import Ecosystem2ABI from "../artifacts/contracts/Ecosystem Contracts/Ecosystem2.sol/Ecosystem2.json";
+import Ecosystem1FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem1Facet.sol/Ecosystem1Facet.json";
 import { useEthersSigner } from "../components/useClientSigner";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
@@ -19,9 +20,9 @@ import { QuizContext } from "../contexts/quizContext";
 import { uploadFileToPinata, uploadMetadataToIPFS } from "../components/pinata";
 import PreviewCourse from "../pages/PreviewCourse";
 
-const Ecosystem2ContractAddress = import.meta.env
-  .VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
-const Ecosystem2_ABI = Ecosystem2ABI.abi;
+const EcosystemDiamondAddress = import.meta.env
+  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
 
 const CourseCreationPipeline = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -49,6 +50,8 @@ const CourseCreationPipeline = () => {
 
   console.log("Courses Data:", courses);
 
+  console.log("Using Diamond Address:", EcosystemDiamondAddress);
+
   const createCourse = async () => {
     if (isConnected && address) {
       console.log("Wallet Connection Details:", {
@@ -73,14 +76,14 @@ const CourseCreationPipeline = () => {
         console.log("Validated Contract Address:", validatedAddress);
 
         const contract = new ethers.Contract(
-          Ecosystem2ContractAddress,
-          Ecosystem2_ABI,
+          EcosystemDiamondAddress,
+          Ecosystem1Facet_ABI,
           signer
         );
 
         // Safe logging with optional chaining
         console.log("Contract Details:", {
-          address: Ecosystem2ContractAddress,
+          address: EcosystemDiamondAddress,
           methods: contract.interface
             ? Object.keys(contract.interface.functions || {})
             : "No interface",
@@ -97,6 +100,7 @@ const CourseCreationPipeline = () => {
         console.log("Transaction Params:", {
           name: courseData.basicInfo.name,
           description: courseData.basicInfo.description,
+          difficulty_level: courseData.basicInfo.difficulty_level,
         });
 
         // Validate input before transaction
@@ -104,10 +108,20 @@ const CourseCreationPipeline = () => {
           throw new Error("Course name and description are required");
         }
 
-        const tx = await contract.createCourse(
+        // Estimate gas
+        const gasEstimate = await contract.estimateGas.createCourse(
           courseData.basicInfo.name,
           courseData.basicInfo.description,
           courseData.basicInfo.difficulty_level
+        );
+
+        console.log("Gas Estimate:", gasEstimate.toString());
+
+        const tx = await contract.createCourse(
+          courseData.basicInfo.name,
+          courseData.basicInfo.description,
+          courseData.basicInfo.difficulty_level,
+          { gasLimit: gasEstimate }
         );
 
         console.log("Transaction Sent:", {

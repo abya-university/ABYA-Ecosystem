@@ -57,6 +57,16 @@ async function main() {
 
     const cuts = [
         {
+            facetAddress: diamondCutfacet.target,
+            action: 0,
+            functionSelectors: getSelectorsFromInterface(DiamondCut.interface)
+        },
+        {
+            facetAddress: diamondLoupe.target,
+            action: 0,
+            functionSelectors: selectorsLoupe
+        },
+        {
             facetAddress: ecosystem1Facet.target,
             action: 0, // Add
             functionSelectors: selectors1
