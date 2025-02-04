@@ -1,21 +1,52 @@
 import pkg from 'hardhat';
 const { ethers } = pkg;
 
+function getSelectors(contract) {
+    const signatures = new Set();
+    const selectors = [];
+
+    for (const fragment of contract.interface.fragments) {
+        if (fragment.type === 'function') {
+            const selector = contract.interface.getFunction(fragment.name).selector;
+            const signature = fragment.format('sighash');
+
+            if (!signatures.has(selector)) {
+                signatures.add(selector);
+                selectors.push(selector);
+                console.log(`Added selector for ${signature}: ${selector}`);
+            }
+        }
+    }
+    return selectors;
+}
+
 async function main() {
     const [deployer] = await ethers.getSigners();
     console.log("Deploying contracts with the account:", deployer.address);
 
     // Deploy DiamondCut contract
     const DiamondCut = await ethers.getContractFactory("DiamondCutFacet");
-    const diamondCutfacet = await DiamondCut.deploy();
-    await diamondCutfacet.waitForDeployment();
-    console.log("DiamondCut deployed to:", diamondCutfacet.target);
+    const diamondCutFacet = await DiamondCut.deploy();
+    await diamondCutFacet.waitForDeployment();
+    console.log("DiamondCut deployed to:", diamondCutFacet.target);
+
+    // Deploy DiamondInit contract
+    const DiamondInit = await ethers.getContractFactory('DiamondInit');
+    const diamondInit = await DiamondInit.deploy();
+    await diamondInit.waitForDeployment();
+    console.log('DiamondInit deployed:', diamondInit.target);
 
     // Deploy DiamondLoupe contract
     const DiamondLoupe = await ethers.getContractFactory("DiamondLoupeFacet");
     const diamondLoupe = await DiamondLoupe.deploy();
     await diamondLoupe.waitForDeployment();
     console.log("DiamondLoupe deployed to:", diamondLoupe.target);
+
+    // Deploy OwnershipFacet contract
+    const OwnershipFacet = await ethers.getContractFactory("OwnershipFacet");
+    const ownershipFacet = await OwnershipFacet.deploy();
+    await ownershipFacet.waitForDeployment();
+    console.log("OwnershipFacet deployed to:", ownershipFacet.target);
 
     // Deploy Diamond
     const Diamond = await ethers.getContractFactory("EcosystemDiamond");
@@ -25,8 +56,36 @@ async function main() {
         "0x3fCf08DDE67A9ED9314F79B97197175313A8E327",
         "0x74c5d6cd0325205b86e2a30B07f1be350367B40D"
     ];
-    const owner = deployer.address;
-    const diamond = await Diamond.deploy(reviewers, owner);
+
+    // Encode the init function call
+    const functionCall = diamondInit.interface.encodeFunctionData('init');
+
+    // Prepare diamond cut and args
+    const diamondCut = [
+        {
+            facetAddress: diamondCutFacet.target,
+            action: 0,
+            functionSelectors: getSelectors(diamondCutFacet)
+        },
+        {
+            facetAddress: diamondLoupe.target,
+            action: 0,
+            functionSelectors: getSelectors(diamondLoupe)
+        },
+        {
+            facetAddress: ownershipFacet.target,
+            action: 0,
+            functionSelectors: getSelectors(ownershipFacet)
+        }
+    ];
+
+    const diamondArgs = {
+        owner: deployer.address,
+        init: diamondInit.target,
+        initCalldata: functionCall
+    };
+
+    const diamond = await Diamond.deploy(diamondCut, diamondArgs, reviewers, deployer.address);
     await diamond.waitForDeployment();
     console.log("Diamond deployed to:", diamond.target);
 
@@ -46,80 +105,76 @@ async function main() {
     await ecosystem3Facet.waitForDeployment();
     console.log("Ecosystem3Facet deployed to:", ecosystem3Facet.target);
 
-    // Get selectors for each facet
-    const selectors1 = getSelectorsFromInterface(Ecosystem1Facet.interface);
-    const selectors2 = getSelectorsFromInterface(Ecosystem2Facet.interface);
-    const selectors3 = getSelectorsFromInterface(Ecosystem3Facet.interface);
+    // Get selectors
+    const selectors1 = getSelectors(ecosystem1Facet);
+    const selectors2 = getSelectors(ecosystem2Facet);
+    const selectors3 = getSelectors(ecosystem3Facet);
 
-    console.log("Selectors1:", selectors1);
-    console.log("Selectors2:", selectors2);
-    console.log("Selectors3:", selectors3);
+    function removeDuplicateSelectors(selectors, previousSelectorArrays) {
+        console.log("\n--- removeDuplicateSelectors ---"); // Clearer separator
+        console.log("Initial Selectors:", selectors);
 
-    const cuts = [
-        {
-            facetAddress: diamondCutfacet.target,
-            action: 0,
-            functionSelectors: getSelectorsFromInterface(DiamondCut.interface)
-        },
-        {
-            facetAddress: diamondLoupe.target,
-            action: 0,
-            functionSelectors: selectorsLoupe
-        },
+        const existing = new Set();
+        previousSelectorArrays.forEach(arr => arr.forEach(selector => existing.add(selector)));
+
+        const uniqueSelectors = selectors.filter(selector => !existing.has(selector));
+
+        console.log("Existing Selectors (from previous arrays):", Array.from(existing)); // Log existing selectors
+        console.log("Unique Selectors:", uniqueSelectors);
+        console.log("--- End of removeDuplicateSelectors ---\n"); // Clearer separator
+
+        return uniqueSelectors;
+    }
+
+    const uniqueSelectors1 = removeDuplicateSelectors(selectors1, [diamondCut[1].functionSelectors, diamondCut[0].functionSelectors, diamondCut[2].functionSelectors]);
+    const uniqueSelectors2 = removeDuplicateSelectors(selectors2, [diamondCut[1].functionSelectors, diamondCut[0].functionSelectors, diamondCut[2].functionSelectors, uniqueSelectors1]);
+    const uniqueSelectors3 = removeDuplicateSelectors(selectors3, [diamondCut[1].functionSelectors, diamondCut[0].functionSelectors, diamondCut[2].functionSelectors, uniqueSelectors1, uniqueSelectors2]);
+
+    // Prepare cuts array for additional facets
+    const additionalFacetCuts = [
         {
             facetAddress: ecosystem1Facet.target,
-            action: 0, // Add
-            functionSelectors: selectors1
+            action: 0,
+            functionSelectors: uniqueSelectors1
         },
         {
             facetAddress: ecosystem2Facet.target,
             action: 0,
-            functionSelectors: selectors2
+            functionSelectors: uniqueSelectors2
         },
         {
             facetAddress: ecosystem3Facet.target,
             action: 0,
-            functionSelectors: selectors3
-        },
+            functionSelectors: uniqueSelectors3
+        }
     ];
 
-    console.log("Cuts:", cuts);
+    console.log("Additional Facet Cuts Structure:", JSON.stringify(additionalFacetCuts, null, 2));
 
-    // Create contract instance with IDiamondCut interface
-    const diamondCutInterface = [
-        "function diamondCut((address facetAddress, uint8 action, bytes4[] functionSelectors)[] _diamondCut, address _init, bytes calldata _calldata) external"
-    ];
+    // Execute additional diamond cut
+    const diamondCutInterface = ["function diamondCut((address facetAddress, uint8 action, bytes4[] functionSelectors)[] _diamondCut, address _init, bytes calldata _calldata) external"];
     const diamondCutContract = new ethers.Contract(diamond.target, diamondCutInterface, deployer);
 
     try {
         const tx = await diamondCutContract.diamondCut(
-            cuts,
+            additionalFacetCuts,
             ethers.ZeroAddress,
             "0x",
-            { gasLimit: 8000000 } // Add explicit gas limit
+            { gasLimit: 8000000 }
         );
         console.log("Diamond cut transaction sent:", tx.hash);
         const receipt = await tx.wait();
-        console.log("Diamond cut transaction confirmed:", receipt.hash);
+        console.log("Diamond cut transaction confirmed:", receipt.transactionHash);
     } catch (error) {
-        console.error("Error performing diamondCut:", error);
+        console.error("Detailed error:", {
+            message: error.message,
+            reason: error.reason,
+            code: error.code,
+            data: error.data,
+            transaction: error.transaction
+        });
         throw error;
     }
-}
-
-function getSelectorsFromInterface(contractInterface) {
-    const selectors = [];
-    for (const fragment of contractInterface.fragments) {
-        if (fragment.type === 'function') {
-            // Get the full function signature
-            const signature = fragment.format('sighash');
-            // Calculate the selector
-            const selector = contractInterface.getFunction(fragment.name).selector;
-            selectors.push(selector);
-            console.log(`Added selector for ${signature}: ${selector}`);
-        }
-    }
-    return selectors;
 }
 
 main()

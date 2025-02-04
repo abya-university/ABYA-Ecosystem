@@ -10,13 +10,19 @@ import {IERC173} from "./DiamondInterfaces/IERC173.sol";
 import {DiamondCutFacet} from "./DiamondCutFacet.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
-
+struct DiamondArgs {
+    address owner;
+    address init;
+    bytes initCalldata;
+}
 contract EcosystemDiamond is LMSToken {
-    constructor(
+    constructor(IDiamondCut.FacetCut[] memory _diamondCut, 
+        DiamondArgs memory _args,
         address[] memory _reviewers,
         address _owner
     ) LMSToken(_reviewers) {
         LibDiamond.setContractOwner(_owner);
+        LibDiamond.diamondCut(_diamondCut, _args.init, _args.initCalldata);
 
         // Deploy DiamondCutFacet
         DiamondCutFacet diamondCutFacet = new DiamondCutFacet();

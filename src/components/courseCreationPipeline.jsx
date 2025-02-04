@@ -50,133 +50,45 @@ const CourseCreationPipeline = () => {
 
   console.log("Courses Data:", courses);
 
-  console.log("Using Diamond Address:", EcosystemDiamondAddress);
-
   const createCourse = async () => {
-    if (isConnected && address) {
-      console.log("Wallet Connection Details:", {
-        isConnected,
-        address,
-        addressType: typeof address,
-        addressLength: address?.length,
+    setLoading(true);
+    try {
+      const signer = await signerPromise;
+      const diamondContract = new ethers.Contract(
+        EcosystemDiamondAddress,
+        Ecosystem1Facet_ABI,
+        signer
+      );
+
+      console.log("Contract Details:", diamondContract);
+      console.log("Transaction Params:", courseData.basicInfo);
+
+      const tx = await diamondContract.createCourse(
+        courseData.basicInfo.name,
+        courseData.basicInfo.description,
+        courseData.basicInfo.difficulty_level
+      );
+      console.log("Transaction sent:", tx.hash);
+      const receipt = await tx.wait();
+      console.log("Transaction confirmed:", receipt.transactionHash);
+      setSuccess("Course created successfully!");
+    } catch (err) {
+      console.error("Full Error Details:", {
+        name: err.name || "Unknown Error",
+        code: err.code || "No Error Code",
+        message: err.message || "No Error Message",
+        stack: err.stack || "No Stack Trace",
       });
 
-      try {
-        setLoading(true);
-        setError("");
-        setSuccess("");
-
-        const signer = await signerPromise;
-        if (!signer) {
-          throw new Error("Signer is required to access the contract.");
-        }
-
-        // Validate and clean the address
-        const validatedAddress = ethers.getAddress(address);
-        console.log("Validated Contract Address:", validatedAddress);
-
-        const contract = new ethers.Contract(
-          EcosystemDiamondAddress,
-          Ecosystem1Facet_ABI,
-          signer
-        );
-
-        // Safe logging with optional chaining
-        console.log("Contract Details:", {
-          address: EcosystemDiamondAddress,
-          methods: contract.interface
-            ? Object.keys(contract.interface.functions || {})
-            : "No interface",
-        });
-
-        // Check if the contract method is callable
-        if (typeof contract.createCourse !== "function") {
-          throw new Error(
-            "createCourse method is not available on the contract."
-          );
-        }
-
-        // Detailed logging before transaction
-        console.log("Transaction Params:", {
-          name: courseData.basicInfo.name,
-          description: courseData.basicInfo.description,
-          difficulty_level: courseData.basicInfo.difficulty_level,
-        });
-
-        // Validate input before transaction
-        if (!courseData.basicInfo.name || !courseData.basicInfo.description) {
-          throw new Error("Course name and description are required");
-        }
-
-        // Estimate gas
-        const gasEstimate = await contract.estimateGas.createCourse(
-          courseData.basicInfo.name,
-          courseData.basicInfo.description,
-          courseData.basicInfo.difficulty_level
-        );
-
-        console.log("Gas Estimate:", gasEstimate.toString());
-
-        const tx = await contract.createCourse(
-          courseData.basicInfo.name,
-          courseData.basicInfo.description,
-          courseData.basicInfo.difficulty_level,
-          { gasLimit: gasEstimate }
-        );
-
-        console.log("Transaction Sent:", {
-          hash: tx.hash,
-          from: tx.from,
-          to: tx.to,
-        });
-
-        const receipt = await tx.wait();
-
-        console.log("Transaction Receipt:", {
-          status: receipt.status,
-          blockNumber: receipt.blockNumber,
-          transactionHash: receipt.transactionHash,
-        });
-
-        if (receipt.status === 1) {
-          setSuccess(`${courseData.basicInfo.name} created successfully!`);
-          setCourseData({
-            basicInfo: {
-              name: "",
-              description: "",
-              image: null,
-              difficulty_level: 0,
-            },
-          });
-        } else {
-          setError("Transaction failed. Please try again.");
-        }
-      } catch (err) {
-        // Comprehensive error logging with fallback values
-        console.error("Full Error Details:", {
-          name: err.name || "Unknown Error",
-          code: err.code || "No Error Code",
-          message: err.message || "No Error Message",
-          stack: err.stack || "No Stack Trace",
-        });
-
-        // More specific error handling
-        if (err.code === "INVALID_ARGUMENT") {
-          setError("Invalid transaction parameters. Please check your input.");
-        } else if (err.code === "UNSUPPORTED_OPERATION") {
-          setError(
-            "Unsupported network operation. Check your network settings."
-          );
-        } else {
-          setError(
-            `Failed to create course: ${err.message || "Unknown error"}`
-          );
-        }
-      } finally {
-        setLoading(false);
+      if (err.code === "INVALID_ARGUMENT") {
+        setError("Invalid transaction parameters. Please check your input.");
+      } else if (err.code === "UNSUPPORTED_OPERATION") {
+        setError("Unsupported network operation. Check your network settings.");
+      } else {
+        setError(`Failed to create course: ${err.message || "Unknown error"}`);
       }
-    } else {
-      setError("Wallet is not connected or address is missing.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -343,15 +255,17 @@ const CourseCreationPipeline = () => {
             throw new Error("Number of chapters and durations must match");
           }
 
-          const contract = new ethers.Contract(
-            Ecosystem2ContractAddress,
-            Ecosystem2_ABI,
+          const diamondContract = new ethers.Contract(
+            EcosystemDiamondAddress,
+            Ecosystem1Facet_ABI,
             signer
           );
 
           // Verify course exists
           try {
-            const rawCourseObject = await contract.courseObject(parsedCourseId);
+            const rawCourseObject = await diamondContract.courseObject(
+              parsedCourseId
+            );
             const [contractCourseId] = rawCourseObject;
 
             if (contractCourseId.toString() !== parsedCourseId.toString()) {
@@ -363,7 +277,7 @@ const CourseCreationPipeline = () => {
             return;
           }
 
-          const tx = await contract.addChapters(
+          const tx = await diamondContract.addChapters(
             parsedCourseId,
             chapters,
             durations
