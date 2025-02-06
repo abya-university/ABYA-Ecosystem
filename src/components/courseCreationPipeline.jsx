@@ -14,6 +14,10 @@ import { useAccount } from "wagmi";
 import { ethers } from "ethers";
 import { CourseContext } from "../contexts/courseContext";
 import { ChapterContext } from "../contexts/chapterContext";
+import { LessonContext } from "../contexts/lessonContext";
+import { QuizContext } from "../contexts/quizContext";
+import { uploadFileToPinata, uploadMetadataToIPFS } from "../components/pinata";
+import PreviewCourse from "../pages/PreviewCourse";
 
 const Ecosystem2ContractAddress = import.meta.env
   .VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
@@ -39,6 +43,8 @@ const CourseCreationPipeline = () => {
   const [loading, setLoading] = useState(false);
   const { courses } = useContext(CourseContext);
   const { chapters, fetchChapters, setChapters } = useContext(ChapterContext);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   console.log("Courses Data:", courses);
 
@@ -154,77 +160,111 @@ const CourseCreationPipeline = () => {
   const CourseBasicInfo = () => {
     const handleImageUpload = (e) => {
       const file = e.target.files[0];
-      setCourseData((prev) => ({
-        ...prev,
-        basicInfo: { ...prev.basicInfo, image: file },
-      }));
+      if (file) {
+        setCourseData((prev) => ({
+          ...prev,
+          basicInfo: { ...prev.basicInfo, image: file },
+        }));
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImagePreview(reader.result);
+        };
+        reader.readAsDataURL(file);
+      }
     };
 
     return (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-yellow-500">
+      <div className="max-w-4xl mx-auto p-6">
+        <h2 className="text-2xl font-bold text-yellow-500 mb-6">
           Course Basic Information
         </h2>
-        {success ? (
-          <>
-            <div className="bg-green-50 p-4 rounded-lg flex items-center text-green-600">
-              <CheckCircle className="h-5 w-5 mr-2" />
-              <span>{success}</span>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="bg-red-50 p-4 rounded-lg flex items-center text-red-700">
-              <AlertCircle className="h-5 w-5 mr-2" />
-              <span>{error}</span>
-            </div>
-          </>
-        )}
-        <div className="grid gap-4">
-          <input
-            type="text"
-            placeholder="Course Name"
-            className="w-full p-3 border rounded-lg"
-            value={courseData.basicInfo.name}
-            onChange={(e) =>
-              setCourseData((prev) => ({
-                ...prev,
-                basicInfo: { ...prev.basicInfo, name: e.target.value },
-              }))
-            }
-          />
-          <textarea
-            placeholder="Course Description"
-            className="w-full p-3 border rounded-lg h-32"
-            value={courseData.basicInfo.description}
-            onChange={(e) =>
-              setCourseData((prev) => ({
-                ...prev,
-                basicInfo: { ...prev.basicInfo, description: e.target.value },
-              }))
-            }
-          />
-          <div className="flex items-center space-x-4">
-            <label className="flex items-center space-x-2 bg-yellow-500 text-black px-4 py-2 rounded-lg cursor-pointer">
-              <Image size={20} />
-              <span>Upload Course Image</span>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleImageUpload}
-              />
-            </label>
-            {courseData.basicInfo.image && (
-              <span className="text-green-500">Image Selected</span>
-            )}
-          </div>
-          <button
-            onClick={createCourse}
-            className="rounded-lg bg-yellow-500 p-2 w-[18%]"
+
+        {(success || error) && (
+          <div
+            className={`mb-4 p-4 rounded-lg flex items-center ${
+              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
+            }`}
           >
-            Create Course
-          </button>
+            {success ? (
+              <CheckCircle className="h-5 w-5 mr-2" />
+            ) : (
+              <AlertCircle className="h-5 w-5 mr-2" />
+            )}
+            <span>{success || error}</span>
+          </div>
+        )}
+
+        <div className="flex gap-6">
+          {/* Left side - Form inputs */}
+          <div className="flex-1 space-y-4">
+            <input
+              type="text"
+              placeholder="Course Name"
+              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+              value={courseData.basicInfo.name}
+              onChange={(e) =>
+                setCourseData((prev) => ({
+                  ...prev,
+                  basicInfo: { ...prev.basicInfo, name: e.target.value },
+                }))
+              }
+            />
+
+            <textarea
+              placeholder="Course Description"
+              className="w-full p-3 border rounded-lg h-32 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+              value={courseData.basicInfo.description}
+              onChange={(e) =>
+                setCourseData((prev) => ({
+                  ...prev,
+                  basicInfo: { ...prev.basicInfo, description: e.target.value },
+                }))
+              }
+            />
+
+            <div className="flex items-center gap-4">
+              <label className="inline-flex items-center space-x-2 bg-yellow-500 text-black px-4 py-2 rounded-lg cursor-pointer hover:bg-yellow-600 transition-colors">
+                <Image size={20} />
+                <span>Upload Course Image</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
+                />
+              </label>
+
+              <button
+                onClick={createCourse}
+                className="rounded-lg bg-yellow-500 p-2 px-6 hover:bg-yellow-600 transition-colors"
+              >
+                Create Course
+              </button>
+            </div>
+          </div>
+
+          {/* Right side - Image preview */}
+          <div className="w-64 flex-shrink-0">
+            <div className="p-4">
+              {imagePreview ? (
+                <div className="relative w-full h-48 rounded-lg overflow-hidden">
+                  <img
+                    src={imagePreview}
+                    alt="Course preview"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-full h-48 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <div className="text-gray-400 text-center">
+                    <Image className="mx-auto mb-2 h-8 w-8" />
+                    <p className="text-sm">Course Image</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -319,20 +359,19 @@ const CourseCreationPipeline = () => {
         <h2 className="text-2xl font-bold text-yellow-500">
           Create Chapters/Modules
         </h2>
-        {success ? (
-          <>
-            <div className="bg-green-50 p-4 rounded-lg flex items-center text-green-600">
+        {(success || error) && (
+          <div
+            className={`mb-4 p-4 rounded-lg flex items-center ${
+              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
+            }`}
+          >
+            {success ? (
               <CheckCircle className="h-5 w-5 mr-2" />
-              <span>{success}</span>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="bg-red-50 p-4 rounded-lg flex items-center text-red-700">
+            ) : (
               <AlertCircle className="h-5 w-5 mr-2" />
-              <span>{error}</span>
-            </div>
-          </>
+            )}
+            <span>{success || error}</span>
+          </div>
         )}
         <div className="flex space-x-4">
           <input
@@ -405,13 +444,16 @@ const CourseCreationPipeline = () => {
     );
   };
 
-  //Lesson creation
   const LessonCreation = () => {
     const [lessonName, setLessonName] = useState("");
     const [lessonContent, setLessonContent] = useState("");
     const [lessons, setLessons] = useState([]);
     const [chapterId, setChapterId] = useState("");
     const [courseId, setCourseId] = useState("");
+    const { fetchChapters, chapters, setChapters } = useContext(ChapterContext);
+    const { isConnected } = useAccount();
+    const [success, setSuccess] = useState("");
+    const [error, setError] = useState("");
 
     const createLesson = async () => {
       if (!isConnected) {
@@ -429,15 +471,20 @@ const CourseCreationPipeline = () => {
             Ecosystem2_ABI,
             signer
           );
+          console.log("Chapter ID: ", chapterId);
+          console.log("Lesson Name: ", lessonName);
+          console.log("Lesson Content: ", lessonContent);
 
-          const tx = await contract.addLessons(
-            chapterId,
+          const tx = await contract.addLesson(
+            chapterId.toString(),
             lessonName,
             lessonContent
           );
           const receipt = await tx.wait();
           console.log(receipt);
-          setSuccess("Lessons created successfully!");
+          setSuccess(`${lessonName} lesson created successfully!`);
+          setLessonName("");
+          setLessonContent("");
         } catch (err) {
           console.error("Full Error:", err);
           setError(`Failed to create lessons: ${err.message}`);
@@ -458,23 +505,40 @@ const CourseCreationPipeline = () => {
     };
 
     useEffect(() => {
-      const courseId = courses?.courseId;
-      console.log("course id type: ", typeof courseId);
-      console.log("course id type: ", courseId);
-
       if (courseId) {
-        console.log("Fetching chapters for courseId:", courses.courseId);
-        fetchChapters(courses.courseId);
+        console.log("Fetching chapters for courseId:", courseId);
+        fetchChapters(courseId).then((fetchedChapters) => {
+          if (fetchedChapters) {
+            const formattedChapters = fetchedChapters.map((chapter) => ({
+              chapterId: Number(chapter.chapterId),
+              chapterName: chapter.chapterName,
+            }));
+            setChapters(formattedChapters);
+            console.log("Chapters: ", formattedChapters);
+          } else {
+            setChapters([]);
+          }
+        });
       }
-    }, [courses.courseId, fetchChapters]);
-
-    // useEffect(() => {
-    console.log("Course Chapters: ", chapters);
-    // }, [chapters]);
+    }, [courseId, fetchChapters]);
 
     return (
       <div className="space-y-6">
         <h2 className="text-2xl font-bold text-yellow-500">Create Lessons</h2>
+        {(success || error) && (
+          <div
+            className={`mb-4 p-4 rounded-lg flex items-center ${
+              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
+            }`}
+          >
+            {success ? (
+              <CheckCircle className="h-5 w-5 mr-2" />
+            ) : (
+              <AlertCircle className="h-5 w-5 mr-2" />
+            )}
+            <span>{success || error}</span>
+          </div>
+        )}
         <div className="grid gap-4">
           <input
             type="text"
@@ -508,6 +572,7 @@ const CourseCreationPipeline = () => {
               </option>
             ))}
           </select>
+          <p>{courseId}</p>
         </div>
 
         {/* Chapter Selection */}
@@ -539,38 +604,66 @@ const CourseCreationPipeline = () => {
     );
   };
 
-  const QuizCreation = ({ onNextStep }) => {
-    const [quizName, setQuizName] = useState("");
+  const QuizCreation = () => {
+    const [quizTitle, setQuizTitle] = useState("");
     const [lessonId, setLessonId] = useState("");
     const [quizId, setQuizId] = useState("");
     const [questions, setQuestions] = useState([]);
     const [question, setQuestion] = useState("");
     const [options, setOptions] = useState([
-      { text: "", isCorrect: false },
-      { text: "", isCorrect: false },
-      { text: "", isCorrect: false },
-      { text: "", isCorrect: false },
+      { option: "", isCorrect: false },
+      { option: "", isCorrect: false },
+      { option: "", isCorrect: false },
+      { option: "", isCorrect: false },
     ]);
+    const { lessons } = useContext(LessonContext);
+    const { quizzes } = useContext(QuizContext);
+    const [quizSuccess, setQuizSuccess] = useState("");
+    const [quizError, setQuizError] = useState("");
+    const [questionSuccess, setQuestionSuccess] = useState("");
+    const [questionError, setQuestionError] = useState("");
 
-    // Lessons could be fetched from an API or defined statically
-    const lessons = [
-      { id: "lesson1", name: "Introduction to Programming" },
-      { id: "lesson2", name: "Data Structures" },
-      { id: "lesson3", name: "Algorithms" },
-    ];
+    console.log("Lessons: ", lessons);
+    console.log("Quizzes: ", quizzes);
 
-    const quizzes = [
-      { id: "quiz1", name: "Introduction to Programming" },
-      { id: "quiz2", name: "Data Structures" },
-      { id: "quiz3", name: "Algorithms" },
-    ];
+    const createQuiz = async () => {
+      if (!isConnected || !address) {
+        throw new Error("Please connect to a blockchain network");
+      }
 
-    const addQuestion = () => {
+      try {
+        // const lesson = lessons.find((lesson) => lesson.lessonId === lessonId);
+        const signer = await signerPromise;
+
+        const contract = new ethers.Contract(
+          Ecosystem2ContractAddress,
+          Ecosystem2_ABI,
+          signer
+        );
+
+        console.log("Lesson Id: ", lessonId);
+        console.log("Quiz Title: ", quizTitle);
+
+        const tx = await contract.createQuiz(lessonId, quizTitle);
+        const receipt = await tx.wait();
+        console.log("Quiz created: ", receipt);
+        setLessonId("");
+        setQuizTitle("");
+        setQuizSuccess(`${quizTitle} created successfully!!`);
+      } catch (error) {
+        console.error("Error creating quiz: ", error);
+        setQuizError("Error creating quiz");
+      }
+    };
+
+    const createQuestion = async () => {
       // Validate that there's a question, all options are filled, and exactly one correct option
       const hasQuestion = question.trim();
-      const hasFilledOptions = options.every((option) => option.text.trim());
-      const hasOneCorrectOption =
-        options.filter((option) => option.isCorrect).length === 1;
+      const hasFilledOptions = options.every((option) => option.text?.trim());
+      const correctOptionIndex = options.findIndex(
+        (option) => option.isCorrect
+      );
+      const hasOneCorrectOption = correctOptionIndex !== -1;
 
       if (hasQuestion && hasFilledOptions && hasOneCorrectOption) {
         setQuestions([
@@ -584,14 +677,48 @@ const CourseCreationPipeline = () => {
           },
         ]);
 
-        // Reset inputs after adding
-        setQuestion("");
-        setOptions([
-          { text: "", isCorrect: false },
-          { text: "", isCorrect: false },
-          { text: "", isCorrect: false },
-          { text: "", isCorrect: false },
-        ]);
+        if (!isConnected || !address) {
+          throw new Error("Please connect to a blockchain network");
+        }
+
+        try {
+          const signer = await signerPromise;
+          const contract = new ethers.Contract(
+            Ecosystem2ContractAddress,
+            Ecosystem2_ABI,
+            signer
+          );
+
+          console.log("Quiz Id: ", quizId);
+          console.log("Question: ", question);
+          console.log(
+            "Options: ",
+            options.map((option) => option.text)
+          );
+          console.log("Correct Option Index: ", correctOptionIndex);
+
+          const tx = await contract.createQuestionWithChoices(
+            quizId,
+            question,
+            options.map((option) => option.text),
+            correctOptionIndex // Send the index of the correct option instead of boolean array
+          );
+
+          const receipt = await tx.wait();
+          setQuestionSuccess("Question created successfully!!");
+
+          // Reset inputs after adding
+          setQuestion("");
+          setOptions([
+            { text: "", isCorrect: false },
+            { text: "", isCorrect: false },
+            { text: "", isCorrect: false },
+            { text: "", isCorrect: false },
+          ]);
+        } catch (err) {
+          console.error("Error creating question: ", err);
+          setQuestionError("Error creating question");
+        }
       } else {
         alert(
           "Please ensure: \n- Question is filled\n- All options are filled\n- Exactly one option is marked as correct"
@@ -611,39 +738,32 @@ const CourseCreationPipeline = () => {
       );
     };
 
-    const handleNextStep = () => {
-      // Validate before moving to next step
-      if (!quizName.trim()) {
-        alert("Please enter a quiz name");
-        return;
-      }
-      if (!lessonId) {
-        alert("Please select a lesson");
-        return;
-      }
-      if (questions.length === 0) {
-        alert("Please add at least one question");
-        return;
-      }
-
-      // If validation passes, call onNextStep with quiz data
-      onNextStep({
-        quizName,
-        lessonId,
-        questions,
-      });
-    };
-
     return (
       <div className="space-y-6 p-4">
         <h2 className="text-2xl font-bold text-yellow-500">Create Quiz</h2>
+        {(quizSuccess || quizError) && (
+          <div
+            className={`mb-4 p-4 rounded-lg flex items-center ${
+              quizSuccess
+                ? "bg-green-50 text-green-600"
+                : "bg-red-50 text-red-700"
+            }`}
+          >
+            {quizSuccess ? (
+              <CheckCircle className="h-5 w-5 mr-2" />
+            ) : (
+              <AlertCircle className="h-5 w-5 mr-2" />
+            )}
+            <span>{quizSuccess || quizError}</span>
+          </div>
+        )}
         <div className="grid gap-4">
           <input
             type="text"
             placeholder="Quiz Title"
             className="w-full p-3 border rounded-lg"
-            value={quizName}
-            onChange={(e) => setQuizName(e.target.value)}
+            value={quizTitle}
+            onChange={(e) => setQuizTitle(e.target.value)}
           />
 
           {/* Lesson Selection */}
@@ -658,19 +778,36 @@ const CourseCreationPipeline = () => {
             >
               <option value="">Choose a lesson</option>
               {lessons.map((lesson) => (
-                <option key={lesson.id} value={lesson.id}>
-                  {lesson.name}
+                <option key={lesson.lessonId} value={lesson.lessonId}>
+                  {lesson.lessonName}
                 </option>
               ))}
             </select>
           </div>
 
           <button
-            // onClick={}
+            onClick={createQuiz}
             className="bg-yellow-500 text-black px-4 py-2 w-[120px] rounded-lg flex items-center"
           >
             Create Quiz
           </button>
+
+          {(questionSuccess || questionError) && (
+            <div
+              className={`mb-4 p-4 rounded-lg flex items-center ${
+                questionSuccess
+                  ? "bg-green-50 text-green-600"
+                  : "bg-red-50 text-red-700"
+              }`}
+            >
+              {questionSuccess ? (
+                <CheckCircle className="h-5 w-5 mr-2" />
+              ) : (
+                <AlertCircle className="h-5 w-5 mr-2" />
+              )}
+              <span>{questionSuccess || questionError}</span>
+            </div>
+          )}
 
           {/* Quiz Selection */}
           <div className="space-y-2">
@@ -684,8 +821,8 @@ const CourseCreationPipeline = () => {
             >
               <option value="">Choose a Quiz</option>
               {quizzes.map((quiz) => (
-                <option key={quiz.id} value={quiz.id}>
-                  {quiz.name}
+                <option key={quiz.quizId} value={quiz.quizId}>
+                  {quiz.quizTitle}
                 </option>
               ))}
             </select>
@@ -731,10 +868,10 @@ const CourseCreationPipeline = () => {
             ))}
 
             <button
-              onClick={addQuestion}
+              onClick={createQuestion}
               className="bg-yellow-500 text-black px-4 py-2 rounded-lg flex items-center"
             >
-              Add Question
+              Create Question
             </button>
 
             {/* Added Questions List */}
@@ -777,45 +914,169 @@ const CourseCreationPipeline = () => {
                 </div>
               </div>
             )}
-
-            {/* Next Step Button */}
-            {questions.length > 0 && (
-              <div className="mt-4">
-                <button
-                  onClick={handleNextStep}
-                  className="bg-yellow-500 text-black px-4 py-2 rounded-lg w-full"
-                >
-                  Next Step
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>
     );
   };
 
-  //add resources
   const ResourcesCreation = () => {
     const [resourceName, setResourceName] = useState("");
     const [resourceLink, setResourceLink] = useState("");
+    const [contentType, setContentType] = useState("");
+    const [file, setFile] = useState(null);
     const [resources, setResources] = useState([]);
+    const { lessons } = useContext(LessonContext);
+    const [lessonId, setLessonId] = useState("");
+    const [isUploading, setIsUploading] = useState(false);
+    const [success, setSuccess] = useState("");
+    const [error, setError] = useState("");
 
-    const addResource = () => {
-      if (resourceName.trim() && resourceLink.trim()) {
+    // Enum mapping matching the contract
+    const ContentTypeEnum = {
+      Video: 0,
+      Image: 1,
+      Document: 2,
+    };
+
+    const addResource = async () => {
+      try {
+        if (!lessonId || !contentType || !resourceName) {
+          alert("Please fill in all required fields");
+          return;
+        }
+
+        if (!isConnected || !address) {
+          setError("Wallet is not connected");
+          return;
+        }
+
+        setIsUploading(true);
+        let finalLink = "";
+
+        // Handle file upload for Image/Document
+        if (contentType !== "Video") {
+          if (!file) {
+            alert("Please upload a file");
+            return;
+          }
+          // Upload to Pinata
+          const fileCid = await uploadFileToPinata(file);
+          console.log("File uploaded to Pinata with CID:", fileCid);
+
+          // Create and upload metadata
+          const metadata = {
+            type: contentType.toLowerCase(),
+            file: fileCid,
+          };
+          finalLink = await uploadMetadataToIPFS(metadata);
+        } else {
+          finalLink = resourceLink;
+        }
+
+        // Create resource object matching contract structure
+        const newResource = {
+          contentType: ContentTypeEnum[contentType],
+          url: finalLink,
+          name: resourceName,
+        };
+
+        const signer = await signerPromise;
+        const contract = new ethers.Contract(
+          Ecosystem2ContractAddress,
+          Ecosystem2_ABI,
+          signer
+        );
+
+        // Call contract with the new parameters
+        const tx = await contract.addResourcesToLesson(
+          lessonId,
+          ContentTypeEnum[contentType],
+          [newResource] // Pass as array to match contract function
+        );
+
+        const receipt = await tx.wait();
+        console.log("Resources added to lesson:", receipt);
+
+        // Update local state
         setResources([
           ...resources,
-          { name: resourceName.trim(), link: resourceLink.trim() },
+          {
+            name: resourceName,
+            link: finalLink,
+            contentType,
+          },
         ]);
+
+        setSuccess("Resource added successfully!");
+
+        // Reset form
         setResourceName("");
         setResourceLink("");
+        setFile(null);
+        setContentType("");
+      } catch (error) {
+        console.error("Error adding resource:", error);
+        setError("Error adding resource. Please try again.");
+      } finally {
+        setIsUploading(false);
       }
     };
 
     return (
       <div className="space-y-6">
         <h2 className="text-2xl font-bold text-yellow-500">Add Resources</h2>
+        {(success || error) && (
+          <div
+            className={`mb-4 p-4 rounded-lg flex items-center ${
+              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
+            }`}
+          >
+            {success ? (
+              <CheckCircle className="h-5 w-5 mr-2" />
+            ) : (
+              <AlertCircle className="h-5 w-5 mr-2" />
+            )}
+            <span>{success || error}</span>
+          </div>
+        )}
         <div className="grid gap-4">
+          {/* Lesson Selection */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Select Lesson
+            </label>
+            <select
+              value={lessonId}
+              onChange={(e) => setLessonId(e.target.value)}
+              className="w-full p-3 border rounded-lg"
+            >
+              <option value="">Choose a lesson</option>
+              {lessons.map((lesson) => (
+                <option key={lesson.lessonId} value={lesson.lessonId}>
+                  {lesson.lessonName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Content Type Selection */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Content Type
+            </label>
+            <select
+              value={contentType}
+              onChange={(e) => setContentType(e.target.value)}
+              className="w-full p-3 border rounded-lg"
+            >
+              <option value="">Select content type</option>
+              <option value="Video">Video</option>
+              <option value="Image">Image</option>
+              <option value="Document">Document</option>
+            </select>
+          </div>
+
           <input
             type="text"
             placeholder="Resource Name"
@@ -823,21 +1084,52 @@ const CourseCreationPipeline = () => {
             value={resourceName}
             onChange={(e) => setResourceName(e.target.value)}
           />
-          <input
-            type="text"
-            placeholder="Resource Link"
-            className="w-full p-3 border rounded-lg"
-            value={resourceLink}
-            onChange={(e) => setResourceLink(e.target.value)}
-          />
+
+          {contentType === "Video" ? (
+            <input
+              type="text"
+              placeholder="YouTube Video URL"
+              className="w-full p-3 border rounded-lg"
+              value={resourceLink}
+              onChange={(e) => setResourceLink(e.target.value)}
+            />
+          ) : contentType ? (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Upload {contentType}
+              </label>
+              <input
+                type="file"
+                accept={
+                  contentType === "Image"
+                    ? "image/*"
+                    : "application/pdf,.doc,.docx"
+                }
+                onChange={(e) => setFile(e.target.files[0])}
+                className="w-full p-3 border rounded-lg dark:text-gray-300"
+              />
+            </div>
+          ) : null}
+
           <button
             onClick={addResource}
-            className="bg-yellow-500 text-black px-4 py-2 w-[160px] rounded-lg flex items-center"
+            disabled={isUploading}
+            className={`bg-yellow-500 text-black px-4 py-2 w-[160px] rounded-lg flex items-center ${
+              isUploading ? "opacity-50 cursor-not-allowed" : ""
+            }`}
           >
-            <Plus size={20} />
-            Add Resource
+            {isUploading ? (
+              <span>Uploading...</span>
+            ) : (
+              <>
+                <Plus size={20} />
+                Add Resource
+              </>
+            )}
           </button>
         </div>
+
+        {/* Display Added Resources */}
         {resources.length > 0 && (
           <div className="mt-4">
             <h3 className="font-semibold mb-2">Added Resources:</h3>
@@ -849,9 +1141,21 @@ const CourseCreationPipeline = () => {
                 >
                   <div>
                     <h3 className="font-semibold">{resource.name}</h3>
-                    <a href={resource.link} target="_blank" rel="noreferrer">
-                      {resource.link}
-                    </a>
+                    <div className="text-sm">
+                      <span className="text-gray-500">
+                        Type: {resource.contentType}
+                      </span>
+                      <a
+                        href={resource.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="ml-2 text-blue-500"
+                      >
+                        {resource.contentType === "Video"
+                          ? "Watch Video"
+                          : "View Resource"}
+                      </a>
+                    </div>
                   </div>
                   <button
                     onClick={() =>
@@ -923,13 +1227,17 @@ const CourseCreationPipeline = () => {
     <div className="w-[90%] md:w-[60%] lg:w-[50%] mx-auto p-8 bg-white dark:bg-gray-900 rounded-lg shadow-lg mt-[100px]">
       <ProgressBar />
 
-      <div className="mb-8">
-        {currentStep === 1 && <CourseBasicInfo />}
-        {currentStep === 2 && <ChapterCreation />}
-        {currentStep === 3 && <LessonCreation />}
-        {currentStep === 4 && <QuizCreation />}
-        {currentStep === 5 && <ResourcesCreation />}
-      </div>
+      {showPreview ? (
+        <PreviewCourse />
+      ) : (
+        <div className="mb-8">
+          {currentStep === 1 && <CourseBasicInfo />}
+          {currentStep === 2 && <ChapterCreation />}
+          {currentStep === 3 && <LessonCreation />}
+          {currentStep === 4 && <QuizCreation />}
+          {currentStep === 5 && <ResourcesCreation />}
+        </div>
+      )}
 
       <div className="flex justify-between">
         {currentStep > 1 && (
@@ -949,7 +1257,10 @@ const CourseCreationPipeline = () => {
             <ChevronRight size={20} className="ml-2" />
           </button>
         ) : (
-          <button className="bg-green-500 text-white px-6 py-2 rounded-lg">
+          <button
+            onClick={() => setShowPreview(true)}
+            className="bg-green-500 text-white px-6 py-2 rounded-lg"
+          >
             Preview Course
           </button>
         )}

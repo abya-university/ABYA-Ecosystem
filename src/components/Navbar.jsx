@@ -15,7 +15,15 @@ import {
   UserCircle,
   CopyCheckIcon,
   CopyIcon,
+  Aperture,
+  ChartNetwork,
 } from "lucide-react";
+import Ecosystem2ABI from "../artifacts/contracts/Ecosystem Contracts/Ecosystem2.sol/Ecosystem2.json";
+import { ethers } from "ethers";
+import { useEthersSigner } from "./useClientSigner";
+
+const contractABI = Ecosystem2ABI.abi;
+const contractAddress = import.meta.env.VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
 
 const Navbar = () => {
   const logo = "/abya_logo.jpg";
@@ -29,6 +37,50 @@ const Navbar = () => {
   const { data: balanceData } = useBalance({
     address,
   });
+  const [tokenBalance, setTokenBalance] = useState("");
+  const [tokenSymbol, setTokenSymbol] = useState("");
+  const signerPromise = useEthersSigner();
+
+  useEffect(() => {
+    if (isConnected && address) {
+      fetchTokenBalance();
+    } else {
+      setTokenBalance("");
+      setTokenSymbol("");
+    }
+  }, [isConnected, address]);
+
+  const fetchTokenBalance = async () => {
+    if (isConnected && address) {
+      try {
+        const signer = await signerPromise;
+        const contract = new ethers.Contract(
+          contractAddress,
+          contractABI,
+          signer
+        );
+
+        const tokenBalanceRaw = await contract.balanceOf(address);
+        const tokenDecimalsRaw = await contract.decimals();
+        const tokenSymbol = await contract.symbol();
+
+        const tokenDecimals = Number(tokenDecimalsRaw);
+        const formattedTokenBalance = ethers.formatUnits(
+          tokenBalanceRaw,
+          tokenDecimals
+        );
+
+        setTokenBalance(parseFloat(formattedTokenBalance).toFixed(1));
+        setTokenSymbol(tokenSymbol);
+
+        console.log("Token Balance: ", formattedTokenBalance);
+        console.log("Token Symbol: ", tokenSymbol);
+      } catch (error) {
+        console.error("Error fetching token balance:", error);
+        setTokenBalance("Error");
+      }
+    }
+  };
 
   useEffect(() => {
     if (darkMode) {
@@ -62,9 +114,9 @@ const Navbar = () => {
     try {
       disconnect();
       setIsLoggedIn(false);
-      setTimeout(() => {
-        navigate("/");
-      }, 1500);
+      // setTimeout(() => {
+      //   navigate("/");
+      // }, 1500);
     } catch (error) {
       console.log(error);
     }
@@ -143,7 +195,7 @@ const Navbar = () => {
                   <div className="p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2 dark:text-white">
-                        <Wallet className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                        <ChartNetwork className="w-5 h-5 text-gray-600 dark:text-gray-300" />
                         <span>Status</span>
                       </div>
                       <span
@@ -193,6 +245,17 @@ const Navbar = () => {
                           ? parseFloat(balanceData.formatted).toFixed(5)
                           : "0.0000"}{" "}
                         {balanceData?.symbol}
+                      </span>
+                    </div>
+
+                    {/* //token balance */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 dark:text-white">
+                        <Aperture className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                        <span>Token Balance</span>
+                      </div>
+                      <span className="font-semibold dark:text-purple-600">
+                        {tokenBalance} {tokenSymbol}
                       </span>
                     </div>
 

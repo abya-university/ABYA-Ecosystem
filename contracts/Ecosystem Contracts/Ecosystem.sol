@@ -42,6 +42,8 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
         bool approved;
         uint256 approvalCount;
         address creator;
+        bool exists;
+        address[] enrolledStudents;
     }
 
     struct Review {
@@ -63,31 +65,40 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
     }
 
     struct Chapter {
+        uint256 courseId;
         uint256 chapterId;
         string chapterName;
+        bool exists;
     }
 
     struct Lesson {
+        uint256 chapterId;
         uint256 lessonId;
         string lessonName;
         string lessonContent;
         Resource[10] additionalResources;
         uint256 resourceCount;
+        bool exists;
     }
 
+    enum ContentType { Video, Image, Document }
+
     struct Resource {
-        string contentType; // "video" or "document"
+        ContentType contentType;
         string url;
-        string description;
+        string name;
     }
 
     struct Quiz {
+        uint256 lessonId;
         uint256 quizId;
         string quizTitle;
         Question[] questions;
+        bool exists;
     }
 
     struct Question {
+        uint256 quizId;
         uint256 questionId;
         string questionText;
         Choice[] choices;
@@ -104,7 +115,7 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
     mapping(address => Account) public accountCourses;
     mapping(address => mapping(uint256 => bool)) public approvals;
     mapping(uint256 => Chapter) public chapter;
-    mapping(uint256 => string[]) public courseChapters;
+    mapping(uint256 => Chapter[]) public courseChapters;
     mapping(uint256 => Lesson) public lesson;
     mapping(uint256 => string[]) public chapterLessons;
     mapping(uint256 => Quiz) public quizzes;
@@ -164,7 +175,7 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
         // require(nextCourseId > 0, "All course IDs have been assigned");
         require(courseObject[nextCourseId].creator == address(0), "Course ID already exists");
 
-        Course memory newCourse = Course(nextCourseId,_courseName, _description, false, 0, msg.sender);
+        Course memory newCourse = Course(nextCourseId,_courseName, _description, false, 0, msg.sender, true, new address[](0));
         courseObject[nextCourseId] = newCourse;
 
         listOfCourses.push(newCourse);
@@ -190,7 +201,9 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
                 listOfCourses[i].description,
                 listOfCourses[i].approved,
                 listOfCourses[i].approvalCount,
-                listOfCourses[i].creator
+                listOfCourses[i].creator,
+                listOfCourses[i].exists,
+                listOfCourses[i].enrolledStudents
             );
         }
         return courses;
@@ -242,6 +255,7 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
     }
 
     function approveCourse(uint256 _courseId) public onlyRole(REVIEWER_ROLE) {
+        // Update in the mapping
         Course storage course = courseObject[_courseId];
         require(!course.approved, "Course already approved");
         require(!approvals[msg.sender][_courseId], "You have already approved this course");
@@ -251,11 +265,28 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
 
         if (course.approvalCount >= REQUIRED_APPROVALS) {
             course.approved = true;
-            mintToken(course.creator, CREATE_COURSE_REWARD); //mint the course creation reward to the course creator
+        
+            // Update in the array
+            for (uint256 i = 0; i < listOfCourses.length; i++) {
+                if (listOfCourses[i].courseId == _courseId) {
+                    listOfCourses[i].approved = true;
+                    listOfCourses[i].approvalCount = course.approvalCount;
+                    break;
+                }
+            }
+
+            mintToken(course.creator, CREATE_COURSE_REWARD);
+        } else {
+            for (uint256 i = 0; i < listOfCourses.length; i++) {
+                if (listOfCourses[i].courseId == _courseId) {
+                    listOfCourses[i].approvalCount = course.approvalCount;
+                    break;
+                }
+            }
         }
     }
 
-    function selectCourseReviewers(uint256 courseId) public onlyRole(REVIEWER_ROLE) {
+    function selectCourseReviewers(uint256 courseId) public onlyRole(COURSE_OWNER_ROLE) {
         require(!courseReviewInitiated[courseId], "Reviewers already selected");
         require(reviewerPool.length >= 3, "Not enough reviewers in the pool");
     
