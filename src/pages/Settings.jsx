@@ -13,6 +13,7 @@ import {
   CopyCheckIcon,
 } from "lucide-react";
 import { useAccount } from "wagmi";
+import { Link } from 'react-router-dom';
 
 const SettingsPage = () => {
   const [activeSection, setActiveSection] = useState("did");
@@ -141,7 +142,7 @@ const SettingsPage = () => {
               </button>
             ))}
           </div>
-
+ 
           {/* Settings Content */}
           <div
             className="col-span-3 p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200
@@ -155,58 +156,112 @@ const SettingsPage = () => {
 
                 {/* DID Document Section */}
                 <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 border dark:border-none rounded-lg p-4 mb-4">
+                  {/* Header */}
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="font-medium">DID Document</h3>
-                    <button className="text-yellow-500 hover:underline">
+                    <Link to="/Didpage" className="text-yellow-500 hover:underline">
                       Generate New DID
-                    </button>
+                    </Link>
                   </div>
+
+                  {/* DID Details */}
                   <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-gray-400">DID</span>
-                      <span className="font-mono text-sm">
-                        {mockDidDocument.id}
-                      </span>
+                      <span className="font-mono text-sm">{mockDidDocument.id}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-gray-400">Controller</span>
-                      <span className="font-mono text-sm">
-                        {mockDidDocument.controller}
-                      </span>
+                      <span className="font-mono text-sm">{mockDidDocument.controller}</span>
                     </div>
+                  </div>
+
+                  {/* DID Owner */}
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-medium">DID Owner</h3>
+                    <Link to="/Ownercheck" className="text-yellow-500 hover:underline">
+                      View owner
+                    </Link>
+                  </div>
+
+                  {/* DID Transfer */}
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-medium">DID Transfer</h3>
+                    <Link to="/Changeowner" className="text-yellow-500 hover:underline">
+                      Change owner
+                    </Link>
                   </div>
                 </div>
 
+
+                {/* DID Delegate Section */}
+                <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 border dark:border-none rounded-lg p-4 mb-4">
+                  {/* Add Delegate */}
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-medium">DID Delegates</h3>
+                    <Link to="/AddDelegate" className="text-yellow-500 hover:underline">
+                      Add Delegate
+                    </Link>
+                  </div>
+
+                  {/* Look up Delegate */}
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-medium">Look up Delegate</h3>
+                    <Link to="/CheckDelegate" className="text-yellow-500 hover:underline">
+                      Validity check
+                    </Link>
+                  </div>
+
+                  {/* Revoke Delegate */}
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-medium">Revoke Delegate</h3>
+                    <Link to="/RevokeDelegate" className="text-red-500 hover:underline">
+                      Revoke
+                    </Link>
+                  </div>
+                </div>
+
+
                 {/* Verifiable Credentials Section */}
                 <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 border dark:border-none rounded-lg p-4 mb-4">
+                  {/* Header */}
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="font-medium">Verifiable Credentials</h3>
                     <button className="text-yellow-500 hover:underline">
                       Add Credential
                     </button>
                   </div>
-                  {mockVerifiableCredentials.map((vc) => (
-                    <div
-                      key={vc.id}
-                      className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 rounded-lg p-3 mb-2 last:mb-0"
-                    >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <span className="font-medium">
-                            {vc.type.join(", ")}
-                          </span>
-                          <p className="text-sm text-gray-400">
-                            Issued:{" "}
-                            {new Date(vc.issuanceDate).toLocaleDateString()}
-                          </p>
+
+                  {/* Credentials List */}
+                  {mockVerifiableCredentials.length > 0 ? (
+                    mockVerifiableCredentials.map((vc) => (
+                      <div
+                        key={vc.id}
+                        className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 rounded-lg p-3 mb-2 last:mb-0"
+                      >
+                        <div className="flex justify-between items-center">
+                          {/* Credential Info */}
+                          <div>
+                            <span className="font-medium">{vc.type.join(", ")}</span>
+                            <p className="text-sm text-gray-400">
+                              Issued: {new Date(vc.issuanceDate).toLocaleDateString()}
+                            </p>
+                          </div>
+                          {/* View Details Button */}
+                          <button
+                            className="text-yellow-500 hover:underline"
+                            onClick={() => handleViewCredential(vc.id)}
+                          >
+                            View Details
+                          </button>
                         </div>
-                        <button className="text-yellow-500 hover:underline">
-                          View Details
-                        </button>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-center text-gray-400">No credentials available.</p>
+                  )}
                 </div>
+
 
                 {/* Linked Accounts/DIDs */}
                 <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 border dark:border-none rounded-lg p-4">
@@ -226,6 +281,7 @@ const SettingsPage = () => {
                     </div>
                   </div>
                 </div>
+                
               </div>
             )}
 
