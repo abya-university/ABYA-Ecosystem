@@ -60,6 +60,7 @@ library LibDiamond {
         mapping(address => uint256) facetAddressPosition; // Added this line
         mapping(address => bytes4[]) facetToSelectors; // Added this line
         mapping(bytes4 => bool) supportedInterfaces; // Added this line
+        mapping(bytes32 => mapping(address => bool)) roles;
     }
 
     //Struct to Hold EcosystemLib.Data
@@ -272,6 +273,16 @@ function diamondStorage() internal pure returns (DiamondStorage storage ds) {
 
     function contractOwner() internal view returns (address contractOwner_) {
         contractOwner_ = diamondStorage().contractOwner;
+    }
+
+    function grantRole(bytes32 role, address account) internal {
+        DiamondStorage storage ds = diamondStorage();
+        ds.roles[role][account] = true;
+    }
+
+    function hasRole(bytes32 role, address account) internal view returns (bool) {
+        DiamondStorage storage ds = diamondStorage();
+        return ds.roles[role][account];
     }
 
     function diamondCut(

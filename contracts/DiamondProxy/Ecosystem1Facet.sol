@@ -5,10 +5,8 @@ pragma solidity ^0.8.24;
 import { LibDiamond } from "./DiamondLibrary/LibDiamond.sol";
 import { EcosystemLib } from "./DiamondLibrary/EcosystemLib.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
 
-
-contract Ecosystem1Facet is ReentrancyGuard, AccessControl {
+contract Ecosystem1Facet is ReentrancyGuard {
     using EcosystemLib for EcosystemLib.Data;
     EcosystemLib.Data private data;
     LibDiamond.DiamondStorage private diamondStorage;
@@ -26,15 +24,40 @@ contract Ecosystem1Facet is ReentrancyGuard, AccessControl {
     event ReviewersAssigned(uint256 indexed courseId, address[] reviewers);
     event CourseEdited(uint256 indexed _courseId, string _courseName);
     event CourseDeleteSuccess(uint256 indexed _courseId, address owner);
+    event RoleGranted(address indexed account, bytes32 indexed role);
+    event DebugRoleCheck(address account, bytes32 role, bool hasRole);
+    event DebugStorageAccess(address account, bytes32 role, bool roleValue);
 
     //Ecosystem1Facet Storage Pointer
     function ecosystemStorage() internal pure returns (LibDiamond.EcosystemStorage storage es) {
         return LibDiamond.ecosystemStorage();
     }
 
+    modifier onlyRole(bytes32 role) {
+        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
+        require(ds.roles[role][msg.sender], "Caller does not have required role");
+        _;
+    }
+
+    function checkRole(address account, bytes32 role) public view returns (bool) {
+        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
+        return ds.roles[role][account];
+    }
+
+    function grantRole(bytes32 role, address account) public {
+        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
+        ds.roles[role][account] = true; // Ensure the role is granted correctly
+        emit RoleGranted(account, role); // Emit event for role granting
+        emit RoleGranted(account, role);
+        
+        // Debug event
+        emit DebugRoleCheck(account, role, ds.roles[role][account]);
+    }
+
 
     function createCourse(string memory _courseName, string memory _description, LibDiamond.DifficultyLevel _difficultyLevel) external returns(bool) {
         LibDiamond.EcosystemStorage storage es = LibDiamond.ecosystemStorage();
+        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
         
         require(!es.courseObject[es.nextCourseId].exists, "Course already exists");
 
@@ -55,14 +78,36 @@ contract Ecosystem1Facet is ReentrancyGuard, AccessControl {
 
         es.courseCount++;
         es.accountCourses[msg.sender].courseCount += 1;
+        
+        // Grant the COURSE_OWNER_ROLE using Diamond storage
+        ds.roles[COURSE_OWNER_ROLE][msg.sender] = true;
+        emit DebugStorageAccess(msg.sender, COURSE_OWNER_ROLE, ds.roles[COURSE_OWNER_ROLE][msg.sender]);
+        
+        // Also try library method
+        LibDiamond.grantRole(COURSE_OWNER_ROLE, msg.sender);
+        
+        // Verify role assignment
+        bool hasRole = checkRole(msg.sender, COURSE_OWNER_ROLE);
+        emit DebugRoleCheck(msg.sender, COURSE_OWNER_ROLE, hasRole);
+        
         es.nextCourseId++;
 
-        // TODO: Implement role granting mechanism
-        _grantRole(COURSE_OWNER_ROLE, msg.sender);
-
-        emit CourseCreationSuccess(es.nextCourseId - 1, _courseName, false);
+        emit CourseCreationSuccess(es.nextCourseId - 1, _courseName, false); // Emit course creation success event
+        emit RoleGranted(msg.sender, COURSE_OWNER_ROLE); // Emit event for role granted
+        emit RoleGranted(msg.sender, COURSE_OWNER_ROLE);
 
         return true;
+    }
+
+    // Update the hasRole check to use Diamond storage
+    function hasCourseOwnerRole(address account) public view returns (bool) {
+        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
+        return ds.roles[COURSE_OWNER_ROLE][account];
+    }
+
+    function onlyRoleCheck(bytes32 role) public view returns (bool) {
+        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
+        return ds.roles[role][msg.sender];
     }
 
     function getAllCourses() external view returns (LibDiamond.Course[] memory) {
@@ -94,7 +139,7 @@ contract Ecosystem1Facet is ReentrancyGuard, AccessControl {
         // TODO: Implement actual token minting logic
         mintToken(to, amount);
         
-        es.ecosystemPoolSupply += amount;
+        // es.ecosystemPoolSupply += amount; // Commented out as unreachable code
 
         emit EcosystemPoolUpdate(to, amount);
 
@@ -106,7 +151,7 @@ contract Ecosystem1Facet is ReentrancyGuard, AccessControl {
         
         burn(account, amount);
         
-        es.ecosystemPoolSupply -= amount;
+        // es.ecosystemPoolSupply -= amount; // Commented out as unreachable code
     }
 
     function getCurrentEcosystemPoolSupply() public view returns(uint256) {

@@ -18,13 +18,14 @@ import { useUser } from "../contexts/userContext";
 import { ChapterContext } from "../contexts/chapterContext";
 import { LessonContext } from "../contexts/lessonContext";
 import { QuizContext } from "../contexts/quizContext";
-import Ecosystem2ABI from "../artifacts/contracts/Ecosystem Contracts/Ecosystem2.sol/Ecosystem2.json";
+import Ecosystem1FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem1Facet.sol/Ecosystem1Facet.json";
 import { ethers } from "ethers";
 import { useEthersSigner } from "../components/useClientSigner";
 import { useAccount } from "wagmi";
 
-const ContractABI = Ecosystem2ABI.abi;
-const ContractAddress = import.meta.env.VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
+const EcosystemDiamondAddress = import.meta.env
+  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
 
 const CoursesPage = ({ onCourseSelect }) => {
   const { courses } = useContext(CourseContext);
@@ -174,14 +175,14 @@ const CoursesPage = ({ onCourseSelect }) => {
   const requestReview = async (courseId) => {
     try {
       const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        ContractAddress,
-        ContractABI,
+      const diamondContract = new ethers.Contract(
+        EcosystemDiamondAddress,
+        Ecosystem1Facet_ABI,
         signer
       );
 
       console.log("Requesting review for courseId:", courseId); // Debug log
-      await contract.selectCourseReviewers(courseId);
+      await diamondContract.selectCourseReviewers(courseId);
       setRequestSent(true);
     } catch (error) {
       console.error("Error requesting review:", error);

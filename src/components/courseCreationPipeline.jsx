@@ -8,8 +8,8 @@ import {
   CheckCircle,
   AlertCircle,
 } from "lucide-react";
-// import Ecosystem2ABI from "../artifacts/contracts/Ecosystem Contracts/Ecosystem2.sol/Ecosystem2.json";
 import Ecosystem1FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem1Facet.sol/Ecosystem1Facet.json";
+import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import { useEthersSigner } from "../components/useClientSigner";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
@@ -23,6 +23,7 @@ import PreviewCourse from "../pages/PreviewCourse";
 const EcosystemDiamondAddress = import.meta.env
   .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
 const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
+const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
 const CourseCreationPipeline = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -72,6 +73,18 @@ const CourseCreationPipeline = () => {
       const receipt = await tx.wait();
       console.log("Transaction confirmed:", receipt.transactionHash);
       setSuccess("Course created successfully!");
+
+      // Check if the role has been granted
+      const hasRole = await diamondContract.hasCourseOwnerRole(
+        signer.getAddress()
+      );
+      console.log("Has COURSE_OWNER_ROLE:", hasRole);
+
+      if (hasRole) {
+        console.log("Role granted successfully");
+      } else {
+        console.error("Role not granted");
+      }
     } catch (err) {
       console.error("Full Error Details:", {
         name: err.name || "Unknown Error",
@@ -257,25 +270,31 @@ const CourseCreationPipeline = () => {
 
           const diamondContract = new ethers.Contract(
             EcosystemDiamondAddress,
-            Ecosystem1Facet_ABI,
+            Ecosystem2Facet_ABI,
             signer
           );
 
-          // Verify course exists
-          try {
-            const rawCourseObject = await diamondContract.courseObject(
-              parsedCourseId
-            );
-            const [contractCourseId] = rawCourseObject;
+          // const diamondContract2 = new ethers.Contract(
+          //   EcosystemDiamondAddress,
+          //   Ecosystem1Facet_ABI,
+          //   signer
+          // );
 
-            if (contractCourseId.toString() !== parsedCourseId.toString()) {
-              throw new Error("Course ID mismatch!");
-            }
-          } catch (courseCheckError) {
-            console.error("Course Verification Error:", courseCheckError);
-            setError(`Course verification failed: ${courseCheckError.message}`);
-            return;
-          }
+          // // Verify course exists
+          // try {
+          //   const rawCourseObject = await diamondContract2.courseObject(
+          //     parsedCourseId
+          //   );
+          //   const [contractCourseId] = rawCourseObject;
+
+          //   if (contractCourseId.toString() !== parsedCourseId.toString()) {
+          //     throw new Error("Course ID mismatch!");
+          //   }
+          // } catch (courseCheckError) {
+          //   console.error("Course Verification Error:", courseCheckError);
+          //   setError(`Course verification failed: ${courseCheckError.message}`);
+          //   return;
+          // }
 
           const tx = await diamondContract.addChapters(
             parsedCourseId,
@@ -434,16 +453,16 @@ const CourseCreationPipeline = () => {
             throw new Error("Signer is required to access the contract.");
           }
 
-          const contract = new ethers.Contract(
-            Ecosystem2ContractAddress,
-            Ecosystem2_ABI,
+          const diamondContract = new ethers.Contract(
+            EcosystemDiamondAddress,
+            Ecosystem2Facet_ABI,
             signer
           );
           console.log("Chapter ID: ", chapterId);
           console.log("Lesson Name: ", lessonName);
           console.log("Lesson Content: ", lessonContent);
 
-          const tx = await contract.addLesson(
+          const tx = await diamondContract.addLesson(
             chapterId.toString(),
             lessonName,
             lessonContent
@@ -618,16 +637,16 @@ const CourseCreationPipeline = () => {
         // const lesson = lessons.find((lesson) => lesson.lessonId === lessonId);
         const signer = await signerPromise;
 
-        const contract = new ethers.Contract(
-          Ecosystem2ContractAddress,
-          Ecosystem2_ABI,
+        const diamondContract = new ethers.Contract(
+          EcosystemDiamondAddress,
+          Ecosystem2Facet_ABI,
           signer
         );
 
         console.log("Lesson Id: ", lessonId);
         console.log("Quiz Title: ", quizTitle);
 
-        const tx = await contract.createQuiz(lessonId, quizTitle);
+        const tx = await diamondContract.createQuiz(lessonId, quizTitle);
         const receipt = await tx.wait();
         console.log("Quiz created: ", receipt);
         setLessonId("");
@@ -666,9 +685,9 @@ const CourseCreationPipeline = () => {
 
         try {
           const signer = await signerPromise;
-          const contract = new ethers.Contract(
-            Ecosystem2ContractAddress,
-            Ecosystem2_ABI,
+          const diamondContract = new ethers.Contract(
+            EcosystemDiamondAddress,
+            Ecosystem2Facet_ABI,
             signer
           );
 
@@ -680,7 +699,7 @@ const CourseCreationPipeline = () => {
           );
           console.log("Correct Option Index: ", correctOptionIndex);
 
-          const tx = await contract.createQuestionWithChoices(
+          const tx = await diamondContract.createQuestionWithChoices(
             quizId,
             question,
             options.map((option) => option.text),
@@ -860,7 +879,9 @@ const CourseCreationPipeline = () => {
             {/* Added Questions List */}
             {questions.length > 0 && (
               <div className="mt-4">
-                <h3 className="font-semibold mb-2">Added Questions:</h3>
+                <h3 className="font-semibold mb-2 dark:text-gray-200 text-gray-800">
+                  Added Questions:
+                </h3>
                 <div className="space-y-2">
                   {questions.map((q, index) => (
                     <div
@@ -965,14 +986,14 @@ const CourseCreationPipeline = () => {
         };
 
         const signer = await signerPromise;
-        const contract = new ethers.Contract(
-          Ecosystem2ContractAddress,
-          Ecosystem2_ABI,
+        const diamondContract = new ethers.Contract(
+          EcosystemDiamondAddress,
+          Ecosystem2Facet_ABI,
           signer
         );
 
         // Call contract with the new parameters
-        const tx = await contract.addResourcesToLesson(
+        const tx = await diamondContract.addResourcesToLesson(
           lessonId,
           ContentTypeEnum[contentType],
           [newResource] // Pass as array to match contract function
