@@ -1,12 +1,12 @@
 import React, { createContext, useEffect, useState } from "react";
-import Ecosystem2ABI from "../artifacts/contracts/Ecosystem Contracts/Ecosystem2.sol/Ecosystem2.json";
+import Ecosystem1FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem1Facet.sol/Ecosystem1Facet.json";
 import { useEthersSigner } from "../components/useClientSigner";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
 
-const Ecosystem2ContractAddress = import.meta.env
-  .VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
-const Ecosystem2_ABI = Ecosystem2ABI.abi;
+const EcosystemDiamondAddress = import.meta.env
+  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
 
 const CourseContext = createContext();
 
@@ -25,8 +25,8 @@ const CourseProvider = ({ children }) => {
       if (resolvedSigner) {
         try {
           const contract = new ethers.Contract(
-            Ecosystem2ContractAddress,
-            Ecosystem2_ABI,
+            EcosystemDiamondAddress,
+            Ecosystem1Facet_ABI,
             resolvedSigner
           );
 
@@ -43,6 +43,8 @@ const CourseProvider = ({ children }) => {
               approved: course.approved,
               approvalCount: course.approvalCount.toString(),
               creator: course.creator,
+              enrolledStudents: course.enrolledStudents.toString(),
+              difficulty_level: Number(course.difficultyLevel),
             }));
 
             console.log("Formatted Courses:", formattedCourses);
