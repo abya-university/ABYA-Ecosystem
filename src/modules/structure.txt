@@ -5,15 +5,18 @@ DID-Project/
 │   ├── config/
 │   │   └── ethers.js        # Ethers.js configuration for blockchain interaction
 │   ├── modules/
-│   │   ├── didCreation.js   # Logic for DID creation
-│   │   ├── didDocument.js   # Logic for DID Document creation
-│   │   ├── didResolver.js   # DID resolution logic
+│   │   ├── didDocument.js   # Logic for DID creation, DID Document creation & DID resolution logic
+|   |   ├── didregister.js   # Logic for registering the DID
 │   │   ├── didUsage.js      # Logic for DID usage
-│   │   ├── didUpdate.js     # Logic for DID updates
-│   │   ├── didDeactivate.js # Logic for DID deactivation
-│   │   ├── didVerify.js     # Logic for DID verification
-│   │   ├── didregister.js   # Logic for registering the DID
+│   │   ├── deleteDid.js     # Logic for Deleting DID locally
+│   │   ├── reactivateDid.js     # Logic for DID verification
+│   │   ├── revokeDid.js     # Logic for DID revocation
+│   │   ├── updateDid.js     # Logic for DID verification
 │   │   └── dids/
-│   │       └── dids.json    # Storage for generated DIDs
+│   │       ├──  dids.json    # Storage for generated DIDs
+│   │       ├──  revokeDid.json    # Storage for generated DIDs
+│   │       ├──  registeredDids.json    # Storage for registered DIDs
+│   │       └──  resolvedDid.json   # Storage for resolved DIDs document
+│   │
 │   └── index.js             # Main entry point
 ├── README.md                # Documentation

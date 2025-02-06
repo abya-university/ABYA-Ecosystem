@@ -1,0 +1,31 @@
+{
+  "didDocumentMetadata": {
+    "versionId": "7504582",
+    "updated": "2025-01-16T14:21:00Z"
+  },
+  "didResolutionMetadata": {
+    "contentType": "application/did+ld+json"
+  },
+  "didDocument": {
+    "id": "did:ethr:sepolia:0xa77759E342c83377449B2fB2eCe35b621de40Bf5",
+    "verificationMethod": [
+      {
+        "id": "did:ethr:sepolia:0xa77759E342c83377449B2fB2eCe35b621de40Bf5#controller",
+        "type": "EcdsaSecp256k1RecoveryMethod2020",
+        "controller": "did:ethr:sepolia:0xa77759E342c83377449B2fB2eCe35b621de40Bf5",
+        "blockchainAccountId": "eip155:11155111:0xa77759E342c83377449B2fB2eCe35b621de40Bf5"
+      }
+    ],
+    "authentication": [
+      "did:ethr:sepolia:0xa77759E342c83377449B2fB2eCe35b621de40Bf5#controller"
+    ],
+    "assertionMethod": [
+      "did:ethr:sepolia:0xa77759E342c83377449B2fB2eCe35b621de40Bf5#controller"
+    ],
+    "@context": [
+      "https://www.w3.org/ns/did/v1",
+      "https://w3id.org/security/suites/secp256k1recovery-2020/v2",
+      "https://w3id.org/security/v3-unstable"
+    ]
+  }
+}

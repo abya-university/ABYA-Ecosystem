@@ -11,9 +11,8 @@ const createAndResolveDid = async () => {
   try {
     const { INFURA_URL, PRIVATE_KEY, CONTRACT_ADDRESS } = process.env;
 
-    // Ensure environment variables are present
+    // Validate environment variables early on
     if (!INFURA_URL || !PRIVATE_KEY || !CONTRACT_ADDRESS) {
-      console.error('Missing environment variables:', { INFURA_URL, PRIVATE_KEY, CONTRACT_ADDRESS });
       throw new Error('Missing environment variables.');
     }
 
@@ -26,12 +25,19 @@ const createAndResolveDid = async () => {
       identifier: wallet.address,
       privateKey: PRIVATE_KEY,
       provider,
-      chainNameOrId: 'sepolia',  // Use SePOLIA network for testing
+      chainNameOrId: 'sepolia',
     });
 
     console.log('Generated DID:', ethrDid.did);
 
-    // Setup DID Resolver with the correct contract address
+    // Check if DID exists, skip creation if it does
+    const didExists = await doesDidExist(ethrDid.did);
+    if (didExists) {
+      console.log(`DID ${ethrDid.did} already exists. Skipping creation.`);
+      return;
+    }
+
+    // Setup DID Resolver
     const resolver = new Resolver(
       getResolver({
         networks: [
@@ -52,10 +58,41 @@ const createAndResolveDid = async () => {
 
     console.log('Resolved DID:', resolvedDid);
 
-    // Save the resolved DID Document to a JSON file
-    fs.writeFileSync("./src/modules/dids/resolvedDid.json", JSON.stringify(resolvedDid, null, 2));
+    // Save resolved DID Document as a JSON file using the index
+    const didsPath = "./src/modules/dids/dids.json";
+    let dids = [];
 
-    // Return the generated DID
+    if (fs.existsSync(didsPath)) {
+      const existingData = fs.readFileSync(didsPath, "utf8");
+      dids = JSON.parse(existingData);
+    }
+
+    const currentYear = new Date().getFullYear();
+    const yearDids = dids.filter(didData => String(didData.index).startsWith(currentYear));
+    const lastIndex = yearDids.length > 0 
+      ? Math.max(...yearDids.map(didData => parseInt(didData.index))) 
+      : currentYear * 1000;
+
+    const newIndex = lastIndex + 1;
+
+    const didData = {
+      index: newIndex,
+      did: ethrDid.did,
+      address: wallet.address,
+      //privateKey: wallet.privateKey, // Avoid logging in production
+      createdAt: new Date().toISOString(),
+    };
+
+    // Add DID data to the list
+    dids.push(didData);
+    fs.writeFileSync(didsPath, JSON.stringify(dids, null, 2));
+    console.log(`DID information saved to ${didsPath}`);
+
+    // Save the resolved DID document to a new file named with the index
+    const resolvedDidFilePath = `./src/modules/dids/didDocument/${newIndex}.json`;
+    fs.writeFileSync(resolvedDidFilePath, JSON.stringify(resolvedDid, null, 2));
+    console.log(`Resolved DID Document saved to ${resolvedDidFilePath}`);
+
     return ethrDid.did;
   } catch (error) {
     console.error('Error creating or resolving DID:', error.message);
@@ -64,8 +101,17 @@ const createAndResolveDid = async () => {
   }
 };
 
-// Check if the script is being executed directly
+const doesDidExist = async (did) => {
+  const didsPath = "./src/modules/dids/dids.json";
+  if (fs.existsSync(didsPath)) {
+    const existingData = fs.readFileSync(didsPath, "utf8");
+    const dids = JSON.parse(existingData);
+    return dids.some(didData => didData.did === did);
+  }
+  return false;
+};
+
+// Execute the script if it's run directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  // Run the function only if this file is executed directly
   createAndResolveDid();
 }
