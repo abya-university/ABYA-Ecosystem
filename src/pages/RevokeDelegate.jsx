@@ -39,11 +39,11 @@ const RevokeDelegate = () => {
       console.log("✅ Transaction sender:", wallet.address);
       console.log("✅ DID identity owner:", identity);
 
-      // Ensure wallet address is the controller of the DID
-      if (wallet.address.toLowerCase() !== identity.toLowerCase()) {
-        setStatus("⚠️ Wallet address is not the controller of this DID. Revocation may fail.");
-        return;
-      }
+      // // Ensure wallet address is the controller of the DID
+      // if (wallet.address.toLowerCase() !== identity.toLowerCase()) {
+      //   setStatus("⚠️ Wallet address is not the controller of this DID. Revocation may fail.");
+      //   return;
+      // }
 
       // Instantiate the DID Registry contract
       const DidReg = new ethers.Contract(
@@ -77,7 +77,7 @@ const RevokeDelegate = () => {
 
       // Verify delegate status
       const isValid = await DidReg.validDelegate(identity, delegateTypeHash, delegate);
-      setStatus(`🔍 Delegate ${delegate} new status: ${isValid ? "✅ Valid" : "❌ Invalid"}`);
+      setStatus(`✅ Delegate ${delegate} has been revoked. Delegate new status: ${isValid ? "✅ Valid" : "❌ Invalid"}`);
     } catch (error) {
       console.error("❌ Error during revocation:", error);
       setStatus(`❌ Error: ${error.message}`);

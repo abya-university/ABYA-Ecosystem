@@ -1,6 +1,6 @@
+// src/components/DidForm.jsx
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import { Home, ArrowLeft, Eye, EyeOff, Clipboard } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Clipboard } from "lucide-react";
 import { createDid, resolveDid } from "../services/didService";
 import { storeDidDocument, fetchDidDocument } from "../services/ipfsService";
 
@@ -8,10 +8,12 @@ const DidForm = () => {
   const [privateKey, setPrivateKey] = useState("");
   const [did, setDid] = useState("");
   const [resolvedDid, setResolvedDid] = useState(null);
+  const [ipfsCid, setIpfsCid] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
 
+  // Generate DID, resolve it, and store the DID document on Pinata
   const handleGenerateDid = async () => {
     if (!privateKey.trim()) {
       setError("Private key is required");
@@ -24,13 +26,18 @@ const DidForm = () => {
     try {
       const INFURA_URL = import.meta.env.VITE_INFURA_URL;
       const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
-     
 
+      // Create the DID and resolve its DID document
       const generatedDid = await createDid(privateKey, INFURA_URL, CONTRACT_ADDRESS);
       setDid(generatedDid);
 
       const resolved = await resolveDid(generatedDid, INFURA_URL, CONTRACT_ADDRESS);
       setResolvedDid(resolved);
+
+      // Store the resolved DID document on Pinata
+      const cid = await storeDidDocument(resolved);
+      setIpfsCid(cid);
+      console.log("Stored DID document on Pinata, CID:", cid);
     } catch (err) {
       const errorMessage = err?.message || err?.toString() || "An unexpected error occurred";
       setError(`Error: ${errorMessage}`);
@@ -39,6 +46,25 @@ const DidForm = () => {
     }
   };
 
+  // Fetch a DID document from Pinata by CID
+  const handleFetchDid = async () => {
+    // If we already have a CID from storage, use it; otherwise, prompt the user.
+    const cid = ipfsCid || prompt("Enter the CID to fetch the DID document:");
+    if (!cid) return;
+
+    setLoading(true);
+    setError("");
+    try {
+      const fetchedDid = await fetchDidDocument(cid);
+      setResolvedDid(fetchedDid);
+    } catch (err) {
+      setError("Failed to fetch DID document from IPFS");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Copy the generated DID to the clipboard
   const copyToClipboard = () => {
     navigator.clipboard.writeText(did);
     alert("DID copied to clipboard!");
@@ -47,7 +73,9 @@ const DidForm = () => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
       <div className="bg-white p-8 rounded shadow-md w-full max-w-lg">
-        <h1 className="flex justify-center text-2xl font-semibold mb-6 text-yellow-500">Generate New DID</h1>
+        <h1 className="flex justify-center text-2xl font-semibold mb-6 text-yellow-500">
+          Generate New DID
+        </h1>
         <div className="mb-4 relative">
           <input
             id="privateKey"
@@ -92,6 +120,18 @@ const DidForm = () => {
             <pre className="bg-gray-100 p-4 rounded-md overflow-x-auto">
               {JSON.stringify(resolvedDid, null, 2)}
             </pre>
+          </div>
+        )}
+        {ipfsCid && (
+          <div className="mt-4">
+            <h2 className="font-bold text-lg">Stored on Pinata, CID:</h2>
+            <p className="text-gray-700 break-all">{ipfsCid}</p>
+            <button
+              onClick={handleFetchDid}
+              className="w-full mt-2 py-2 px-4 rounded-md text-white bg-blue-500 hover:bg-blue-600"
+            >
+              Fetch DID Document from IPFS
+            </button>
           </div>
         )}
       </div>
