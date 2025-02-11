@@ -6,6 +6,9 @@ import { BrowserRouter } from "react-router-dom";
 import Providers from "./providers/Providers.jsx";
 import CourseProvider from "./contexts/courseContext.jsx";
 import ChapterProvider from "./contexts/chapterContext.jsx";
+import LessonProvider from "./contexts/lessonContext.jsx";
+import QuizProvider from "./contexts/quizContext.jsx";
+import { UserProvider } from "./contexts/userContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -13,7 +16,13 @@ createRoot(document.getElementById("root")).render(
       <BrowserRouter>
         <CourseProvider>
           <ChapterProvider>
-            <App />
+            <LessonProvider>
+              <QuizProvider>
+                <UserProvider>
+                  <App />
+                </UserProvider>
+              </QuizProvider>
+            </LessonProvider>
           </ChapterProvider>
         </CourseProvider>
       </BrowserRouter>

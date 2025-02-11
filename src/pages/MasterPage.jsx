@@ -9,10 +9,14 @@ import SettingsPage from "./Settings";
 import CoursesPage from "./CourseList";
 import AbyaChatbot from "../components/chatbot";
 import DiscussionsPage from "./Discussions";
+import CourseDetails from "./CourseDetails";
+import LiquidityPage from "./LiquidityPage";
+import AnalyticsPage from "./AnalyticsPage";
 
 const MasterPage = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
   const [theme, setTheme] = useState("dark");
+  const [selectedCourseId, setSelectedCourseId] = useState(null);
 
   // 3D Illuminated Element Component
   const IlluminatedObject = ({ position, size, color, blur }) => (
@@ -29,7 +33,16 @@ const MasterPage = () => {
     />
   );
 
+  const onCourseSelect = (courseId) => {
+    setSelectedCourseId(courseId);
+    setActiveSection("course-details");
+  };
+
   const renderContent = () => {
+    if (activeSection === "course-details" && selectedCourseId) {
+      return <CourseDetails courseId={selectedCourseId} />;
+    }
+
     switch (activeSection) {
       case "dashboard":
         return <Dashboard />;
@@ -42,9 +55,17 @@ const MasterPage = () => {
       case "settings":
         return <SettingsPage />;
       case "courses":
-        return <CoursesPage />;
+        return <CoursesPage onCourseSelect={onCourseSelect} />;
       case "discussions":
         return <DiscussionsPage />;
+      case "liquidity":
+        return <LiquidityPage />;
+      case "analytics":
+        return <AnalyticsPage />;
+      // case "course-details":
+      //   return <CourseDetails courseId={selectedCourseId} />;
+      // case "courses":
+      //   return <CoursesPage onCourseSelect={onCourseSelect} />;
       default:
         return <HomePage />;
     }
