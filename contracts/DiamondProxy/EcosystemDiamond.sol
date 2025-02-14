@@ -38,6 +38,13 @@ contract EcosystemDiamond is LMSToken {
             facetAddress: address(diamondCutFacet),
             functionSelectorPosition: 0
         });
+
+        // Add reviewers to the reviewer pool
+        LibDiamond.EcosystemStorage storage es = LibDiamond.ecosystemStorage();
+        for (uint256 i = 0; i < _reviewers.length; i++) {
+            es.reviewerPool.push(_reviewers[i]);
+            es.isInReviewerPool[_reviewers[i]] = true;
+        }
         
         // Add the facet address
         ds.facetAddresses.push(address(diamondCutFacet));

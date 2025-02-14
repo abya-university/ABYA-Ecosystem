@@ -2,9 +2,9 @@
 
 pragma solidity ^0.8.24;
 
-import { Ecosystem } from "./Ecosystem.sol";
+import { Ecosystem2 } from "./Ecosystem2.sol";
 
-contract Ecosystem3 is Ecosystem {
+contract Ecosystem3 is Ecosystem2 {
     uint256 public constant COURSE_COMPLETION_REWARD = 2 * 10 ** 18;
     uint256 public constant QUIZ_COMPLETION_REWARD = 1 * 10 ** 18;
 
@@ -39,7 +39,7 @@ contract Ecosystem3 is Ecosystem {
     event QuizEdited(uint256 indexed _lessonId, uint256 indexed _quizId, string _quizTitle);
 
 
-    constructor(address[] memory _reviewers) Ecosystem(_reviewers) {}
+    constructor(address[] memory _reviewers) Ecosystem2(_reviewers) {}
 
     //function to delete a course
     function deleteCourse(uint256 _courseId) external onlyRole(COURSE_OWNER_ROLE) returns(bool) {

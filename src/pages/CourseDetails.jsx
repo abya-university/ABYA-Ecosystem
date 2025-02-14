@@ -27,12 +27,13 @@ import { useUser } from "../contexts/userContext";
 import { useAccount } from "wagmi";
 import PropTypes from "prop-types";
 import ProgressBar from "../components/progressBar";
-import Ecosystem2ABI from "../artifacts/contracts/Ecosystem Contracts/Ecosystem2.sol/Ecosystem2.json";
+import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import { ethers } from "ethers";
 import { useEthersSigner } from "../components/useClientSigner";
 
-const ContractAddress = import.meta.env.VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
-const ContractABI = Ecosystem2ABI.abi;
+const EcosystemDiamondAddress = import.meta.env
+  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
 // Separate Video component to prevent re-renders
 const VideoResource = memo(({ url, name }) => (
@@ -332,20 +333,6 @@ const LessonContent = memo(
           </div>
         )}
 
-        {/* Mark as Read Button */}
-        {role === "USER" &&
-          currentCourse.approved &&
-          currentCourse.enrolledStudents?.includes(address) && (
-            <div className="flex justify-between items-center">
-              <button
-                className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 p-2 my-3 rounded-lg font-normal"
-                onClick={() => {}}
-              >
-                Mark as Read
-              </button>
-            </div>
-          )}
-
         {/* Quiz Section */}
         {quiz && (
           <div className="mt-6 p-6 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg dark:text-gray-300">
@@ -418,43 +405,80 @@ const CourseDetails = memo(({ courseId }) => {
     const fetchCompletedLessons = async () => {
       const signer = await signerPromise;
       const contract = new ethers.Contract(
-        ContractAddress,
-        ContractABI,
+        EcosystemDiamondAddress,
+        Ecosystem2Facet_ABI,
         signer
       );
 
-      const completedLessons = await contract.getUserCompletedLessons();
+      const completedLessons = await contract.getUserCompletedLessonsByCourse(
+        courseId
+      );
       setCompletedLessonIds(new Set(completedLessons));
     };
 
     fetchCompletedLessons();
   }, []);
 
-  // Update totalLessons calculation
-  // const totalLessons = useMemo(() => {
-  //   return lessons.filter((lesson) =>
-  //     filteredChapters.some(
-  //       (chapter) => chapter.chapterId === lesson.chapterId.toString()
-  //     )
-  //   ).length;
-  // }, [lessons, filteredChapters]);
-
-  const markAsRead = async (chapterId, lessonId) => {
+  const markAsRead = async (courseId, chapterId, lessonId) => {
     try {
+      // Convert parameters to BigInts for ethers v6
+      const courseIdBN = BigInt(courseId);
+      const chapterIdBN = BigInt(chapterId);
+      const lessonIdBN = BigInt(lessonId);
+
+      console.log("Attempting to mark as read with params:", {
+        courseId: courseIdBN.toString(),
+        chapterId: chapterIdBN.toString(),
+        lessonId: lessonIdBN.toString(),
+      });
+
       const signer = await signerPromise;
+      if (!signer) {
+        throw new Error("No signer available");
+      }
+
       const contract = new ethers.Contract(
-        ContractAddress,
-        ContractABI,
+        EcosystemDiamondAddress,
+        Ecosystem2Facet_ABI,
         signer
       );
 
-      const tx = await contract.markAsRead(chapterId, lessonId);
-      await tx.wait();
+      try {
+        // Send transaction with fixed gas limit for now
+        const tx = await contract.markAsRead(
+          courseIdBN,
+          chapterIdBN,
+          lessonIdBN,
+          {
+            gasLimit: 300000, // Fixed gas limit
+          }
+        );
 
-      // Update local state
-      setCompletedLessonIds((prev) => new Set(prev).add(lessonId));
+        console.log("Transaction sent:", tx.hash);
+
+        // Wait for transaction confirmation
+        const receipt = await tx.wait();
+        console.log("Transaction confirmed:", receipt);
+
+        // Update local state only after confirmation
+        setCompletedLessonIds((prev) => new Set([...prev, lessonId]));
+      } catch (contractError) {
+        console.error("Contract interaction failed:", {
+          error: contractError,
+          errorMessage: contractError.message,
+        });
+
+        if (contractError.message.includes("Already marked")) {
+          throw new Error("This lesson has already been marked as read");
+        } else if (contractError.message.includes("Lesson doesn't exist")) {
+          throw new Error("Invalid lesson ID");
+        }
+
+        throw contractError;
+      }
     } catch (error) {
-      console.error(error);
+      console.error("Error in markAsRead:", error);
+      throw error;
     }
   };
 
@@ -473,6 +497,15 @@ const CourseDetails = memo(({ courseId }) => {
     () => chapters.filter((chapter) => chapter.courseID === courseId),
     [chapters, courseId]
   );
+
+  // Update totalLessons calculation
+  const totalLessons = useMemo(() => {
+    return lessons.filter((lesson) =>
+      filteredChapters.some(
+        (chapter) => chapter.chapterId === lesson.chapterId.toString()
+      )
+    ).length;
+  }, [lessons, filteredChapters]);
 
   // Fetch chapters only when courseId changes or when chapters are empty
   useEffect(() => {
@@ -496,7 +529,11 @@ const CourseDetails = memo(({ courseId }) => {
         chapterName: chapter.chapterName,
       }));
 
-      setChapters(formattedChapters);
+      // Only update the state if the formatted chapters are different
+      if (JSON.stringify(formattedChapters) !== JSON.stringify(chapters)) {
+        setChapters(formattedChapters);
+        console.log("Formatted chapters:", formattedChapters);
+      }
 
       // Set first chapter as active only if there's no active chapter
       if (formattedChapters.length > 0 && !activeChapterId) {
@@ -652,7 +689,7 @@ const CourseDetails = memo(({ courseId }) => {
                                   {lesson.lessonContent}
                                 </p>
 
-                                {lesson.additionalResources?.some(
+                                {lesson?.additionalResources?.some(
                                   (r) => r.url
                                 ) && (
                                   <div className="mt-4 space-y-4">
@@ -660,8 +697,8 @@ const CourseDetails = memo(({ courseId }) => {
                                       Additional Resources
                                     </h4>
                                     <div className="grid gap-4">
-                                      {lesson.additionalResources
-                                        .filter((r) => r.url)
+                                      {lesson?.additionalResources
+                                        ?.filter((r) => r.url)
                                         .map((resource, index) => (
                                           <div key={index}>
                                             <Resource resource={resource} />
@@ -675,22 +712,43 @@ const CourseDetails = memo(({ courseId }) => {
                                 )}
 
                                 {/* add a mark as read btn */}
-                                {role === "USER" &&
-                                currentCourse.approved &&
-                                currentCourse.enrolledStudents?.includes(
-                                  address
-                                ) ? (
+                                {role === "USER" ? (
                                   <div className="flex justify-between items-center">
                                     <button
-                                      className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 p-2 my-3 rounded-lg font-normal"
-                                      onClick={() =>
-                                        markAsRead(
-                                          chapter.chapterId,
-                                          lesson.lessonId
-                                        )
-                                      }
+                                      className={`bg-yellow-500 text-gray-900 p-2 my-3 rounded-lg font-normal ${
+                                        completedLessonIds.has(lesson.lessonId)
+                                          ? "opacity-50 cursor-not-allowed"
+                                          : "hover:bg-yellow-600"
+                                      }`}
+                                      onClick={async () => {
+                                        if (
+                                          !completedLessonIds.has(
+                                            lesson.lessonId
+                                          )
+                                        ) {
+                                          try {
+                                            await markAsRead(
+                                              currentCourse.courseId,
+                                              chapter.chapterId,
+                                              lesson.lessonId
+                                            );
+                                            // Show success message
+                                          } catch (error) {
+                                            // Show error message to user
+                                            console.error(
+                                              "Failed to mark lesson as read:",
+                                              error
+                                            );
+                                          }
+                                        }
+                                      }}
+                                      disabled={completedLessonIds.has(
+                                        lesson.lessonId
+                                      )}
                                     >
-                                      Mark as Read
+                                      {completedLessonIds.has(lesson.lessonId)
+                                        ? "Completed"
+                                        : "Mark as Read"}
                                     </button>
                                   </div>
                                 ) : null}
@@ -736,7 +794,7 @@ const CourseDetails = memo(({ courseId }) => {
           <div className="w-[20%] bg-white dark:bg-gray-800 p-6 rounded-lg h-fit sticky top-[100px]">
             <ProgressBar
               completedLessons={completedLessonIds.size}
-              // totalLessons={totalLessons}
+              totalLessons={totalLessons}
             />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 pt-2">
               Course Navigation
