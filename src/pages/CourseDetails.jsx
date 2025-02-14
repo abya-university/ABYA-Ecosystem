@@ -413,11 +413,19 @@ const CourseDetails = memo(({ courseId }) => {
       const completedLessons = await contract.getUserCompletedLessonsByCourse(
         courseId
       );
-      setCompletedLessonIds(new Set(completedLessons));
+
+      // Split the lesson IDs if they are in a single string
+      const lessonIds = completedLessons.flatMap((lesson) =>
+        lesson.toString().split(",")
+      );
+
+      const completedLessonIdsSet = new Set(lessonIds);
+      setCompletedLessonIds(completedLessonIdsSet);
+      console.log("Completed user lessons:", Array.from(completedLessonIdsSet));
     };
 
     fetchCompletedLessons();
-  }, []);
+  }, [courseId, signerPromise]);
 
   const markAsRead = async (courseId, chapterId, lessonId) => {
     try {
@@ -716,14 +724,16 @@ const CourseDetails = memo(({ courseId }) => {
                                   <div className="flex justify-between items-center">
                                     <button
                                       className={`bg-yellow-500 text-gray-900 p-2 my-3 rounded-lg font-normal ${
-                                        completedLessonIds.has(lesson.lessonId)
+                                        completedLessonIds.has(
+                                          lesson.lessonId.toString()
+                                        ) // Ensure lessonId is a string
                                           ? "opacity-50 cursor-not-allowed"
                                           : "hover:bg-yellow-600"
                                       }`}
                                       onClick={async () => {
                                         if (
                                           !completedLessonIds.has(
-                                            lesson.lessonId
+                                            lesson.lessonId.toString()
                                           )
                                         ) {
                                           try {
@@ -743,10 +753,12 @@ const CourseDetails = memo(({ courseId }) => {
                                         }
                                       }}
                                       disabled={completedLessonIds.has(
-                                        lesson.lessonId
+                                        lesson.lessonId.toString()
                                       )}
                                     >
-                                      {completedLessonIds.has(lesson.lessonId)
+                                      {completedLessonIds.has(
+                                        lesson.lessonId.toString()
+                                      )
                                         ? "Completed"
                                         : "Mark as Read"}
                                     </button>
