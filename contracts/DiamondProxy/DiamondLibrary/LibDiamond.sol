@@ -102,6 +102,7 @@ library LibDiamond {
         mapping(uint256 => Question) questions;
         mapping(uint256 => mapping(address => bool)) isEnrolled;
         mapping(uint256 => mapping(address => bool)) completedQuizzes;
+        mapping(address => mapping(uint256 => uint256[])) userCompletedQuizzesByCourse;
         mapping(address => mapping(uint256 => uint256)) userScores;
 
         Course[] listOfCourses;

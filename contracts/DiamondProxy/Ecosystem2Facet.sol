@@ -274,7 +274,7 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
     }
 
     //function to add resources
-    function addResourcesToLesson(uint256 _lessonId, LibDiamond.ContentType contentType , LibDiamond.Resource[] calldata _resources) external onlyRole(LibDiamond.COURSE_OWNER_ROLE) {
+    function addResourcesToLesson(uint256 _lessonId, LibDiamond.ContentType contentType , LibDiamond.Resource[] calldata _resources) external {
         LibDiamond.Ecosystem2Storage storage es = LibDiamond.ecosystem2Storage();
 
         LibDiamond.Lesson storage lessonStorage = es.lesson[_lessonId];
@@ -325,6 +325,14 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
         return (completedLessons, completedLessons.length);
     }
 
+    //get usercompleted quizzes by course
+    function getUserCompletedQuizzesByCourse(uint256 _courseId) external view returns(uint256[] memory, uint256) {
+        LibDiamond.Ecosystem2Storage storage es = LibDiamond.ecosystem2Storage();
+
+        uint256[] memory completedQuizzes = es.userCompletedQuizzesByCourse[msg.sender][_courseId];
+        return (completedQuizzes, completedQuizzes.length);
+    }
+
 
     function mintToken(address to, uint256 amount) internal returns(bool) {
         LibDiamond.EcosystemStorage storage es = LibDiamond.ecosystemStorage();
@@ -350,7 +358,7 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
     }
 
     //function to take/submit quiz
-    function submitQuiz(uint256 _quizId, uint256[] memory _answers) public returns (uint256 score) {
+    function submitQuiz(uint256 _courseId, uint256 _quizId, uint256[] memory _answers) public returns (uint256 score) {
         LibDiamond.Ecosystem2Storage storage es = LibDiamond.ecosystem2Storage();
 
         LibDiamond.Quiz storage quiz = es.quizzes[_quizId];
@@ -380,6 +388,7 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
         if(score >= 75) {
             es.completedQuizzes[_quizId][msg.sender] = true;
             es.userScores[msg.sender][_quizId] = score;
+            es.userCompletedQuizzesByCourse[msg.sender][_courseId].push(_quizId);
 
             mintToken(msg.sender, LibDiamond.QUIZ_COMPLETION_REWARD);
         }

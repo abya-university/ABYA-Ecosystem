@@ -189,10 +189,27 @@ const Resource = memo(({ resource }) => {
 
 Resource.displayName = "Resource";
 
-// Quiz component with navigation
+// Quiz component with navigation and scoring
 const Quiz = memo(({ quiz }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState({});
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [score, setScore] = useState(0);
+  const [attempts, setAttempts] = useState(0);
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockEndTime, setLockEndTime] = useState(null);
+  const signerPromise = useEthersSigner();
+
+  useEffect(() => {
+    // Check if quiz is locked
+    const lockedUntil = localStorage.getItem(
+      `quiz_${quiz.quizId}_locked_until`
+    );
+    if (lockedUntil && new Date(lockedUntil) > new Date()) {
+      setIsLocked(true);
+      setLockEndTime(new Date(lockedUntil));
+    }
+  }, [quiz.quizId]);
 
   const handleNext = useCallback(() => {
     if (currentQuestionIndex < quiz.questions.length - 1) {
@@ -206,21 +223,193 @@ const Quiz = memo(({ quiz }) => {
     }
   }, [currentQuestionIndex]);
 
-  const handleSubmit = useCallback(() => {
-    console.log("Quiz answers:", selectedAnswers);
-  }, [selectedAnswers]);
+  const calculateScore = useCallback(() => {
+    let correctAnswers = 0;
+    quiz.questions.forEach((question) => {
+      const selectedAnswer = selectedAnswers[question.questionId];
+      if (
+        selectedAnswer !== undefined &&
+        question.choices[selectedAnswer].isCorrect
+      ) {
+        correctAnswers++;
+      }
+    });
+    return (correctAnswers / quiz.questions.length) * 100;
+  }, [quiz.questions, selectedAnswers]);
 
-  const handleAnswerSelect = useCallback((questionId, index) => {
-    setSelectedAnswers((prev) => ({
-      ...prev,
-      [questionId]: index,
-    }));
+  const handleSubmit = useCallback(async () => {
+    const calculatedScore = calculateScore();
+    setScore(calculatedScore);
+    setQuizSubmitted(true);
+
+    if (calculatedScore >= 80) {
+      try {
+        const signer = await signerPromise;
+        const contract = new ethers.Contract(
+          EcosystemDiamondAddress,
+          Ecosystem2Facet_ABI,
+          signer
+        );
+
+        // Convert selected answers to array format required by contract
+        const answersArray = quiz.questions.map((question) =>
+          BigInt(selectedAnswers[question.questionId] || 0)
+        );
+
+        // Submit answers to contract
+        const tx = await contract.submitQuiz(
+          courseId,
+          BigInt(quiz.quizId),
+          answersArray,
+          {
+            gasLimit: 300000, // Fixed gas limit
+          }
+        );
+
+        console.log("Quiz submission transaction:", tx.hash);
+        await tx.wait();
+      } catch (error) {
+        console.error("Failed to submit quiz:", error);
+      }
+    } else {
+      const newAttempts = attempts + 1;
+      setAttempts(newAttempts);
+
+      if (newAttempts >= 3) {
+        const lockEndTime = new Date(Date.now() + 6 * 60 * 60 * 1000); // 6 hours
+        localStorage.setItem(
+          `quiz_${quiz.quizId}_locked_until`,
+          lockEndTime.toISOString()
+        );
+        setIsLocked(true);
+        setLockEndTime(lockEndTime);
+      }
+    }
+  }, [
+    calculateScore,
+    attempts,
+    quiz.quizId,
+    quiz.questions,
+    selectedAnswers,
+    signerPromise,
+  ]);
+
+  const resetQuiz = useCallback(() => {
+    setSelectedAnswers({});
+    setCurrentQuestionIndex(0);
+    setQuizSubmitted(false);
+    setScore(0);
   }, []);
 
-  const currentQuestion = useMemo(
-    () => quiz.questions[currentQuestionIndex],
-    [quiz.questions, currentQuestionIndex]
+  const handleAnswerSelect = useCallback(
+    (questionId, index) => {
+      if (!quizSubmitted) {
+        setSelectedAnswers((prev) => ({
+          ...prev,
+          [questionId]: index,
+        }));
+      }
+    },
+    [quizSubmitted]
   );
+
+  if (isLocked) {
+    return (
+      <div className="p-6 bg-red-50 dark:bg-red-900/20 rounded-lg">
+        <h3 className="text-lg font-medium text-red-800 dark:text-red-200">
+          Quiz Locked
+        </h3>
+        <p className="mt-2 text-red-700 dark:text-red-300">
+          You've exceeded the maximum attempts. Please try again after{" "}
+          {lockEndTime ? new Date(lockEndTime).toLocaleString() : "6 hours"}.
+        </p>
+      </div>
+    );
+  }
+
+  if (quizSubmitted) {
+    return (
+      <div className="p-6">
+        <div
+          className={`p-4 rounded-lg ${
+            score >= 80
+              ? "bg-green-50 dark:bg-green-900/20"
+              : "bg-yellow-50 dark:bg-yellow-900/20"
+          }`}
+        >
+          <h3
+            className={`text-lg font-medium ${
+              score >= 80
+                ? "text-green-800 dark:text-green-200"
+                : "text-yellow-800 dark:text-yellow-200"
+            }`}
+          >
+            Quiz Results
+          </h3>
+          <p className="mt-2 text-gray-700 dark:text-gray-300">
+            Your score: {score.toFixed(1)}%
+          </p>
+          {score >= 80 ? (
+            <p className="mt-2 text-green-700 dark:text-green-300">
+              Congratulations! You've passed the quiz!
+            </p>
+          ) : (
+            <div>
+              <p className="mt-2 text-yellow-700 dark:text-yellow-300">
+                You need 80% to pass. Attempts remaining: {3 - attempts}
+              </p>
+              {attempts < 3 && (
+                <button
+                  onClick={resetQuiz}
+                  className="mt-4 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
+                >
+                  Try Again
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-6 space-y-4">
+          {quiz.questions.map((question, index) => {
+            const selectedAnswer = selectedAnswers[question.questionId];
+            const correctAnswer = question.choices.findIndex(
+              (choice) => choice.isCorrect
+            );
+
+            return (
+              <div
+                key={question.questionId}
+                className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800"
+              >
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {index + 1}. {question.questionText}
+                </p>
+                <div className="mt-2 space-y-2">
+                  {question.choices.map((choice, choiceIndex) => (
+                    <div
+                      key={choiceIndex}
+                      className={`p-2 rounded ${
+                        choiceIndex === correctAnswer
+                          ? "bg-green-100 dark:bg-green-900/20"
+                          : choiceIndex === selectedAnswer && !choice.isCorrect
+                          ? "bg-red-100 dark:bg-red-900/20"
+                          : "bg-gray-100 dark:bg-gray-700"
+                      }`}
+                    >
+                      {choice.option}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  const currentQuestion = quiz.questions[currentQuestionIndex];
 
   return (
     <div className="mt-4">
@@ -238,12 +427,13 @@ const Quiz = memo(({ quiz }) => {
           {currentQuestion.choices.map((choice, index) => (
             <div
               key={index}
-              className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+              className={`flex items-center space-x-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer ${
+                selectedAnswers[currentQuestion.questionId] === index
+                  ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-500"
+                  : ""
+              }`}
               onClick={() =>
-                setSelectedAnswers((prev) => ({
-                  ...prev,
-                  [currentQuestion.questionId]: index,
-                }))
+                handleAnswerSelect(currentQuestion.questionId, index)
               }
             >
               <div
@@ -261,31 +451,41 @@ const Quiz = memo(({ quiz }) => {
         </div>
 
         <div className="flex justify-between mt-6">
-          <div
-            variant="outline"
+          <button
             onClick={handlePrevious}
             disabled={currentQuestionIndex === 0}
-            className="flex items-center gap-2 bg-gray-200 hover:cursor-pointer dark:text-gray-900 hover:bg-gray-300 rounded-lg p-2 px-4"
+            className={`flex items-center gap-2 p-2 px-4 rounded-lg ${
+              currentQuestionIndex === 0
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : "bg-gray-200 hover:bg-gray-300 dark:text-gray-900"
+            }`}
           >
             <ChevronLeft className="w-4 h-4" />
             Previous
-          </div>
+          </button>
 
           {currentQuestionIndex === quiz.questions.length - 1 ? (
-            <div
+            <button
               onClick={handleSubmit}
-              className="bg-green-500 hover:bg-green-600 rounded-lg p-2 px-4 hover:cursor-pointer dark:text-gray-900"
+              disabled={
+                Object.keys(selectedAnswers).length !== quiz.questions.length
+              }
+              className={`p-2 px-4 rounded-lg ${
+                Object.keys(selectedAnswers).length === quiz.questions.length
+                  ? "bg-green-500 hover:bg-green-600 text-white"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              }`}
             >
               Submit Quiz
-            </div>
+            </button>
           ) : (
-            <div
+            <button
               onClick={handleNext}
-              className="flex items-center gap-2 bg-yellow-500 dark:text-gray-900 hover:bg-yellow-600 p-2 px-4 rounded-lg hover:cursor-pointer"
+              className="flex items-center gap-2 bg-yellow-500 dark:text-gray-900 hover:bg-yellow-600 p-2 px-4 rounded-lg"
             >
               Next
               <ChevronRight className="w-4 h-4" />
-            </div>
+            </button>
           )}
         </div>
       </div>
