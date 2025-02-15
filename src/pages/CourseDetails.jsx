@@ -515,6 +515,25 @@ const CourseDetails = memo(({ courseId }) => {
     ).length;
   }, [lessons, filteredChapters]);
 
+  // Total quizzes calculation
+  const totalQuizzes = useMemo(() => {
+    // Get all lesson IDs for the filtered chapters
+    const lessonIds = lessons
+      .filter((lesson) =>
+        filteredChapters.some(
+          (chapter) => chapter.chapterId === lesson.chapterId.toString()
+        )
+      )
+      .map((lesson) => lesson.lessonId.toString());
+
+    // Count quizzes that are linked to these lessons
+    return quizzes.filter((quiz) =>
+      lessonIds.includes(quiz.lessonId.toString())
+    ).length;
+
+    // console.log("Total quizzes:", totalQuizzes2);
+  }, [quizzes, lessons, filteredChapters]);
+
   // Fetch chapters only when courseId changes or when chapters are empty
   useEffect(() => {
     const shouldFetchChapters =
@@ -806,7 +825,7 @@ const CourseDetails = memo(({ courseId }) => {
           <div className="w-[20%] bg-white dark:bg-gray-800 p-6 rounded-lg h-fit sticky top-[100px]">
             <ProgressBar
               completedLessons={completedLessonIds.size}
-              totalLessons={totalLessons}
+              totalLessons={totalLessons + totalQuizzes}
             />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 pt-2">
               Course Navigation
