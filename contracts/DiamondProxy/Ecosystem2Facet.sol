@@ -27,6 +27,7 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
     event QuestionDeleted(uint256 indexed _quizId, uint256 indexed _questionId);
     event QuizSubmitted(address indexed learner, uint256 quizId, uint256 score);
     event EcosystemPoolUpdate(address indexed _to, uint256 indexed _amount);
+    event QuizLocked(uint256 indexed _quizId, address indexed _user);
 
 
 
@@ -308,7 +309,7 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
         LibDiamond.Ecosystem2Storage storage es = LibDiamond.ecosystem2Storage();
         
         require(!es.lessonRead[_lessonId][msg.sender], "Already marked");
-        require(es.lesson[_lessonId].lessonId != 0, "Lesson doesn't exist");
+        require(es.lesson[_lessonId].exists, "Lesson doesn't exist");
 
         es.lessonRead[_lessonId][msg.sender] = true;
         es.userCompletedLessons[msg.sender].push(_lessonId);
@@ -318,19 +319,19 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
         return true;
     }
 
-    function getUserCompletedLessonsByCourse(uint256 _courseId) external view returns(uint256[] memory, uint256) {
+    function getUserCompletedLessonsByCourse(uint256 _courseId) external view returns(uint256[] memory) {
         LibDiamond.Ecosystem2Storage storage es = LibDiamond.ecosystem2Storage();
 
         uint256[] memory completedLessons = es.userCompletedLessonsByCourse[msg.sender][_courseId];
-        return (completedLessons, completedLessons.length);
+        return (completedLessons);
     }
 
     //get usercompleted quizzes by course
-    function getUserCompletedQuizzesByCourse(uint256 _courseId) external view returns(uint256[] memory, uint256) {
+    function getUserCompletedQuizzesByCourse(uint256 _courseId) external view returns(uint256[] memory) {
         LibDiamond.Ecosystem2Storage storage es = LibDiamond.ecosystem2Storage();
 
         uint256[] memory completedQuizzes = es.userCompletedQuizzesByCourse[msg.sender][_courseId];
-        return (completedQuizzes, completedQuizzes.length);
+        return (completedQuizzes);
     }
 
 
@@ -358,44 +359,76 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
     }
 
     //function to take/submit quiz
-    function submitQuiz(uint256 _courseId, uint256 _quizId, uint256[] memory _answers) public returns (uint256 score) {
+    function submitQuiz(uint256 _courseId, uint256 _quizId, uint256[] memory _answers, uint256 _score) public returns(bool) {
         LibDiamond.Ecosystem2Storage storage es = LibDiamond.ecosystem2Storage();
 
-        LibDiamond.Quiz storage quiz = es.quizzes[_quizId];
-        uint256 totalQuestions = quiz.questions.length;
-        uint256 correctAnswers = 0;
+        // Verify quiz exists
+        require(es.quizzes[_quizId].exists, "Quiz does not exist");
 
-        // Ensure the number of answers matches the number of questions
-        require(_answers.length == totalQuestions, "Number of answers must equal number of questions");
+        // uint256 totalQuestions = quiz.questions.length;
+        // require(_answers.length == totalQuestions, "Invalid number of answers");
 
-        // Iterate through all the questions in the quiz
-        for (uint256 i = 0; i < totalQuestions; i++) {
-            LibDiamond.Question storage question = quiz.questions[i];
-            uint256 selectedChoiceId = _answers[i];
-        
-            // Ensure the selected choice is valid
-            require(selectedChoiceId < question.choices.length, "Invalid choice selected");
+        // uint256 correctAnswers = 0;
 
-            // Check if the selected choice is correct
-            if (question.choices[selectedChoiceId].isCorrect) {
-                correctAnswers++;
-            }
-        }
+        // // Iterate through all the questions in the quiz
+        // for (uint256 i = 0; i < totalQuestions; i++) {
+        //     LibDiamond.Question storage question = quiz.questions[i];
+        //     uint256 selectedChoiceId = _answers[i];
 
-        // Calculate the score 
-        score = (correctAnswers * 100) / totalQuestions;
+        //     // Check if the selected choice is correct
+        //     if (question.choices[selectedChoiceId].isCorrect) {
+        //         correctAnswers++;
+        //     }
+        // }
 
-        if(score >= 75) {
+        // Calculate the score
+        // score = (correctAnswers * 100) / totalQuestions;
+
+        // Update completion status if the score is 75 or higher
+        if (_score >= 75) {
             es.completedQuizzes[_quizId][msg.sender] = true;
-            es.userScores[msg.sender][_quizId] = score;
+            es.userScores[msg.sender][_quizId] = _score;
             es.userCompletedQuizzesByCourse[msg.sender][_courseId].push(_quizId);
 
+            // Try to mint token
             mintToken(msg.sender, LibDiamond.QUIZ_COMPLETION_REWARD);
         }
 
-        emit QuizSubmitted(msg.sender, _quizId, score);
+        emit QuizSubmitted(msg.sender, _quizId, _score);
 
-        return score;
+        return true;
+    }
+
+    //function to check if quiz exists
+    function quizExists(uint256 _quizId) external view returns (bool) {
+        LibDiamond.Ecosystem2Storage storage es = LibDiamond.ecosystem2Storage();
+        return es.quizzes[_quizId].exists;
+    }
+
+    //function to lock quiz
+    function lockQuiz(uint256 _courseId, uint256 _quizId) external {
+        LibDiamond.Ecosystem2Storage storage es = LibDiamond.ecosystem2Storage();
+
+        require(es.quizzes[_quizId].exists, "Quiz does not exist");
+
+        for(uint256 i = 0; i < es.userCompletedQuizzesByCourse[msg.sender][_courseId].length; i++){
+            if(es.userCompletedQuizzesByCourse[msg.sender][_courseId][i] == _quizId){
+                revert("Quiz already completed");
+            }
+        }
+
+        // Lock the quiz for the user
+        es.userQuizLockTimes[msg.sender][_quizId] = block.timestamp;
+
+        emit QuizLocked(_quizId, msg.sender);
+    }
+
+    //return the time a quiz is locked for a specific user
+    function getQuizLockTime(uint256 _quizId, address _user) external view returns (uint256) {
+        LibDiamond.Ecosystem2Storage storage es = LibDiamond.ecosystem2Storage();
+
+        require(es.quizzes[_quizId].exists, "Quiz does not exist");
+        return es.userQuizLockTimes[_user][_quizId];
     }
 
     //function to edit module

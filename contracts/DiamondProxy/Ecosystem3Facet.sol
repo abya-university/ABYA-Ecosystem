@@ -57,7 +57,7 @@ contract Ecosystem3Facet is ReentrancyGuard {
         es.courseCompleted[_courseId][msg.sender] = true;
     
         // Award tokens for course completion
-        mintToken(msg.sender, COURSE_COMPLETION_REWARD);
+        mintToken(msg.sender, LibDiamond.COURSE_COMPLETION_REWARD);
 
         // Generate a unique certificate ID using a hash and convert it to uint256
         uint256 certificateId = uint256(keccak256(abi.encodePacked(_courseId, learner, courseName, cert_issuer, issue_date, block.timestamp)));

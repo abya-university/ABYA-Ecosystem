@@ -104,6 +104,7 @@ library LibDiamond {
         mapping(uint256 => mapping(address => bool)) completedQuizzes;
         mapping(address => mapping(uint256 => uint256[])) userCompletedQuizzesByCourse;
         mapping(address => mapping(uint256 => uint256)) userScores;
+        mapping(address => mapping(uint256 => uint256)) userQuizLockTimes;
 
         Course[] listOfCourses;
         Chapter[] listOfChapters;
@@ -178,6 +179,7 @@ library LibDiamond {
         string quizTitle;
         Question[] questions;
         bool exists;
+        uint256 lockTime;
     }
 
     struct Question {
