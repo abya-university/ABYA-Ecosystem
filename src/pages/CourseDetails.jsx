@@ -32,6 +32,7 @@ import Ecosystem3FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem3Fa
 import { ethers } from "ethers";
 import { useEthersSigner } from "../components/useClientSigner";
 import Certificate from "../components/Certificate";
+import { useCertificates } from "../contexts/certificatesContext";
 
 const EcosystemDiamondAddress = import.meta.env
   .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
@@ -689,6 +690,7 @@ const CourseDetails = memo(({ courseId }) => {
   const [learnerName, setLearnerName] = useState("");
   const [showCertificate, setShowCertificate] = useState(false);
   const [certificateData, setCertificateData] = useState(null);
+  const { certificates } = useCertificates();
 
   // Update both fetch functions to filter out invalid IDs
 
@@ -844,6 +846,15 @@ const CourseDetails = memo(({ courseId }) => {
     () => courses.find((course) => course.courseId === courseId),
     [courses, courseId]
   );
+
+  useEffect(() => {
+    const hasCertificate = certificates.some(
+      (cert) => cert.courseName === currentCourse.courseName
+    );
+    if (!hasCertificate) {
+      setShowCongratsPopup(true);
+    }
+  }, [certificates, currentCourse.courseName]);
 
   // Memoize filtered chapters
   const filteredChapters = useMemo(
@@ -1057,11 +1068,11 @@ const CourseDetails = memo(({ courseId }) => {
       };
 
       const tx = await contract.issueCertificate(
-        BigInt(currentCourse.courseId),
+        currentCourse.courseId,
         learner,
         currentCourse.courseName,
         cert_issuer,
-        Date.now(),
+        Math.floor(Date.now() / 1000),
         { gasLimit: 500000 }
       );
 
@@ -1070,7 +1081,7 @@ const CourseDetails = memo(({ courseId }) => {
         learner,
         courseName: currentCourse.courseName,
         issuer: cert_issuer,
-        timestamp: Date.now(),
+        timestamp: Math.floor(Date.now() / 1000),
       });
 
       console.log("Transaction sent:", tx.hash);
@@ -1083,7 +1094,13 @@ const CourseDetails = memo(({ courseId }) => {
       setShowCertificate(true);
     } catch (err) {
       console.error("Error issuing certificate:", err);
-      // alert("Failed to issue certificate. Please try again.");
+      // Extract more error information if possible
+      if (err.error && err.error.message) {
+        console.error("Contract error message:", err.error.message);
+      }
+      if (err.receipt) {
+        console.error("Transaction receipt:", err.receipt);
+      }
     }
   };
 
@@ -1361,7 +1378,7 @@ const CourseDetails = memo(({ courseId }) => {
 
       {showCertificate && certificateData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 overflow-auto">
-          <div className="relative bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-auto">
+          <div className="relative bg-white rounded-lg max-w-7xl w-full max-h-[80vh] overflow-auto p-8 shadow-lg">
             <button
               onClick={() => setShowCertificate(false)}
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10"

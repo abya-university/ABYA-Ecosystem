@@ -37,7 +37,7 @@ contract Ecosystem3Facet is ReentrancyGuard {
         require(amount + es.ecosystemPoolSupply <= LibDiamond.ECOSYSTEM_POOL, "Limit Exceeded!");
         
         // TODO: Implement actual token minting logic
-        mintToken(to, amount);
+        // mintToken(to, amount);
         
         es.ecosystemPoolSupply += amount;
 
@@ -55,9 +55,6 @@ contract Ecosystem3Facet is ReentrancyGuard {
 
         // Mark course as completed
         es.courseCompleted[_courseId][msg.sender] = true;
-    
-        // Award tokens for course completion
-        mintToken(msg.sender, LibDiamond.COURSE_COMPLETION_REWARD);
 
         // Generate a unique certificate ID using a hash and convert it to uint256
         uint256 certificateId = uint256(keccak256(abi.encodePacked(_courseId, learner, courseName, cert_issuer, issue_date, block.timestamp)));
@@ -74,12 +71,43 @@ contract Ecosystem3Facet is ReentrancyGuard {
         });
 
         es.certificates[certificateId] = newCert;
+        es.listOfCertificates.push(newCert);
 
-         emit CertificateIssued(certificateId, courseName, cert_issuer, learner);
+        // Award tokens for course completion
+        // mintToken(msg.sender, LibDiamond.COURSE_COMPLETION_REWARD);
+
+        emit CertificateIssued(certificateId, courseName, cert_issuer, learner);
 
         // Return the certificate details and the unique certificate ID
         return (certificateId, newCert);
     }
+
+    // Function to get all certificates of a user
+function getCertificates(address _owner) public view returns (LibDiamond.Certificate[] memory) {
+    LibDiamond.Ecosystem3Storage storage es = ecosystem3Storage();
+    
+    // First, count the number of certificates owned by this user
+    uint256 count = 0;
+    for (uint256 i = 0; i < es.listOfCertificates.length; i++) {
+        if (es.listOfCertificates[i].owner == _owner) {
+            count++;
+        }
+    }
+
+    // Create an array to hold the certificates
+    LibDiamond.Certificate[] memory result = new LibDiamond.Certificate[](count);
+    
+    // Fill the array with certificates owned by the user
+    uint256 index = 0;
+    for (uint256 i = 0; i < es.listOfCertificates.length; i++) {
+        if (es.listOfCertificates[i].owner == _owner) {
+            result[index] = es.listOfCertificates[i];
+            index++;
+        }
+    }
+
+    return result;
+}
 
 
 }
