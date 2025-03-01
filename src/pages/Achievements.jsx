@@ -295,35 +295,41 @@ const AchievementsPage = () => {
               </h2>
             </div>
             <div className="space-y-4">
-              {certificates.map((cert, index) => (
-                <div
-                  key={index}
-                  className="p-4 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 cursor-pointer mb-4"
-                  onClick={() => handleCertificateClick(cert)}
-                >
-                  <div className="flex items-center">
-                    <div className="mr-4 text-2xl text-blue-600">
-                      <BadgeCheck />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3
-                        className="text-lg font-semibold text-gray-800 truncate"
-                        title={cert.courseName}
-                      >
-                        {cert.courseName}
-                      </h3>
-                      <p className="text-gray-600 text-sm">
-                        {cert.cert_issuer}
-                      </p>
-                    </div>
-                    <div className="ml-4 text-sm text-gray-500">
-                      {new Date(
-                        Number(cert.issue_date) * 1000
-                      ).toLocaleDateString()}
+              {certificates.length === 0 ? (
+                <div className="text-gray-500 text-center">
+                  No certificates yet!
+                </div>
+              ) : (
+                certificates.map((cert, index) => (
+                  <div
+                    key={index}
+                    className="p-4 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 cursor-pointer mb-4"
+                    onClick={() => handleCertificateClick(cert)}
+                  >
+                    <div className="flex items-center">
+                      <div className="mr-4 text-2xl text-blue-600">
+                        <BadgeCheck />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3
+                          className="text-lg font-semibold text-gray-800 truncate"
+                          title={cert.courseName}
+                        >
+                          {cert.courseName}
+                        </h3>
+                        <p className="text-gray-600 text-sm">
+                          {cert.cert_issuer}
+                        </p>
+                      </div>
+                      <div className="ml-4 text-sm text-gray-500">
+                        {new Date(
+                          Number(cert.issue_date) * 1000
+                        ).toLocaleDateString()}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
