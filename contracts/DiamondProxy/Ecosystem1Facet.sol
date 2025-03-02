@@ -293,7 +293,7 @@ function approveCourse(uint256 courseId) public onlyRole(LibDiamond.REVIEWER_ROL
         course.approved = true;
         
         emit CourseApproved(courseId, course.approvalCount);
-        mintToken(course.creator, LibDiamond.CREATE_COURSE_REWARD);
+        // mintToken(course.creator, LibDiamond.CREATE_COURSE_REWARD);
     }
 }
 

@@ -204,6 +204,47 @@ const Quiz = memo(({ quiz, courseId }) => {
   const [lockEndTime, setLockEndTime] = useState(null);
   const signerPromise = useEthersSigner();
   const { address } = useAccount();
+  const [completedQuizIds, setCompletedQuizIds] = useState(new Set());
+  const { quizzes } = useContext(QuizContext);
+
+  useEffect(() => {
+    const fetchCompletedQuizzes = async () => {
+      const signer = await signerPromise;
+      const contract = new ethers.Contract(
+        EcosystemDiamondAddress,
+        Ecosystem2Facet_ABI,
+        signer
+      );
+
+      const completedQuizzes = await contract.getUserCompletedQuizzesByCourse(
+        courseId
+      );
+
+      // Special case handling: if the only value is "0" and there's no quiz with ID 0
+      if (
+        completedQuizzes.length === 1 &&
+        completedQuizzes[0].toString() === "0" &&
+        !quizzes.some((quiz) => quiz.quizId.toString() === "0")
+      ) {
+        setCompletedQuizIds(new Set());
+        console.log(
+          "No completed quizzes (found [0] which isn't a valid quiz ID)"
+        );
+        return;
+      }
+
+      // Split the quiz IDs and filter only valid ones
+      const quizIds = completedQuizzes
+        .flatMap((quiz) => quiz.toString().split(","))
+        .filter((id) => quizzes.some((quiz) => quiz.quizId.toString() === id));
+
+      const completedQuizIdsSet = new Set(quizIds);
+      setCompletedQuizIds(completedQuizIdsSet);
+      console.log("Completed user quizzes:", Array.from(completedQuizIdsSet));
+    };
+
+    fetchCompletedQuizzes();
+  }, [courseId, signerPromise, quizzes]);
 
   useEffect(() => {
     const checkQuizLock = async () => {
@@ -404,6 +445,19 @@ const Quiz = memo(({ quiz, courseId }) => {
         <p className="mt-2 text-red-700 dark:text-red-300">
           You've exceeded the maximum attempts. Please try again after{" "}
           {lockEndTime ? new Date(lockEndTime).toLocaleString() : "6 hours"}.
+        </p>
+      </div>
+    );
+  }
+
+  if (completedQuizIds.has(quiz.quizId.toString())) {
+    return (
+      <div className="p-6 bg-green-50 dark:bg-green-900/20 rounded-lg">
+        <h3 className="text-lg font-medium text-green-800 dark:text-green-200">
+          Quiz Completed
+        </h3>
+        <p className="mt-2 text-green-700 dark:text-green-300">
+          You have already completed this quiz.
         </p>
       </div>
     );
@@ -1024,7 +1078,10 @@ const CourseDetails = memo(({ courseId }) => {
 
   //issueCertificate section
   useEffect(() => {
-    if (completedLessonIds.size === totalLessons) {
+    if (
+      completedLessonIds.size + completedQuizIds.size ===
+      totalLessons + totalQuizzes
+    ) {
       setShowCongratsPopup(true);
       // alert("Congratulations! You've completed all lessons.");
     }
@@ -1270,8 +1327,8 @@ const CourseDetails = memo(({ courseId }) => {
           {/* Right Sidebar Navigation (20%) */}
           <div className="w-[20%] bg-white dark:bg-gray-800 p-6 rounded-lg h-fit sticky top-[100px]">
             <ProgressBar
-              completedLessons={completedLessonIds.size}
-              totalLessons={totalLessons}
+              completedLessons={completedLessonIds.size + completedQuizIds.size}
+              totalLessons={totalLessons + totalQuizzes}
             />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 pt-2">
               Course Navigation

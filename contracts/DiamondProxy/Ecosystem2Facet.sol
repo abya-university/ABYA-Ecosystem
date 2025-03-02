@@ -391,7 +391,7 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
             es.userCompletedQuizzesByCourse[msg.sender][_courseId].push(_quizId);
 
             // Try to mint token
-            mintToken(msg.sender, LibDiamond.QUIZ_COMPLETION_REWARD);
+            // mintToken(msg.sender, LibDiamond.QUIZ_COMPLETION_REWARD);
         }
 
         emit QuizSubmitted(msg.sender, _quizId, _score);
