@@ -1079,13 +1079,14 @@ const CourseDetails = memo(({ courseId }) => {
   //issueCertificate section
   useEffect(() => {
     if (
+      completedLessonIds.size + completedQuizIds.size !== 0 &&
+      totalLessons + totalQuizzes !== 0 &&
       completedLessonIds.size + completedQuizIds.size ===
-      totalLessons + totalQuizzes
+        totalLessons + totalQuizzes
     ) {
       setShowCongratsPopup(true);
-      // alert("Congratulations! You've completed all lessons.");
     }
-  }, [completedLessonIds, totalLessons]);
+  }, [completedLessonIds, completedQuizIds, totalLessons, totalQuizzes]);
 
   const handleClosePopup = () => {
     setShowCongratsPopup(false);

@@ -198,7 +198,7 @@ const AchievementsPage = () => {
                   <div className="flex items-center">
                     <div
                       className="
-                      p-2 rounded-full mr-3 dark:bg-yellow-500 dark:text-yellow-400 bg-yellow-500 bg-opacity-20 text-yellow-600"
+                      p-2 rounded-full mr-3 dark:bg-yellow-500 dark:text-white bg-yellow-500 bg-opacity-20 text-yellow-600"
                     >
                       {badge.icon}
                     </div>
@@ -303,7 +303,7 @@ const AchievementsPage = () => {
                 certificates.map((cert, index) => (
                   <div
                     key={index}
-                    className="p-4 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 cursor-pointer mb-4"
+                    className="p-4 bg-white dark:bg-gray-700 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 cursor-pointer mb-4"
                     onClick={() => handleCertificateClick(cert)}
                   >
                     <div className="flex items-center">
@@ -312,12 +312,12 @@ const AchievementsPage = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3
-                          className="text-lg font-semibold text-gray-800 truncate"
+                          className="text-lg font-normal text-gray-800 dark:text-gray-50 truncate"
                           title={cert.courseName}
                         >
                           {cert.courseName}
                         </h3>
-                        <p className="text-gray-600 text-sm">
+                        <p className="text-gray-600 text-sm dark:text-gray-400">
                           {cert.cert_issuer}
                         </p>
                       </div>
