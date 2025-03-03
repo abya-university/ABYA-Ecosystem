@@ -181,7 +181,11 @@ const CoursesPage = ({ onCourseSelect }) => {
         signer
       );
 
+      console.log("Course ID: ", courseId);
+
       console.log("Requesting review for courseId:", courseId); // Debug log
+      const courseIdNumber = parseInt(courseId, 10);
+      console.log("Course ID Type: ", typeof courseIdNumber);
       await diamondContract.selectCourseReviewers(courseId);
       setRequestSent(true);
     } catch (error) {
@@ -371,8 +375,7 @@ const CoursesPage = ({ onCourseSelect }) => {
                         View Course
                       </button>
                     )}
-                    {(role === "Course Owner" ||
-                      role === "ADMIN" ||
+                    {(role === "ADMIN" ||
                       (role === "Reviewer" &&
                         !course.approved &&
                         course.creator === address)) && (
@@ -387,26 +390,26 @@ const CoursesPage = ({ onCourseSelect }) => {
                         Request Review
                       </button>
                     )}
-                    {role === "USER" && course.approved && address && (
+                    {role === "USER" && !course.approved && address && (
                       <>
-                        {course.enrolledStudents?.includes(address) ? (
-                          <>
-                            <button
-                              onClick={() => viewCourse(course.courseId)}
-                              className="flex-1 bg-yellow-500 mt-3 text-gray-800 text-sm py-2 px-1 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center"
-                            >
-                              <Eye className="w-5 h-5 mr-2" />
-                              View Course
-                            </button>
-                            <button
-                              onClick={() => unEnroll(course.courseId)}
-                              className="flex-1 bg-red-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center"
-                            >
-                              <WifiOff className="w-5 h-5 mr-2" />
-                              Unenroll
-                            </button>
-                          </>
-                        ) : (
+                        {/* {course.enrolledStudents?.includes(address) ? ( */}
+                        <>
+                          <button
+                            onClick={() => viewCourse(course.courseId)}
+                            className="flex-1 bg-yellow-500 mt-3 text-gray-800 text-sm py-2 px-1 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center"
+                          >
+                            <Eye className="w-5 h-5 mr-2" />
+                            View Course
+                          </button>
+                          <button
+                            onClick={() => unEnroll(course.courseId)}
+                            className="flex-1 bg-red-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center"
+                          >
+                            <WifiOff className="w-5 h-5 mr-2" />
+                            Unenroll
+                          </button>
+                        </>
+                        {/* ) : (
                           <button
                             onClick={() => enroll(course.courseId)}
                             className="flex-1 bg-gray-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center"
@@ -414,7 +417,7 @@ const CoursesPage = ({ onCourseSelect }) => {
                             <Wifi className="w-5 h-5 mr-2" />
                             Enroll
                           </button>
-                        )}
+                        )} */}
                       </>
                     )}
                   </div>

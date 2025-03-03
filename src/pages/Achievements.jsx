@@ -10,10 +10,33 @@ import {
   Layers,
   Moon,
   Sun,
+  BadgeCheck,
 } from "lucide-react";
+import { useCertificates } from "../contexts/certificatesContext";
+import Certificate from "../components/Certificate";
+import { CSSTransition } from "react-transition-group";
+import "../index.css";
 
 const AchievementsPage = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const { certificates } = useCertificates();
+  const [selectedCertificate, setSelectedCertificate] = useState(null);
+  const [showPopup, setShowPopup] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleCertificateClick = (cert) => {
+    setLoading(true);
+    setSelectedCertificate(cert);
+    setShowPopup(true);
+    setLoading(false);
+  };
+
+  const handleClosePopup = () => {
+    setShowPopup(false);
+    setTimeout(() => setSelectedCertificate(null), 300); // Delay unmounting to allow transition
+  };
+
+  console.log("certificates", certificates);
 
   // Sample data for achievements
   const communityBadges = [
@@ -61,33 +84,35 @@ const AchievementsPage = () => {
     },
   ];
 
-  const certificates = [
-    {
-      name: "Blockchain Fundamentals",
-      issuer: "Web3 Academy",
-      date: "Jan 25, 2024",
-      icon: <BookOpen className="w-6 h-6" />,
-    },
-    {
-      name: "Advanced Smart Contracts",
-      issuer: "Crypto University",
-      date: "Mar 5, 2024",
-      icon: <Medal className="w-6 h-6" />,
-    },
-  ];
+  // const certificates = [
+  //   {
+  //     name: "Blockchain Fundamentals",
+  //     issuer: "Web3 Academy",
+  //     date: "Jan 25, 2024",
+  //     icon: <BookOpen className="w-6 h-6" />,
+  //   },
+  //   {
+  //     name: "Advanced Smart Contracts",
+  //     issuer: "Crypto University",
+  //     date: "Mar 5, 2024",
+  //     icon: <Medal className="w-6 h-6" />,
+  //   },
+  // ];
 
   const communityEvents = [
     {
-      name: "Blockchain Hackathon 2024",
+      courseName: "Blockchain Hackathon 2024",
       type: "Participated",
       date: "Feb 10, 2024",
       status: "Completed",
+      cert_issuer: "ABYA UNIVERSITY",
     },
     {
-      name: "Web3 Security Workshop",
+      courseName: "Web3 Security Workshop",
       type: "Planned",
       date: "Apr 15, 2024",
       status: "Upcoming",
+      cert_issuer: "ABYA UNIVERSITY",
     },
   ];
 
@@ -173,7 +198,7 @@ const AchievementsPage = () => {
                   <div className="flex items-center">
                     <div
                       className="
-                      p-2 rounded-full mr-3 dark:bg-yellow-500 dark:text-yellow-400 bg-yellow-500 bg-opacity-20 text-yellow-600"
+                      p-2 rounded-full mr-3 dark:bg-yellow-500 dark:text-white bg-yellow-500 bg-opacity-20 text-yellow-600"
                     >
                       {badge.icon}
                     </div>
@@ -262,69 +287,91 @@ const AchievementsPage = () => {
           </div>
 
           {/* Certificates */}
-          <div
-            className="
-            p-6 rounded-xl shadow-lg 
-            dark:bg-gray-800 dark:border-gray-700 bg-white border border-gray-200"
-          >
+          <div className="p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border border-gray-200">
             <div className="flex items-center mb-4">
-              <Medal
-                className="
-                w-8 h-8 mr-3
-                dark:text-yellow-400 text-yellow-500"
-              />
-              <h2
-                className="
-                text-xl font-semibold
-                dark:text-white text-gray-900"
-              >
+              <Medal className="w-8 h-8 mr-3 dark:text-yellow-400 text-yellow-500" />
+              <h2 className="text-xl font-semibold dark:text-white text-gray-900">
                 Certificates
               </h2>
             </div>
             <div className="space-y-4">
-              {certificates.map((cert, index) => (
-                <div
-                  key={index}
-                  className="
-                    p-4 rounded-lg flex items-center justify-between
-                    dark:bg-gray-700 bg-gray-100"
-                >
-                  <div className="flex items-center">
-                    <div
-                      className="
-                      p-2 rounded-full mr-3
-                      dark:bg-yellow-500 dark:text-yellow-400 bg-yellow-500 bg-opacity-20 text-yellow-600"
-                    >
-                      {cert.icon}
-                    </div>
-                    <div>
-                      <p
-                        className="
-                        font-medium
-                        dark:text-white text-gray-900"
-                      >
-                        {cert.name}
-                      </p>
-                      <p
-                        className="
-                        text-xs
-                        dark:text-gray-400 text-gray-600"
-                      >
-                        {cert.issuer}
-                      </p>
+              {certificates.length === 0 ? (
+                <div className="text-gray-500 text-center">
+                  No certificates yet!
+                </div>
+              ) : (
+                certificates.map((cert, index) => (
+                  <div
+                    key={index}
+                    className="p-4 bg-white dark:bg-gray-700 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 cursor-pointer mb-4"
+                    onClick={() => handleCertificateClick(cert)}
+                  >
+                    <div className="flex items-center">
+                      <div className="mr-4 text-2xl text-blue-600">
+                        <BadgeCheck />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3
+                          className="text-lg font-normal text-gray-800 dark:text-gray-50 truncate"
+                          title={cert.courseName}
+                        >
+                          {cert.courseName}
+                        </h3>
+                        <p className="text-gray-600 text-sm dark:text-gray-400">
+                          {cert.cert_issuer}
+                        </p>
+                      </div>
+                      <div className="ml-4 text-sm text-gray-500">
+                        {new Date(
+                          Number(cert.issue_date) * 1000
+                        ).toLocaleDateString()}
+                      </div>
                     </div>
                   </div>
-                  <p
-                    className="
-                    text-sm
-                    dark:text-gray-400 text-gray-600"
-                  >
-                    {cert.date}
-                  </p>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
+
+          {/* Certificate Popup */}
+          <CSSTransition
+            in={showPopup}
+            timeout={300}
+            classNames="popup"
+            unmountOnExit
+          >
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 overflow-auto">
+              <div className="relative bg-white rounded-lg max-w-7xl w-full max-h-[87vh] overflow-auto p-8 shadow-lg">
+                <button
+                  onClick={handleClosePopup}
+                  className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+
+                {loading ? (
+                  <div className="flex justify-center items-center h-full">
+                    <div className="loader"></div>
+                  </div>
+                ) : (
+                  <Certificate certificateData={selectedCertificate} />
+                )}
+              </div>
+            </div>
+          </CSSTransition>
 
           {/* Community Events */}
           <div

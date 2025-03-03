@@ -73,6 +73,14 @@ const CourseCreationPipeline = () => {
       const receipt = await tx.wait();
       console.log("Transaction confirmed:", receipt.transactionHash);
       setSuccess("Course created successfully!");
+      setCourseData({
+        basicInfo: {
+          name: "",
+          description: "",
+          difficulty_level: 0,
+          image: null,
+        },
+      });
 
       // Check if the role has been granted
       const hasRole = await diamondContract.hasCourseOwnerRole(

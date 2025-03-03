@@ -15,6 +15,7 @@ import {
   Timer,
   Users,
 } from "lucide-react";
+import { useAccount } from "wagmi";
 
 const PreviewCourse = () => {
   const { courses } = useContext(CourseContext);
@@ -23,6 +24,7 @@ const PreviewCourse = () => {
   const { quizzes } = useContext(QuizContext);
   const [courseId, setCourseId] = useState("");
   const [selectedQuiz, setSelectedQuiz] = useState(null);
+  const { address } = useAccount();
 
   const renderResourceIcon = (contentType) => {
     switch (contentType) {
@@ -141,15 +143,25 @@ const PreviewCourse = () => {
     }
   };
 
-  const handleCourseSelect = (id) => {
-    setCourseId(id);
-  };
+  // const handleCourseSelect = (id) => {
+  //   setCourseId(id);
+  // };
 
   useEffect(() => {
     if (courseId) {
       fetchChapters(courseId);
     }
   }, [courseId, fetchChapters]);
+
+  const userCourses = courses.filter((course) => course.creator === address);
+
+  // Sort courses by creation date (assuming course.creationDate is a timestamp)
+  userCourses.sort(
+    (a, b) => new Date(b.creationDate) - new Date(a.creationDate)
+  );
+
+  // Get the most recent course
+  const mostRecentCourse = userCourses[0];
 
   const renderQuiz = (quiz) => {
     if (!quiz) return null;
@@ -189,14 +201,14 @@ const PreviewCourse = () => {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       {/* Course Header */}
       <div className="max-w-7xl mx-auto mb-12">
-        {courses?.map((course) => (
+        {mostRecentCourse ? (
           <div
-            key={course.courseId}
+            key={mostRecentCourse.courseId}
             className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden"
           >
             <div className="p-8 border-b border-gray-200 dark:border-gray-700">
               <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-                {course?.courseName}
+                {mostRecentCourse?.courseName}
               </h1>
               <div className="flex flex-wrap gap-4 text-gray-600 dark:text-gray-400">
                 <div className="flex items-center gap-2">
@@ -213,25 +225,31 @@ const PreviewCourse = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <Users className="w-5 h-5" />
-                  <span>{course?.enrolledStudents || 0} Students</span>
+                  <span>
+                    {mostRecentCourse?.enrolledStudents || 0} Students
+                  </span>
                 </div>
               </div>
-              <button
-                onClick={() => handleCourseSelect(course.courseId)}
+              {/* <button
+                onClick={() => handleCourseSelect(mostRecentCourse.courseId)}
                 className="mt-4 bg-yellow-500 text-white px-4 py-2 rounded-lg"
               >
                 Select Course
-              </button>
+              </button> */}
             </div>
 
             {/* Course Description */}
             <div className="p-8 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-800">
               <p className="text-gray-700 dark:text-gray-300">
-                {course?.courseDescription}
+                {mostRecentCourse?.courseDescription}
               </p>
             </div>
           </div>
-        ))}
+        ) : (
+          <div className="text-center text-gray-500 dark:text-gray-400">
+            No courses found for the current user.
+          </div>
+        )}
       </div>
 
       {/* Course Content */}

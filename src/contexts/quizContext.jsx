@@ -37,6 +37,7 @@ const QuizProvider = ({ children }) => {
           lessonId: Number(quiz.lessonId),
           quizId: Number(quiz.quizId),
           quizTitle: quiz.quizTitle,
+          exists: quiz.exists,
           questions: quiz.questions.map((question) => ({
             quizId: Number(question.quizId),
             questionId: Number(question.questionId),

@@ -60,7 +60,7 @@ const LessonProvider = ({ children }) => {
     if (signer) {
       fetchLessons();
     }
-  }, [signer, address]);
+  }, [signer, address, lessons]);
 
   return (
     <LessonContext.Provider value={{ lessons, fetchLessons, setLessons }}>
