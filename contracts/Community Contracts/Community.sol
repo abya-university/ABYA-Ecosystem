@@ -3,9 +3,10 @@ pragma solidity ^0.8.24;
 
 import { LMSToken } from "../LMS Token.sol";
 import { CommunityBadgeSystem } from "./CommunityBadgeSystem.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract Community is LMSToken, ReentrancyGuard, CommunityBadgeSystem {
+contract Community is AccessControl, ReentrancyGuard, LMSToken, CommunityBadgeSystem {
     // Constants
     uint256 public constant COMMUNITY_POOL = (MAX_SUPPLY * 10) / 100;
     uint256 public constant MAX_COMMUNITY_PROJECT_FUNDING = (COMMUNITY_POOL * 5) / 100;
@@ -113,7 +114,7 @@ contract Community is LMSToken, ReentrancyGuard, CommunityBadgeSystem {
         uint256 _startTime, 
         uint256 _endTime, 
         uint256 _maxParticipants
-    ) external returns (uint256) {
+    ) external onlyRole(COMMUNITY_MANAGER) returns (uint256) {
         uint256 eventId = _eventIdCounter++;
         
         CommunityEvent storage newEvent = communityEvents[eventId];

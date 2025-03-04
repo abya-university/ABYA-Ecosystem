@@ -84,34 +84,26 @@ const AchievementsPage = () => {
     },
   ];
 
-  // const certificates = [
-  //   {
-  //     name: "Blockchain Fundamentals",
-  //     issuer: "Web3 Academy",
-  //     date: "Jan 25, 2024",
-  //     icon: <BookOpen className="w-6 h-6" />,
-  //   },
-  //   {
-  //     name: "Advanced Smart Contracts",
-  //     issuer: "Crypto University",
-  //     date: "Mar 5, 2024",
-  //     icon: <Medal className="w-6 h-6" />,
-  //   },
-  // ];
-
   const communityEvents = [
     {
-      courseName: "Blockchain Hackathon 2024",
+      eventName: "Blockchain Hackathon 2024",
       type: "Participated",
       date: "Feb 10, 2024",
       status: "Completed",
       cert_issuer: "ABYA UNIVERSITY",
     },
     {
-      courseName: "Web3 Security Workshop",
+      eventName: "Web3 Security Workshop",
       type: "Planned",
       date: "Apr 15, 2024",
       status: "Upcoming",
+      cert_issuer: "ABYA UNIVERSITY",
+    },
+    {
+      eventName: "Blockchain Roadtirp",
+      type: "Planned",
+      date: "Apr 19, 2025",
+      status: "To Attend",
       cert_issuer: "ABYA UNIVERSITY",
     },
   ];
@@ -406,7 +398,7 @@ const AchievementsPage = () => {
                       font-medium
                       dark:text-white text-gray-900"
                     >
-                      {event.name}
+                      {event.eventName}
                     </p>
                     <p
                       className="

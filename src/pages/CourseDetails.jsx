@@ -326,9 +326,37 @@ const Quiz = memo(({ quiz, courseId }) => {
       setScore(calculatedScore);
       setQuizSubmitted(true);
 
-      if (calculatedScore < 75) {
-        // Handle failed attempt logic...
-        return;
+      setAttempts((prevAttempts) => prevAttempts + 1);
+
+      if (attempts + 1 >= 3) {
+        try {
+          const signer = await signerPromise;
+          const contract = new ethers.Contract(
+            EcosystemDiamondAddress,
+            Ecosystem2Facet_ABI,
+            signer
+          );
+
+          const courseIdBN = BigInt(courseId);
+          const quizIdBN = BigInt(quiz.quizId);
+
+          console.log("Locking quiz:", {
+            courseId: courseIdBN.toString(),
+            quizId: quizIdBN.toString(),
+          });
+
+          const tx = await contract.lockQuiz(courseIdBN, quizIdBN, {
+            gasLimit: 300000,
+          });
+
+          await tx.wait();
+          console.log("Quiz locked successfully");
+
+          // Update UI to reflect locked state
+          setIsLocked(true);
+        } catch (lockError) {
+          console.error("Failed to lock quiz:", lockError);
+        }
       }
 
       const signer = await signerPromise;
