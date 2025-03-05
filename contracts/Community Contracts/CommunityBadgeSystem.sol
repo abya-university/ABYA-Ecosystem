@@ -38,6 +38,7 @@ contract CommunityBadgeSystem {
     // Events for badge achievements
     event BadgeAwarded(address indexed member, BadgeLevel badge);
     event EventParticipationRecorded(address indexed member, uint256 totalEvents);
+    event MemberRegistered(address indexed member);
 
     constructor() {
         // Define badge metadata with names, icon URIs, and token rewards
@@ -70,6 +71,20 @@ contract CommunityBadgeSystem {
             iconURI: "ipfs://champion-badge-icon",
             tokenReward: 4 * 10**18 // 4  ABYTKN tokens
         });
+    }
+
+    // Internal function to register a new community member
+    function _registerMember(address _member) internal {
+        CommunityMember storage member = communityMembers[_member];
+        
+        // Only register if not already a member
+        if (member.currentBadge == BadgeLevel(0)) {
+            member.currentBadge = BadgeLevel.NONE;
+            member.totalEventsAttended = 0;
+            member.totalContributions = 0;
+            
+            emit MemberRegistered(_member);
+        }
     }
 
     // Internal function to update badge status
@@ -108,6 +123,9 @@ contract CommunityBadgeSystem {
 
     // Function to record event participation
     function recordEventParticipation(address _participant) internal {
+        // Ensure member is registered
+        _registerMember(_participant);
+
         CommunityMember storage member = communityMembers[_participant];
         
         // Increment total events attended

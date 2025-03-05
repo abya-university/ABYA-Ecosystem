@@ -21,30 +21,36 @@ contract Community is AccessControl, ReentrancyGuard, LMSToken, CommunityBadgeSy
     
     // Structs
     struct CommunityEvent {
-        uint256 id;
-        string name;
-        address creator;
-        uint256 startTime;
-        uint256 endTime;
-        uint256 maxParticipants;
-        uint256 currentParticipants;
-        bool isActive;
-    }
+    uint256 id;
+    string name;
+    address creator;
+    uint256 startTime;
+    uint256 endTime;
+    uint256 maxParticipants;
+    uint256 currentParticipants;
+    bool isActive;
+    bool isOnline;           // true if online, false if physical
+    string location;         // URL for online events, physical address for in-person events
+    string additionalDetails; // Additional event details (dress code, items to bring, etc.)
+}
 
     // Mappings
     mapping(uint256 => CommunityEvent) public communityEvents;
     mapping(address => uint256) public communityContributorRewards;
+    mapping(address => bool) public isCommunityMember;
 
     // Events
     event CommunityPoolUpdate(address indexed _to, uint256 indexed _amount);
     event AirdropDistributeSuccess(uint256 indexed _amount, uint256 _numberOfEarlyAdopters);
     event CommunityProjectFunded(address indexed project, uint256 amount);
-    event EventCreated(uint256 indexed eventId, string name, address creator);
+    event EventCreated(uint256 indexed eventId, string name, address creator, bool isOnline, string location);
     event EventParticipation(uint256 indexed eventId, address participant);
+    event JoinSuccess(address indexed _address);
 
     // Counters (simulating OpenZeppelin's Counters library)
     uint256 private _eventIdCounter;
     uint256 private _proposalIdCounter;
+    address[] public abyaCommunity;
 
     constructor(address[] memory _reviewers) LMSToken(_reviewers) ReentrancyGuard() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -70,6 +76,25 @@ contract Community is AccessControl, ReentrancyGuard, LMSToken, CommunityBadgeSy
         
         super.burn(account, amount);
         communityPoolSupply = communityPoolSupply > amount ? communityPoolSupply - amount : 0;
+    }
+
+    // Function to join ABYA Community
+    function joinCommunity() external returns (bool) {
+        require(!isCommunityMember[msg.sender], "Already a member!");
+
+        abyaCommunity.push(msg.sender);
+        isCommunityMember[msg.sender] = true;
+
+        recordEventParticipation(msg.sender);
+
+        emit JoinSuccess(msg.sender);
+
+        return true;
+    }
+
+    // Function to get all community members
+    function getAllCommunityMembers() external view returns (address[] memory) {
+        return abyaCommunity;
     }
 
     // Get Current Community Pool Supply
@@ -113,10 +138,13 @@ contract Community is AccessControl, ReentrancyGuard, LMSToken, CommunityBadgeSy
         string memory _name, 
         uint256 _startTime, 
         uint256 _endTime, 
-        uint256 _maxParticipants
-    ) external onlyRole(COMMUNITY_MANAGER) returns (uint256) {
+        uint256 _maxParticipants,
+        bool _isOnline,
+        string memory _location,
+        string memory _additionalDetails
+        ) external onlyRole(COMMUNITY_MANAGER) returns (uint256) {
         uint256 eventId = _eventIdCounter++;
-        
+    
         CommunityEvent storage newEvent = communityEvents[eventId];
         newEvent.id = eventId;
         newEvent.name = _name;
@@ -125,8 +153,11 @@ contract Community is AccessControl, ReentrancyGuard, LMSToken, CommunityBadgeSy
         newEvent.endTime = _endTime;
         newEvent.maxParticipants = _maxParticipants;
         newEvent.isActive = true;
+        newEvent.isOnline = _isOnline;
+        newEvent.location = _location;
+        newEvent.additionalDetails = _additionalDetails;
 
-        emit EventCreated(eventId, _name, msg.sender);
+        emit EventCreated(eventId, _name, msg.sender, _isOnline, _location);
         return eventId;
     }
 
@@ -231,4 +262,16 @@ contract Community is AccessControl, ReentrancyGuard, LMSToken, CommunityBadgeSy
             mintToken(_eligibleAddresses[i], _amount);
         }
     }
+
+    // Function to get all community events with details
+function getAllCommunityEvents() external view returns (CommunityEvent[] memory) {
+    uint256 totalEvents = _eventIdCounter;
+    CommunityEvent[] memory allEvents = new CommunityEvent[](totalEvents);
+    
+    for (uint256 i = 0; i < totalEvents; i++) {
+        allEvents[i] = communityEvents[i];
+    }
+    
+    return allEvents;
+}
 }

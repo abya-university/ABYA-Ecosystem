@@ -18,6 +18,9 @@ import {
   Activity,
   X,
   PlusCircle,
+  MapPin,
+  Merge,
+  Check,
 } from "lucide-react";
 import { FaMedal, FaGem, FaTrophy } from "react-icons/fa";
 import { toast, ToastContainer } from "react-toastify";
@@ -26,6 +29,8 @@ import "../index.css";
 import { ethers } from "ethers";
 import { useEthersSigner } from "../components/useClientSigner";
 import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
+import { useCommunityEvents } from "../contexts/communityEventsContext";
+import { useCommunityMembers } from "../contexts/communityMembersContext";
 
 const Community_ABI = CommunityABI.abi;
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
@@ -40,6 +45,9 @@ const CommunityPage = () => {
     startTime: "",
     endTime: "",
     maxParticipants: 50,
+    isOnline: true, // Default to online event
+    location: "",
+    additionalDetails: "",
   });
   const [airdropData, setAirdropData] = useState({
     amount: "",
@@ -49,7 +57,6 @@ const CommunityPage = () => {
     projectAddress: "",
     amount: "",
   });
-  const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [userBadge, setUserBadge] = useState(null);
   const signerPromise = useEthersSigner();
@@ -62,6 +69,23 @@ const CommunityPage = () => {
   const [fundProjectLoading, setFundProjectLoading] = useState(false);
   const [participateLoading, setParticipateLoading] = useState(false);
   const [claimRewardsLoading, setClaimRewardsLoading] = useState(false);
+  const [joinCommunityLoading, setJoinCommunityLoading] = useState(false);
+
+  const { events, fetchEvents } = useCommunityEvents();
+  const { members, fetchMembers } = useCommunityMembers();
+
+  useEffect(() => {
+    fetchEvents();
+    console.log("Events2: ", events);
+  }, [events]);
+
+  useEffect(() => {
+    fetchMembers();
+    console.log("Members2: ", members);
+  }, [members]);
+
+  console.log("Events: ", events);
+  console.log("Members: ", members);
 
   // Fetch badge data
   const fetchBadgeData = async () => {
@@ -114,6 +138,29 @@ const CommunityPage = () => {
     }
   }, [isConnected, address]);
 
+  //handle join community
+  const handleJoinCommunity = async () => {
+    setJoinCommunityLoading(true);
+
+    try {
+      const signer = await signerPromise;
+      const contract = new ethers.Contract(
+        CommunityAddress,
+        Community_ABI,
+        signer
+      );
+
+      const tx = await contract.joinCommunity();
+      await tx.wait();
+
+      toast.success("You've successfully joined the community!");
+      setJoinCommunityLoading(false);
+    } catch (error) {
+      console.error("Error joining community:", error);
+      toast.error("Failed to join community");
+    }
+  };
+
   const handleCreateEvent = async () => {
     if (!isConnected) {
       openConnectModal();
@@ -137,7 +184,10 @@ const CommunityPage = () => {
         eventData.name,
         BigInt(startTimeUnix),
         BigInt(endTimeUnix),
-        BigInt(eventData.maxParticipants)
+        BigInt(eventData.maxParticipants),
+        eventData.isOnline,
+        eventData.location,
+        eventData.additionalDetails
       );
 
       await tx.wait();
@@ -149,11 +199,16 @@ const CommunityPage = () => {
         startTime: "",
         endTime: "",
         maxParticipants: 50,
+        isOnline: true,
+        location: "",
+        additionalDetails: "",
       });
       fetchEvents();
     } catch (error) {
       console.error("Error creating event:", error);
       toast.error("Failed to create event");
+    } finally {
+      setCreateEventLoading(false);
     }
   };
 
@@ -289,44 +344,6 @@ const CommunityPage = () => {
     }
   };
 
-  // Fetch events (simulated - you would integrate with contract events)
-  const fetchEvents = async () => {
-    setLoading(true);
-    // In a real app, you'd query the blockchain for events
-    // For now, using mock data
-    setTimeout(() => {
-      setEvents([
-        {
-          id: 1,
-          name: "DeFi Workshop",
-          creator: "0x123...456",
-          startTime: Date.now() + 86400000, // tomorrow
-          endTime: Date.now() + 86400000 * 2, // day after tomorrow
-          maxParticipants: 100,
-          currentParticipants: 45,
-          isActive: true,
-        },
-        {
-          id: 2,
-          name: "Smart Contract Security",
-          creator: "0x789...012",
-          startTime: Date.now() + 86400000 * 3,
-          endTime: Date.now() + 86400000 * 4,
-          maxParticipants: 50,
-          currentParticipants: 20,
-          isActive: true,
-        },
-      ]);
-      setLoading(false);
-    }, 1000);
-  };
-
-  useEffect(() => {
-    if (isConnected) {
-      fetchEvents();
-    }
-  }, [isConnected]);
-
   useEffect(() => {
     if (badgeData !== undefined) {
       // Badge levels are 0-based in the contract (enum)
@@ -344,24 +361,6 @@ const CommunityPage = () => {
 
   const fadeIn = "animate-fadeIn";
   const slideIn = "animate-slideIn";
-
-  const communityStats = [
-    {
-      icon: <Users className="w-6 h-6 text-blue-500" />,
-      label: "Total Members",
-      value: "42,856",
-    },
-    {
-      icon: <Globe className="w-6 h-6 text-green-500" />,
-      label: "Countries",
-      value: "87",
-    },
-    {
-      icon: <MessageCircle className="w-6 h-6 text-purple-500" />,
-      label: "Active Discussions",
-      value: "1,234",
-    },
-  ];
 
   const featuredMembers = [
     {
@@ -415,10 +414,17 @@ const CommunityPage = () => {
     }
   };
 
-  // Modal Component for Create Event
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setEventData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }));
+  };
+
   const CreateEventModal = () => (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm transition-opacity">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6 transform transition-all duration-300 ease-in-out scale-100">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6 transform transition-all duration-300 ease-in-out scale-100 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-bold text-gray-900 dark:text-white">
             Create Community Event
@@ -434,14 +440,13 @@ const CommunityPage = () => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Event Name
+              Event Name *
             </label>
             <input
               type="text"
+              name="name"
               value={eventData.name}
-              onChange={(e) =>
-                setEventData({ ...eventData, name: e.target.value })
-              }
+              onChange={handleInputChange}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               placeholder="Workshop, Hackathon, etc."
             />
@@ -449,44 +454,108 @@ const CommunityPage = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Start Time
+              Start Time *
             </label>
             <input
               type="datetime-local"
+              name="startTime"
               value={eventData.startTime}
-              onChange={(e) =>
-                setEventData({ ...eventData, startTime: e.target.value })
-              }
+              onChange={handleInputChange}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              End Time
+              End Time *
             </label>
             <input
               type="datetime-local"
+              name="endTime"
               value={eventData.endTime}
-              onChange={(e) =>
-                setEventData({ ...eventData, endTime: e.target.value })
-              }
+              onChange={handleInputChange}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Max Participants
+              Max Participants *
             </label>
             <input
               type="number"
+              name="maxParticipants"
               value={eventData.maxParticipants}
-              onChange={(e) =>
-                setEventData({ ...eventData, maxParticipants: e.target.value })
-              }
+              onChange={handleInputChange}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               min="1"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Event Type *
+            </label>
+            <div className="flex gap-4">
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="isOnline"
+                  className="form-radio text-yellow-500"
+                  checked={eventData.isOnline}
+                  onChange={() =>
+                    setEventData({ ...eventData, isOnline: true })
+                  }
+                />
+                <span className="ml-2 text-gray-700 dark:text-gray-300">
+                  Online
+                </span>
+              </label>
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="isOnline"
+                  className="form-radio text-yellow-500"
+                  checked={!eventData.isOnline}
+                  onChange={() =>
+                    setEventData({ ...eventData, isOnline: false })
+                  }
+                />
+                <span className="ml-2 text-gray-700 dark:text-gray-300">
+                  Physical
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {eventData.isOnline ? "Meeting Link *" : "Location Address *"}
+            </label>
+            <input
+              type="text"
+              name="location"
+              value={eventData.location}
+              onChange={handleInputChange}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              placeholder={
+                eventData.isOnline
+                  ? "https://meet.google.com/..."
+                  : "123 Main St, City, Country"
+              }
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Additional Details
+            </label>
+            <textarea
+              name="additionalDetails"
+              value={eventData.additionalDetails}
+              onChange={handleInputChange}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white h-24"
+              placeholder="Dress code, items to bring, agenda, etc."
             />
           </div>
 
@@ -727,6 +796,30 @@ const CommunityPage = () => {
                 </>
               )}
             </button>
+
+            {/* join community button */}
+            <button
+              onClick={handleJoinCommunity}
+              disabled={joinCommunityLoading || members.includes(address)}
+              className={`flex items-end justify-end gap-2 px-4 py-2 ${
+                members.includes(address)
+                  ? "bg-green-300 cursor-not-allowed"
+                  : "bg-green-500 hover:bg-green-600"
+              } text-white rounded-lg transition-colors duration-300`}
+            >
+              {joinCommunityLoading ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
+              ) : (
+                <>
+                  {members.includes(address) ? (
+                    <Check className="w-5 h-5" />
+                  ) : (
+                    <Merge className="w-5 h-5" />
+                  )}
+                  {members.includes(address) ? "Joined" : "Join Community"}
+                </>
+              )}
+            </button>
           </div>
         )}
 
@@ -740,15 +833,27 @@ const CommunityPage = () => {
             >
               <h2 className="text-xl font-semibold mb-4">Community Stats</h2>
               <div className="space-y-4">
-                {communityStats.map((stat, index) => (
-                  <div key={index} className="flex items-center space-x-4">
-                    {stat.icon}
-                    <div>
-                      <p className="text-gray-400">{stat.label}</p>
-                      <p className="text-2xl font-bold">{stat.value}</p>
-                    </div>
+                <div className="flex items-center space-x-4">
+                  <Users className="w-6 h-6 text-blue-500" />
+                  <div>
+                    <p className="text-gray-400">Total Members</p>
+                    <p className="text-2xl font-bold">{members?.length}</p>
                   </div>
-                ))}
+                </div>
+                <div className="flex items-center space-x-4">
+                  <Globe className="w-6 h-6 text-green-500" />
+                  <div>
+                    <p className="text-gray-400">Countries</p>
+                    <p className="text-2xl font-bold">87</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <MessageCircle className="w-6 h-6 text-purple-500" />
+                  <div>
+                    <p className="text-gray-400">Active Discussions</p>
+                    <p className="text-2xl font-bold">1,234</p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -838,31 +943,8 @@ const CommunityPage = () => {
                 {events.map((event) => (
                   <div
                     key={event.id}
-                    className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 transform hover:scale-105 transition-transform duration-1000"
+                    className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 transform hover:scale-105 transition-transform duration-1000 relative"
                   >
-                    <h2 className="text-lg font-bold mb-4">{event.name}</h2>
-                    <p className="text-gray-500 dark:text-gray-400 mb-4">
-                      {event.description
-                        ? event.description
-                            .substring(0, 100)
-                            .trim()
-                            .concat("...")
-                        : "Join this exciting community event!"}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-5 h-5" />
-                        <span>
-                          {new Date(event.startTime).toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Users className="w-5 h-5" />
-                        <span>
-                          {event.currentParticipants} / {event.maxParticipants}
-                        </span>
-                      </div>
-                    </div>
                     <div className="absolute top-4 right-4">
                       <span
                         className={`text-xs px-2 py-1 rounded-full ${
@@ -884,13 +966,99 @@ const CommunityPage = () => {
                           : "Past"}
                       </span>
                     </div>
+
+                    <h2 className="text-lg font-bold mb-2 pr-16">
+                      {event.name}
+                    </h2>
+
+                    {/* Event Type Badge */}
+                    <div className="inline-block mb-3">
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full ${
+                          event.isOnline
+                            ? "bg-purple-100 text-purple-800"
+                            : "bg-orange-100 text-orange-800"
+                        }`}
+                      >
+                        {event.isOnline ? "Online" : "Physical"}
+                      </span>
+                    </div>
+
+                    {/* Additional Details */}
+                    <p className="text-gray-500 dark:text-gray-400 mb-4">
+                      {event.additionalDetails
+                        ? event.additionalDetails
+                            .substring(0, 100)
+                            .trim()
+                            .concat(
+                              event.additionalDetails.length > 100 ? "..." : ""
+                            )
+                        : "Join this exciting community event!"}
+                    </p>
+
+                    {/* Location */}
+                    <div className="flex items-start gap-2 mb-3">
+                      <div className="mt-0.5">
+                        {event.isOnline ? (
+                          <Globe className="w-5 h-5 text-blue-500" />
+                        ) : (
+                          <MapPin className="w-5 h-5 text-red-500" />
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-300 overflow-hidden text-ellipsis">
+                        {event.location ||
+                          (event.isOnline ? "Online meeting" : "Location TBD")}
+                      </p>
+                    </div>
+
+                    {/* Date and Participants */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-5 h-5 text-gray-500" />
+                        <div className="flex flex-col">
+                          <span className="text-sm">
+                            {new Date(event.startTime).toLocaleDateString()}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(event.startTime).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Users className="w-5 h-5 text-gray-500" />
+                        <span className="text-sm">
+                          {event.currentParticipants} / {event.maxParticipants}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Join Button */}
                     <button
                       onClick={() => handleParticipateInEvent(event.id)}
-                      disabled={participateLoading}
-                      className="mt-4 w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-cyan-950 font-medium rounded-lg transition-colors duration-300 flex items-center justify-center"
+                      disabled={
+                        participateLoading ||
+                        getEventStatus(event.startTime, event.endTime) ===
+                          "past" ||
+                        event.currentParticipants >= event.maxParticipants
+                      }
+                      className={`mt-2 w-full py-2 px-4 font-medium rounded-lg transition-colors duration-300 flex items-center justify-center
+          ${
+            getEventStatus(event.startTime, event.endTime) === "past" ||
+            event.currentParticipants >= event.maxParticipants
+              ? "bg-gray-300 text-gray-700 dark:bg-gray-700 dark:text-gray-300 cursor-not-allowed"
+              : "bg-yellow-500 hover:bg-yellow-600 text-cyan-950"
+          }`}
                     >
                       {participateLoading ? (
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
+                      ) : getEventStatus(event.startTime, event.endTime) ===
+                        "past" ? (
+                        <>Event Ended</>
+                      ) : event.currentParticipants >= event.maxParticipants ? (
+                        <>Event Full</>
                       ) : (
                         <>Join Event</>
                       )}
