@@ -31,6 +31,7 @@ import { useEthersSigner } from "../components/useClientSigner";
 import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
 import { useCommunityEvents } from "../contexts/communityEventsContext";
 import { useCommunityMembers } from "../contexts/communityMembersContext";
+import RewardsSection from "../components/RewardsSection";
 
 const Community_ABI = CommunityABI.abi;
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
@@ -68,7 +69,6 @@ const CommunityPage = () => {
     useState(false);
   const [fundProjectLoading, setFundProjectLoading] = useState(false);
   const [participateLoading, setParticipateLoading] = useState(false);
-  const [claimRewardsLoading, setClaimRewardsLoading] = useState(false);
   const [joinCommunityLoading, setJoinCommunityLoading] = useState(false);
 
   const { events, fetchEvents } = useCommunityEvents();
@@ -76,12 +76,10 @@ const CommunityPage = () => {
 
   useEffect(() => {
     fetchEvents();
-    console.log("Events2: ", events);
   }, [events]);
 
   useEffect(() => {
     fetchMembers();
-    console.log("Members2: ", members);
   }, [members]);
 
   console.log("Events: ", events);
@@ -317,41 +315,6 @@ const CommunityPage = () => {
     }
   };
 
-  // Handle Claim Badge Rewards
-  const handleClaimRewards = async () => {
-    if (!isConnected) {
-      openConnectModal();
-      return;
-    }
-
-    setClaimRewardsLoading(true);
-
-    try {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
-
-      const tx = await contract.claimBadgeRewards();
-      await tx.wait();
-
-      toast.success("Badge rewards claimed successfully!");
-    } catch (error) {
-      console.error("Error claiming rewards:", error);
-      toast.error("Failed to claim rewards");
-    }
-  };
-
-  useEffect(() => {
-    if (badgeData !== undefined) {
-      // Badge levels are 0-based in the contract (enum)
-      const badgeLevels = ["BRONZE", "SILVER", "GOLD", "PLATINUM"];
-      setUserBadge(badgeLevels[Number(badgeData)] || "NONE");
-    }
-  }, [badgeData]);
-
   const getEventStatus = (startTime, endTime) => {
     const now = Date.now();
     if (now < startTime) return "upcoming";
@@ -397,22 +360,6 @@ const CommunityPage = () => {
       timestamp: "1d ago",
     },
   ];
-
-  // Badge icon based on level
-  const getBadgeIcon = (level) => {
-    switch (level) {
-      case "BRONZE":
-        return <FaMedal className="w-6 h-6 text-amber-600" />;
-      case "SILVER":
-        return <FaMedal className="w-6 h-6 text-gray-400" />;
-      case "GOLD":
-        return <FaMedal className="w-6 h-6 text-yellow-400" />;
-      case "PLATINUM":
-        return <FaTrophy className="w-6 h-6 text-cyan-400" />;
-      default:
-        return <Award className="w-6 h-6 text-gray-500" />;
-    }
-  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -782,30 +729,15 @@ const CommunityPage = () => {
               Fund Project
             </button>
 
-            <button
-              onClick={handleClaimRewards}
-              disabled={claimRewardsLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-cyan-950 rounded-lg transition-colors duration-300"
-            >
-              {claimRewardsLoading ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
-              ) : (
-                <>
-                  <Award className="w-5 h-5" />
-                  Claim Badge Rewards
-                </>
-              )}
-            </button>
-
-            {/* join community button */}
+            {/* Join community button */}
             <button
               onClick={handleJoinCommunity}
               disabled={joinCommunityLoading || members.includes(address)}
               className={`flex items-end justify-end gap-2 px-4 py-2 ${
                 members.includes(address)
-                  ? "bg-green-300 cursor-not-allowed"
-                  : "bg-green-500 hover:bg-green-600"
-              } text-white rounded-lg transition-colors duration-300`}
+                  ? "bg-yellow-300 cursor-not-allowed"
+                  : "bg-yellow-500 hover:bg-yellow-600"
+              } text-gray-800 rounded-lg transition-colors duration-300`}
             >
               {joinCommunityLoading ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
@@ -1070,119 +1002,7 @@ const CommunityPage = () => {
           </div>
         )}
 
-        {activeTab === "rewards" && (
-          <div className={`space-y-6 ${fadeIn}`}>
-            <h2 className="text-2xl font-bold">Community Rewards & Badges</h2>
-
-            {/* Current Badge Status */}
-            <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-xl shadow-lg p-6 mb-6 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-bold mb-2">Your Badge</h3>
-                  <div className="flex items-center gap-3">
-                    {getBadgeIcon(userBadge)}
-                    <span className="text-2xl">
-                      {userBadge || "No Badge Yet"}
-                    </span>
-                  </div>
-                  <p className="text-gray-300 mt-2">
-                    Keep participating to level up your badge!
-                  </p>
-                </div>
-
-                <button
-                  onClick={handleClaimRewards}
-                  disabled={claimRewardsLoading || !isConnected}
-                  className="py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-cyan-950 rounded-lg transition-colors duration-300 flex items-center gap-2"
-                >
-                  {claimRewardsLoading ? (
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
-                  ) : (
-                    <>
-                      <Award className="w-5 h-5" />
-                      Claim Rewards
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Badge Levels */}
-            <div className="grid md:grid-cols-4 gap-4">
-              {[
-                {
-                  level: "BRONZE",
-                  icon: <FaMedal className="w-8 h-8 text-amber-600" />,
-                  requirement: "10+ Participation Points",
-                },
-                {
-                  level: "SILVER",
-                  icon: <FaMedal className="w-8 h-8 text-gray-400" />,
-                  requirement: "50+ Participation Points",
-                },
-                {
-                  level: "GOLD",
-                  icon: <FaMedal className="w-8 h-8 text-yellow-400" />,
-                  requirement: "100+ Participation Points",
-                },
-                {
-                  level: "PLATINUM",
-                  icon: <FaTrophy className="w-8 h-8 text-cyan-400" />,
-                  requirement: "250+ Participation Points",
-                },
-              ].map((badge) => (
-                <div
-                  key={badge.level}
-                  className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 transition-all duration-300 ${
-                    userBadge === badge.level ? "ring-2 ring-yellow-500" : ""
-                  }`}
-                >
-                  <div className="flex flex-col items-center text-center">
-                    {badge.icon}
-                    <h3 className="mt-2 font-bold">{badge.level}</h3>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {badge.requirement}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Benefits List */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 mt-6">
-              <h3 className="text-xl font-bold mb-4">Badge Benefits</h3>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <Sparkles className="w-5 h-5 text-yellow-500 mt-1" />
-                  <div>
-                    <p className="font-medium">Exclusive Access</p>
-                    <p className="text-sm text-gray-500">
-                      Access to special events and content
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Coins className="w-5 h-5 text-yellow-500 mt-1" />
-                  <div>
-                    <p className="font-medium">Token Rewards</p>
-                    <p className="text-sm text-gray-500">
-                      Regular LMS token distributions
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Zap className="w-5 h-5 text-yellow-500 mt-1" />
-                  <div>
-                    <p className="font-medium">Governance Power</p>
-                    <p className="text-sm text-gray-500">
-                      Higher voting weight in community decisions
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {activeTab === "rewards" && <RewardsSection />}
 
         {activeTab === "projects" && (
           <div className={`space-y-6 ${fadeIn}`}>
