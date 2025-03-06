@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Trophy,
   Medal,
@@ -11,11 +11,51 @@ import {
   Moon,
   Sun,
   BadgeCheck,
+  Calendar,
+  MapPin,
+  Globe2,
+  Users,
 } from "lucide-react";
 import { useCertificates } from "../contexts/certificatesContext";
 import Certificate from "../components/Certificate";
 import { CSSTransition } from "react-transition-group";
 import "../index.css";
+import { useCommunityMembers } from "../contexts/communityMembersContext";
+import { useAccount } from "wagmi";
+import { useCommunityEvents } from "../contexts/communityEventsContext";
+
+const BADGE_DISPLAY_MAP = {
+  0: {
+    name: "Newcomer",
+    icon: <Medal className="w-8 h-8 text-gray-400" />,
+    color: "bg-gray-100 dark:bg-gray-800",
+    requirements: "No participation yet",
+  },
+  1: {
+    name: "Participant",
+    icon: <Medal className="w-8 h-8 text-amber-600" />,
+    color: "bg-amber-50 dark:bg-amber-900/20",
+    requirements: "1+ Event Participation",
+  },
+  2: {
+    name: "Contributor",
+    icon: <Medal className="w-8 h-8 text-gray-500" />,
+    color: "bg-gray-100 dark:bg-gray-800",
+    requirements: "3+ Event Participation",
+  },
+  3: {
+    name: "Leader",
+    icon: <Trophy className="w-8 h-8 text-yellow-600" />,
+    color: "bg-yellow-50 dark:bg-yellow-900/20",
+    requirements: "5+ Event Participation",
+  },
+  4: {
+    name: "Champion",
+    icon: <Trophy className="w-8 h-8 text-cyan-600" />,
+    color: "bg-cyan-50 dark:bg-cyan-900/20",
+    requirements: "10+ Event Participation",
+  },
+};
 
 const AchievementsPage = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -23,6 +63,27 @@ const AchievementsPage = () => {
   const [selectedCertificate, setSelectedCertificate] = useState(null);
   const [showPopup, setShowPopup] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const [userBadge, setUserBadge] = useState(null);
+  const { memberBadgeDetails, fetchMemberBadgeDetails } = useCommunityMembers();
+  const { address, isConnected } = useAccount();
+  const currentBadgeLevel = memberBadgeDetails?.currentBadge || 0;
+  const badgeInfo = BADGE_DISPLAY_MAP[currentBadgeLevel];
+  const { events, fetchEvents } = useCommunityEvents();
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [showEventPopup, setShowEventPopup] = useState(false);
+  const { members, fetchMembers } = useCommunityMembers();
+
+  useEffect(() => {
+    fetchEvents();
+    fetchMemberBadgeDetails(address);
+    if (memberBadgeDetails) {
+      // Use the currentBadge from the contract's badge details
+      setUserBadge(memberBadgeDetails.currentBadge);
+    }
+  }, [memberBadgeDetails, events]);
+
+  console.log("Member Badge Details: ", memberBadgeDetails);
 
   const handleCertificateClick = (cert) => {
     setLoading(true);
@@ -37,31 +98,6 @@ const AchievementsPage = () => {
   };
 
   console.log("certificates", certificates);
-
-  // Sample data for achievements
-  const communityBadges = [
-    {
-      name: "Genesis Contributor",
-      description: "Participated in first community event",
-      date: "Jan 15, 2024",
-      icon: <Flag className="w-6 h-6" />,
-      rarity: "Legendary",
-    },
-    {
-      name: "Web3 Warrior",
-      description: "Completed 5 blockchain courses",
-      date: "Feb 22, 2024",
-      icon: <Layers className="w-6 h-6" />,
-      rarity: "Epic",
-    },
-    {
-      name: "Community Champion",
-      description: "Hosted first community workshop",
-      date: "Mar 10, 2024",
-      icon: <Globe className="w-6 h-6" />,
-      rarity: "Rare",
-    },
-  ];
 
   const abytkns = [
     {
@@ -84,29 +120,17 @@ const AchievementsPage = () => {
     },
   ];
 
-  const communityEvents = [
-    {
-      eventName: "Blockchain Hackathon 2024",
-      type: "Participated",
-      date: "Feb 10, 2024",
-      status: "Completed",
-      cert_issuer: "ABYA UNIVERSITY",
-    },
-    {
-      eventName: "Web3 Security Workshop",
-      type: "Planned",
-      date: "Apr 15, 2024",
-      status: "Upcoming",
-      cert_issuer: "ABYA UNIVERSITY",
-    },
-    {
-      eventName: "Blockchain Roadtirp",
-      type: "Planned",
-      date: "Apr 19, 2025",
-      status: "To Attend",
-      cert_issuer: "ABYA UNIVERSITY",
-    },
-  ];
+  function handleEventDetailsClick(event) {
+    setSelectedEvent(event);
+    setShowEventPopup(true);
+  }
+
+  const getEventStatus = (startTime, endTime) => {
+    const now = Date.now();
+    if (now < startTime) return "upcoming";
+    if (now > endTime) return "past";
+    return "ongoing";
+  };
 
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
@@ -161,167 +185,184 @@ const AchievementsPage = () => {
         {/* Achievements Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Community Badges */}
-          <div
-            className="
-            p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border border-gray-200"
-          >
+          <div className="p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border border-gray-200 overflow-hidden flex flex-col">
             <div className="flex items-center mb-4">
-              <Trophy
-                className="
-                w-8 h-8 mr-3
-                dark:text-yellow-400 text-yellow-500"
-              />
-              <h2
-                className="
-                text-xl font-semibold
-                dark:text-white text-gray-900"
-              >
+              <Trophy className="w-8 h-8 mr-3 dark:text-yellow-400 text-yellow-500" />
+              <h2 className="text-xl font-semibold dark:text-white text-gray-900">
                 Community Badges
               </h2>
             </div>
-            <div className="space-y-4">
-              {communityBadges.map((badge, index) => (
-                <div
-                  key={index}
-                  className="
-                    p-4 rounded-lg flex items-center justify-between
-                    dark:bg-gray-700 bg-gray-100"
-                >
-                  <div className="flex items-center">
+            <div className="overflow-y-auto pr-2 custom-scrollbar h-96">
+              <div className="grid gap-4">
+                {Object.entries(BADGE_DISPLAY_MAP).map(([level, badge]) => {
+                  const levelNum = parseInt(level);
+                  const isUnlocked =
+                    levelNum <= currentBadgeLevel && members.includes(address);
+                  const isCurrentBadge =
+                    levelNum === currentBadgeLevel && members.includes(address);
+
+                  return (
                     <div
-                      className="
-                      p-2 rounded-full mr-3 dark:bg-yellow-500 dark:text-white bg-yellow-500 bg-opacity-20 text-yellow-600"
+                      key={level}
+                      className={`
+                ${badge.color}
+                rounded-xl p-5 border
+                ${
+                  isUnlocked
+                    ? "border-green-500/50 dark:border-green-500/30"
+                    : "border-gray-200 dark:border-gray-700"
+                }
+                ${isCurrentBadge ? "ring-2 ring-yellow-500" : ""}
+                ${isUnlocked ? "opacity-100" : "opacity-50"}
+                transition-all duration-300 transform hover:scale-102 hover:shadow-md
+              `}
                     >
-                      {badge.icon}
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-shrink-0">{badge.icon}</div>
+                        <div className="flex-1 min-w-0">
+                          <h3
+                            className={`font-bold truncate text-lg ${
+                              isCurrentBadge ? "text-yellow-600" : ""
+                            }`}
+                          >
+                            {badge.name}
+                          </h3>
+                          <p className="text-sm text-gray-500 mt-1">
+                            {badge.requirements}
+                          </p>
+                          {isUnlocked && (
+                            <div className="mt-2 text-green-600 flex items-center">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-5 w-5 mr-1"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                              Unlocked
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p
-                        className="
-                        font-medium
-                        dark:text-white text-gray-900"
-                      >
-                        {badge.name}
-                      </p>
-                      <p
-                        className="
-                        text-xs
-                        dark:text-gray-400 text-gray-600"
-                      >
-                        {badge.date}
-                      </p>
-                    </div>
-                  </div>
-                  <RarityBadge rarity={badge.rarity} />
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
           </div>
 
           {/* ABYTKN Tokens */}
-          <div
-            className="
-            p-6 rounded-xl shadow-lg 
-                dark:bg-gray-800 dark:border-gray-700 bg-white border border-gray-200"
-          >
+          <div className="p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border border-gray-200 flex flex-col">
             <div className="flex items-center mb-4">
-              <Star
-                className="
-                w-8 h-8 mr-3
-                dark:text-yellow-400 text-yellow-500"
-              />
-              <h2
-                className="
-                text-xl font-semibold
-                dark:text-white text-gray-900"
-              >
+              <Star className="w-8 h-8 mr-3 dark:text-yellow-400 text-yellow-500" />
+              <h2 className="text-xl font-semibold dark:text-white text-gray-900">
                 ABYTKN Tokens
               </h2>
             </div>
-            <div className="space-y-4">
-              {abytkns.map((token, index) => (
-                <div
-                  key={index}
-                  className="
-                    p-4 rounded-lg flex items-center justify-between
-                    dark:bg-gray-700 bg-gray-100"
-                >
-                  <div>
-                    <p
-                      className="
-                      font-medium
-                      dark:text-white text-gray-900"
-                    >
-                      {token.name}
-                    </p>
-                    <p
-                      className="
-                      text-sm
-                      dark:text-gray-400 text-gray-600"
-                    >
-                      {token.value}
-                    </p>
-                  </div>
-                  <span
-                    className={`
-                    px-3 py-1 rounded-full text-xs font-medium
-                    ${
-                      token.status === "Claimed"
-                        ? "bg-green-500 bg-opacity-20 text-green-500"
-                        : "bg-yellow-500 bg-opacity-20 text-yellow-500"
-                    }
-                  `}
+            <div className="overflow-y-auto pr-2 custom-scrollbar h-96">
+              <div className="space-y-3">
+                {abytkns.map((token, index) => (
+                  <div
+                    key={index}
+                    className="p-4 rounded-lg dark:bg-gray-700 bg-gray-50 hover:bg-gray-100 dark:hover:bg-gray-650 transition-colors duration-200 border border-gray-200 dark:border-gray-600"
                   >
-                    {token.status}
-                  </span>
-                </div>
-              ))}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium dark:text-white text-gray-900 text-lg">
+                          {token.name}
+                        </p>
+                        <div className="flex items-center mt-1">
+                          <span className="text-sm dark:text-yellow-300 text-yellow-600 font-semibold">
+                            {token.value}
+                          </span>
+                        </div>
+                      </div>
+                      <span
+                        className={`
+                  px-3 py-1 rounded-full text-xs font-medium
+                  ${
+                    token.status === "Claimed"
+                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+                      : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
+                  }
+                `}
+                      >
+                        {token.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Certificates */}
-          <div className="p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border border-gray-200">
+          <div className="p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border border-gray-200 flex flex-col">
             <div className="flex items-center mb-4">
               <Medal className="w-8 h-8 mr-3 dark:text-yellow-400 text-yellow-500" />
               <h2 className="text-xl font-semibold dark:text-white text-gray-900">
                 Certificates
               </h2>
             </div>
-            <div className="space-y-4">
-              {certificates.length === 0 ? (
-                <div className="text-gray-500 text-center">
-                  No certificates yet!
-                </div>
-              ) : (
-                certificates.map((cert, index) => (
-                  <div
-                    key={index}
-                    className="p-4 bg-white dark:bg-gray-700 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 cursor-pointer mb-4"
-                    onClick={() => handleCertificateClick(cert)}
-                  >
-                    <div className="flex items-center">
-                      <div className="mr-4 text-2xl text-blue-600">
-                        <BadgeCheck />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3
-                          className="text-lg font-normal text-gray-800 dark:text-gray-50 truncate"
-                          title={cert.courseName}
-                        >
-                          {cert.courseName}
-                        </h3>
-                        <p className="text-gray-600 text-sm dark:text-gray-400">
-                          {cert.cert_issuer}
-                        </p>
-                      </div>
-                      <div className="ml-4 text-sm text-gray-500">
-                        {new Date(
-                          Number(cert.issue_date) * 1000
-                        ).toLocaleDateString()}
+            <div className="overflow-y-auto pr-2 custom-scrollbar h-96">
+              <div className="space-y-3">
+                {certificates.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full py-10 text-gray-500">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-16 w-16 mb-4 text-gray-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V7a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    <p>No certificates yet!</p>
+                  </div>
+                ) : (
+                  certificates.map((cert, index) => (
+                    <div
+                      key={index}
+                      className="p-4 bg-white dark:bg-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer border border-gray-200 dark:border-gray-600"
+                      onClick={() => handleCertificateClick(cert)}
+                    >
+                      <div className="flex items-center">
+                        <div className="mr-4 text-2xl text-blue-600 dark:text-blue-400">
+                          <BadgeCheck />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3
+                            className="text-lg font-medium text-gray-800 dark:text-gray-50 truncate"
+                            title={cert.courseName}
+                          >
+                            {cert.courseName}
+                          </h3>
+                          <div className="flex justify-between items-center mt-1">
+                            <p className="text-gray-600 text-sm dark:text-gray-400">
+                              {cert.cert_issuer}
+                            </p>
+                            <div className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-600 dark:text-gray-300 px-2 py-1 rounded-full">
+                              {new Date(
+                                Number(cert.issue_date) * 1000
+                              ).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
           </div>
 
@@ -336,7 +377,7 @@ const AchievementsPage = () => {
               <div className="relative bg-white rounded-lg max-w-7xl w-full max-h-[87vh] overflow-auto p-8 shadow-lg">
                 <button
                   onClick={handleClosePopup}
-                  className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10"
+                  className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10 bg-white rounded-full p-1"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -366,66 +407,317 @@ const AchievementsPage = () => {
           </CSSTransition>
 
           {/* Community Events */}
-          <div
-            className="
-            p-6 rounded-xl shadow-lg 
-            dark:bg-gray-800 dark:border-gray-700 bg-white border border-gray-200"
-          >
+          <div className="p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border border-gray-200 flex flex-col">
             <div className="flex items-center mb-4">
-              <Globe
-                className="
-                w-8 h-8 mr-3
-                dark:text-yellow-400 text-yellow-500"
-              />
-              <h2
-                className="
-                text-xl font-semibold
-                dark:text-white text-gray-900"
-              >
+              <Globe className="w-8 h-8 mr-3 dark:text-yellow-400 text-yellow-500" />
+              <h2 className="text-xl font-semibold dark:text-white text-gray-900">
                 Community Events
               </h2>
             </div>
-            <div className="space-y-4">
-              {communityEvents.map((event, index) => (
-                <div
-                  key={index}
-                  className="
-                    p-4 rounded-lg flex items-center justify-between"
-                >
-                  <div>
-                    <p
-                      className="
-                      font-medium
-                      dark:text-white text-gray-900"
+            <div className="overflow-y-auto pr-2 custom-scrollbar h-96">
+              <div className="space-y-4">
+                {events?.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full py-10 text-gray-500">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-16 w-16 mb-4 text-gray-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
                     >
-                      {event.eventName}
-                    </p>
-                    <p
-                      className="
-                      text-xs
-                      dark:text-gray-400 text-gray-600"
-                    >
-                      {event.type}
-                    </p>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1}
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                    <p>No events yet!</p>
                   </div>
-                  <span
-                    className={`
-                    px-3 py-1 rounded-full text-xs font-medium
-                    ${
-                      event.status === "Completed"
-                        ? "bg-green-500 bg-opacity-20 text-green-500"
-                        : event.status === "Upcoming"
-                        ? "bg-blue-500 bg-opacity-20 text-blue-500"
-                        : "bg-gray-500 bg-opacity-20 text-gray-500"
-                    }
-                  `}
-                  >
-                    {event.status}
-                  </span>
-                </div>
-              ))}
+                ) : (
+                  events.map((event) => (
+                    <div
+                      key={event.id}
+                      className="bg-white dark:bg-gray-700 rounded-xl shadow-sm hover:shadow-md p-4 border border-gray-200 dark:border-gray-600 transition-all duration-300"
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <h2 className="text-lg font-bold truncate pr-16">
+                          {event.name}
+                        </h2>
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            getEventStatus(event.startTime, event.endTime) ===
+                            "upcoming"
+                              ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+                              : getEventStatus(
+                                  event.startTime,
+                                  event.endTime
+                                ) === "ongoing"
+                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+                              : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-300"
+                          }`}
+                        >
+                          {getEventStatus(event.startTime, event.endTime) ===
+                          "upcoming"
+                            ? "Upcoming"
+                            : getEventStatus(event.startTime, event.endTime) ===
+                              "ongoing"
+                            ? "Ongoing"
+                            : "Past"}
+                        </span>
+                      </div>
+
+                      {/* Event Type Badge */}
+                      <div className="mb-3">
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            event.isOnline
+                              ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
+                              : "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300"
+                          }`}
+                        >
+                          {event.isOnline ? "Online" : "Physical"}
+                        </span>
+                      </div>
+
+                      {/* Important Details */}
+                      <div className="flex items-center space-x-2 mb-3">
+                        <Calendar className="w-4 h-4 text-gray-500" />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                          {new Date(event.startTime).toLocaleDateString()} at{" "}
+                          {new Date(event.startTime).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center space-x-2 mb-4">
+                        {event.isOnline ? (
+                          <Globe2 className="w-4 h-4 text-blue-500" />
+                        ) : (
+                          <MapPin className="w-4 h-4 text-red-500" />
+                        )}
+                        <span className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                          {event.location ||
+                            (event.isOnline
+                              ? "Online meeting"
+                              : "Location TBD")}
+                        </span>
+                      </div>
+
+                      {/* More Details Button */}
+                      <button
+                        onClick={() => handleEventDetailsClick(event)}
+                        className="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-lg transition-colors duration-200 text-sm font-medium flex items-center justify-center"
+                      >
+                        <span>View Details</span>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4 ml-2"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Event Details Popup */}
+          <CSSTransition
+            in={showEventPopup}
+            timeout={300}
+            classNames="popup"
+            unmountOnExit
+          >
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 overflow-auto">
+              <div className="relative bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-auto p-6 shadow-lg">
+                <button
+                  onClick={() => setShowEventPopup(false)}
+                  className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 z-10 bg-white dark:bg-gray-700 rounded-full p-1"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+
+                {selectedEvent && (
+                  <div className="pt-2">
+                    <div className="flex justify-between items-start mb-4">
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {selectedEvent.name}
+                      </h2>
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full ${
+                          getEventStatus(
+                            selectedEvent.startTime,
+                            selectedEvent.endTime
+                          ) === "upcoming"
+                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+                            : getEventStatus(
+                                selectedEvent.startTime,
+                                selectedEvent.endTime
+                              ) === "ongoing"
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+                            : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-300"
+                        }`}
+                      >
+                        {getEventStatus(
+                          selectedEvent.startTime,
+                          selectedEvent.endTime
+                        ) === "upcoming"
+                          ? "Upcoming"
+                          : getEventStatus(
+                              selectedEvent.startTime,
+                              selectedEvent.endTime
+                            ) === "ongoing"
+                          ? "Ongoing"
+                          : "Past"}
+                      </span>
+                    </div>
+
+                    {/* Event Type */}
+                    <div className="mb-6">
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full ${
+                          selectedEvent.isOnline
+                            ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
+                            : "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300"
+                        }`}
+                      >
+                        {selectedEvent.isOnline ? "Online" : "Physical"}
+                      </span>
+                    </div>
+
+                    {/* Date and Time */}
+                    <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-6">
+                      <div className="flex items-start space-x-3 mb-4">
+                        <Calendar className="w-5 h-5 text-blue-500 mt-0.5" />
+                        <div>
+                          <h3 className="font-medium text-gray-900 dark:text-white">
+                            Date & Time
+                          </h3>
+                          <p className="text-gray-600 dark:text-gray-300 mt-1">
+                            {new Date(
+                              selectedEvent.startTime
+                            ).toLocaleDateString()}{" "}
+                            at{" "}
+                            {new Date(
+                              selectedEvent.startTime
+                            ).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                            {" - "}
+                            {new Date(
+                              selectedEvent.endTime
+                            ).toLocaleDateString()}{" "}
+                            at{" "}
+                            {new Date(selectedEvent.endTime).toLocaleTimeString(
+                              [],
+                              {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              }
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Location */}
+                      <div className="flex items-start space-x-3 mb-4">
+                        {selectedEvent.isOnline ? (
+                          <Globe className="w-5 h-5 text-blue-500 mt-0.5" />
+                        ) : (
+                          <MapPin className="w-5 h-5 text-red-500 mt-0.5" />
+                        )}
+                        <div>
+                          <h3 className="font-medium text-gray-900 dark:text-white">
+                            Location
+                          </h3>
+                          <p className="text-gray-600 dark:text-gray-300 mt-1">
+                            {selectedEvent.location ||
+                              (selectedEvent.isOnline
+                                ? "Online meeting"
+                                : "Location TBD")}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Participants */}
+                      <div className="flex items-start space-x-3">
+                        <Users className="w-5 h-5 text-green-500 mt-0.5" />
+                        <div>
+                          <h3 className="font-medium text-gray-900 dark:text-white">
+                            Participants
+                          </h3>
+                          <p className="text-gray-600 dark:text-gray-300 mt-1">
+                            {selectedEvent.currentParticipants} /{" "}
+                            {selectedEvent.maxParticipants} participants
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <div className="mb-6">
+                      <h3 className="font-medium text-gray-900 dark:text-white mb-2">
+                        Details
+                      </h3>
+                      <p className="text-gray-600 dark:text-gray-300 whitespace-pre-line">
+                        {selectedEvent.additionalDetails ||
+                          "No additional details available."}
+                      </p>
+                    </div>
+
+                    {/* Action buttons */}
+                    {getEventStatus(
+                      selectedEvent.startTime,
+                      selectedEvent.endTime
+                    ) !== "past" && (
+                      <div className="flex space-x-4">
+                        <button className="flex-1 py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors duration-200 font-medium">
+                          Join Event
+                        </button>
+                        {selectedEvent.currentParticipants <
+                          selectedEvent.maxParticipants &&
+                          getEventStatus(
+                            selectedEvent.startTime,
+                            selectedEvent.endTime
+                          ) === "upcoming" && (
+                            <button className="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium">
+                              Register
+                            </button>
+                          )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </CSSTransition>
         </div>
       </div>
     </div>

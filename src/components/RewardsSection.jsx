@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Award, Coins, Sparkles, Zap } from "lucide-react";
+import { Award, CircleSlash2, Coins, Sparkles, Zap } from "lucide-react";
 import { Trophy, Medal } from "lucide-react";
 import { useCommunityMembers } from "../contexts/communityMembersContext";
 import { useAccount } from "wagmi";
@@ -40,7 +40,8 @@ const BADGE_DISPLAY_MAP = {
 
 const RewardsSection = () => {
   const [userBadge, setUserBadge] = useState(null);
-  const { memberBadgeDetails, fetchMemberBadgeDetails } = useCommunityMembers();
+  const { memberBadgeDetails, fetchMemberBadgeDetails, members } =
+    useCommunityMembers();
   const { address, isConnected } = useAccount();
 
   useEffect(() => {
@@ -90,8 +91,29 @@ const RewardsSection = () => {
           <div>
             <h3 className="text-xl font-bold mb-2">Your Badge</h3>
             <div className="flex items-center gap-3">
-              {badgeInfo.icon}
-              <span className="text-2xl">{badgeInfo.name}</span>
+              {members.includes(address) ? (
+                badgeInfo.icon
+              ) : (
+                <CircleSlash2 className="w-8 h-8 text-gray-400" />
+              )}
+              <span className="text-2xl">
+                {members.includes(address) ? (
+                  badgeInfo.name // Display badge name if the user is a member
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-gray-500">Locked</span>{" "}
+                    {/* Locked indicator */}
+                    <div className="animate-pulse bg-red-50 border-2 border-red-500 rounded-lg p-3 shadow-lg">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-red-500 rounded-full animate-ping"></div>
+                        <span className="text-sm font-bold text-red-600">
+                          You need to join the community to unlock badges.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </span>
             </div>
             <p className="text-gray-300 mt-2">
               Current Level: {badgeInfo.requirements}
@@ -125,8 +147,10 @@ const RewardsSection = () => {
       <div className="grid md:grid-cols-5 gap-4">
         {Object.entries(BADGE_DISPLAY_MAP).map(([level, badge]) => {
           const levelNum = parseInt(level);
-          const isUnlocked = levelNum <= currentBadgeLevel;
-          const isCurrentBadge = levelNum === currentBadgeLevel;
+          const isUnlocked =
+            levelNum <= currentBadgeLevel && members.includes(address);
+          const isCurrentBadge =
+            levelNum === currentBadgeLevel && members.includes(address);
 
           return (
             <div

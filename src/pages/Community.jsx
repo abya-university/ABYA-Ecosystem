@@ -21,6 +21,8 @@ import {
   MapPin,
   Merge,
   Check,
+  GiftIcon,
+  Badge,
 } from "lucide-react";
 import { FaMedal, FaGem, FaTrophy } from "react-icons/fa";
 import { toast, ToastContainer } from "react-toastify";
@@ -32,6 +34,7 @@ import CommunityABI from "../artifacts/contracts/Community Contracts/Community.s
 import { useCommunityEvents } from "../contexts/communityEventsContext";
 import { useCommunityMembers } from "../contexts/communityMembersContext";
 import RewardsSection from "../components/RewardsSection";
+import { useUser } from "../contexts/userContext";
 
 const Community_ABI = CommunityABI.abi;
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
@@ -73,10 +76,11 @@ const CommunityPage = () => {
 
   const { events, fetchEvents } = useCommunityEvents();
   const { members, fetchMembers } = useCommunityMembers();
+  const { role } = useUser();
 
   useEffect(() => {
     fetchEvents();
-  }, [events]);
+  }, []);
 
   useEffect(() => {
     fetchMembers();
@@ -702,58 +706,71 @@ const CommunityPage = () => {
         </div>
 
         {/* Action Buttons */}
-        {isConnected && (
-          <div className="flex flex-wrap gap-3 mb-8">
-            <button
-              onClick={() => setShowCreateEventModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-300"
-            >
-              <Calendar className="w-5 h-5" />
-              Create Event
-            </button>
+        <div className="relative flex flex-wrap items-center justify-between mb-8">
+          {isConnected && (
+            <>
+              <div className="flex flex-wrap gap-3">
+                {(role === "ADMIN" ||
+                  role === "Community Manager" ||
+                  role === "Reviewer") && (
+                  <>
+                    <button
+                      onClick={() => setShowCreateEventModal(true)}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-300 shadow-sm hover:shadow-md font-medium"
+                    >
+                      <Calendar className="w-5 h-5" />
+                      Create Event
+                    </button>
 
-            {/* Only show admin actions if needed */}
-            <button
-              onClick={() => setShowAirdropModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors duration-300"
-            >
-              <Gift className="w-5 h-5" />
-              Distribute Airdrops
-            </button>
+                    <button
+                      onClick={() => setShowAirdropModal(true)}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-all duration-300 shadow-sm hover:shadow-md font-medium"
+                    >
+                      <GiftIcon className="w-5 h-5" />
+                      Distribute Airdrops
+                    </button>
 
-            <button
-              onClick={() => setShowProjectFundingModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors duration-300"
-            >
-              <Coins className="w-5 h-5" />
-              Fund Project
-            </button>
+                    <button
+                      onClick={() => setShowProjectFundingModal(true)}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all duration-300 shadow-sm hover:shadow-md font-medium"
+                    >
+                      <Coins className="w-5 h-5" />
+                      Fund Project
+                    </button>
+                  </>
+                )}
+              </div>
 
-            {/* Join community button */}
-            <button
-              onClick={handleJoinCommunity}
-              disabled={joinCommunityLoading || members.includes(address)}
-              className={`flex items-end justify-end gap-2 px-4 py-2 ${
-                members.includes(address)
-                  ? "bg-yellow-300 cursor-not-allowed"
-                  : "bg-yellow-500 hover:bg-yellow-600"
-              } text-gray-800 rounded-lg transition-colors duration-300`}
-            >
-              {joinCommunityLoading ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
-              ) : (
-                <>
-                  {members.includes(address) ? (
-                    <Check className="w-5 h-5" />
-                  ) : (
-                    <Merge className="w-5 h-5" />
-                  )}
-                  {members.includes(address) ? "Joined" : "Join Community"}
-                </>
-              )}
-            </button>
-          </div>
-        )}
+              {/* Join community button */}
+              <div className="mt-3 sm:mt-0">
+                {members.includes(address) ? (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 rounded-lg shadow-md">
+                    <div className="relative">
+                      <Badge className="w-5 h-5" />
+                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></div>
+                    </div>
+                    <span className="font-medium">ABYA Member</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleJoinCommunity}
+                    disabled={joinCommunityLoading}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-gray-900 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md font-medium"
+                  >
+                    {joinCommunityLoading ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
+                    ) : (
+                      <>
+                        <Merge className="w-5 h-5" />
+                        Join Community
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Content based on active tab */}
         {activeTab === "overview" && (
@@ -843,13 +860,17 @@ const CommunityPage = () => {
           <div className={`space-y-6 ${fadeIn}`}>
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Community Events</h2>
-              <button
-                onClick={() => setShowCreateEventModal(true)}
-                className="flex items-center gap-2 px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-300 text-sm"
-              >
-                <Plus className="w-4 h-4" />
-                New Event
-              </button>
+              {(role === "ADMIN" ||
+                role === "Community Manager" ||
+                role === "Reviewer") && (
+                <button
+                  onClick={() => setShowCreateEventModal(true)}
+                  className="flex items-center gap-2 px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-300 text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  New Event
+                </button>
+              )}
             </div>
 
             {loading ? (
