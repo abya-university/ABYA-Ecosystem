@@ -30,11 +30,16 @@ contract Ecosystem1Facet is ReentrancyGuard {
         return LibDiamond.ecosystemStorage();
     }
 
+    // modifier onlyRole(bytes32 role) {
+    //     LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
+    //     require(ds.roles[role][msg.sender], "Caller does not have required role");
+    //     _;
+    // }
+
     modifier onlyRole(bytes32 role) {
-        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
-        require(ds.roles[role][msg.sender], "Caller does not have required role");
-        _;
-    }
+    require(LibDiamond.hasRole(role, msg.sender), "Caller doesn't have required role");
+    _;
+}
 
     function checkRole(address account, bytes32 role) public view returns (bool) {
         LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
@@ -132,10 +137,10 @@ contract Ecosystem1Facet is ReentrancyGuard {
         
         require(amount + es.ecosystemPoolSupply <= LibDiamond.ECOSYSTEM_POOL, "Limit Exceeded!");
         
+        es.ecosystemPoolSupply += amount; // Commented out as unreachable code
+
         // TODO: Implement actual token minting logic
         mintToken(to, amount);
-        
-        es.ecosystemPoolSupply += amount; // Commented out as unreachable code
 
         emit EcosystemPoolUpdate(to, amount);
 

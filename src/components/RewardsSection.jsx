@@ -116,7 +116,8 @@ const RewardsSection = () => {
               </span>
             </div>
             <p className="text-gray-300 mt-2">
-              Current Level: {badgeInfo.requirements}
+              Current Level:{" "}
+              {members.includes(address) ? badgeInfo.requirements : "N/A"}
             </p>
           </div>
 

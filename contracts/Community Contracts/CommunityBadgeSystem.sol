@@ -35,6 +35,12 @@ contract CommunityBadgeSystem {
     uint256 public constant LEADER_BADGE_THRESHOLD = 5;
     uint256 public constant CHAMPION_BADGE_THRESHOLD = 10;
 
+    //Badge Token Rewards
+    uint256 public constant PARTICIPANT_REWARD = 1 * 10**18; // 1 ABYTKN token
+    uint256 public constant CONTRIBUTOR_REWARD = 2 * 10**18; // 2 ABYTKN tokens
+    uint256 public constant LEADER_REWARD = 3 * 10**18; // 3 ABYTKN tokens
+    uint256 public constant CHAMPION_REWARD = 4 * 10**18; // 4 ABYTKN tokens
+
     // Events for badge achievements
     event BadgeAwarded(address indexed member, BadgeLevel badge);
     event EventParticipationRecorded(address indexed member, uint256 totalEvents);
@@ -51,25 +57,25 @@ contract CommunityBadgeSystem {
         badgeMetadata[BadgeLevel.PARTICIPANT] = BadgeMetadata({
             name: "Participant",
             iconURI: "ipfs://participant-badge-icon",
-            tokenReward: 1 * 10**18 // 1 ABYTKN token
+            tokenReward: PARTICIPANT_REWARD // 1 ABYTKN token
         });
         
         badgeMetadata[BadgeLevel.CONTRIBUTOR] = BadgeMetadata({
             name: "Contributor",
             iconURI: "ipfs://contributor-badge-icon",
-            tokenReward: 2 * 10**18 // 2 ABYTKN tokens
+            tokenReward: CONTRIBUTOR_REWARD // 2 ABYTKN tokens
         });
         
         badgeMetadata[BadgeLevel.LEADER] = BadgeMetadata({
             name: "Leader",
             iconURI: "ipfs://leader-badge-icon",
-            tokenReward: 3 * 10**18 // 3 ABYTKN tokens
+            tokenReward: LEADER_REWARD // 3 ABYTKN tokens
         });
         
         badgeMetadata[BadgeLevel.CHAMPION] = BadgeMetadata({
             name: "Champion",
             iconURI: "ipfs://champion-badge-icon",
-            tokenReward: 4 * 10**18 // 4  ABYTKN tokens
+            tokenReward: CHAMPION_REWARD // 4  ABYTKN tokens
         });
     }
 

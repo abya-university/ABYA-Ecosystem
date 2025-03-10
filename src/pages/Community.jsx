@@ -893,131 +893,205 @@ const CommunityPage = () => {
               </div>
             ) : (
               <div className="grid md:grid-cols-2 gap-6">
-                {events.map((event) => (
-                  <div
-                    key={event.id}
-                    className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 transform hover:scale-105 transition-transform duration-1000 relative"
-                  >
-                    <div className="absolute top-4 right-4">
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full ${
-                          getEventStatus(event.startTime, event.endTime) ===
-                          "upcoming"
-                            ? "bg-blue-100 text-blue-800"
-                            : getEventStatus(event.startTime, event.endTime) ===
-                              "ongoing"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {getEventStatus(event.startTime, event.endTime) ===
-                        "upcoming"
-                          ? "Upcoming"
-                          : getEventStatus(event.startTime, event.endTime) ===
-                            "ongoing"
-                          ? "Ongoing"
-                          : "Past"}
-                      </span>
-                    </div>
+                {events.map((event) => {
+                  // Calculate countdown
+                  const now = Date.now();
+                  const isUpcoming = event.startTime > now;
+                  const isPast = event.endTime < now;
+                  const isOngoing = !isUpcoming && !isPast;
 
-                    <h2 className="text-lg font-bold mb-2 pr-16">
-                      {event.name}
-                    </h2>
+                  // Calculate countdown values
+                  const secondsToStart = Math.max(
+                    0,
+                    Math.floor((event.startTime - now) / 1000)
+                  );
+                  const days = Math.floor(secondsToStart / (60 * 60 * 24));
+                  const hours = Math.floor(
+                    (secondsToStart % (60 * 60 * 24)) / (60 * 60)
+                  );
+                  const minutes = Math.floor((secondsToStart % (60 * 60)) / 60);
+                  const seconds = Math.floor(secondsToStart % 60);
 
-                    {/* Event Type Badge */}
-                    <div className="inline-block mb-3">
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full ${
-                          event.isOnline
-                            ? "bg-purple-100 text-purple-800"
-                            : "bg-orange-100 text-orange-800"
-                        }`}
-                      >
-                        {event.isOnline ? "Online" : "Physical"}
-                      </span>
-                    </div>
-
-                    {/* Additional Details */}
-                    <p className="text-gray-500 dark:text-gray-400 mb-4">
-                      {event.additionalDetails
-                        ? event.additionalDetails
-                            .substring(0, 100)
-                            .trim()
-                            .concat(
-                              event.additionalDetails.length > 100 ? "..." : ""
-                            )
-                        : "Join this exciting community event!"}
-                    </p>
-
-                    {/* Location */}
-                    <div className="flex items-start gap-2 mb-3">
-                      <div className="mt-0.5">
-                        {event.isOnline ? (
-                          <Globe className="w-5 h-5 text-blue-500" />
-                        ) : (
-                          <MapPin className="w-5 h-5 text-red-500" />
-                        )}
+                  return (
+                    <div
+                      key={event.id}
+                      className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 transform hover:scale-105 transition-transform duration-1000 relative"
+                    >
+                      <div className="absolute top-4 right-4">
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            isUpcoming
+                              ? "bg-blue-100 text-blue-800"
+                              : isOngoing
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {isUpcoming
+                            ? "Upcoming"
+                            : isOngoing
+                            ? "Ongoing"
+                            : "Past"}
+                        </span>
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-300 overflow-hidden text-ellipsis">
-                        {event.location ||
-                          (event.isOnline ? "Online meeting" : "Location TBD")}
-                      </p>
-                    </div>
 
-                    {/* Date and Participants */}
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-5 h-5 text-gray-500" />
-                        <div className="flex flex-col">
+                      <h2 className="text-lg font-bold mb-2 pr-16">
+                        {event.name}
+                      </h2>
+
+                      {/* Event Type Badge */}
+                      <div className="inline-block mb-3">
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            event.isOnline
+                              ? "bg-purple-100 text-purple-800"
+                              : "bg-orange-100 text-orange-800"
+                          }`}
+                        >
+                          {event.isOnline ? "Online" : "Physical"}
+                        </span>
+                      </div>
+
+                      {/* Additional Details */}
+                      <p className="text-gray-500 dark:text-gray-400 mb-4">
+                        {event.additionalDetails
+                          ? event.additionalDetails
+                              .substring(0, 100)
+                              .trim()
+                              .concat(
+                                event.additionalDetails.length > 100
+                                  ? "..."
+                                  : ""
+                              )
+                          : "Join this exciting community event!"}
+                      </p>
+
+                      {/* Location - Modified to hide actual link */}
+                      <div className="flex items-start gap-2 mb-3">
+                        <div className="mt-0.5">
+                          {event.isOnline ? (
+                            <Globe className="w-5 h-5 text-blue-500" />
+                          ) : (
+                            <MapPin className="w-5 h-5 text-red-500" />
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 overflow-hidden text-ellipsis">
+                          {event.isOnline
+                            ? "Click 'Join Event' when the event starts"
+                            : event.location || "Location TBD"}
+                        </p>
+                      </div>
+
+                      {/* Date and Participants */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-5 h-5 text-gray-500" />
+                          <div className="flex flex-col">
+                            <span className="text-sm">
+                              {new Date(event.startTime).toLocaleDateString()}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {new Date(event.startTime).toLocaleTimeString(
+                                [],
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  second: "2-digit",
+                                }
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Users className="w-5 h-5 text-gray-500" />
                           <span className="text-sm">
-                            {new Date(event.startTime).toLocaleDateString()}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {new Date(event.startTime).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
+                            {event.currentParticipants} /{" "}
+                            {event.maxParticipants}
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Users className="w-5 h-5 text-gray-500" />
-                        <span className="text-sm">
-                          {event.currentParticipants} / {event.maxParticipants}
-                        </span>
-                      </div>
-                    </div>
 
-                    {/* Join Button */}
-                    <button
-                      onClick={() => handleParticipateInEvent(event.id)}
-                      disabled={
-                        participateLoading ||
-                        getEventStatus(event.startTime, event.endTime) ===
-                          "past" ||
-                        event.currentParticipants >= event.maxParticipants
-                      }
-                      className={`mt-2 w-full py-2 px-4 font-medium rounded-lg transition-colors duration-300 flex items-center justify-center
-          ${
-            getEventStatus(event.startTime, event.endTime) === "past" ||
-            event.currentParticipants >= event.maxParticipants
-              ? "bg-gray-300 text-gray-700 dark:bg-gray-700 dark:text-gray-300 cursor-not-allowed"
-              : "bg-yellow-500 hover:bg-yellow-600 text-cyan-950"
-          }`}
-                    >
-                      {participateLoading ? (
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
-                      ) : getEventStatus(event.startTime, event.endTime) ===
-                        "past" ? (
-                        <>Event Ended</>
-                      ) : event.currentParticipants >= event.maxParticipants ? (
-                        <>Event Full</>
-                      ) : (
-                        <>Join Event</>
+                      {/* Countdown Timer - New Addition */}
+                      {isUpcoming && (
+                        <div className="mb-4 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                          <p className="text-xs text-gray-600 dark:text-gray-300 mb-1">
+                            Starting in:
+                          </p>
+                          <div className="flex justify-center space-x-2">
+                            <div className="text-center">
+                              <span className="text-sm font-bold">{days}</span>
+                              <p className="text-xs">days</p>
+                            </div>
+                            <div className="text-center">
+                              <span className="text-sm font-bold">{hours}</span>
+                              <p className="text-xs">hours</p>
+                            </div>
+                            <div className="text-center">
+                              <span className="text-sm font-bold">
+                                {minutes}
+                              </span>
+                              <p className="text-xs">min</p>
+                            </div>
+                            <div className="text-center">
+                              <span className="text-sm font-bold">
+                                {seconds}
+                              </span>
+                              <p className="text-xs">sec</p>
+                            </div>
+                          </div>
+                        </div>
                       )}
-                    </button>
-                  </div>
-                ))}
+
+                      {/* Modified Join Button with contract function call */}
+                      <button
+                        onClick={async () => {
+                          if (!event.isOnline) {
+                            // For physical events, just call the contract function
+                            await handleParticipateInEvent(event.id);
+                            return;
+                          }
+
+                          try {
+                            // For online events, call contract first then open meeting
+                            await handleParticipateInEvent(event.id);
+                            // Only open the link if contract call was successful
+                            window.open(event.location, "_blank");
+                          } catch (error) {
+                            console.error("Failed to join event:", error);
+                            toast.error("Failed to join event");
+                          }
+                        }}
+                        disabled={
+                          participateLoading ||
+                          isPast ||
+                          isUpcoming || // Disable if event hasn't started yet
+                          event.currentParticipants >= event.maxParticipants
+                        }
+                        className={`mt-2 w-full py-2 px-4 font-medium rounded-lg transition-colors duration-300 flex items-center justify-center
+            ${
+              isPast ||
+              isUpcoming ||
+              event.currentParticipants >= event.maxParticipants
+                ? "bg-gray-300 text-gray-700 dark:bg-gray-700 dark:text-gray-300 cursor-not-allowed"
+                : "bg-yellow-500 hover:bg-yellow-600 text-cyan-950"
+            }`}
+                      >
+                        {participateLoading ? (
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
+                        ) : isPast ? (
+                          <>Event Ended</>
+                        ) : isUpcoming ? (
+                          <>Event Not Started</>
+                        ) : event.currentParticipants >=
+                          event.maxParticipants ? (
+                          <>Event Full</>
+                        ) : (
+                          <>Join Event</>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

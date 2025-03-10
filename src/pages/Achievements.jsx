@@ -435,100 +435,108 @@ const AchievementsPage = () => {
                     <p>No events yet!</p>
                   </div>
                 ) : (
-                  events.map((event) => (
-                    <div
-                      key={event.id}
-                      className="bg-white dark:bg-gray-700 rounded-xl shadow-sm hover:shadow-md p-4 border border-gray-200 dark:border-gray-600 transition-all duration-300"
-                    >
-                      <div className="flex justify-between items-start mb-3">
-                        <h2 className="text-lg font-bold truncate pr-16">
-                          {event.name}
-                        </h2>
-                        <span
-                          className={`text-xs px-2 py-1 rounded-full ${
-                            getEventStatus(event.startTime, event.endTime) ===
-                            "upcoming"
-                              ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
-                              : getEventStatus(
-                                  event.startTime,
-                                  event.endTime
-                                ) === "ongoing"
-                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
-                              : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-300"
-                          }`}
-                        >
-                          {getEventStatus(event.startTime, event.endTime) ===
-                          "upcoming"
-                            ? "Upcoming"
-                            : getEventStatus(event.startTime, event.endTime) ===
-                              "ongoing"
-                            ? "Ongoing"
-                            : "Past"}
-                        </span>
-                      </div>
+                  events.map((event) => {
+                    // Calculate event status directly
+                    const now = Date.now();
+                    const isUpcoming = event.startTime > now;
+                    const isPast = event.endTime < now;
+                    const isOngoing = !isUpcoming && !isPast;
+                    const eventStatus = isUpcoming
+                      ? "upcoming"
+                      : isOngoing
+                      ? "ongoing"
+                      : "past";
 
-                      {/* Event Type Badge */}
-                      <div className="mb-3">
-                        <span
-                          className={`text-xs px-2 py-1 rounded-full ${
-                            event.isOnline
-                              ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
-                              : "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300"
-                          }`}
-                        >
-                          {event.isOnline ? "Online" : "Physical"}
-                        </span>
-                      </div>
-
-                      {/* Important Details */}
-                      <div className="flex items-center space-x-2 mb-3">
-                        <Calendar className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm text-gray-700 dark:text-gray-300">
-                          {new Date(event.startTime).toLocaleDateString()} at{" "}
-                          {new Date(event.startTime).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center space-x-2 mb-4">
-                        {event.isOnline ? (
-                          <Globe2 className="w-4 h-4 text-blue-500" />
-                        ) : (
-                          <MapPin className="w-4 h-4 text-red-500" />
-                        )}
-                        <span className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                          {event.location ||
-                            (event.isOnline
-                              ? "Online meeting"
-                              : "Location TBD")}
-                        </span>
-                      </div>
-
-                      {/* More Details Button */}
-                      <button
-                        onClick={() => handleEventDetailsClick(event)}
-                        className="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-lg transition-colors duration-200 text-sm font-medium flex items-center justify-center"
+                    return (
+                      <div
+                        key={event.id}
+                        className="bg-white dark:bg-gray-700 rounded-xl shadow-sm hover:shadow-md p-4 border border-gray-200 dark:border-gray-600 transition-all duration-300"
                       >
-                        <span>View Details</span>
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4 ml-2"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
+                        <div className="flex justify-between items-start mb-3">
+                          <h2 className="text-lg font-bold truncate pr-16">
+                            {event.name}
+                          </h2>
+                          <span
+                            className={`text-xs px-2 py-1 rounded-full ${
+                              eventStatus === "upcoming"
+                                ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+                                : eventStatus === "ongoing"
+                                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+                                : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-300"
+                            }`}
+                          >
+                            {eventStatus === "upcoming"
+                              ? "Upcoming"
+                              : eventStatus === "ongoing"
+                              ? "Ongoing"
+                              : "Past"}
+                          </span>
+                        </div>
+
+                        {/* Event Type Badge */}
+                        <div className="mb-3">
+                          <span
+                            className={`text-xs px-2 py-1 rounded-full ${
+                              event.isOnline
+                                ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
+                                : "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300"
+                            }`}
+                          >
+                            {event.isOnline ? "Online" : "Physical"}
+                          </span>
+                        </div>
+
+                        {/* Important Details */}
+                        <div className="flex items-center space-x-2 mb-3">
+                          <Calendar className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm text-gray-700 dark:text-gray-300">
+                            {new Date(event.startTime).toLocaleDateString()} at{" "}
+                            {new Date(event.startTime).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                            })}
+                          </span>
+                        </div>
+
+                        {/* Modified Location Section - Hide direct link */}
+                        <div className="flex items-center space-x-2 mb-4">
+                          {event.isOnline ? (
+                            <Globe2 className="w-4 h-4 text-blue-500" />
+                          ) : (
+                            <MapPin className="w-4 h-4 text-red-500" />
+                          )}
+                          <span className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                            {!event.isOnline
+                              ? event.location || "Location TBD"
+                              : "Click 'Join Event' when the event starts"}
+                          </span>
+                        </div>
+
+                        {/* More Details Button */}
+                        <button
+                          onClick={() => handleEventDetailsClick(event)}
+                          className="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-lg transition-colors duration-200 text-sm font-medium flex items-center justify-center"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5l7 7-7 7"
-                          />
-                        </svg>
-                      </button>
-                    </div>
-                  ))
+                          <span>View Details</span>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4 ml-2"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 5l7 7-7 7"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -565,154 +573,253 @@ const AchievementsPage = () => {
 
                 {selectedEvent && (
                   <div className="pt-2">
-                    <div className="flex justify-between items-start mb-4">
-                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {selectedEvent.name}
-                      </h2>
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full ${
-                          getEventStatus(
-                            selectedEvent.startTime,
-                            selectedEvent.endTime
-                          ) === "upcoming"
-                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
-                            : getEventStatus(
-                                selectedEvent.startTime,
-                                selectedEvent.endTime
-                              ) === "ongoing"
-                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
-                            : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-300"
-                        }`}
-                      >
-                        {getEventStatus(
-                          selectedEvent.startTime,
-                          selectedEvent.endTime
-                        ) === "upcoming"
-                          ? "Upcoming"
-                          : getEventStatus(
-                              selectedEvent.startTime,
-                              selectedEvent.endTime
-                            ) === "ongoing"
-                          ? "Ongoing"
-                          : "Past"}
-                      </span>
-                    </div>
+                    {/* Calculate event status and countdown */}
+                    {(() => {
+                      const now = Date.now();
+                      const isUpcoming = selectedEvent.startTime > now;
+                      const isPast = selectedEvent.endTime < now;
+                      const isOngoing = !isUpcoming && !isPast;
+                      const eventStatus = isUpcoming
+                        ? "upcoming"
+                        : isOngoing
+                        ? "ongoing"
+                        : "past";
 
-                    {/* Event Type */}
-                    <div className="mb-6">
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full ${
-                          selectedEvent.isOnline
-                            ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
-                            : "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300"
-                        }`}
-                      >
-                        {selectedEvent.isOnline ? "Online" : "Physical"}
-                      </span>
-                    </div>
+                      // Calculate countdown values
+                      const secondsToStart = Math.max(
+                        0,
+                        Math.floor((selectedEvent.startTime - now) / 1000)
+                      );
+                      const days = Math.floor(secondsToStart / (60 * 60 * 24));
+                      const hours = Math.floor(
+                        (secondsToStart % (60 * 60 * 24)) / (60 * 60)
+                      );
+                      const minutes = Math.floor(
+                        (secondsToStart % (60 * 60)) / 60
+                      );
+                      const seconds = Math.floor(secondsToStart % 60);
 
-                    {/* Date and Time */}
-                    <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-6">
-                      <div className="flex items-start space-x-3 mb-4">
-                        <Calendar className="w-5 h-5 text-blue-500 mt-0.5" />
-                        <div>
-                          <h3 className="font-medium text-gray-900 dark:text-white">
-                            Date & Time
-                          </h3>
-                          <p className="text-gray-600 dark:text-gray-300 mt-1">
-                            {new Date(
-                              selectedEvent.startTime
-                            ).toLocaleDateString()}{" "}
-                            at{" "}
-                            {new Date(
-                              selectedEvent.startTime
-                            ).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                            {" - "}
-                            {new Date(
-                              selectedEvent.endTime
-                            ).toLocaleDateString()}{" "}
-                            at{" "}
-                            {new Date(selectedEvent.endTime).toLocaleTimeString(
-                              [],
-                              {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              }
-                            )}
-                          </p>
-                        </div>
-                      </div>
+                      return (
+                        <>
+                          <div className="flex justify-between items-start mb-4">
+                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                              {selectedEvent.name}
+                            </h2>
+                            <span
+                              className={`text-xs px-2 py-1 rounded-full ${
+                                eventStatus === "upcoming"
+                                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+                                  : eventStatus === "ongoing"
+                                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+                                  : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-300"
+                              }`}
+                            >
+                              {eventStatus === "upcoming"
+                                ? "Upcoming"
+                                : eventStatus === "ongoing"
+                                ? "Ongoing"
+                                : "Past"}
+                            </span>
+                          </div>
 
-                      {/* Location */}
-                      <div className="flex items-start space-x-3 mb-4">
-                        {selectedEvent.isOnline ? (
-                          <Globe className="w-5 h-5 text-blue-500 mt-0.5" />
-                        ) : (
-                          <MapPin className="w-5 h-5 text-red-500 mt-0.5" />
-                        )}
-                        <div>
-                          <h3 className="font-medium text-gray-900 dark:text-white">
-                            Location
-                          </h3>
-                          <p className="text-gray-600 dark:text-gray-300 mt-1">
-                            {selectedEvent.location ||
-                              (selectedEvent.isOnline
-                                ? "Online meeting"
-                                : "Location TBD")}
-                          </p>
-                        </div>
-                      </div>
+                          {/* Event Type */}
+                          <div className="mb-6">
+                            <span
+                              className={`text-xs px-2 py-1 rounded-full ${
+                                selectedEvent.isOnline
+                                  ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
+                                  : "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300"
+                              }`}
+                            >
+                              {selectedEvent.isOnline ? "Online" : "Physical"}
+                            </span>
+                          </div>
 
-                      {/* Participants */}
-                      <div className="flex items-start space-x-3">
-                        <Users className="w-5 h-5 text-green-500 mt-0.5" />
-                        <div>
-                          <h3 className="font-medium text-gray-900 dark:text-white">
-                            Participants
-                          </h3>
-                          <p className="text-gray-600 dark:text-gray-300 mt-1">
-                            {selectedEvent.currentParticipants} /{" "}
-                            {selectedEvent.maxParticipants} participants
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Description */}
-                    <div className="mb-6">
-                      <h3 className="font-medium text-gray-900 dark:text-white mb-2">
-                        Details
-                      </h3>
-                      <p className="text-gray-600 dark:text-gray-300 whitespace-pre-line">
-                        {selectedEvent.additionalDetails ||
-                          "No additional details available."}
-                      </p>
-                    </div>
-
-                    {/* Action buttons */}
-                    {getEventStatus(
-                      selectedEvent.startTime,
-                      selectedEvent.endTime
-                    ) !== "past" && (
-                      <div className="flex space-x-4">
-                        <button className="flex-1 py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors duration-200 font-medium">
-                          Join Event
-                        </button>
-                        {selectedEvent.currentParticipants <
-                          selectedEvent.maxParticipants &&
-                          getEventStatus(
-                            selectedEvent.startTime,
-                            selectedEvent.endTime
-                          ) === "upcoming" && (
-                            <button className="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium">
-                              Register
-                            </button>
+                          {/* Countdown Timer - New Addition */}
+                          {isUpcoming && (
+                            <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                              <h3 className="font-medium text-gray-900 dark:text-white mb-2">
+                                Countdown to Event Start
+                              </h3>
+                              <div className="flex justify-center space-x-4">
+                                <div className="text-center">
+                                  <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                    {days}
+                                  </span>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    days
+                                  </p>
+                                </div>
+                                <div className="text-center">
+                                  <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                    {hours}
+                                  </span>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    hours
+                                  </p>
+                                </div>
+                                <div className="text-center">
+                                  <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                    {minutes}
+                                  </span>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    minutes
+                                  </p>
+                                </div>
+                                <div className="text-center">
+                                  <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                    {seconds}
+                                  </span>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    sec
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
                           )}
-                      </div>
-                    )}
+
+                          {/* Date and Time */}
+                          <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-6">
+                            <div className="flex items-start space-x-3 mb-4">
+                              <Calendar className="w-5 h-5 text-blue-500 mt-0.5" />
+                              <div>
+                                <h3 className="font-medium text-gray-900 dark:text-white">
+                                  Date & Time
+                                </h3>
+                                <p className="text-gray-600 dark:text-gray-300 mt-1">
+                                  {new Date(
+                                    selectedEvent.startTime
+                                  ).toLocaleDateString()}{" "}
+                                  at{" "}
+                                  {new Date(
+                                    selectedEvent.startTime
+                                  ).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                  {" - "}
+                                  {new Date(
+                                    selectedEvent.endTime
+                                  ).toLocaleDateString()}{" "}
+                                  at{" "}
+                                  {new Date(
+                                    selectedEvent.endTime
+                                  ).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Location - Modified to hide meeting link */}
+                            <div className="flex items-start space-x-3 mb-4">
+                              {selectedEvent.isOnline ? (
+                                <Globe className="w-5 h-5 text-blue-500 mt-0.5" />
+                              ) : (
+                                <MapPin className="w-5 h-5 text-red-500 mt-0.5" />
+                              )}
+                              <div>
+                                <h3 className="font-medium text-gray-900 dark:text-white">
+                                  Location
+                                </h3>
+                                <p className="text-gray-600 dark:text-gray-300 mt-1">
+                                  {!selectedEvent.isOnline
+                                    ? selectedEvent.location || "Location TBD"
+                                    : "Click 'Join Event' when the event starts"}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Participants */}
+                            <div className="flex items-start space-x-3">
+                              <Users className="w-5 h-5 text-green-500 mt-0.5" />
+                              <div>
+                                <h3 className="font-medium text-gray-900 dark:text-white">
+                                  Participants
+                                </h3>
+                                <p className="text-gray-600 dark:text-gray-300 mt-1">
+                                  {selectedEvent.currentParticipants} /{" "}
+                                  {selectedEvent.maxParticipants} participants
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Description */}
+                          <div className="mb-6">
+                            <h3 className="font-medium text-gray-900 dark:text-white mb-2">
+                              Details
+                            </h3>
+                            <p className="text-gray-600 dark:text-gray-300 whitespace-pre-line">
+                              {selectedEvent.additionalDetails ||
+                                "No additional details available."}
+                            </p>
+                          </div>
+
+                          {/* Action buttons - Modified for contract interaction */}
+                          <div className="flex space-x-4">
+                            <button
+                              onClick={async () => {
+                                // Only enable for ongoing events
+                                if (!isOngoing) return;
+
+                                try {
+                                  if (selectedEvent.isOnline) {
+                                    // For online events, call contract first then open meeting
+                                    await handleParticipateInEvent(
+                                      selectedEvent.id
+                                    );
+                                    // Only open the link if contract call was successful
+                                    window.open(
+                                      selectedEvent.location,
+                                      "_blank"
+                                    );
+                                  } else {
+                                    // For physical events, just call contract
+                                    await handleParticipateInEvent(
+                                      selectedEvent.id
+                                    );
+                                  }
+                                } catch (error) {
+                                  console.error("Failed to join event:", error);
+                                  // You could add a toast notification here
+                                }
+                              }}
+                              disabled={
+                                !isOngoing ||
+                                selectedEvent.currentParticipants >=
+                                  selectedEvent.maxParticipants
+                              }
+                              className={`flex-1 py-2 px-4 rounded-lg transition-colors duration-200 font-medium ${
+                                !isOngoing ||
+                                selectedEvent.currentParticipants >=
+                                  selectedEvent.maxParticipants
+                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                  : "bg-yellow-500 hover:bg-yellow-600 text-white"
+                              }`}
+                            >
+                              {isPast
+                                ? "Event Ended"
+                                : isUpcoming
+                                ? "Event Not Started"
+                                : selectedEvent.currentParticipants >=
+                                  selectedEvent.maxParticipants
+                                ? "Event Full"
+                                : "Join Event"}
+                            </button>
+
+                            {isUpcoming &&
+                              selectedEvent.currentParticipants <
+                                selectedEvent.maxParticipants && (
+                                <button className="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 font-medium">
+                                  Register
+                                </button>
+                              )}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
