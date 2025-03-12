@@ -12,6 +12,7 @@ import { UserProvider } from "./contexts/userContext.jsx";
 import { CertificatesProvider } from "./contexts/certificatesContext.jsx";
 import { CommunityEventsProvider } from "./contexts/communityEventsContext.jsx";
 import { CommunityMembersProvider } from "./contexts/communityMembersContext.jsx";
+import { ProjectProposalsProvider } from "./contexts/projectProposalsContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -25,7 +26,9 @@ createRoot(document.getElementById("root")).render(
                   <CertificatesProvider>
                     <CommunityEventsProvider>
                       <CommunityMembersProvider>
-                        <App />
+                        <ProjectProposalsProvider>
+                          <App />
+                        </ProjectProposalsProvider>
                       </CommunityMembersProvider>
                     </CommunityEventsProvider>
                   </CertificatesProvider>

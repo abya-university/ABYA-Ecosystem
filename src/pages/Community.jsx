@@ -35,6 +35,8 @@ import { useCommunityEvents } from "../contexts/communityEventsContext";
 import { useCommunityMembers } from "../contexts/communityMembersContext";
 import RewardsSection from "../components/RewardsSection";
 import { useUser } from "../contexts/userContext";
+import ProjectFundingRequestModal from "../components/ProjectRequestFundsForm";
+import ProjectDetails from "./ProjectDetails";
 
 const Community_ABI = CommunityABI.abi;
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
@@ -42,6 +44,8 @@ const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
 const CommunityPage = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [showCreateEventModal, setShowCreateEventModal] = useState(false);
+  const [showProjectRequestFundsForm, setShowProjectRequestFundsForm] =
+    useState(false);
   const [showAirdropModal, setShowAirdropModal] = useState(false);
   const [showProjectFundingModal, setShowProjectFundingModal] = useState(false);
   const [eventData, setEventData] = useState({
@@ -673,6 +677,11 @@ const CommunityPage = () => {
       {showCreateEventModal && <CreateEventModal />}
       {showAirdropModal && <AirdropModal />}
       {showProjectFundingModal && <ProjectFundingModal />}
+      {showProjectRequestFundsForm && (
+        <ProjectFundingRequestModal
+          setShowProjectRequestFundsForm={setShowProjectRequestFundsForm}
+        />
+      )}
 
       <div className="max-w-6xl mx-auto">
         {/* Header */}
@@ -710,9 +719,9 @@ const CommunityPage = () => {
           {isConnected && (
             <>
               <div className="flex flex-wrap gap-3">
-                {(role === "ADMIN" ||
-                  role === "Community Manager" ||
-                  role === "Reviewer") && (
+                {role === "ADMIN" ||
+                role === "Community Manager" ||
+                role === "Reviewer" ? (
                   <>
                     <button
                       onClick={() => setShowCreateEventModal(true)}
@@ -736,6 +745,16 @@ const CommunityPage = () => {
                     >
                       <Coins className="w-5 h-5" />
                       Fund Project
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setShowProjectRequestFundsForm(true)}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all duration-300 shadow-sm hover:shadow-md font-medium"
+                    >
+                      <Coins className="w-5 h-5" />
+                      Request Project Funding
                     </button>
                   </>
                 )}
@@ -1112,64 +1131,7 @@ const CommunityPage = () => {
               </button>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
-              {[
-                {
-                  id: 1,
-                  name: "DeFi Academy",
-                  description:
-                    "Educational platform for learning about decentralized finance",
-                  funded: "12,500 ABYATKN",
-                  status: "In Development",
-                  creator: "0x123...456",
-                },
-                {
-                  id: 2,
-                  name: "NFT Marketplace",
-                  description: "Community-owned marketplace for digital assets",
-                  funded: "24,000 ABYATKN",
-                  status: "Active",
-                  creator: "0x789...012",
-                },
-              ].map((project) => (
-                <div
-                  key={project.id}
-                  className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 transform hover:scale-105 transition-transform duration-1000"
-                >
-                  <h3 className="text-lg font-bold mb-2">{project.name}</h3>
-                  <p className="text-gray-500 dark:text-gray-400 mb-4">
-                    {project.description}
-                  </p>
-
-                  <div className="flex flex-col gap-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Funded:</span>
-                      <span className="font-medium">{project.funded}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Status:</span>
-                      <span
-                        className={`font-medium ${
-                          project.status === "Active"
-                            ? "text-green-500"
-                            : "text-blue-500"
-                        }`}
-                      >
-                        {project.status}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Creator:</span>
-                      <span className="font-medium">{project.creator}</span>
-                    </div>
-                  </div>
-
-                  <button className="mt-4 w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-cyan-950 font-medium rounded-lg transition-colors duration-300">
-                    View Details
-                  </button>
-                </div>
-              ))}
-            </div>
+            <ProjectDetails />
           </div>
         )}
       </div>

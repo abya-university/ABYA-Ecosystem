@@ -21,36 +21,68 @@ contract Community is AccessControl, ReentrancyGuard, LMSToken, CommunityBadgeSy
     
     // Structs
     struct CommunityEvent {
-    uint256 id;
-    string name;
-    address creator;
-    uint256 startTime;
-    uint256 endTime;
-    uint256 maxParticipants;
-    uint256 currentParticipants;
-    bool isActive;
-    bool isOnline;           // true if online, false if physical
-    string location;         // URL for online events, physical address for in-person events
-    string additionalDetails; // Additional event details (dress code, items to bring, etc.)
-}
+        uint256 id;
+        string name;
+        address creator;
+        uint256 startTime;
+        uint256 endTime;
+        uint256 maxParticipants;
+        uint256 currentParticipants;
+        bool isActive;
+        bool isOnline;           // true if online, false if physical
+        string location;         // URL for online events, physical address for in-person events
+        string additionalDetails; // Additional event details (dress code, items to bring, etc.)
+    }
+
+    enum ProjectStage {
+        IDEA,
+        PLANNING,
+        MVP,
+        ALPHA,
+        BETA,
+        PRODUCTION
+    }
+
+    struct ProjectFundingProposal {
+        uint256 id;
+        address creator;
+        string name;
+        string description;
+        string[] techStack;
+        string blockchain;
+        uint256 requestedAmount;
+        uint256 timeline; // In days
+        ProjectStage stage;
+        bool isApproved;
+        bool isRejected;
+        string rejectionReason;
+        uint256 approvalCount;
+    }
+
 
     // Mappings
     mapping(uint256 => CommunityEvent) public communityEvents;
     mapping(address => uint256) public communityContributorRewards;
     mapping(address => bool) public isCommunityMember;
+    mapping(uint256 => ProjectFundingProposal) public projectProposals;
+    mapping(uint256 => mapping(address => bool)) approvals;
 
     // Events
     event CommunityPoolUpdate(address indexed _to, uint256 indexed _amount);
     event AirdropDistributeSuccess(uint256 indexed _amount, uint256 _numberOfEarlyAdopters);
-    event CommunityProjectFunded(address indexed project, uint256 amount);
     event EventCreated(uint256 indexed eventId, string name, address creator, bool isOnline, string location);
     event EventParticipation(uint256 indexed eventId, address participant);
     event JoinSuccess(address indexed _address);
+    event ProjectProposalCreated(uint256 indexed proposalId, address indexed creator, string name, uint256 requestedAmount);
+    event ProjectProposalApproved(uint256 indexed proposalId);
+    event ProjectProposalRejected(uint256 indexed proposalId, string reason);
+    event ProjectFundingReleased(uint256 indexed proposalId, address indexed creator, uint256 amount);
 
     // Counters (simulating OpenZeppelin's Counters library)
     uint256 private _eventIdCounter;
     uint256 private _proposalIdCounter;
     address[] public abyaCommunity;
+    uint256 private _projectProposalCounter;
 
     constructor(address[] memory _reviewers) LMSToken(_reviewers) ReentrancyGuard() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -187,27 +219,6 @@ contract Community is AccessControl, ReentrancyGuard, LMSToken, CommunityBadgeSy
         return getMemberBadge(msg.sender);
     }
 
-    // Fund Community Projects
-    function fundCommunityProjects(
-        address _projectAddress, 
-        uint256 _amount
-    ) external onlyRole(COMMUNITY_MANAGER) {
-        require(_amount <= MAX_COMMUNITY_PROJECT_FUNDING, "Exceeds max project funding");
-        require(communityProjectFunds + _amount <= MAX_COMMUNITY_PROJECT_FUNDING, 
-            "Insufficient community project funds");
-
-        // Create multi-sig proposal for project funding
-        bytes memory data = abi.encodeWithSignature(
-            "transferFunds(address,uint256)", 
-            _projectAddress, 
-            _amount
-        );
-        createMultiSigProposal(address(this), data);
-
-        communityProjectFunds += _amount;
-        emit CommunityProjectFunded(_projectAddress, _amount);
-    }
-
     // Function to claim badge rewards
     function claimBadgeRewards() external {
         CommunityMember storage member = communityMembers[msg.sender];
@@ -218,13 +229,6 @@ contract Community is AccessControl, ReentrancyGuard, LMSToken, CommunityBadgeSy
         if (reward > 0) {
             mintToken(msg.sender, reward);
         }
-    }
-
-    // Internal function to transfer project funds
-    function transferFunds(address _projectAddress, uint256 _amount) external {
-        require(hasRole(COMMUNITY_MANAGER, msg.sender), "Not authorized");
-        (bool success, ) = _projectAddress.call{value: _amount}("");
-        require(success, "Transfer failed");
     }
 
     // Process Community Contributor Rewards
@@ -273,5 +277,164 @@ function getAllCommunityEvents() external view returns (CommunityEvent[] memory)
     }
     
     return allEvents;
+}
+
+// Function to create a project funding proposal
+function createProjectFundingProposal(
+    string memory _name,
+    string memory _description,
+    string[] memory _techStack,
+    string memory _blockchain,
+    uint256 _requestedAmount,
+    uint256 _timeline,
+    ProjectStage _stage
+) external nonReentrant returns (uint256) {
+    // Require that the creator is a community member
+    require(isCommunityMember[msg.sender], "Must be a community member to create proposals");
+    
+    // Require that the requested amount is within limits
+    require(_requestedAmount <= MAX_COMMUNITY_PROJECT_FUNDING, "Requested amount exceeds maximum funding limit");
+    
+    ProjectFundingProposal storage proposal = projectProposals[_projectProposalCounter];
+    proposal.id = _projectProposalCounter;
+    proposal.creator = msg.sender;
+    proposal.name = _name;
+    proposal.description = _description;
+    proposal.techStack = _techStack;
+    proposal.blockchain = _blockchain;
+    proposal.requestedAmount = _requestedAmount;
+    proposal.timeline = _timeline;
+    proposal.stage = _stage;
+    proposal.isApproved = false;
+    proposal.isRejected = false;
+    proposal.rejectionReason = "";
+    proposal.approvalCount = 0;
+
+    _projectProposalCounter++;
+    
+    emit ProjectProposalCreated(_projectProposalCounter, msg.sender, _name, _requestedAmount);
+    
+    return _projectProposalCounter;
+}
+
+// Function for multisig approvers to approve a project funding proposal
+function approveProjectProposal(uint256 _proposalId) external onlyRole(MULTISIG_APPROVER) {
+    ProjectFundingProposal storage proposal = projectProposals[_proposalId];
+    
+    require(!proposal.isApproved, "Proposal already approved");
+    require(!proposal.isRejected, "Proposal already rejected");
+    require(!approvals[_proposalId][msg.sender], "Already approved by this approver");
+    
+    approvals[_proposalId][msg.sender] = true;
+    proposal.approvalCount++;
+    
+    // Execute if enough approvals (using the same threshold as other multisig operations - 3)
+    if (proposal.approvalCount >= 3) {
+        proposal.isApproved = true;
+        
+        // Create data for multisig proposal to release funds
+        bytes memory data = abi.encodeWithSignature(
+            "releaseProjectFunding(uint256)",
+            _proposalId
+        );
+        
+        // Create multisig proposal for releasing funds
+        createMultiSigProposal(address(this), data);
+        
+        emit ProjectProposalApproved(_proposalId);
+    }
+}
+
+// Function to reject a project proposal
+function rejectProjectProposal(uint256 _proposalId, string memory _reason) external onlyRole(MULTISIG_APPROVER) {
+    ProjectFundingProposal storage proposal = projectProposals[_proposalId];
+    
+    require(!proposal.isApproved, "Proposal already approved");
+    require(!proposal.isRejected, "Proposal already rejected");
+    
+    proposal.isRejected = true;
+    proposal.rejectionReason = _reason;
+    
+    emit ProjectProposalRejected(_proposalId, _reason);
+}
+
+// Internal function to release project funding after approval
+function releaseProjectFunding(uint256 _proposalId) external {
+    ProjectFundingProposal storage proposal = projectProposals[_proposalId];
+    
+    require(proposal.isApproved, "Proposal not approved");
+    require(communityProjectFunds + proposal.requestedAmount <= MAX_COMMUNITY_PROJECT_FUNDING, 
+        "Insufficient community project funds");
+    
+    // Mint tokens to the project creator
+    mintToken(proposal.creator, proposal.requestedAmount);
+    
+    // Update community project funds
+    communityProjectFunds += proposal.requestedAmount;
+    
+    emit ProjectFundingReleased(_proposalId, proposal.creator, proposal.requestedAmount);
+}
+
+// Function to get project proposal details
+function getProjectProposal(uint256 _proposalId) external view returns (
+    address creator,
+    string memory name,
+    string memory description,
+    string memory blockchain,
+    uint256 requestedAmount,
+    uint256 timeline,
+    ProjectStage stage,
+    bool isApproved,
+    bool isRejected,
+    string memory rejectionReason,
+    uint256 approvalCount
+) {
+    ProjectFundingProposal storage proposal = projectProposals[_proposalId];
+    
+    return (
+        proposal.creator,
+        proposal.name,
+        proposal.description,
+        proposal.blockchain,
+        proposal.requestedAmount,
+        proposal.timeline,
+        proposal.stage,
+        proposal.isApproved,
+        proposal.isRejected,
+        proposal.rejectionReason,
+        proposal.approvalCount
+    );
+}
+
+// Function to get project proposal tech stack
+function getProjectTechStack(uint256 _proposalId) external view returns (string[] memory) {
+    return projectProposals[_proposalId].techStack;
+}
+
+// Function to get all project proposals
+function getAllProjectProposals() external view returns (ProjectFundingProposal[] memory) {
+    uint256 totalProposals = _projectProposalCounter;
+    ProjectFundingProposal[] memory allProposals = new ProjectFundingProposal[](totalProposals);
+
+    for (uint256 i = 0; i < totalProposals; i++) {
+        ProjectFundingProposal storage proposal = projectProposals[i];
+        allProposals[i] = ProjectFundingProposal({
+            id: proposal.id,
+            creator: proposal.creator,
+            name: proposal.name,
+            description: proposal.description,
+            techStack: proposal.techStack,
+            blockchain: proposal.blockchain,
+            requestedAmount: proposal.requestedAmount,
+            timeline: proposal.timeline,
+            stage: proposal.stage,
+            isApproved: proposal.isApproved,
+            isRejected: proposal.isRejected,
+            rejectionReason: proposal.rejectionReason,
+            approvalCount: proposal.approvalCount
+        });
+    }
+
+    return allProposals;
 }
 }
