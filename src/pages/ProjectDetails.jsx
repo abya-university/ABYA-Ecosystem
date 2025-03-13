@@ -21,6 +21,7 @@ const ProjectDetails = () => {
   const [isRejectLoading, setIsRejectLoading] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [showReasonInput, setShowReasonInput] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     fetchProposals();
@@ -120,6 +121,7 @@ const ProjectDetails = () => {
         Community_ABI,
         signer
       );
+      console.log("Payload: ", selectedProject.id, rejectReason);
       const tx = await communityContract.rejectProjectProposal(
         selectedProject.id,
         rejectReason
@@ -127,9 +129,11 @@ const ProjectDetails = () => {
       await tx.wait();
       toast.success("Project rejected successfully");
       setIsRejectLoading(false);
+      setRejectReason("");
       closeModal();
     } catch (err) {
-      toast.error("Error rejecting project");
+      setError("Error rejecting project", err);
+      toast.error("Error rejecting project", err);
     }
   };
 
@@ -208,6 +212,9 @@ const ProjectDetails = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
             <div className="p-6">
+              {error && (
+                <div className="text-red-500 text-normal p-2">{error}</div>
+              )}
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold">{selectedProject.name}</h2>
                 <button
@@ -403,28 +410,46 @@ const ProjectDetails = () => {
                       role === "Community Manager" ||
                       role === "ADMIN") && (
                       <div className="flex space-x-3">
-                        <button
-                          onClick={handleApprove}
-                          disabled={isApproveLoading}
-                          className="py-2 px-6 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg transition-colors duration-300 relative"
-                        >
-                          {isApproveLoading ? (
-                            <>
-                              <span className="opacity-0">Approve</span>
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                              </div>
-                            </>
-                          ) : (
-                            "Approve"
-                          )}
-                        </button>
-                        <button
-                          onClick={handleRejectClick}
-                          className="py-2 px-6 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-colors duration-300"
-                        >
-                          Reject
-                        </button>
+                        {!selectedProject.isApproved &&
+                        !selectedProject.isRejected ? (
+                          <>
+                            <button
+                              onClick={handleApprove}
+                              disabled={isApproveLoading}
+                              className="py-2 px-6 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg transition-colors duration-300 relative"
+                            >
+                              {isApproveLoading ? (
+                                <>
+                                  <span className="opacity-0">Approve</span>
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                  </div>
+                                </>
+                              ) : (
+                                "Approve"
+                              )}
+                            </button>
+                            <button
+                              onClick={handleRejectClick}
+                              className="py-2 px-6 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-colors duration-300"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        ) : (
+                          <div className="py-2 px-6 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+                            Status:{" "}
+                            {selectedProject.isApproved ? (
+                              <span className="font-medium text-lg text-green-500 p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
+                                Approved
+                              </span>
+                            ) : (
+                              <span className="font-medium text-lg text-red-500 p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
+                                Rejected
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                     <button
