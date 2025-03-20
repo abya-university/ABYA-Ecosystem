@@ -75,7 +75,7 @@ const SettingsPage = () => {
   ];
 
   const mockDidDocument = {
-    id: "did:ethr:0x1234567890abcdef",
+    id: "did:ethr:sepolia:0x12345678ihou9476490abcdef",
     controller: "0x1234567890abcdef",
     verificationMethod: [
       {
@@ -151,12 +151,48 @@ const SettingsPage = () => {
             {activeSection === "did" && (
               <div>
                 <h2 className="text-2xl font-semibold mb-6 text-yellow-500">
-                  DID Management
+                  Profile Management
                 </h2>
+
+                {/* Linked Accounts/DIDs */}
+                <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 border dark:border-none rounded-lg p-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-medium">Create Profile</h3>
+                    <Link to="/ProfileForm" className="text-yellow-500 hover:underline">
+                      New Profile
+                    </Link>
+                  </div>
+
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-medium">Link Profile</h3>
+                    <Link to="/ConnectProfile" className="text-yellow-500 hover:underline">
+                      Link Profile
+                    </Link>
+                  </div>
+
+                  <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <Link2 className="w-5 h-5 text-yellow-500" />
+                        <span>No linked accounts</span>
+                      </div>
+                      <QrCode className="w-6 h-6 text-gray-500" />
+                    </div>
+                  </div>
+                </div>
 
                 {/* DID Document Section */}
                 <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 border dark:border-none rounded-lg p-4 mb-4">
-                  {/* Header */}
+                  
+                  {/* DIDs */}
+                  <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-gray-400">DID Owned</span>
+                      <span className="font-mono text-sm">{mockDidDocument.id}</span>
+                    </div>
+                  </div>
+                  
+                  {/* DID Generation */}
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="font-medium">DID Document</h3>
                     <Link to="/Didpage" className="text-yellow-500 hover:underline">
@@ -164,17 +200,6 @@ const SettingsPage = () => {
                     </Link>
                   </div>
 
-                  {/* DID Details */}
-                  <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-gray-400">DID</span>
-                      <span className="font-mono text-sm">{mockDidDocument.id}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-400">Controller</span>
-                      <span className="font-mono text-sm">{mockDidDocument.controller}</span>
-                    </div>
-                  </div>
 
                   {/* DID Owner */}
                   <div className="flex justify-between items-center mb-4">
@@ -227,9 +252,15 @@ const SettingsPage = () => {
                   {/* Header */}
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="font-medium">Verifiable Credentials</h3>
-                    <button className="text-yellow-500 hover:underline">
+                    <Link to="/VcForm" className="text-yellow-500 hover:underline">
                       Add Credential
-                    </button>
+                    </Link>
+                  </div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-medium">Verify Credentials</h3>
+                    <Link to="/VerifyVc" className="text-yellow-500 hover:underline">
+                      Verify Credential
+                    </Link>
                   </div>
 
                   {/* Credentials List */}
@@ -260,26 +291,6 @@ const SettingsPage = () => {
                   ) : (
                     <p className="text-center text-gray-400">No credentials available.</p>
                   )}
-                </div>
-
-
-                {/* Linked Accounts/DIDs */}
-                <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 border dark:border-none rounded-lg p-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-medium">Linked Accounts</h3>
-                    <button className="text-yellow-500 hover:underline">
-                      Link New Account
-                    </button>
-                  </div>
-                  <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 rounded-lg p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <Link2 className="w-5 h-5 text-yellow-500" />
-                        <span>No linked accounts</span>
-                      </div>
-                      <QrCode className="w-6 h-6 text-gray-500" />
-                    </div>
-                  </div>
                 </div>
                 
               </div>

@@ -1,19 +1,75 @@
-// src/components/DidForm.jsx
 import React, { useState } from "react";
-import { ArrowLeft, Eye, EyeOff, Clipboard } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Clipboard, Loader } from "lucide-react";
 import { createDid, resolveDid } from "../services/didService";
-import { storeDidDocument, fetchDidDocument } from "../services/ipfsService";
+import {
+  storeDidDocument,
+  fetchDidDocument,
+  updateDidRegistry,
+} from "../services/ipfsService";
+import { ethers } from "ethers";
+import { EthereumDIDRegistry } from "ethr-did-registry";
 
 const DidForm = () => {
   const [privateKey, setPrivateKey] = useState("");
   const [did, setDid] = useState("");
   const [resolvedDid, setResolvedDid] = useState(null);
   const [ipfsCid, setIpfsCid] = useState("");
+  const [owner, setOwner] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [storedDids, setStoredDids] = useState([]);
 
-  // Generate DID, resolve it, and store the DID document on Pinata
+  // Refactored function to verify the DID owner.
+  // It returns the owner address instead of setting state directly.
+  const verifyIdentityOwner = async (identityDID) => {
+    try {
+      const INFURA_URL = import.meta.env.VITE_INFURA_URL;
+      const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
+
+      if (!INFURA_URL || !CONTRACT_ADDRESS) {
+        throw new Error("Missing environment variables");
+      }
+
+      // Extract the Ethereum address from the DID string
+      const identityAddress = identityDID.split(":")[3]; // Assumes DID format: did:ethr:sepolia:<address>
+      if (!identityAddress) {
+        throw new Error("Invalid DID format. Ensure it follows 'did:ethr:sepolia:<address>'");
+      }
+
+      // Connect to Ethereum provider
+      const provider = new ethers.JsonRpcProvider(INFURA_URL);
+
+      // Instantiate the DID Registry contract
+      const DidReg = new ethers.Contract(
+        CONTRACT_ADDRESS,
+        EthereumDIDRegistry.abi,
+        provider
+      );
+
+      // Call the `identityOwner` function to get the owner's address
+      const ownerAddress = await DidReg.identityOwner(identityAddress);
+      return ownerAddress;
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  // Retry mechanism to verify the owner in case of propagation delays.
+  const retryVerifyOwner = async (identityDID, retries = 3, delay = 3000) => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const ownerAddress = await verifyIdentityOwner(identityDID);
+        if (ownerAddress) return ownerAddress;
+      } catch (err) {
+        // Optionally log the error if needed.
+      }
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+    return null;
+  };
+
   const handleGenerateDid = async () => {
     if (!privateKey.trim()) {
       setError("Private key is required");
@@ -27,28 +83,40 @@ const DidForm = () => {
       const INFURA_URL = import.meta.env.VITE_INFURA_URL;
       const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
 
-      // Create the DID and resolve its DID document
+      // Generate a new DID
       const generatedDid = await createDid(privateKey, INFURA_URL, CONTRACT_ADDRESS);
       setDid(generatedDid);
 
+      // Resolve the DID to get the DID document
       const resolved = await resolveDid(generatedDid, INFURA_URL, CONTRACT_ADDRESS);
       setResolvedDid(resolved);
 
-      // Store the resolved DID document on Pinata
-      const cid = await storeDidDocument(resolved);
+      // Use the retry mechanism to fetch the owner for the generated DID
+      const ownerAddress = await retryVerifyOwner(generatedDid, 3, 3000);
+      setOwner(ownerAddress);
+
+      // Store the DID document on IPFS using a filename that includes the DID
+      const cid = await storeDidDocument(generatedDid, resolved);
       setIpfsCid(cid);
-      console.log("Stored DID document on Pinata, CID:", cid);
+
+      // Save the generated DID, CID, and owner in state
+      setStoredDids((prev) => [...prev, { did: generatedDid, cid, owner: ownerAddress }]);
+
+      // Update the DID registry on Pinata by appending the new DID record
+      const registryCid = await updateDidRegistry({
+        did: generatedDid,
+        didDocumentCid: cid,
+        didOwner: ownerAddress,
+      });
+      console.log("Updated DID registry CID:", registryCid);
     } catch (err) {
-      const errorMessage = err?.message || err?.toString() || "An unexpected error occurred";
-      setError(`Error: ${errorMessage}`);
+      setError(`Error: ${err?.message || "An unexpected error occurred"}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch a DID document from Pinata by CID
   const handleFetchDid = async () => {
-    // If we already have a CID from storage, use it; otherwise, prompt the user.
     const cid = ipfsCid || prompt("Enter the CID to fetch the DID document:");
     if (!cid) return;
 
@@ -58,16 +126,17 @@ const DidForm = () => {
       const fetchedDid = await fetchDidDocument(cid);
       setResolvedDid(fetchedDid);
     } catch (err) {
-      setError("Failed to fetch DID document from IPFS");
+      setError(`Failed to fetch DID document: ${err?.message || err}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // Copy the generated DID to the clipboard
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(did);
-    alert("DID copied to clipboard!");
+    navigator.clipboard.writeText(did).then(() => {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    });
   };
 
   return (
@@ -95,12 +164,12 @@ const DidForm = () => {
         </div>
         <button
           onClick={handleGenerateDid}
-          className={`w-full py-2 px-4 rounded-md text-white ${
+          className={`w-full py-2 px-4 rounded-md text-white flex items-center justify-center ${
             loading ? "bg-gray-400 cursor-not-allowed" : "bg-yellow-500 hover:bg-yellow-600"
           }`}
           disabled={loading}
         >
-          {loading ? "Generating..." : "Generate DID"}
+          {loading ? <Loader className="animate-spin" size={20} /> : "Generate DID"}
         </button>
         {error && <p className="text-red-500 mt-4">{error}</p>}
         {did && (
@@ -112,12 +181,18 @@ const DidForm = () => {
               </button>
             </h2>
             <p className="text-gray-700 break-all">{did}</p>
+            {copySuccess && <p className="text-green-500">Copied to clipboard!</p>}
+            {owner && (
+              <p className="mt-2 text-gray-600">
+                <strong>Owner:</strong> {owner}
+              </p>
+            )}
           </div>
         )}
         {resolvedDid && (
           <div className="mt-4">
             <h2 className="font-bold text-lg">Resolved DID Document:</h2>
-            <pre className="bg-gray-100 p-4 rounded-md overflow-x-auto">
+            <pre className="bg-yellow-100 p-4 rounded-md overflow-x-auto">
               {JSON.stringify(resolvedDid, null, 2)}
             </pre>
           </div>
@@ -128,10 +203,40 @@ const DidForm = () => {
             <p className="text-gray-700 break-all">{ipfsCid}</p>
             <button
               onClick={handleFetchDid}
-              className="w-full mt-2 py-2 px-4 rounded-md text-white bg-blue-500 hover:bg-blue-600"
+              className="w-full mt-2 py-2 px-4 rounded-md text-white bg-yellow-500 hover:bg-yellow-600"
             >
               Fetch DID Document from IPFS
             </button>
+          </div>
+        )}
+        {storedDids.length > 0 && (
+          <div className="mt-6">
+            <h2 className="font-bold text-lg">Previously Generated DIDs:</h2>
+            <ul>
+              {storedDids.map((item, index) => (
+                <li key={index} className="mt-2 p-2 bg-yellow-100 border border-yellow-300 rounded-md overflow-x-auto">
+                  <p>
+                    <strong>DID:</strong> {item.did}
+                  </p>
+                  <p>
+                    <strong>CID:</strong> {item.cid}
+                  </p>
+                  <p>
+                    <strong>Owner:</strong> {item.owner || "Unknown Owner"}
+                  </p>
+                  <button
+                    onClick={async () => {
+                      setLoading(true);
+                      await fetchDidDocument(item.cid);
+                      setLoading(false);
+                    }}
+                    className="mt-2 py-2 px-4 text-white bg-yellow-500 hover:bg-yellow-600 rounded"
+                  >
+                    Fetch DID Document
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>

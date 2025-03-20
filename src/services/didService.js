@@ -1,3 +1,4 @@
+// didService.js
 import { ethers } from "ethers";
 import { EthrDID } from "ethr-did";
 import { Resolver } from "did-resolver";
