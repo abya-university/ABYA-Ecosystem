@@ -16,6 +16,7 @@ import {
   Search,
   Trash2,
   UsersIcon,
+  BadgeCent,
 } from "lucide-react";
 import { useAccount } from "wagmi";
 import { Link } from "react-router-dom";
@@ -23,6 +24,7 @@ import { ethers } from "ethers";
 import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
 import { useEthersSigner } from "../components/useClientSigner";
 import { toast, ToastContainer } from "react-toastify";
+import SFuelDistributor from "../providers/SFuelDistribution";
 
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
 const Community_ABI = CommunityABI.abi;
@@ -132,6 +134,11 @@ const SettingsPage = () => {
       icon: <ListFilterPlus className="w-5 h-5" />,
       label: "Manage Roles",
       key: "roles",
+    },
+    {
+      icon: <BadgeCent className="w-5 h-5" />,
+      label: "SFuel Details",
+      key: "sfuelDetails",
     },
   ];
 
@@ -639,6 +646,8 @@ const SettingsPage = () => {
                 )}
               </div>
             )}
+
+            {activeSection === "sfuelDetails" && <SFuelDistributor />}
           </div>
         </div>
       </div>
