@@ -42,12 +42,12 @@ const ProjectDetails = () => {
   // Helper function to get stage name from number
   const getStageLabel = (stageNumber) => {
     const stages = {
-      0: "Proposal",
-      1: "Under Review",
-      2: "Approved",
-      3: "Funding",
-      4: "Development",
-      5: "Completed",
+      0: "IDEA",
+      1: "Planning",
+      2: "MVP",
+      3: "Alpha",
+      4: "Beta",
+      5: "Production",
     };
     return stages[stageNumber] || "Unknown";
   };
@@ -104,6 +104,7 @@ const ProjectDetails = () => {
       setIsApproveLoading(false);
       closeModal();
     } catch (err) {
+      setError("Error approving project", err);
       toast.error("Error approving project");
     }
   };

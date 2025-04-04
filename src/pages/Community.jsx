@@ -37,6 +37,8 @@ import RewardsSection from "../components/RewardsSection";
 import { useUser } from "../contexts/userContext";
 import ProjectFundingRequestModal from "../components/ProjectRequestFundsForm";
 import ProjectDetails from "./ProjectDetails";
+import AirdropModal from "../components/AirdropModal";
+import AirdropDetails from "../components/AirdropDetails";
 
 const Community_ABI = CommunityABI.abi;
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
@@ -57,10 +59,6 @@ const CommunityPage = () => {
     location: "",
     additionalDetails: "",
   });
-  const [airdropData, setAirdropData] = useState({
-    amount: "",
-    addresses: "",
-  });
   const [projectFundingData, setProjectFundingData] = useState({
     projectAddress: "",
     amount: "",
@@ -72,8 +70,6 @@ const CommunityPage = () => {
   const [badgeData, setBadgeData] = useState(null);
   const [tokenBalance, setTokenBalance] = useState(null);
   const [createEventLoading, setCreateEventLoading] = useState(false);
-  const [distributeAirdropsLoading, setDistributeAirdropsLoading] =
-    useState(false);
   const [fundProjectLoading, setFundProjectLoading] = useState(false);
   const [participateLoading, setParticipateLoading] = useState(false);
   const [joinCommunityLoading, setJoinCommunityLoading] = useState(false);
@@ -533,71 +529,6 @@ const CommunityPage = () => {
     </div>
   );
 
-  // Modal Component for Airdrops
-  const AirdropModal = () => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm transition-opacity">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6 transform transition-all duration-300 ease-in-out scale-100">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-            Distribute Airdrops
-          </h3>
-          <button
-            onClick={() => setShowAirdropModal(false)}
-            className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Amount per Address (LMS)
-            </label>
-            <input
-              type="text"
-              value={airdropData.amount}
-              onChange={(e) =>
-                setAirdropData({ ...airdropData, amount: e.target.value })
-              }
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              placeholder="e.g., 10"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Recipient Addresses (one per line)
-            </label>
-            <textarea
-              value={airdropData.addresses}
-              onChange={(e) =>
-                setAirdropData({ ...airdropData, addresses: e.target.value })
-              }
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white h-32"
-              placeholder="0x123...&#10;0x456...&#10;0x789..."
-            />
-          </div>
-
-          <button
-            onClick={handleAirdrop}
-            disabled={distributeAirdropsLoading}
-            className="w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-cyan-950 font-medium rounded-lg transition-colors duration-300 flex items-center justify-center"
-          >
-            {distributeAirdropsLoading ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
-            ) : (
-              <>
-                <Gift className="w-5 h-5 mr-2" />
-                Submit Airdrop Proposal
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
   // Modal Component for Project Funding
   const ProjectFundingModal = () => (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm transition-opacity">
@@ -675,7 +606,9 @@ const CommunityPage = () => {
       <ToastContainer position="bottom-right" theme="colored" />
 
       {showCreateEventModal && <CreateEventModal />}
-      {showAirdropModal && <AirdropModal />}
+      {showAirdropModal && (
+        <AirdropModal setShowAirdropModal={setShowAirdropModal} />
+      )}
       {showProjectFundingModal && <ProjectFundingModal />}
       {showProjectRequestFundsForm && (
         <ProjectFundingRequestModal
@@ -699,19 +632,21 @@ const CommunityPage = () => {
 
         {/* Navigation Tabs */}
         <div className="flex overflow-x-auto space-x-4 mb-8 border-b border-gray-800 pb-2">
-          {["Overview", "Events", "Rewards", "Projects"].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab.toLowerCase())}
-              className={`pb-3 whitespace-nowrap transition-all duration-300 ${
-                activeTab === tab.toLowerCase()
-                  ? "dark:text-white text-gray-800 border-b-2 border-yellow-500 transform translate-y-[2px]"
-                  : "text-gray-500 dark:hover:text-white hover:text-gray-900"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+          {["Overview", "Events", "Rewards", "Projects", "Airdrops"].map(
+            (tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab.toLowerCase())}
+                className={`pb-3 whitespace-nowrap transition-all duration-300 ${
+                  activeTab === tab.toLowerCase()
+                    ? "dark:text-white text-gray-800 border-b-2 border-yellow-500 transform translate-y-[2px]"
+                    : "text-gray-500 dark:hover:text-white hover:text-gray-900"
+                }`}
+              >
+                {tab}
+              </button>
+            )
+          )}
         </div>
 
         {/* Action Buttons */}
@@ -1132,6 +1067,17 @@ const CommunityPage = () => {
             </div>
 
             <ProjectDetails />
+          </div>
+        )}
+
+        {/* //activetab for airdrops */}
+        {activeTab === "airdrops" && (
+          <div className={`space-y-6 ${fadeIn}`}>
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Airdrop Distributions</h2>
+            </div>
+
+            <AirdropDetails />
           </div>
         )}
       </div>

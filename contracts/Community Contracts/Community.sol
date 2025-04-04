@@ -18,7 +18,9 @@ contract Community is AccessControl, ReentrancyGuard, LMSToken, CommunityBadgeSy
     // State Variables
     uint256 public communityPoolSupply;
     uint256 public communityProjectFunds;
-    
+    uint256 public nextAirdropId;
+    uint256 public activeAirdropId;
+  
     // Structs
     struct CommunityEvent {
         uint256 id;
@@ -41,6 +43,15 @@ contract Community is AccessControl, ReentrancyGuard, LMSToken, CommunityBadgeSy
         ALPHA,
         BETA,
         PRODUCTION
+    }
+
+    struct AirdropProposal {
+        uint256 airdropId;
+        uint256 amount;
+        uint256 startTime;
+        uint256 endTime;
+        bool isActive;
+        uint256 approvalCount;
     }
 
     struct ProjectFundingProposal {
@@ -66,10 +77,11 @@ contract Community is AccessControl, ReentrancyGuard, LMSToken, CommunityBadgeSy
     mapping(address => bool) public isCommunityMember;
     mapping(uint256 => ProjectFundingProposal) public projectProposals;
     mapping(uint256 => mapping(address => bool)) approvals;
+    mapping(uint256 => mapping(address => bool)) hasClaimedAirdrop;
+    mapping(uint256 => AirdropProposal) public airdropProposal;
 
     // Events
     event CommunityPoolUpdate(address indexed _to, uint256 indexed _amount);
-    event AirdropDistributeSuccess(uint256 indexed _amount, uint256 _numberOfEarlyAdopters);
     event EventCreated(uint256 indexed eventId, string name, address creator, bool isOnline, string location);
     event EventParticipation(uint256 indexed eventId, address participant);
     event JoinSuccess(address indexed _address);
@@ -77,6 +89,11 @@ contract Community is AccessControl, ReentrancyGuard, LMSToken, CommunityBadgeSy
     event ProjectProposalApproved(uint256 indexed proposalId);
     event ProjectProposalRejected(uint256 indexed proposalId, string reason);
     event ProjectFundingReleased(uint256 indexed proposalId, address indexed creator, uint256 amount);
+    event AirdropActivated(uint256 indexed airdropId, uint256 amount, uint256 startTime, uint256 endTime);
+    event AirdropClaimed(uint256 indexed airdropId, address indexed claimer, uint256 amount);
+    event AirdropDeactivated(uint256 indexed airdropId);
+    event AirdropProposalCreated(uint256 indexed airdropId, uint256 amount, uint256 startTime, uint256 endTime);
+    event AirdropProposalApproved(uint256 indexed airdropId, address indexed approver);
 
     // Counters (simulating OpenZeppelin's Counters library)
     uint256 private _eventIdCounter;
@@ -88,6 +105,8 @@ contract Community is AccessControl, ReentrancyGuard, LMSToken, CommunityBadgeSy
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(COMMUNITY_MANAGER, msg.sender);
         _grantRole(MULTISIG_APPROVER, msg.sender);
+
+        nextAirdropId = 1;
     }
 
     // Enhanced Mint Function
@@ -135,34 +154,124 @@ contract Community is AccessControl, ReentrancyGuard, LMSToken, CommunityBadgeSy
     }
 
     // Distribute Airdrops with Multi-Sig Approval
-    function distributeAirdrops(
-        uint256 _amount, 
-        address[] memory earlyAdopters
-    ) external onlyRole(COMMUNITY_MANAGER) returns(bool) {
-        require((earlyAdopters.length * _amount) + getCurrentCommunityPoolSupply() <= (COMMUNITY_POOL / 2), 
-            "Community: Insufficient tokens");
+    function createAirdropProposal(
+    uint256 _amount,
+    uint256 _startTime,
+    uint256 _endTime
+) external onlyRole(COMMUNITY_MANAGER) returns (bool) {
+    require(_startTime < _endTime, "Invalid time period");
+    require(_startTime > block.timestamp, "Start time must be in the future");
+    require(activeAirdropId == 0, "Another airdrop is currently active");
 
-        // Create a multi-sig proposal for airdrop
-        bytes memory data = abi.encodeWithSignature(
-            "performAirdrop(uint256,address[])", 
-            _amount, 
-            earlyAdopters
-        );
-        uint256 proposalId = createMultiSigProposal(address(this), data);
+    // Create the airdrop proposal
+    airdropProposal[nextAirdropId] = AirdropProposal({
+        airdropId: nextAirdropId,
+        amount: _amount,
+        startTime: _startTime,
+        endTime: _endTime,
+        isActive: false,
+        approvalCount: 0
+    });
 
-        return true;
+    emit AirdropProposalCreated(nextAirdropId, _amount, _startTime, _endTime);
+
+    nextAirdropId++;
+    return true;
+}
+
+    //internal functio to activate airdrop proposal
+    function activateAirdrop(uint256 _airdropId) external {
+    AirdropProposal storage proposal = airdropProposal[_airdropId];
+
+    require(proposal.isActive, "Airdrop not approved");
+    require(activeAirdropId == 0, "Another airdrop is currently active");
+
+    // Set the active airdrop ID
+    activeAirdropId = _airdropId;
+
+    emit AirdropActivated(_airdropId, proposal.amount, proposal.startTime, proposal.endTime);
+}
+
+    function claimAirdrop(uint256 _airdropId) external nonReentrant {
+        AirdropProposal storage airdropProposal = airdropProposal[_airdropId];
+        require(airdropProposal.isActive, "Airdrop not active!");
+        require(block.timestamp >= airdropProposal.startTime && block.timestamp <= airdropProposal.endTime, 
+            "Airdrop not in progress");
+        require(!hasClaimedAirdrop[airdropProposal.airdropId][msg.sender], "Already claimed this airdrop");
+        require(isCommunityMember[msg.sender], "Must be a community member to claim");
+    
+        // Mark as claimed using the external mapping
+        hasClaimedAirdrop[airdropProposal.airdropId][msg.sender] = true;
+    
+        // Mint tokens to the claimer
+        mintToken(msg.sender, airdropProposal.amount);
+    
+        emit AirdropClaimed(airdropProposal.airdropId, msg.sender, airdropProposal.amount);
     }
 
-    // Internal function to perform actual airdrop
-    function performAirdrop(
-        uint256 _amount, 
-        address[] memory earlyAdopters
-    ) external {
-        for(uint256 i = 0; i < earlyAdopters.length; i++){
-            mintToken(earlyAdopters[i], _amount);
-        }
 
-        emit AirdropDistributeSuccess(_amount, earlyAdopters.length);
+    function approveAirdropProposal(uint256 _airdropId) external onlyRole(MULTISIG_APPROVER) {
+    AirdropProposal storage proposal = airdropProposal[_airdropId];
+
+    require(!proposal.isActive, "Airdrop already active");
+    require(activeAirdropId == 0, "Another airdrop is currently active");
+    require(!approvals[_airdropId][msg.sender], "Already approved by this approver");
+
+    approvals[_airdropId][msg.sender] = true;
+    proposal.approvalCount++;
+
+    if (proposal.approvalCount >= 3) {
+        proposal.isActive = true;
+        activeAirdropId = _airdropId; // Set the active airdrop ID
+
+                // Create data for multisig proposal to activate airdrop
+            bytes memory data = abi.encodeWithSignature(
+                "activateAirdrop(uint256,uint256,uint256)",
+                proposal.amount,
+                proposal.startTime,
+                proposal.endTime
+            );
+        uint256 proposalId = createMultiSigProposal(address(this), data);
+
+        emit AirdropProposalApproved(_airdropId, msg.sender);
+    }
+}
+
+    //function to get all airdrop proposal plus their details
+    function getAirdropProposal(uint256 _airdropId) external view returns (
+    uint256 airdropId,
+    uint256 amount,
+    uint256 startTime,
+    uint256 endTime,
+    bool isActive,
+    uint256 approvalCount
+) {
+    AirdropProposal storage proposal = airdropProposal[_airdropId];
+    return (
+        proposal.airdropId,
+        proposal.amount,
+        proposal.startTime,
+        proposal.endTime,
+        proposal.isActive,
+        proposal.approvalCount
+    );
+}
+
+function getAllAirdropProposals() external view returns (AirdropProposal[] memory) {
+    uint256 totalProposals = nextAirdropId - 1;
+    AirdropProposal[] memory allProposals = new AirdropProposal[](totalProposals);
+
+    for (uint256 i = 0; i < totalProposals; i++) {
+        allProposals[i] = airdropProposal[i + 1];
+    }
+
+    return allProposals;
+}
+
+    function checkClaimStatus(address _address, uint256 _airdropId) external view returns (bool) {
+        AirdropProposal storage airdropProposal = airdropProposal[_airdropId];
+        require(airdropProposal.isActive, "Airdrop not active!");
+        return hasClaimedAirdrop[airdropProposal.airdropId][_address];
     }
 
     // Create Community Event
@@ -240,31 +349,6 @@ contract Community is AccessControl, ReentrancyGuard, LMSToken, CommunityBadgeSy
         
         mintToken(_contributor, _rewardAmount);
         communityContributorRewards[_contributor] += _rewardAmount;
-    }
-
-    // Periodic Airdrops (can be called periodically)
-    function periodicAirdrops(
-        address[] memory _eligibleAddresses, 
-        uint256 _amount
-    ) external onlyRole(COMMUNITY_MANAGER) {
-        require(_eligibleAddresses.length > 0, "No eligible addresses");
-        
-        bytes memory data = abi.encodeWithSignature(
-            "performPeriodicAirdrop(address[],uint256)", 
-            _eligibleAddresses, 
-            _amount
-        );
-        createMultiSigProposal(address(this), data);
-    }
-
-    // Internal function to perform periodic airdrop
-    function performPeriodicAirdrop(
-        address[] memory _eligibleAddresses, 
-        uint256 _amount
-    ) external {
-        for(uint256 i = 0; i < _eligibleAddresses.length; i++) {
-            mintToken(_eligibleAddresses[i], _amount);
-        }
     }
 
     // Function to get all community events with details

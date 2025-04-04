@@ -4,6 +4,7 @@ import CommunityABI from "../artifacts/contracts/Community Contracts/Community.s
 import CommunityBadgeABI from "../artifacts/contracts/Community Contracts/CommunityBadgeSystem.sol/CommunityBadgeSystem.json";
 import { ethers } from "ethers";
 import { useAccount } from "wagmi";
+import { toast } from "react-toastify";
 
 const Community_ABI = CommunityABI.abi;
 const CommunityBadge_ABI = CommunityBadgeABI.abi;
