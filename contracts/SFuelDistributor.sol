@@ -83,7 +83,7 @@ contract SFuelDistributor is AccessControl, ReentrancyGuard {
      * @dev Whitelist address and distribute sFUEL if needed
      * @param to Address to whitelist and potentially receive sFUEL
      */
-    function whitelist(address to) external onlyRole(MANAGER_ROLE) {
+    function whitelist(address to) external {
         require(!hasRole(WHITELIST_ROLE, to), "SFuelDistributor: Already whitelisted");
         
         // Check if user needs sFUEL
@@ -102,8 +102,10 @@ contract SFuelDistributor is AccessControl, ReentrancyGuard {
         
         // Grant whitelist role regardless of whether sFUEL was distributed
         _grantRole(WHITELIST_ROLE, to);
+
         emit Whitelist(to);
     }
+
     
     /**
      * @dev Remove address from whitelist

@@ -1,4 +1,3 @@
-// SFuelDistributor.jsx
 import { useState, useEffect } from "react";
 import {
   useAccount,
@@ -9,6 +8,7 @@ import {
 import { parseEther, formatEther } from "viem";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import SFUELDISTRIBUTIONABI from "../artifacts/contracts/SFuelDistributor.sol/SFuelDistributor.json";
+import { toast } from "react-toastify";
 
 const SFUEL_DISTRIBUTOR_ABI = SFUELDISTRIBUTIONABI.abi;
 const DISTRIBUTOR_CONTRACT_ADDRESS = import.meta.env
@@ -19,6 +19,7 @@ export default function SFuelDistributor() {
   const { address, isConnected } = useAccount();
   const [needsSFuel, setNeedsSFuel] = useState(false);
   const [isWhitelisted, setIsWhitelisted] = useState(false);
+  const [isEligible, setIsEligible] = useState(false);
   const [distributionStatus, setDistributionStatus] = useState("");
 
   // Get user's sFUEL balance
@@ -48,9 +49,20 @@ export default function SFuelDistributor() {
       enabled: Boolean(whitelistRole && address && isConnected),
     });
 
-  // Setup contract write for whitelist function (distributes sFUEL)
+  // Check if user is eligible for distribution
+  const { data: eligibleForDistribution, refetch: refetchEligibility } =
+    useReadContract({
+      address: DISTRIBUTOR_CONTRACT_ADDRESS,
+      abi: SFUEL_DISTRIBUTOR_ABI,
+      functionName: "isEligibleForDistribution",
+      args: [address],
+      chainId: 1020352220,
+      enabled: Boolean(address && isConnected),
+    });
+
+  // Setup contract write for whitelist function
   const {
-    writeContractAsync: whitelistUser,
+    writeContractAsync: whitelist,
     isPending,
     isSuccess,
     error,
@@ -64,34 +76,47 @@ export default function SFuelDistributor() {
     }
   }, [balanceData]);
 
-  // Update whitelist status when data changes
+  // Update whitelist and eligibility status when data changes
   useEffect(() => {
     setIsWhitelisted(Boolean(hasWhitelistRole));
-  }, [hasWhitelistRole]);
+    setIsEligible(Boolean(eligibleForDistribution));
+  }, [hasWhitelistRole, eligibleForDistribution]);
+
+  console.log(
+    "Balance:",
+    balanceData ? formatEther(balanceData.value) : "unknown"
+  );
+  console.log("IsEligible:", isEligible);
+  console.log("IsWhitelisted:", isWhitelisted);
 
   // Function to handle sFUEL distribution
   const handleDistributeSFuel = async () => {
-    if (!needsSFuel || !address || isPending) return;
+    if (!isEligible || !address || isPending) return;
 
     try {
       setDistributionStatus("Requesting sFUEL...");
 
-      await whitelistUser({
+      await whitelist({
         address: DISTRIBUTOR_CONTRACT_ADDRESS,
         abi: SFUEL_DISTRIBUTOR_ABI,
         functionName: "whitelist",
         args: [address],
         chainId: 1020352220,
+        gas: 100000n,
       });
 
+      toast.success("sFUEL distribution successful!");
       setDistributionStatus("sFUEL distribution successful!");
-      // Refresh balance and whitelist status after distribution
+
+      // Refresh balance and statuses after distribution
       setTimeout(() => {
         refetchBalance();
         refetchWhitelistStatus();
+        refetchEligibility();
       }, 3000); // Give blockchain some time to process
     } catch (err) {
       console.error("sFUEL distribution failed:", err);
+      toast.error(`Distribution failed: ${err.message || "Unknown error"}`);
       setDistributionStatus(
         `Distribution failed: ${err.message || "Unknown error"}`
       );
@@ -101,7 +126,7 @@ export default function SFuelDistributor() {
   // Auto-trigger sFUEL distribution when needed
   useEffect(() => {
     if (
-      needsSFuel &&
+      isEligible &&
       isConnected &&
       !isWhitelisted &&
       !isPending &&
@@ -109,7 +134,7 @@ export default function SFuelDistributor() {
     ) {
       handleDistributeSFuel();
     }
-  }, [needsSFuel, isConnected, isWhitelisted, isPending, isSuccess]);
+  }, [isEligible, isConnected, isWhitelisted, isPending, isSuccess]);
 
   return (
     <div className="dark:bg-gray-900 p-6 rounded-lg shadow-lg border border-yellow-500/30 relative overflow-hidden">
@@ -139,8 +164,8 @@ export default function SFuelDistributor() {
       </div>
 
       {!isConnected ? (
-        <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-lg border border-gray-700 shadow-inner">
-          <p className="text-gray-300 mb-4">
+        <div className="dark:bg-gray-800/50 backdrop-blur-sm p-6 rounded-lg border dark:border-gray-700 shadow-inner">
+          <p className="dark:text-gray-300 mb-4">
             Connect your wallet to check sFUEL balance
           </p>
           <div className="mt-4 flex justify-center">
@@ -150,7 +175,7 @@ export default function SFuelDistributor() {
       ) : (
         <>
           {/* Wallet info card with glassmorphism */}
-          <div className="mb-6 p-5 rounded-lg dark:bg-gray-800/70 backdrop-blur-sm dark:border dark:border-gray-700 shadow-inner relative overflow-hidden">
+          <div className="mb-6 p-5 rounded-lg dark:bg-gray-800/70 backdrop-blur-sm border dark:border-gray-700 shadow-inner relative overflow-hidden">
             <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-500/5 rounded-full blur-md"></div>
 
             <div className="flex flex-col space-y-3">
@@ -190,7 +215,7 @@ export default function SFuelDistributor() {
 
           {/* sFUEL status and actions */}
           {needsSFuel && (
-            <div className="mt-4 p-5 rounded-lg bg-gray-800/70 backdrop-blur-sm border border-yellow-500/20 relative overflow-hidden">
+            <div className="mt-4 p-5 rounded-lg dark:bg-gray-800/70 backdrop-blur-sm border border-yellow-500/20 relative overflow-hidden">
               <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-yellow-500/10 rounded-full blur-lg"></div>
 
               <div className="flex items-center mb-4">
@@ -216,7 +241,7 @@ export default function SFuelDistributor() {
                 disabled={isPending || isSuccess}
                 className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-300 shadow-lg ${
                   isPending
-                    ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                    ? "dark:bg-gray-700 text-gray-400 cursor-not-allowed"
                     : "bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-gray-900 shadow-yellow-500/20 hover:shadow-yellow-500/30"
                 }`}
               >
