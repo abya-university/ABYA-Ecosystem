@@ -35,7 +35,7 @@
     "react-router-dom": "^6.28.0",
     "react-toastify": "^11.0.5",
     "react-transition-group": "^4.4.5",
-    "recharts": "^2.15.0",
+    "recharts": "^2.15.2",
     "viem": "^2.21.47",
     "vite-plugin-node-stdlib-browser": "^0.2.1",
     "wagmi": "^2.12.33"

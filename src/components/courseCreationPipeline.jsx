@@ -257,6 +257,8 @@ const CourseCreationPipeline = () => {
     const [success, setSuccess] = useState(""); // Added missing state
     const [error, setError] = useState(""); // Added missing state
 
+    console.log("Coursess: ", courses);
+
     const createChapter = async () => {
       if (isConnected) {
         try {
