@@ -31,7 +31,7 @@ contract Ecosystem1Facet is ReentrancyGuard {
     uint256 constant MIN_CHAPTERS = 1;
     uint256 constant MIN_LESSONS = 1;
     uint256 constant MIN_QUIZZES = 1;
-    uint256 constant APPROVAL_THRESHOLD = 75; // 80% threshold
+    uint256 constant APPROVAL_THRESHOLD = 50; // 50% threshold
     uint256 constant ELIGIBILITY_CHECK_DELAY = 10 minutes; // 10 minutes delay for eligibility check
 
     // Course feedback reasons
@@ -263,10 +263,19 @@ contract Ecosystem1Facet is ReentrancyGuard {
     
     es.courseReviews[_courseId].push(review);
     
-    if ((score / 100) >= APPROVAL_THRESHOLD) {
+    if ((review.score) >= APPROVAL_THRESHOLD * 100) {
         // Course passed the threshold
         es.courseObject[_courseId].approved = true;
         es.courseObject[_courseId].score = score;
+
+        // Update the listOfCourses array
+        for (uint256 i = 0; i < es.listOfCourses.length; i++) {
+            if (es.listOfCourses[i].courseId == _courseId) {
+                es.listOfCourses[i].approved = true;
+                es.listOfCourses[i].score = score;
+                break;
+            }
+        }
     
         // Reward the course creator
         // address creator = es.courseObject[courseId].creator;

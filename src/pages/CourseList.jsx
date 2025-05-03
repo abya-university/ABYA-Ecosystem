@@ -456,7 +456,7 @@ const CoursesPage = ({ onCourseSelect }) => {
       console.log("Sending transaction to approve course...");
       const tx = await diamondContract.approveCourse(
         courseIdToApprove,
-        finalScore.toString(),
+        finalScore,
         review
       );
 
@@ -816,10 +816,7 @@ const CoursesPage = ({ onCourseSelect }) => {
                         View Course
                       </button>
                     )}
-                    {(role === "ADMIN" ||
-                      (role === "Reviewer" &&
-                        !course.approved &&
-                        course.creator === address)) && (
+                    {!course.approved && course.creator === address && (
                       <button
                         onClick={async () => approveCourse(course)}
                         className={`flex-1 bg-gray-800 text-white px-1 dark:bg-gray-300 text-sm dark:text-black py-2 rounded-lg 
@@ -841,24 +838,24 @@ const CoursesPage = ({ onCourseSelect }) => {
                     )}
                     {role === "USER" && !course.approved && address && (
                       <>
-                        {/* {course.enrolledStudents?.includes(address) ? ( */}
-                        <>
-                          <button
-                            onClick={() => viewCourse(course.courseId)}
-                            className="flex-1 bg-yellow-500 mt-3 text-gray-800 text-sm py-2 px-1 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center"
-                          >
-                            <Eye className="w-5 h-5 mr-2" />
-                            View Course
-                          </button>
-                          <button
-                            onClick={() => unEnroll(course.courseId)}
-                            className="flex-1 bg-red-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center"
-                          >
-                            <WifiOff className="w-5 h-5 mr-2" />
-                            Unenroll
-                          </button>
-                        </>
-                        {/* ) : (
+                        {course.enrolledStudents?.includes(address) ? (
+                          <>
+                            <button
+                              onClick={() => viewCourse(course.courseId)}
+                              className="flex-1 bg-yellow-500 mt-3 text-gray-800 text-sm py-2 px-1 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center"
+                            >
+                              <Eye className="w-5 h-5 mr-2" />
+                              View Course
+                            </button>
+                            <button
+                              onClick={() => unEnroll(course.courseId)}
+                              className="flex-1 bg-red-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center"
+                            >
+                              <WifiOff className="w-5 h-5 mr-2" />
+                              Unenroll
+                            </button>
+                          </>
+                        ) : (
                           <button
                             onClick={() => enroll(course.courseId)}
                             className="flex-1 bg-gray-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center"
@@ -866,7 +863,7 @@ const CoursesPage = ({ onCourseSelect }) => {
                             <Wifi className="w-5 h-5 mr-2" />
                             Enroll
                           </button>
-                        )} */}
+                        )}
                       </>
                     )}
                   </div>
@@ -1148,7 +1145,7 @@ const CoursesPage = ({ onCourseSelect }) => {
                                 const approvalPercentage = latestReview?.score
                                   ? latestReview.score / 100
                                   : 0;
-                                const isPassed = approvalPercentage >= 75;
+                                const isPassed = approvalPercentage >= 50;
 
                                 return (
                                   <>
@@ -1294,21 +1291,6 @@ const CoursesPage = ({ onCourseSelect }) => {
                               No detailed metrics available for this course
                             </div>
                           )}
-                        </div>
-
-                        {/* View Full Report Button */}
-                        <div className="pt-2">
-                          <button
-                            onClick={() =>
-                              navigate(
-                                `/course-metrics/${selectedCourse.courseId}`
-                              )
-                            }
-                            className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
-                          >
-                            <ExternalLink className="w-5 h-5" />
-                            <span>View Full Metrics Report</span>
-                          </button>
                         </div>
                       </>
                     )}

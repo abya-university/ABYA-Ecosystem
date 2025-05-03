@@ -1385,7 +1385,7 @@ const CourseDetails = memo(({ courseId }) => {
             </div>
           </div>
         </div>
-        {role === "Reviewer" && !currentCourse.approved && (
+        {/* {role === "Reviewer" && !currentCourse.approved && (
           <button
             onClick={() => {
               // setCourseId(currentCourse.courseId);
@@ -1395,7 +1395,7 @@ const CourseDetails = memo(({ courseId }) => {
           >
             Review Course
           </button>
-        )}
+        )} */}
 
         <ReviewModal
           isOpen={isReviewModalOpen}
