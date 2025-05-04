@@ -1,13 +1,10 @@
-// ConnectProfile.jsx
-
 import React, { useState } from "react";
 import { Loader } from "lucide-react";
 import { createDid } from "../services/didService";
 import { ethers } from "ethers";
-import { useNavigate } from "react-router-dom";
 import EthereumDIDRegistryArtifact from "../artifacts/contracts/EthereumDIDRegistry.sol/EthereumDIDRegistry.json";
 
-const ConnectProfile = () => {
+const ConnectProfile = ({ onClose, onProfileConnected }) => {
   const [privateKey, setPrivateKey] = useState("");
   const [did, setDid] = useState("");
   const [onChainProfileCID, setOnChainProfileCID] = useState("");
@@ -19,10 +16,6 @@ const ConnectProfile = () => {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
 
-  // useNavigate hook from react-router-dom
-  const navigate = useNavigate();
-
-  // Generate a random challenge message for authentication
   const generateChallenge = () => {
     return `Login challenge: ${Math.floor(Math.random() * 1000000)} at ${new Date().toISOString()}`;
   };
@@ -45,18 +38,15 @@ const ConnectProfile = () => {
       setDid(derivedDid);
 
       setStatus("Generating challenge and signing...");
-      // 2. Generate a challenge message and sign it with the private key
       const challengeMessage = generateChallenge();
       setChallenge(challengeMessage);
       const wallet = new ethers.Wallet(privateKey);
       const sig = await wallet.signMessage(challengeMessage);
       setSignature(sig);
 
-      // Clear the private key from state for security after using it
       setPrivateKey("");
-
       setStatus("Verifying signature...");
-      // 3. Verify the signature using ethers
+
       const recoveredAddress = ethers.verifyMessage(challengeMessage, sig);
       const didParts = derivedDid.split(":");
       if (didParts.length < 3) {
@@ -69,16 +59,13 @@ const ConnectProfile = () => {
       setAuthMessage("Authentication successful!");
 
       setStatus("Fetching on-chain profile CID...");
-      // 4. Create a provider and contract instance (read-only)
       const provider = new ethers.JsonRpcProvider(INFURA_URL);
       const didContract = new ethers.Contract(
         CONTRACT_ADDRESS,
         EthereumDIDRegistryArtifact.abi,
         provider
       );
-      // Extract the identity address from the derived DID.
       const identityAddress = didParts[didParts.length - 1];
-      // Call the on-chain function to get the stored profile CID.
       const profileCidOnChain = await didContract.getProfileCID(identityAddress);
       setOnChainProfileCID(profileCidOnChain);
       if (!profileCidOnChain) {
@@ -86,7 +73,6 @@ const ConnectProfile = () => {
       }
 
       setStatus("Fetching profile from IPFS...");
-      // 5. Use your specified IPFS gateway URL to fetch the profile JSON.
       const ipfsUrl = `https://sapphire-near-whippet-156.mypinata.cloud/ipfs/${profileCidOnChain}`;
       const response = await fetch(ipfsUrl);
       const responseText = await response.text();
@@ -94,16 +80,16 @@ const ConnectProfile = () => {
       try {
         profileJson = JSON.parse(responseText);
       } catch (jsonError) {
-        console.error("Failed to parse student profile JSON. Raw response:", responseText);
-        throw new Error("Failed to parse student profile JSON from IPFS. Raw response: " + responseText);
+        console.error("Failed to parse profile JSON. Raw response:", responseText);
+        throw new Error("Failed to parse profile JSON from IPFS. Raw response: " + responseText);
       }
       setProfile(profileJson);
       setStatus("Profile fetched successfully!");
 
-      // Ensure state is fully updated before navigation
+      // Callback to update SettingsPage with the connected profile
       setTimeout(() => {
-        navigate("/ProfileDash", { state: { profile: profileJson, did: derivedDid } });
-      }, 1000); // Adding a small delay to ensure state updates
+        onProfileConnected(derivedDid, profileJson);
+      }, 1000);
     } catch (err) {
       setError(`Error: ${err.message || "An unexpected error occurred"}`);
       setStatus("");
@@ -113,7 +99,7 @@ const ConnectProfile = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
+    <div className="flex flex-col items-center justify-center bg-gray-200 p-6">
       <div className="bg-white p-8 rounded shadow-md w-full max-w-md">
         <h1 className="text-2xl font-semibold mb-6 text-yellow-500">Connect to Your Profile</h1>
         <div className="mb-4">
@@ -156,7 +142,9 @@ const ConnectProfile = () => {
         {profile && (
           <div className="mt-4">
             <h2 className="font-bold text-lg">Your Profile</h2>
-            <pre className="bg-yellow-100 p-4 rounded">{JSON.stringify(profile, null, 2)}</pre>
+            <pre className="bg-yellow-100 p-4 rounded">
+              {JSON.stringify(profile, null, 2)}
+            </pre>
           </div>
         )}
       </div>

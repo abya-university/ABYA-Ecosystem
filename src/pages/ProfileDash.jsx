@@ -1,94 +1,198 @@
-// ProfileDash.jsx
-import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { User, IdCard, Mail, Phone, MapPin, Calendar, Globe } from "lucide-react";
+// ProfileDashboard.jsx
+import { useState, useEffect, Suspense, lazy } from "react";
+import ProfileHeader from "../components/ProfileHeader";
+import ProfileSidebar from "../components/ProfileSidebar";
+import DelegateListSection from "../components/DelegateList";
+import Modal from "../components/ui/Modal";
+import defaultCover from "../assets/cover.jpg";
 
-const ProfileDashboard = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  // The profile JSON is passed in state from ConnectProfile
-  const { profile, did } = location.state || {};
+// Lazy load modal components
+const DidForm = lazy(() => import("./DidForm"));
+const DidOwnerCheck = lazy(() => import("./DidOwnerCheck"));
+const ChangeOwner = lazy(() => import("./ChangeOwner"));
+const AddDelegate = lazy(() => import("./AddDelegate"));
+const CheckDelegate = lazy(() => import("./CheckDelegate"));
+const RevokeDelegate = lazy(() => import("./RevokeDelegate"));
 
+export default function ProfileDashboard({ profile, did }) {
+  // Show error if required props are missing.
   if (!profile || !did) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <p className="text-gray-600 text-lg">No profile data available.</p>
+      <div className="min-h-screen flex items-center justify-center transition-colors duration-300 bg-gray-100 text-gray-600">
+        <p className="text-lg">No profile data available.</p>
       </div>
     );
   }
 
-  // Extract fields from the JSON. Our JSON structure has a top-level "profile" key.
-  const { firstName, secondName, email, phone, location: loc, dob, website, bio, skills } = profile.profile || {};
-  const fullName = firstName && secondName ? `${firstName} ${secondName}` : "N/A";
-  const userRole = profile.role || "Student"; // Default role
+  const [profileImage, setProfileImage] = useState(null);
+  const [coverImage, setCoverImage] = useState(null);
+  const [darkMode, setDarkMode] = useState(false);
+  const [showDid, setShowDid] = useState(false);
+  const [modalType, setModalType] = useState(null);
+  const [isDidOpen, setIsDidOpen] = useState(false);
+  const [isDelegateOpen, setIsDelegateOpen] = useState(false);
+  const [isVcOpen, setIsVcOpen] = useState(false);
+
+  // State to control the overlay sidebar
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    darkMode ? root.classList.add("dark") : root.classList.remove("dark");
+  }, [darkMode]);
+
+  // Destructure profile data with defaults
+  const {
+    firstName = "N/A",
+    secondName = "",
+    email = "Email Not Provided",
+    location: loc = "Lower Orbit",
+
+  } = profile.profile || {};
+
+  const fullName = `${firstName} ${secondName}`.trim() || "N/A";
+  const userRole = profile.role || "User";
+
+  // Handlers to update images
+  const handleProfileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) setProfileImage(URL.createObjectURL(file));
+  };
+
+  const handleCoverChange = (e) => {
+    const file = e.target.files[0];
+    if (file) setCoverImage(URL.createObjectURL(file));
+  };
+
+  const toggleDarkMode = () => setDarkMode((prev) => !prev);
+
+  const openModal = (type) => setModalType(type);
+  const closeModal = () => setModalType(null);
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6 flex justify-center">
-      <div className="w-full max-w-3xl bg-white shadow-md rounded-lg p-6">
-        <h1 className="text-3xl font-semibold text-yellow-500 mb-6">Your Profile</h1>
+    <div
+      className={`min-h-screen transition-colors duration-300 dark:bg-gray-900 dark:text-gray-100 bg-gray-100 relative`}
+    >
+      {/* Sidebar Toggle Button - visible on all screens (or adjust via responsive classes) */}
+      <button
+        onClick={() => setIsSidebarOpen(true)}
+        className="absolute top-4 left-4 z-10 p-2 bg-yellow-500 rounded-md text-black"
+      >
+        ☰
+      </button>
 
-        {/* Profile Info */}
-        <div className="flex items-center space-x-4 border-b pb-4 mb-4">
-          <User className="w-12 h-12 text-yellow-500" />
-          <div>
-            <h2 className="text-2xl font-semibold">{fullName}</h2>
-            <p className="text-gray-500">{userRole}</p>
-          </div>
-        </div>
-
-        {/* Details Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <ProfileItem icon={<IdCard />} label="DID" value={did} />
-          <ProfileItem icon={<Mail />} label="Email" value={email || "N/A"} />
-          <ProfileItem icon={<Phone />} label="Phone" value={phone || "N/A"} />
-          <ProfileItem icon={<MapPin />} label="Location" value={loc || "N/A"} />
-          <ProfileItem icon={<Calendar />} label="Date of Birth" value={dob || "N/A"} />
-          <ProfileItem icon={<Globe />} label="Website" value={website || "N/A"} />
-        </div>
-
-        {/* Profile Description */}
-        {bio && (
-          <div className="mt-6">
-            <h3 className="text-lg font-semibold text-yellow-500 mb-2">Bio</h3>
-            <p className="text-gray-700">{bio}</p>
-          </div>
-        )}
-
-        {/* Skills */}
-        {skills && Array.isArray(skills) && skills.length > 0 && (
-          <div className="mt-6">
-            <h3 className="text-lg font-semibold text-yellow-500 mb-2">Skills</h3>
-            <div className="flex flex-wrap gap-2">
-              {skills.map((skill, index) => (
-                <span key={index} className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm">
-                  {skill}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="mt-6">
-          <button
-            className="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded"
-            onClick={() => navigate("/")}
+      {/* Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-20 flex"
+          onClick={() => setIsSidebarOpen(false)}
+        >
+          <div
+            className="w-64 bg-white dark:bg-gray-800 shadow-lg"
+            onClick={(e) => e.stopPropagation()} // Stop propagation to prevent closing when interacting inside the sidebar
           >
-            Logout / Connect with another account
-          </button>
+            <ProfileSidebar
+              isDidOpen={isDidOpen}
+              setIsDidOpen={setIsDidOpen}
+              isDelegateOpen={isDelegateOpen}
+              setIsDelegateOpen={setIsDelegateOpen}
+              isVcOpen={isVcOpen}
+              setIsVcOpen={setIsVcOpen}
+              openModal={openModal}
+              onClose={() => setIsSidebarOpen(false)}
+            />
+            {/* Close Button inside sidebar */}
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="p-2 w-full text-left border-t border-gray-300 dark:text-gray-100"
+            >
+              Close Sidebar
+            </button>
+          </div>
+          {/* Overlay area for closing sidebar */}
+          <div className="flex-1" onClick={() => setIsSidebarOpen(false)}></div>
         </div>
+      )}
+
+      {/* Main Column for the content */}
+      <div className="flex flex-col min-h-screen">
+        {/* Header - optionally pass sidebar toggle callback if header contains a toggle */}
+        <ProfileHeader
+          profileImage={profileImage}
+          coverImage={coverImage}
+          defaultCover={defaultCover}
+          handleCoverChange={handleCoverChange}
+          handleProfileChange={handleProfileChange}
+          toggleDarkMode={toggleDarkMode}
+          darkMode={darkMode}
+          fullName={fullName}
+          userRole={userRole}
+          loc={loc}
+          email={email}
+          did={did}
+          showDid={showDid}
+          setShowDid={setShowDid}
+          skillLevel={44}
+          onSidebarToggle={() => setIsSidebarOpen((prev) => !prev)}
+          showSidebarToggle
+        />
+
+        {/* Main Content */}
+        <main className="mt-10 p-6 space-y-8 flex-1">
+          <DelegateListSection did={did} />
+        </main>
       </div>
+
+      {/* Modals */}
+      {modalType && (
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 flex items-center justify-center dark:text-gray-100">
+              Loading...
+            </div>
+          }
+        >
+          <Modal onClose={closeModal} ariaLabel="Modal Window">
+            {modalType === "createDID" && <DidForm />}
+            {modalType === "lookupDID" && <DidOwnerCheck />}
+            {modalType === "changeOwner" && <ChangeOwner />}
+            {modalType === "addDelegate" && <AddDelegate />}
+            {modalType === "checkDelegate" && <CheckDelegate />}
+            {modalType === "revokeDelegate" && <RevokeDelegate />}
+          </Modal>
+        </Suspense>
+      )}
+
+      {/* Custom Scrollbar & Animations */}
+      <style>{`
+        ::-webkit-scrollbar {
+          width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+          background: rgb(61, 61, 61);
+        }
+        ::-webkit-scrollbar-thumb {
+          background: #888;
+          border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: #555;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.6s ease-out both;
+        }
+        @keyframes pulseSlow {
+          0%, 100% { opacity: 0.8; }
+          50% { opacity: 1; }
+        }
+        .animate-pulse-slow {
+          animation: pulseSlow 3s infinite;
+        }
+      `}</style>
     </div>
   );
-};
-
-const ProfileItem = ({ icon, label, value }) => (
-  <div className="flex items-center space-x-3 bg-gray-50 p-4 rounded-lg shadow-sm">
-    <div className="text-yellow-500">{icon}</div>
-    <div>
-      <p className="text-gray-600 text-sm">{label}</p>
-      <p className="text-gray-900 font-semibold">{value}</p>
-    </div>
-  </div>
-);
-
-export default ProfileDashboard;
+}

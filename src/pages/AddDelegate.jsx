@@ -46,7 +46,7 @@ const AddDelegate = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-100">
+    <div className="flex flex-col items-center justify-center p-4 bg-gray-200 rounded-lg">
       <div className="max-w-md w-full bg-white p-6 rounded-lg shadow-md">
         <h2 className="flex justify-center text-2xl font-semibold mb-6 text-yellow-500">Add Delegate to DID</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -59,15 +59,6 @@ const AddDelegate = () => {
         </form>
         {message && <p className={`mt-4 text-center text-sm ${messageColor}`}>{message}</p>}
         {receipt && <pre className="bg-gray-100 p-4 rounded-md overflow-x-auto">{JSON.stringify(receipt, null, 2)}</pre>}
-      </div>
-      <div className="flex justify-center space-x-4 p-6">
-        <button
-          onClick={() => window.history.back()}
-          className="border border-yellow-500 text-yellow-500 px-6 py-3 rounded-lg flex items-center space-x-2 hover:bg-yellow-500 hover:text-white transition-colors"
-        >
-          <ArrowLeft size={20} />
-          <span>Go Back</span>
-        </button>
       </div>
     </div>
   );

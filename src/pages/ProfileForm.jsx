@@ -157,7 +157,7 @@ const DidProfileForm = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
+    <div className="flex flex-col items-center justify-center bg-gray-200 p-6">
       <div className="bg-white p-8 rounded shadow-md w-full max-w-lg">
         <h1 className="flex justify-center text-2xl font-semibold mb-6 text-yellow-500">
           Create Your Profile & DID
@@ -283,15 +283,6 @@ const DidProfileForm = () => {
             )}
           </div>
         )}
-      </div>
-      <div className="flex justify-center space-x-4 p-6">
-        <button
-          onClick={() => window.history.back()}
-          className="border border-yellow-500 text-yellow-500 px-6 py-3 rounded-lg flex items-center space-x-2 hover:bg-yellow-500 hover:text-white transition-colors"
-        >
-          <ArrowLeft size={20} />
-          <span>Go Back</span>
-        </button>
       </div>
     </div>
   );
