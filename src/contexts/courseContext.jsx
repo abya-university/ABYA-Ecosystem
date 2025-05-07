@@ -70,7 +70,9 @@ const CourseProvider = ({ children }) => {
                     !course.approved.isZero()),
                 score: course.score.toString(),
                 creator: course.creator,
-                enrolledStudents: course.enrolledStudents.toString(),
+                enrolledStudents: course.enrolledStudents.map((student) =>
+                  student.toString()
+                ),
                 difficulty_level: Number(course.difficultyLevel),
                 creationTime: course.creationTime.toString(),
               };

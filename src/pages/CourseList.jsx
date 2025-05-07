@@ -15,6 +15,7 @@ import {
   ChartBar,
   ArrowLeft,
   ExternalLink,
+  WifiOffIcon,
 } from "lucide-react";
 import { CourseContext } from "../contexts/courseContext";
 import { useUser } from "../contexts/userContext";
@@ -22,6 +23,7 @@ import { ChapterContext } from "../contexts/chapterContext";
 import { LessonContext } from "../contexts/lessonContext";
 import { QuizContext } from "../contexts/quizContext";
 import Ecosystem1FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem1Facet.sol/Ecosystem1Facet.json";
+import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import { ethers } from "ethers";
 import { useEthersSigner } from "../components/useClientSigner";
 import { useAccount } from "wagmi";
@@ -30,6 +32,7 @@ import { toast, ToastContainer } from "react-toastify";
 const EcosystemDiamondAddress = import.meta.env
   .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
 const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
+const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
 const CoursesPage = ({ onCourseSelect }) => {
   const {
@@ -61,6 +64,7 @@ const CoursesPage = ({ onCourseSelect }) => {
   const [error, setError] = useState(null);
   const [enrolled, setEnrolled] = useState(false);
   const [unEnrolled, setUnEnrolled] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const latestReview = latestReviews[courseId] || {};
   const allReviews = courseReviews[courseId] || [];
@@ -636,41 +640,47 @@ const CoursesPage = ({ onCourseSelect }) => {
 
   const enroll = async (courseId) => {
     try {
+      setLoading(true);
       const signer = await signerPromise;
       const contract = new ethers.Contract(
-        ContractAddress,
-        ContractABI,
+        EcosystemDiamondAddress,
+        Ecosystem2Facet_ABI,
         signer
       );
       const tx = await contract.enroll(courseId);
       await tx.wait();
       console.log(`Transaction Receipt: ${tx.hash}`);
       setEnrolled(true);
-      setSuccess(`Enrolled into course ${courseId} successfully!`);
+      toast.success(`Enrolled into course ${courseId} successfully!`);
     } catch (error) {
       console.error("Error enrolling in course:", error);
-      setError("Error enrolling in course. Please try again!");
+      toast.error("Error enrolling in course. Please try again!");
       setEnrolled(false);
+    } finally {
+      setLoading(false);
     }
   };
 
   const unEnroll = async (courseId) => {
     try {
+      setLoading(true);
       const signer = await signerPromise;
       const contract = new ethers.Contract(
-        ContractAddress,
-        ContractABI,
+        EcosystemDiamondAddress,
+        Ecosystem2Facet_ABI,
         signer
       );
       const tx = await contract.unEnroll(courseId);
       await tx.wait();
       console.log(`Transaction Receipt: ${tx.hash}`);
       setUnEnrolled(true);
-      setSuccess(`Unenrolled into course ${courseId} successfully!`);
+      toast.success(`Unenrolled into course ${courseId} successfully!`);
     } catch (error) {
       console.error("Error enrolling in course:", error);
-      setError("Error enrolling in course. Please try again!");
+      toast.error("Error enrolling in course. Please try again!");
       setUnEnrolled(false);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -820,23 +830,25 @@ const CoursesPage = ({ onCourseSelect }) => {
                       <button
                         onClick={async () => approveCourse(course)}
                         className={`flex-1 bg-gray-800 text-white px-1 dark:bg-gray-300 text-sm dark:text-black py-2 rounded-lg 
-                            ${
-                              isLoading
-                                ? "opacity-70 cursor-not-allowed"
-                                : "hover:bg-gray-600"
-                            } 
-                            transition-colors flex items-center justify-center`}
-                        disabled={isLoading}
+        ${
+          isLoading || course.approved
+            ? "opacity-70 cursor-not-allowed"
+            : "hover:bg-gray-600"
+        } 
+        transition-colors flex items-center justify-center`}
+                        disabled={isLoading || course.approved}
                       >
                         {isLoading ? (
                           <Loader className="w-5 h-5 mr-2 animate-spin" />
                         ) : (
                           <AlertCircle className="w-5 h-5 mr-2" />
                         )}
-                        Request Review
+                        {course.approved
+                          ? "Already Approved"
+                          : "Request Review"}
                       </button>
                     )}
-                    {role === "USER" && !course.approved && address && (
+                    {role === "USER" && course.approved && address && (
                       <>
                         {course.enrolledStudents?.includes(address) ? (
                           <>
@@ -847,21 +859,41 @@ const CoursesPage = ({ onCourseSelect }) => {
                               <Eye className="w-5 h-5 mr-2" />
                               View Course
                             </button>
-                            <button
+                            {/* <button
                               onClick={() => unEnroll(course.courseId)}
                               className="flex-1 bg-red-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center"
                             >
                               <WifiOff className="w-5 h-5 mr-2" />
                               Unenroll
+                            </button> */}
+                            <button
+                              onClick={() => unEnroll(course.courseId)}
+                              disabled={loading}
+                              className={`flex-1 bg-red-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center ${
+                                loading ? "opacity-50 cursor-not-allowed" : ""
+                              }`}
+                            >
+                              <WifiOffIcon className="w-5 h-5 mr-2" />
+                              {loading ? "Unenrolling..." : "Unenroll"}
                             </button>
                           </>
                         ) : (
+                          // <button
+                          //   onClick={() => enroll(course.courseId)}
+                          //   className="flex-1 bg-gray-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center"
+                          // >
+                          //   <Wifi className="w-5 h-5 mr-2" />
+                          //   Enroll
+                          // </button>
                           <button
                             onClick={() => enroll(course.courseId)}
-                            className="flex-1 bg-gray-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center"
+                            disabled={loading}
+                            className={`flex-1 bg-gray-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center ${
+                              loading ? "opacity-50 cursor-not-allowed" : ""
+                            }`}
                           >
                             <Wifi className="w-5 h-5 mr-2" />
-                            Enroll
+                            {loading ? "Enrolling..." : "Enroll"}
                           </button>
                         )}
                       </>

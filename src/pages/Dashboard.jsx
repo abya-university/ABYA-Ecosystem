@@ -66,20 +66,12 @@ const Dashboard = () => {
 
   console.log("Dashboard Courses:", courses);
 
-  const getEnrolledStudentsCount = (enrolledStudentsString) => {
-    // If empty or undefined, return 0
-    if (!enrolledStudentsString) return 0;
+  const getEnrolledStudentsCount = (enrolledStudents) => {
+    // If the array is empty or undefined, return 0
+    if (!enrolledStudents || enrolledStudents.length === 0) return 0;
 
-    // If it's a single address, return 1
-    if (
-      enrolledStudentsString.startsWith("0x") &&
-      !enrolledStudentsString.includes(",")
-    ) {
-      return 1;
-    }
-
-    // If multiple addresses, split and count
-    return enrolledStudentsString.split(",").length;
+    // Return the length of the array
+    return enrolledStudents.length;
   };
 
   const toggleDarkMode = () => {

@@ -47,13 +47,13 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
         require(est.courseObject[_courseId].exists, "Course does not exist!");
     
         LibDiamond.Course storage courseFromMapping = est.courseObject[_courseId];
-        LibDiamond.Course storage courseFromArray = es.listOfCourses[_courseId];
+        LibDiamond.Course storage courseFromArray = est.listOfCourses[_courseId];
     
         courseFromMapping.enrolledStudents.push(msg.sender);
         courseFromArray.enrolledStudents.push(msg.sender);
         es.isEnrolled[_courseId][msg.sender] = true;
 
-        mintToken(msg.sender, LibDiamond.ENROLLMENT_REWARD);
+        // mintToken(msg.sender, LibDiamond.ENROLLMENT_REWARD);
         emit EnrollmentSuccess(_courseId, msg.sender);
         return true;
     }
@@ -73,7 +73,7 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
         removeStudentFromList(courseFromArray.enrolledStudents, msg.sender);
     
         es.isEnrolled[_courseId][msg.sender] = false;
-        burn(msg.sender, LibDiamond.ENROLLMENT_REWARD);
+        // burn(msg.sender, LibDiamond.ENROLLMENT_REWARD);
         emit unEnrollmentSuccess(_courseId, msg.sender);
         return true;
     }
