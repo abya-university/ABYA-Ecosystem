@@ -19,6 +19,7 @@ import { LessonContext } from "../contexts/lessonContext";
 import { QuizContext } from "../contexts/quizContext";
 import { uploadFileToPinata, uploadMetadataToIPFS } from "../components/pinata";
 import PreviewCourse from "../pages/PreviewCourse";
+import { toast, ToastContainer } from "react-toastify";
 
 const EcosystemDiamondAddress = import.meta.env
   .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
@@ -72,7 +73,7 @@ const CourseCreationPipeline = () => {
       console.log("Transaction sent:", tx.hash);
       const receipt = await tx.wait();
       console.log("Transaction confirmed:", receipt.transactionHash);
-      setSuccess("Course created successfully!");
+      toast.success("Course created successfully!");
       setCourseData({
         basicInfo: {
           name: "",
@@ -102,11 +103,15 @@ const CourseCreationPipeline = () => {
       });
 
       if (err.code === "INVALID_ARGUMENT") {
-        setError("Invalid transaction parameters. Please check your input.");
+        toast.error("Invalid transaction parameters. Please check your input.");
       } else if (err.code === "UNSUPPORTED_OPERATION") {
-        setError("Unsupported network operation. Check your network settings.");
+        toast.error(
+          "Unsupported network operation. Check your network settings."
+        );
       } else {
-        setError(`Failed to create course: ${err.message || "Unknown error"}`);
+        toast.error(
+          `Failed to create course: ${err.message || "Unknown error"}`
+        );
       }
     } finally {
       setLoading(false);
@@ -257,8 +262,11 @@ const CourseCreationPipeline = () => {
     const [success, setSuccess] = useState(""); // Added missing state
     const [error, setError] = useState(""); // Added missing state
 
+    console.log("Coursess: ", courses);
+
     const createChapter = async () => {
       if (isConnected) {
+        setLoading(true);
         try {
           const signer = await signerPromise;
           if (!signer) {
@@ -282,28 +290,6 @@ const CourseCreationPipeline = () => {
             signer
           );
 
-          // const diamondContract2 = new ethers.Contract(
-          //   EcosystemDiamondAddress,
-          //   Ecosystem1Facet_ABI,
-          //   signer
-          // );
-
-          // // Verify course exists
-          // try {
-          //   const rawCourseObject = await diamondContract2.courseObject(
-          //     parsedCourseId
-          //   );
-          //   const [contractCourseId] = rawCourseObject;
-
-          //   if (contractCourseId.toString() !== parsedCourseId.toString()) {
-          //     throw new Error("Course ID mismatch!");
-          //   }
-          // } catch (courseCheckError) {
-          //   console.error("Course Verification Error:", courseCheckError);
-          //   setError(`Course verification failed: ${courseCheckError.message}`);
-          //   return;
-          // }
-
           const tx = await diamondContract.addChapters(
             parsedCourseId,
             chapters,
@@ -314,10 +300,12 @@ const CourseCreationPipeline = () => {
           setChapters([]);
           setDurations([]);
           setCourseId("");
-          setSuccess("Chapters created successfully!");
+          toast.success("Chapters created successfully!");
         } catch (err) {
           console.error("Full Error:", err);
-          setError(`Failed to create chapters: ${err.message}`);
+          toast.error(`Failed to create chapters: ${err.message}`);
+        } finally {
+          setLoading(false);
         }
       }
     };
@@ -427,11 +415,20 @@ const CourseCreationPipeline = () => {
                 </div>
               ))}
             </div>
-            <button
+            {/* <button
               onClick={createChapter}
               className="bg-yellow-500 mt-4 text-black px-4 py-2 rounded-lg flex items-center"
             >
               Create Chapters
+            </button> */}
+            <button
+              onClick={createChapter}
+              disabled={loading}
+              className={`rounded-lg bg-yellow-500 mt-4 py-2 px-6 hover:bg-yellow-600 transition-colors ${
+                loading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            >
+              {loading ? "Creating..." : "Create Chapters"}
             </button>
           </div>
         )}
@@ -455,6 +452,7 @@ const CourseCreationPipeline = () => {
         setError("Wallet is not connected");
         return;
       } else {
+        setLoading(true);
         try {
           const signer = await signerPromise;
           if (!signer) {
@@ -477,12 +475,14 @@ const CourseCreationPipeline = () => {
           );
           const receipt = await tx.wait();
           console.log(receipt);
-          setSuccess(`${lessonName} lesson created successfully!`);
+          toast.success(`${lessonName} lesson created successfully!`);
           setLessonName("");
           setLessonContent("");
         } catch (err) {
           console.error("Full Error:", err);
-          setError(`Failed to create lessons: ${err.message}`);
+          toast.error(`Failed to create lessons: ${err.message}`);
+        } finally {
+          setLoading(false);
         }
       }
     };
@@ -604,11 +604,20 @@ const CourseCreationPipeline = () => {
           </select>
         </div>
 
-        <button
+        {/* <button
           onClick={createLesson}
           className="bg-yellow-500 text-black px-4 py-2 rounded-lg flex items-center"
         >
           Create Lesson
+        </button> */}
+        <button
+          onClick={createLesson}
+          disabled={loading}
+          className={`rounded-lg bg-yellow-500 mt-4 py-2 px-6 hover:bg-yellow-600 transition-colors ${
+            loading ? "opacity-50 cursor-not-allowed" : ""
+          }`}
+        >
+          {loading ? "Creating..." : "Create Lesson"}
         </button>
       </div>
     );
@@ -632,6 +641,7 @@ const CourseCreationPipeline = () => {
     const [quizError, setQuizError] = useState("");
     const [questionSuccess, setQuestionSuccess] = useState("");
     const [questionError, setQuestionError] = useState("");
+    const [quizLoading, setQuizLoading] = useState(false);
 
     console.log("Lessons: ", lessons);
     console.log("Quizzes: ", quizzes);
@@ -640,7 +650,7 @@ const CourseCreationPipeline = () => {
       if (!isConnected || !address) {
         throw new Error("Please connect to a blockchain network");
       }
-
+      setQuizLoading(true);
       try {
         // const lesson = lessons.find((lesson) => lesson.lessonId === lessonId);
         const signer = await signerPromise;
@@ -659,10 +669,12 @@ const CourseCreationPipeline = () => {
         console.log("Quiz created: ", receipt);
         setLessonId("");
         setQuizTitle("");
-        setQuizSuccess(`${quizTitle} created successfully!!`);
+        toast.success(`${quizTitle} created successfully!!`);
       } catch (error) {
         console.error("Error creating quiz: ", error);
-        setQuizError("Error creating quiz");
+        toast.error("Error creating quiz");
+      } finally {
+        setQuizLoading(false);
       }
     };
 
@@ -690,7 +702,7 @@ const CourseCreationPipeline = () => {
         if (!isConnected || !address) {
           throw new Error("Please connect to a blockchain network");
         }
-
+        setLoading(true);
         try {
           const signer = await signerPromise;
           const diamondContract = new ethers.Contract(
@@ -715,7 +727,7 @@ const CourseCreationPipeline = () => {
           );
 
           const receipt = await tx.wait();
-          setQuestionSuccess("Question created successfully!!");
+          toast.success("Question created successfully!!");
 
           // Reset inputs after adding
           setQuestion("");
@@ -727,7 +739,9 @@ const CourseCreationPipeline = () => {
           ]);
         } catch (err) {
           console.error("Error creating question: ", err);
-          setQuestionError("Error creating question");
+          toast.error("Error creating question");
+        } finally {
+          setLoading(false);
         }
       } else {
         alert(
@@ -797,9 +811,12 @@ const CourseCreationPipeline = () => {
 
           <button
             onClick={createQuiz}
-            className="bg-yellow-500 text-black px-4 py-2 w-[120px] rounded-lg flex items-center"
+            disabled={quizLoading}
+            className={`rounded-lg bg-yellow-500 py-2 px-4 w-[120px] hover:bg-yellow-600 transition-colors ${
+              quizLoading ? "opacity-50 cursor-not-allowed" : ""
+            }`}
           >
-            Create Quiz
+            {quizLoading ? "Creating..." : "Create Quiz"}
           </button>
 
           {(questionSuccess || questionError) && (
@@ -879,9 +896,12 @@ const CourseCreationPipeline = () => {
 
             <button
               onClick={createQuestion}
-              className="bg-yellow-500 text-black px-4 py-2 rounded-lg flex items-center"
+              disabled={loading}
+              className={`rounded-lg bg-yellow-500 mt-4 py-2 px-6 hover:bg-yellow-600 transition-colors ${
+                loading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
             >
-              Create Question
+              {loading ? "Creating..." : "Create Question"}
             </button>
 
             {/* Added Questions List */}
@@ -1020,16 +1040,15 @@ const CourseCreationPipeline = () => {
           },
         ]);
 
-        setSuccess("Resource added successfully!");
-
         // Reset form
         setResourceName("");
         setResourceLink("");
         setFile(null);
         setContentType("");
+        toast.success("Resource added successfully!");
       } catch (error) {
         console.error("Error adding resource:", error);
-        setError("Error adding resource. Please try again.");
+        toast.error("Error adding resource. Please try again.");
       } finally {
         setIsUploading(false);
       }
@@ -1238,6 +1257,7 @@ const CourseCreationPipeline = () => {
   return (
     <div className="w-[90%] md:w-[60%] lg:w-[50%] mx-auto p-8 bg-white dark:bg-gray-900 rounded-lg shadow-lg mt-[100px]">
       <ProgressBar />
+      <ToastContainer position="bottom-right" theme="colored" />
 
       {showPreview ? (
         <PreviewCourse />

@@ -47,13 +47,13 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
         require(est.courseObject[_courseId].exists, "Course does not exist!");
     
         LibDiamond.Course storage courseFromMapping = est.courseObject[_courseId];
-        LibDiamond.Course storage courseFromArray = es.listOfCourses[_courseId];
+        LibDiamond.Course storage courseFromArray = est.listOfCourses[_courseId];
     
         courseFromMapping.enrolledStudents.push(msg.sender);
         courseFromArray.enrolledStudents.push(msg.sender);
         es.isEnrolled[_courseId][msg.sender] = true;
 
-        mintToken(msg.sender, LibDiamond.ENROLLMENT_REWARD);
+        // mintToken(msg.sender, LibDiamond.ENROLLMENT_REWARD);
         emit EnrollmentSuccess(_courseId, msg.sender);
         return true;
     }
@@ -73,7 +73,7 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
         removeStudentFromList(courseFromArray.enrolledStudents, msg.sender);
     
         es.isEnrolled[_courseId][msg.sender] = false;
-        burn(msg.sender, LibDiamond.ENROLLMENT_REWARD);
+        // burn(msg.sender, LibDiamond.ENROLLMENT_REWARD);
         emit unEnrollmentSuccess(_courseId, msg.sender);
         return true;
     }
@@ -107,6 +107,7 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
 
             // Add the chapter ID to the courseChapters mapping
             es.courseChapters[_courseId].push(newChapter);
+            est.courseChapters[_courseId].push(eds.data.nextChapterId);
 
             eds.data.nextChapterId++;
         }
@@ -139,6 +140,7 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
     function addLesson(uint256 _chapterId, string memory _lessonName, string memory _lessonContent) external {
         LibDiamond.Ecosystem2Storage storage es = LibDiamond.ecosystem2Storage();
         LibDiamond.EcosystemDataStorage storage eds = LibDiamond.ecosystemDataStorage();
+        LibDiamond.EcosystemStorage storage est = LibDiamond.ecosystemStorage();
 
         uint256 lessonId = eds.data.nextLessonId;
         require(es.chapter[_chapterId].exists, "Chapter does not exist!");
@@ -154,6 +156,7 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
 
         // Push a copy to the array
         es.listOfLessons.push(es.lesson[lessonId]);
+        est.courseLessons[_chapterId].push(lessonId);
         
         eds.data.nextLessonId++;
 
@@ -177,6 +180,7 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
     function createQuiz(uint256 _lessonId, string memory _title) external returns(uint256) {
         LibDiamond.Ecosystem2Storage storage es = LibDiamond.ecosystem2Storage();
         LibDiamond.EcosystemDataStorage storage eds = LibDiamond.ecosystemDataStorage();
+        LibDiamond.EcosystemStorage storage est = LibDiamond.ecosystemStorage();
 
         uint256 _quizId = eds.data.nextQuizId;
         require(es.lesson[_lessonId].exists, "Lesson Does not exist!");
@@ -188,6 +192,7 @@ contract Ecosystem2Facet is  ReentrancyGuard, AccessControl {
 
         eds.data.nextQuizId++;
         es.listOfQuizzes.push(newQuiz);
+        est.courseQuizzes[_lessonId].push(_quizId);
 
         emit QuizCreatedSuccess(_quizId, _title);
 

@@ -74,8 +74,17 @@ library LibDiamond {
         uint256 courseCount;
         uint256 nextCourseId;
         address[] reviewerPool;
-        mapping(address => bool) isInReviewerPool;
+        
 
+        // mappings
+        mapping(address => bool) isInReviewerPool;
+        mapping(uint256 => uint256) courseCreationTime;
+        mapping(uint256 => bool) courseEligibilityChecked;
+        mapping(uint256 => bool) courseEligibility;
+        mapping(uint256 => string) courseFeedback;
+        mapping(uint256 => uint256[]) courseChapters;
+        mapping(uint256 => uint256[]) courseLessons;
+        mapping(uint256 => uint256[]) courseQuizzes;
         mapping(uint256 => Course) courseObject;
         mapping(uint256 => mapping(address => Review)) reviews;
         mapping(address => Account) accountCourses;
@@ -120,11 +129,12 @@ library LibDiamond {
         string courseName;
         string description;
         bool approved;
-        uint256 approvalCount;
+        uint256 score;
         address creator;
         bool exists;
         address[] enrolledStudents;
         DifficultyLevel difficultyLevel;
+        uint256 creationTime;
     }
 
     enum DifficultyLevel { Beginner, Intermediate, Advanced }
@@ -141,6 +151,9 @@ library LibDiamond {
         uint256 assessmentForLearning;
         uint256 engagementAndMotivation;
         bool isSubmitted;
+        string category;
+        uint256 score;
+        bool passed;
     }
 
     struct Account {

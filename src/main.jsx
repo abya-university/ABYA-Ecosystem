@@ -10,6 +10,10 @@ import LessonProvider from "./contexts/lessonContext.jsx";
 import QuizProvider from "./contexts/quizContext.jsx";
 import { UserProvider } from "./contexts/userContext.jsx";
 import { CertificatesProvider } from "./contexts/certificatesContext.jsx";
+import { CommunityEventsProvider } from "./contexts/communityEventsContext.jsx";
+import { CommunityMembersProvider } from "./contexts/communityMembersContext.jsx";
+import { ProjectProposalsProvider } from "./contexts/projectProposalsContext.jsx";
+import { AirdropProposalProvider } from "./contexts/airdropProposalContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -21,7 +25,15 @@ createRoot(document.getElementById("root")).render(
               <QuizProvider>
                 <UserProvider>
                   <CertificatesProvider>
-                    <App />
+                    <CommunityEventsProvider>
+                      <CommunityMembersProvider>
+                        <ProjectProposalsProvider>
+                          <AirdropProposalProvider>
+                            <App />
+                          </AirdropProposalProvider>
+                        </ProjectProposalsProvider>
+                      </CommunityMembersProvider>
+                    </CommunityEventsProvider>
                   </CertificatesProvider>
                 </UserProvider>
               </QuizProvider>

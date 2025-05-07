@@ -1,7 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 import Home from "./pages/Home";
 // import Navbar from "./components/Navbar";
-import MasterPage from "./pages/MasterPage"
+import MasterPage from "./pages/MasterPage";
 import CourseCreationPipeline from "./components/courseCreationPipeline";
 import DidForm from "./pages/DidForm";
 import OwnerCheck from "./pages/DidOwnerCheck";
@@ -10,6 +10,7 @@ import AddDelegate from "./pages/AddDelegate";
 import CheckDelegate from "./pages/CheckDelegate";
 import RevokeDelegate from "./pages/RevokeDelegate";
 import NotFoundPage from "./pages/404Page";
+import CourseMetricsPage from "./pages/CourseMetricsPage";
 
 function App() {
   return (
@@ -25,6 +26,10 @@ function App() {
         <Route path="/AddDelegate" element={<AddDelegate />} />
         <Route path="/CheckDelegate" element={<CheckDelegate />} />
         <Route path="/RevokeDelegate" element={<RevokeDelegate />} />
+        <Route
+          path="/course-metrics/:courseId"
+          element={<CourseMetricsPage />}
+        />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </>
