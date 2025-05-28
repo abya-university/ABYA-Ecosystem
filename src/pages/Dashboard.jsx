@@ -11,12 +11,23 @@ import {
 import { CourseContext } from "../contexts/courseContext";
 import { useUser } from "../contexts/userContext";
 import { useAccount } from "wagmi";
+import ProfileFormPopup from "../components/ProfileSurveyForm";
+import axios from "axios";
 
 const Dashboard = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const { courses } = useContext(CourseContext);
   const { role } = useUser();
   const { address } = useAccount();
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
+
+  const handleFormSubmit = (formData) => {
+    console.log('Form submitted:', formData);
+    // Process the form data here
+
+    setIsPopupOpen(false);
+  };
+
 
   // Sample stats data (keep as is or modify based on your needs)
   const stats = [
@@ -90,15 +101,33 @@ const Dashboard = () => {
       <div className="container mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
-          <div>
+          <div className="flex flex-row justify-between gap-80">
+          <div className="items-start">
             <h1 className="text-3xl font-bold dark:text-yellow-400 text-yellow-500">
               ABYA Learning Dashboard
             </h1>
             <p className="text-sm dark:text-gray-400 text-gray-600">
               Your blockchain education journey
             </p>
+            
+            </div>
+            <div className="items-end mx-auto">
+            <button
+            onClick={() => setIsPopupOpen(true)}
+            className="px-6 py-3 bg-yellow-500 text-gray-800 rounded-md hover:bg-yellow-600 transition-colors font-medium"
+          >
+            Open Profile Form
+          </button>
+            </div>
           </div>
         </div>
+
+        <ProfileFormPopup
+          isOpen={isPopupOpen}
+          onClose={() => setIsPopupOpen(false)}
+          onSubmit={handleFormSubmit}
+        />
+        
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
