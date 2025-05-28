@@ -1,0 +1,15 @@
+createCourse(string memory _courseName, string memory _description, LibDiamond.DifficultyLevel _difficultyLevel) => 0x3693dcfa
+getAllCourses() => 0xa217fddf
+mintToken(address to, uint256 amount) => 0x75284998
+burn(address account, uint256 amount) => 0x8a2492bb
+getCurrentEcosystemPoolSupply() => 0x9dad8d22
+submitReview(uint256 courseId, uint256[10] memory scores) => 0x5cc2a14d
+validateScores(uint256 learnerAgency,uint256 criticalThinking,uint256 collaborativeLearning,uint256 reflectivePractice,uint256 adaptiveLearning,
+    uint256 authenticLearning,uint256 technologyIntegration,uint256 learnerSupport,uint256 assessmentForLearning,uint256 engagementAndMotivation) => 0x04e48bd1
+getTotalScore(LibDiamond.Review storage review) => 0xc293bbbe
+isReviewer(uint256 courseId, address reviewer) => 0xc7954e4c
+selectCourseReviewers(uint256 courseId) => 0x248a9ca3
+approveCourse(uint256 courseId) => 0x2f2ff15d
+getCourseReviewers(uint256 courseId) => 0x91d14854
+editCourse(uint256 _courseId, string memory _courseName) => 0x36568abe
+deleteCourse(uint256 _courseId) => 0xd547741f

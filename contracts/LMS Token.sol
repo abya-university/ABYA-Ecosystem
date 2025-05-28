@@ -144,4 +144,14 @@ contract LMSToken is ERC20, AccessControl {
             emit MultiSigProposalExecuted(_proposalId);
         }
     }
+
+    //function to add multisig approver
+    function addMultiSigApprover(address newApprover) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _grantRole(MULTISIG_APPROVER, newApprover);
+    }
+
+    //function to remove multisig approver
+    function removeMultiSigApprover(address approver) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _revokeRole(MULTISIG_APPROVER, approver);
+    }
 }
