@@ -1,4 +1,5 @@
 // ipfsService.js
+
 import { PinataSDK } from "pinata-web3";
 
 // Initialize Pinata SDK using JWT and Gateway URL from environment variables
@@ -127,3 +128,106 @@ export const storeStudentProfile = async (did, profileData) => {
     throw error;
   }
 };
+
+
+
+/**
+ * Unpins a given CID from Pinata to free up space.
+ * @param {string} cid - The IPFS CID to unpin.
+ */
+export const unpinCID = async (cid) => {
+  try {
+    await pinata.unpin(cid);
+    console.log(`Successfully unpinned CID: ${cid}`);
+  } catch (error) {
+    console.error(`Failed to unpin CID ${cid}:`, error);
+    throw error;
+  }
+};
+
+
+
+
+
+// Optional Wallet Connection
+
+/**
+ * Append a new DID entry into the global `did.json` registry on Pinata.
+ * @param {string} did       - The full did:ethr:… string
+ * @param {string} cid       - The IPFS CID of the DID document itself
+ * @param {string} owner     - The on‐chain owner address
+ * @returns {Promise<string>} - The new global registry CID
+ */
+export async function registerDidInGlobalRegistry({ did, cid, owner }) {
+  // 1) fetch the latest did.json pin (if any)
+  let existing = { dids: [] };
+  try {
+    const list = await pinata.pinList({ name: "did.json" });
+    if (list.count > 0) {
+      const latestHash = list.rows[0].ipfs_pin_hash;
+      const resp = await fetch(`${process.env.VITE_PINATA_GATEWAY}/ipfs/${latestHash}`);
+      existing = await resp.json();
+    }
+  } catch (err) {
+    console.warn("No existing registry or fetch error:", err);
+  }
+
+  // 2) append our new entry
+  existing.dids.push({
+    did,
+    owner,
+    didDocumentCid: cid,
+    timestamp: new Date().toISOString(),
+  });
+
+  // 3) re‐upload updated did.json
+  const blob = new Blob([JSON.stringify(existing, null, 2)], {
+    type: "application/json",
+  });
+  const file = new File([blob], "did.json", { type: "application/json" });
+  const upload = await pinata.upload.file(file, {
+    pinataMetadata: { name: "did.json" },
+  });
+  return upload.IpfsHash;
+}
+
+
+/**
+ * Append a new DID + timestamp to a global DID registry on Pinata.
+ * @param {string} did
+ * @returns {Promise<string>}  the new registry CID
+ */
+export const registerDidOnIpfs = async (did) => {
+  try {
+    // 1. see if we already have a registry pinned:
+    const existingCid = await getDidRegistryCid(/* look for “did-registry.json” */);
+    let registry;
+
+    if (existingCid) {
+      // fetch the old registry array
+      registry = await fetchDidDocument(existingCid);
+    } else {
+      registry = { dids: [] };
+    }
+
+    // 2. append the new entry
+    registry.dids.push({
+      did,
+      timestamp: new Date().toISOString(),
+    });
+
+    // 3. upload the updated registry
+    const registryString = JSON.stringify(registry, null, 2);
+    const blob = new Blob([registryString], { type: "application/json" });
+    const file = new File([blob], "did-registry.json", { type: "application/json" });
+    const uploadResponse = await pinata.upload.file(file, {
+      pinataMetadata: { name: "did-registry.json" },
+    });
+
+    return uploadResponse.IpfsHash;
+  } catch (err) {
+    console.error("Error updating DID registry:", err);
+    throw err;
+  }
+};
+

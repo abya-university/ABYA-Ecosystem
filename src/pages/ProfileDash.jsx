@@ -7,7 +7,7 @@ import Modal from "../components/ui/Modal";
 import defaultCover from "../assets/cover.jpg";
 
 // Lazy load modal components
-const DidForm = lazy(() => import("./DidForm"));
+const DidDoc = lazy(() => import("./DidDoc"));
 const DidOwnerCheck = lazy(() => import("./DidOwnerCheck"));
 const ChangeOwner = lazy(() => import("./ChangeOwner"));
 const AddDelegate = lazy(() => import("./AddDelegate"));
@@ -153,7 +153,7 @@ export default function ProfileDashboard({ profile, did }) {
           }
         >
           <Modal onClose={closeModal} ariaLabel="Modal Window">
-            {modalType === "createDID" && <DidForm />}
+            {modalType === "DidDoc" && <DidDoc />}
             {modalType === "lookupDID" && <DidOwnerCheck />}
             {modalType === "changeOwner" && <ChangeOwner />}
             {modalType === "addDelegate" && <AddDelegate />}

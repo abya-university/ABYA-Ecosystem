@@ -13,6 +13,7 @@ import {
 import { useAccount } from "wagmi";
 import Modal from "../components/ui/Modal";
 import ProfileForm from "./ProfileForm";
+import UpdateProfileForm from "./UpdateProfileForm";
 import ConnectProfile from "./ConnectProfile";
 import ProfileDash from "./ProfileDash";
 
@@ -84,6 +85,7 @@ const SettingsPage = () => {
   ];
 
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showUpdateProfileModal, setShowUpdateProfileModal] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
 
   // Callback to update profile information after ConnectProfile succeeds
@@ -160,6 +162,16 @@ const SettingsPage = () => {
                           className="text-yellow-500 hover:underline"
                         >
                           New Profile
+                        </button>
+                      </div>
+
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-medium">Update Profile</h3>
+                        <button
+                          onClick={() => setShowUpdateProfileModal(true)}
+                          className="text-yellow-500 hover:underline"
+                        >
+                          Update
                         </button>
                       </div>
 
@@ -288,6 +300,13 @@ const SettingsPage = () => {
       {showCreateModal && (
         <Modal onClose={() => setShowCreateModal(false)}>
           <ProfileForm onClose={() => setShowCreateModal(false)} />
+        </Modal>
+      )}
+
+      {/* Modal for Update Profile */}
+      {showUpdateProfileModal && (
+        <Modal onClose={() => setShowUpdateProfileModal(false)}>
+          <UpdateProfileForm onClose={() => setShowUpdateProfileModal(false)} />
         </Modal>
       )}
 

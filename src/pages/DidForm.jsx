@@ -1,114 +1,146 @@
+// DidProfileForm.jsx
 import React, { useState } from "react";
 import { ArrowLeft, Eye, EyeOff, Clipboard, Loader } from "lucide-react";
 import { createDid, resolveDid } from "../services/didService";
 import {
   storeDidDocument,
-  fetchDidDocument,
-  updateDidRegistry,
+  storeStudentProfile,
 } from "../services/ipfsService";
 import { ethers } from "ethers";
-import { EthereumDIDRegistry } from "ethr-did-registry";
+// Import your compiled contract artifact to ensure you have the correct ABI.
+import EthereumDIDRegistryArtifact from "../artifacts/contracts/EthereumDIDRegistry.sol/EthereumDIDRegistry.json";
 
-const DidForm = () => {
+const DidProfileForm = () => {
+  // DID and IPFS states
   const [privateKey, setPrivateKey] = useState("");
   const [did, setDid] = useState("");
   const [resolvedDid, setResolvedDid] = useState(null);
-  const [ipfsCid, setIpfsCid] = useState("");
+  const [didCid, setDidCid] = useState("");
   const [owner, setOwner] = useState(null);
+
+  // Profile states - now separate first and second name
+  const [firstName, setFirstName] = useState("");
+  const [secondName, setSecondName] = useState("");
+  const [email, setEmail] = useState("");
+  const [profileCid, setProfileCid] = useState("");
+
+  // Transaction hashes and success message
+  const [docTxHash, setDocTxHash] = useState("");
+  const [profileTxHash, setProfileTxHash] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  // UI states
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-  const [storedDids, setStoredDids] = useState([]);
 
-  // Refactored function to verify the DID owner.
-  // It returns the owner address instead of setting state directly.
+  // Verify DID owner
   const verifyIdentityOwner = async (identityDID) => {
-    try {
-      const INFURA_URL = import.meta.env.VITE_INFURA_URL;
-      const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
-
-      if (!INFURA_URL || !CONTRACT_ADDRESS) {
-        throw new Error("Missing environment variables");
-      }
-
-      // Extract the Ethereum address from the DID string
-      const identityAddress = identityDID.split(":")[3]; // Assumes DID format: did:ethr:sepolia:<address>
-      if (!identityAddress) {
-        throw new Error("Invalid DID format. Ensure it follows 'did:ethr:sepolia:<address>'");
-      }
-
-      // Connect to Ethereum provider
-      const provider = new ethers.JsonRpcProvider(INFURA_URL);
-
-      // Instantiate the DID Registry contract
-      const DidReg = new ethers.Contract(
-        CONTRACT_ADDRESS,
-        EthereumDIDRegistry.abi,
-        provider
+    const INFURA_URL = import.meta.env.VITE_INFURA_URL;
+    const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
+    const identityAddress = identityDID.split(":")[3];
+    if (!identityAddress) {
+      throw new Error(
+        "Invalid DID format. Ensure it follows 'did:ethr:sepolia:<address>'"
       );
-
-      // Call the `identityOwner` function to get the owner's address
-      const ownerAddress = await DidReg.identityOwner(identityAddress);
-      return ownerAddress;
-    } catch (err) {
-      throw err;
     }
+    const provider = new ethers.JsonRpcProvider(INFURA_URL);
+    const DidReg = new ethers.Contract(
+      CONTRACT_ADDRESS,
+      EthereumDIDRegistryArtifact.abi,
+      provider
+    );
+    return await DidReg.identityOwner(identityAddress);
   };
 
-  // Retry mechanism to verify the owner in case of propagation delays.
+  // Retry mechanism for owner verification
   const retryVerifyOwner = async (identityDID, retries = 3, delay = 3000) => {
     for (let i = 0; i < retries; i++) {
       try {
         const ownerAddress = await verifyIdentityOwner(identityDID);
         if (ownerAddress) return ownerAddress;
-      } catch (err) {
-        // Optionally log the error if needed.
-      }
+      } catch (err) {}
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
     return null;
   };
 
-  const handleGenerateDid = async () => {
-    if (!privateKey.trim()) {
-      setError("Private key is required");
+  // Main function to generate DID and profile
+  const handleCreateProfile = async () => {
+    if (
+      !privateKey.trim() ||
+      !firstName.trim() ||
+      !secondName.trim() ||
+      !email.trim()
+    ) {
+      setError("Private key, first name, second name, and email are required");
       return;
     }
 
     setLoading(true);
     setError("");
+    setSuccessMessage("");
+    setDocTxHash("");
+    setProfileTxHash("");
 
     try {
       const INFURA_URL = import.meta.env.VITE_INFURA_URL;
       const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
 
-      // Generate a new DID
+      // 1. Generate a new DID using the private key
       const generatedDid = await createDid(privateKey, INFURA_URL, CONTRACT_ADDRESS);
       setDid(generatedDid);
 
-      // Resolve the DID to get the DID document
+      // 2. Resolve the DID to get its document
       const resolved = await resolveDid(generatedDid, INFURA_URL, CONTRACT_ADDRESS);
       setResolvedDid(resolved);
 
-      // Use the retry mechanism to fetch the owner for the generated DID
+      // 3. Verify the owner address (with retry)
       const ownerAddress = await retryVerifyOwner(generatedDid, 3, 3000);
       setOwner(ownerAddress);
 
-      // Store the DID document on IPFS using a filename that includes the DID
-      const cid = await storeDidDocument(generatedDid, resolved);
-      setIpfsCid(cid);
+      // 4. Store the DID document on IPFS via Pinata
+      const didDocumentCid = await storeDidDocument(generatedDid, resolved);
+      setDidCid(didDocumentCid);
 
-      // Save the generated DID, CID, and owner in state
-      setStoredDids((prev) => [...prev, { did: generatedDid, cid, owner: ownerAddress }]);
-
-      // Update the DID registry on Pinata by appending the new DID record
-      const registryCid = await updateDidRegistry({
+      // 5. Build the student profile object and store it on IPFS
+      const studentProfile = {
         did: generatedDid,
-        didDocumentCid: cid,
-        didOwner: ownerAddress,
-      });
-      console.log("Updated DID registry CID:", registryCid);
+        owner: ownerAddress,
+        profile: { firstName, secondName, email },
+        didDocumentCid,
+        timestamp: new Date().toISOString(),
+      };
+
+      const profileIpfsCid = await storeStudentProfile(generatedDid, studentProfile);
+      setProfileCid(profileIpfsCid);
+
+      // 6. Save the DID document CID and the profile CID on-chain using the smart contract
+      const identityAddress = generatedDid.split(":")[3];
+      if (!identityAddress) {
+        throw new Error("Invalid DID format. Could not extract identity address.");
+      }
+      const provider = new ethers.JsonRpcProvider(INFURA_URL);
+      const wallet = new ethers.Wallet(privateKey, provider);
+      const didContract = new ethers.Contract(
+        CONTRACT_ADDRESS,
+        EthereumDIDRegistryArtifact.abi,
+        wallet
+      );
+
+      // Save DID Document CID on-chain
+      const txDoc = await didContract.setDIDDocumentCID(identityAddress, didDocumentCid);
+      const receiptDoc = await txDoc.wait();
+      setDocTxHash(receiptDoc.transactionHash);
+
+      // Save Profile CID on-chain
+      const txProfile = await didContract.setProfileCID(identityAddress, profileIpfsCid);
+      const receiptProfile = await txProfile.wait();
+      setProfileTxHash(receiptProfile.transactionHash);
+
+      setSuccessMessage("CIDs have been saved successfully on-chain!");
+
     } catch (err) {
       setError(`Error: ${err?.message || "An unexpected error occurred"}`);
     } finally {
@@ -116,22 +148,7 @@ const DidForm = () => {
     }
   };
 
-  const handleFetchDid = async () => {
-    const cid = ipfsCid || prompt("Enter the CID to fetch the DID document:");
-    if (!cid) return;
-
-    setLoading(true);
-    setError("");
-    try {
-      const fetchedDid = await fetchDidDocument(cid);
-      setResolvedDid(fetchedDid);
-    } catch (err) {
-      setError(`Failed to fetch DID document: ${err?.message || err}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Copy DID to clipboard
   const copyToClipboard = () => {
     navigator.clipboard.writeText(did).then(() => {
       setCopySuccess(true);
@@ -140,11 +157,12 @@ const DidForm = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center rounded-lg bg-gray-200 p-6">
+    <div className="flex flex-col items-center justify-center bg-gray-200 p-6">
       <div className="bg-white p-8 rounded shadow-md w-full max-w-lg">
         <h1 className="flex justify-center text-2xl font-semibold mb-6 text-yellow-500">
-          Generate New DID
+          Create Your Profile & DID
         </h1>
+        {/* Private Key Input */}
         <div className="mb-4 relative">
           <input
             id="privateKey"
@@ -162,16 +180,52 @@ const DidForm = () => {
             {showPrivateKey ? <EyeOff size={20} /> : <Eye size={20} />}
           </button>
         </div>
+
+        {/* Profile Information Inputs */}
+        <div className="mb-4">
+          <input
+            type="text"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            placeholder="First Name"
+            className="mt-1 p-2 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-yellow-300 focus:border-yellow-300"
+          />
+        </div>
+        <div className="mb-4">
+          <input
+            type="text"
+            value={secondName}
+            onChange={(e) => setSecondName(e.target.value)}
+            placeholder="Second Name"
+            className="mt-1 p-2 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-yellow-300 focus:border-yellow-300"
+          />
+        </div>
+        <div className="mb-4">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email"
+            className="mt-1 p-2 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-yellow-300 focus:border-yellow-300"
+          />
+        </div>
+
         <button
-          onClick={handleGenerateDid}
+          onClick={handleCreateProfile}
           className={`w-full py-2 px-4 rounded-md text-white flex items-center justify-center ${
             loading ? "bg-gray-400 cursor-not-allowed" : "bg-yellow-500 hover:bg-yellow-600"
           }`}
           disabled={loading}
         >
-          {loading ? <Loader className="animate-spin" size={20} /> : "Generate DID"}
+          {loading ? <Loader className="animate-spin" size={20} /> : "Create Profile & DID"}
         </button>
+
         {error && <p className="text-red-500 mt-4">{error}</p>}
+        {successMessage && (
+          <p className="text-green-600 mt-4 font-semibold">{successMessage}</p>
+        )}
+
+        {/* Display Generated Outputs */}
         {did && (
           <div className="mt-4">
             <h2 className="font-bold text-lg flex items-center">
@@ -180,7 +234,7 @@ const DidForm = () => {
                 <Clipboard size={18} />
               </button>
             </h2>
-            <p className="text-green-600 overflow-x-auto">{did}</p>
+            <p className="text-gray-700 break-all">{did}</p>
             {copySuccess && <p className="text-green-500">Copied to clipboard!</p>}
             {owner && (
               <p className="mt-2 text-gray-600">
@@ -189,6 +243,7 @@ const DidForm = () => {
             )}
           </div>
         )}
+
         {resolvedDid && (
           <div className="mt-4">
             <h2 className="font-bold text-lg">Resolved DID Document:</h2>
@@ -197,46 +252,35 @@ const DidForm = () => {
             </pre>
           </div>
         )}
-        {ipfsCid && (
+
+        {didCid && (
           <div className="mt-4">
-            <h2 className="font-bold text-lg">Stored on Pinata, CID:</h2>
-            <p className="text-gray-700 break-all">{ipfsCid}</p>
-            <button
-              onClick={handleFetchDid}
-              className="w-full mt-2 py-2 px-4 rounded-md text-white bg-yellow-500 hover:bg-yellow-600"
-            >
-              Fetch DID Document from IPFS
-            </button>
+            <h2 className="font-bold text-lg">DID Document CID (IPFS):</h2>
+            <p className="text-gray-700 break-all">{didCid}</p>
           </div>
         )}
-        {storedDids.length > 0 && (
-          <div className="mt-6">
-            <h2 className="font-bold text-lg">Previously Generated DIDs:</h2>
-            <ul>
-              {storedDids.map((item, index) => (
-                <li key={index} className="mt-2 p-2 bg-yellow-100 border border-yellow-300 rounded-md overflow-x-auto">
-                  <p>
-                    <strong>DID:</strong> {item.did}
-                  </p>
-                  <p>
-                    <strong>CID:</strong> {item.cid}
-                  </p>
-                  <p>
-                    <strong>Owner:</strong> {item.owner || "Unknown Owner"}
-                  </p>
-                  <button
-                    onClick={async () => {
-                      setLoading(true);
-                      await fetchDidDocument(item.cid);
-                      setLoading(false);
-                    }}
-                    className="mt-2 py-2 px-4 text-white bg-yellow-500 hover:bg-yellow-600 rounded"
-                  >
-                    Fetch DID Document
-                  </button>
-                </li>
-              ))}
-            </ul>
+
+        {profileCid && (
+          <div className="mt-4">
+            <h2 className="font-bold text-lg">Profile Stored on IPFS, CID:</h2>
+            <p className="text-gray-700 break-all">{profileCid}</p>
+          </div>
+        )}
+
+        {(docTxHash || profileTxHash) && (
+          <div className="mt-4 bg-green-50 p-4 rounded-md">
+            {docTxHash && (
+              <p>
+                <strong>DID Document TX:</strong>{" "}
+                <span className="break-all">{docTxHash}</span>
+              </p>
+            )}
+            {profileTxHash && (
+              <p>
+                <strong>Profile TX:</strong>{" "}
+                <span className="break-all">{profileTxHash}</span>
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -244,4 +288,4 @@ const DidForm = () => {
   );
 };
 
-export default DidForm;
+export default DidProfileForm;

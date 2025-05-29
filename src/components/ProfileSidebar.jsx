@@ -14,12 +14,12 @@ export default function ProfileSidebar({
   return (
     <aside className="w-64 border-r border-gray-300 flex flex-col h-full">
       
-      {/* Removed Top Row: Logo */}
       
       {/* Bottom Row: Scrollable Navigation */}
       <div className="flex-1 overflow-y-auto px-6 pt-6 mb-8">
         <h3 className="text-2xl font-bold mt-4 mb-4 tracking-wide text-center text-yellow-500">Profile Kit</h3>
         <ul className="space-y-3">
+          
           {/* DID Dropdown */}
           <li>
             <div 
@@ -36,15 +36,10 @@ export default function ProfileSidebar({
                 <li className="hover:text-blue-400 cursor-pointer">
                   <button 
                     className="flex items-center gap-2"
-                    onClick={() => openModal("createDID")}
+                    onClick={() => openModal("DidDoc")}
                   >
-                    New DID
-                  </button>
-                </li>
-                <li className="hover:text-blue-400 cursor-pointer">
-                  <Link to="/Diddocument" className="flex items-center gap-2">
                     DID Document
-                  </Link>
+                  </button>
                 </li>
                 <li className="hover:text-blue-400 cursor-pointer">
                   <button 
@@ -65,6 +60,7 @@ export default function ProfileSidebar({
               </ul>
             )}
           </li>
+
           {/* Delegate Dropdown */}
           <li>
             <div 
@@ -105,6 +101,7 @@ export default function ProfileSidebar({
               </ul>
             )}
           </li>
+
           {/* Verifiable Credentials Dropdown */}
           <li>
             <div 
