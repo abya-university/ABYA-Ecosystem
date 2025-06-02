@@ -76,9 +76,9 @@ export default function ProfileDashboard({ profile, did }) {
       {/* Sidebar Toggle Button - visible on all screens (or adjust via responsive classes) */}
       <button
         onClick={() => setIsSidebarOpen(true)}
-        className="absolute top-4 left-4 z-10 p-2 bg-yellow-500 rounded-md text-black"
+        className="absolute top-4 left-4 z-10 p-1 bg-yellow-500 rounded-md text-black"
       >
-        ☰
+        :☰:
       </button>
 
       {/* Sidebar Overlay */}

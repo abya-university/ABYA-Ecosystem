@@ -1,19 +1,21 @@
-// src/pages/ConnectProfile.jsx
 import React, { useState, useEffect } from "react";
 import { Loader } from "lucide-react";
 import { useDid } from '../contexts/DidContext';
+import { useProfile } from '../contexts/ProfileContext';
 import { ethers } from "ethers";
 import EthereumDIDRegistryArtifact from "../artifacts/contracts/EthereumDIDRegistry.sol/EthereumDIDRegistry.json";
 
 const ConnectProfile = ({ onClose, onProfileConnected }) => {
   const { ethrDid } = useDid();
+  const { setProfile: setCtxProfile } = useProfile();
+
   const [onChainProfileCID, setOnChainProfileCID] = useState("");
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
 
-  // Auto-trigger when ethrDid changes (optional)
+  // Auto-trigger when ethrDid changes
   useEffect(() => {
     if (ethrDid) {
       handleConnect();
@@ -53,11 +55,22 @@ const ConnectProfile = ({ onClose, onProfileConnected }) => {
       setStatus("Fetching profile from IPFS...");
       const response = await fetch(`https://ipfs.io/ipfs/${cid}`);
       const json = await response.json();
+
+      // Store locally for preview
       setProfile(json);
       setStatus("Profile fetched successfully!");
 
       // Inform parent
       onProfileConnected(ethrDid, json);
+
+      // Also stash into global ProfileContext
+      setCtxProfile({
+        did:       ethrDid,
+        firstName: json.profile?.firstName || "",
+        secondName: json.profile?.secondName || "",
+        email:      json.profile?.email || ""
+      });
+
     } catch (err) {
       setError(err.message || "Error connecting to profile.");
       setStatus("");

@@ -1,4 +1,3 @@
-// src/components/WalletConnection.jsx
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDisconnect, useAccount, useBalance } from "wagmi";
@@ -45,7 +44,7 @@ const WalletConnection = () => {
         const registry = import.meta.env.VITE_CONTRACT_ADDRESS;
         const did = await createDidFromSigner(signer, registry, 'sepolia');
         if (!mounted) return;
-        setEthrDid(did);  // Store in context
+        setEthrDid(did);
         await registerDidOnIpfs(did);
       } catch (err) {
         console.error(err);
@@ -104,7 +103,6 @@ const WalletConnection = () => {
           aria-label="Connected"
         />
         <Wallet2Icon size={20} />
-        <span>My Wallet</span>
       </button>
 
       {dropdownVisible && (
@@ -114,19 +112,21 @@ const WalletConnection = () => {
           className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden"
         >
           <div className="bg-yellow-500/10 p-4 flex items-center space-x-3 border-b dark:border-gray-700">
-            <UserCircle className="w-10 h-10 text-yellow-600 dark:text-yellow-400" />
+            <Wallet2Icon className="w-10 h-10 text-yellow-600 dark:text-yellow-400" />
             <div>
               <h3 className="font-bold text-lg text-gray-800 dark:text-white">Wallet Details</h3>
-              <p className="text-xs text-gray-600 dark:text-gray-300 truncate max-w-[200px]">{address}</p>
+              {/* <p className="text-xs text-gray-600 dark:text-gray-300 truncate max-w-[200px]">{address}</p> */}
             </div>
           </div>
 
           <div className="p-4 space-y-3">
+            {/* Status */}
             <div className="flex justify-between">
               <span className="flex items-center space-x-2"><ChartNetwork /><span>Status</span></span>
               <span className="flex items-center space-x-1 text-green-500"><Check /><span>Connected</span></span>
             </div>
 
+            {/* Copy Address */}
             <div className="flex justify-between">
               <button onClick={() => copyText(address, setIsCopied)} className="flex items-center space-x-1 hover:underline">
                 {isCopied ? <CopyCheckIcon /> : <CopyIcon />} <span>Address</span>
@@ -136,6 +136,7 @@ const WalletConnection = () => {
               </span>
             </div>
 
+            {/* Copy DID */}
             {ethrDid && (
               <div className="flex justify-between">
                 <button onClick={() => copyText(ethrDid, setIsDidCopied)} className="flex items-center space-x-1 hover:underline">
@@ -147,6 +148,7 @@ const WalletConnection = () => {
               </div>
             )}
 
+            {/* Ether Balance */}
             <div className="flex justify-between">
               <span className="flex items-center space-x-2"><Wallet /><span>Balance</span></span>
               <span className="font-semibold dark:text-yellow-500">
@@ -154,12 +156,13 @@ const WalletConnection = () => {
               </span>
             </div>
 
+            {/* Token Balance Placeholder */}
             <div className="flex justify-between">
               <span className="flex items-center space-x-2"><Aperture /><span>Token Balance</span></span>
-              {/* Assume token balance fetched by parent or separate hook */}
               <span className="font-semibold dark:text-purple-600">--</span>
             </div>
 
+            {/* Disconnect */}
             <button
               onClick={signOut}
               className="w-full flex items-center justify-center space-x-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950 p-2 rounded-lg"
@@ -174,5 +177,3 @@ const WalletConnection = () => {
 };
 
 export default WalletConnection;
-
- 
