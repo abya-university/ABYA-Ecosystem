@@ -6,8 +6,9 @@ import {
   CopyIcon,
   CopyCheckIcon,
   Power,
+  ChartNetwork,
+  Check,
   X,
-  Menu,
 } from "lucide-react";
 
 export default function ProfileConnection() {
@@ -58,7 +59,7 @@ export default function ProfileConnection() {
     navigate("/");
   };
 
-  // If no profile, show placeholder
+  // If no profile, show connect button
   if (!profile || !profile.did) {
     return (
       <button
@@ -89,42 +90,47 @@ export default function ProfileConnection() {
       {dropdownVisible && (
         <div
           ref={dropdownRef}
-          className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50"
+          role="menu"
+          className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50"
         >
-          <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-            <UserCircle className="w-10 h-10 text-yellow-600 dark:text-yellow-400" />
-            <h3 className="font-bold text-lg text-gray-800 dark:text-white">Profile Details</h3>
-            <button onClick={() => setDropdownVisible(false)}>
-              <X size={20} className="text-gray-600 dark:text-gray-300" />
-            </button>
-          </div>
-          <div className="p-4 space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="font-semibold text-sm">DID</span>
-              <button onClick={() => copyText(did, setIsDidCopied)} className="flex items-center space-x-1 hover:underline">
-                {isDidCopied ? <CopyCheckIcon /> : <CopyIcon />} <span>Copy</span>
-              </button>
-            </div>
-            <p className="break-all font-mono text-sm text-gray-700 dark:text-gray-300">{did}</p>
-
+          <div className="bg-blue-500/10 p-4 flex items-center space-x-3 border-b dark:border-gray-700">
+            <UserCircle className="w-10 h-10 text-blue-600 dark:text-blue-400" />
             <div>
-              <h4 className="font-semibold text-sm">Name</h4>
-              <p className="text-gray-700 dark:text-gray-300">{firstName} {secondName}</p>
+              <h3 className="font-bold text-lg text-gray-800 dark:text-white">{firstName} {secondName}</h3>
+            </div>
+          </div>
+
+          <div className="p-4 space-y-3">
+            {/* Status */}
+            <div className="flex justify-between">
+              <span className="flex items-center space-x-2"><ChartNetwork /><span>Status</span></span>
+              <span className="flex items-center space-x-1 text-green-500"><Check /><span>Connected</span></span>
             </div>
 
-            <div className="flex justify-between items-center">
-              <span className="font-semibold text-sm">Email</span>
-              <button onClick={() => copyText(email, setIsEmailCopied)} className="flex items-center space-x-1 hover:underline">
-                {isEmailCopied ? <CopyCheckIcon /> : <CopyIcon />} <span>Copy</span>
+            {/* DID */}
+            <div className="flex justify-between">
+              <button onClick={() => copyText(did, setIsDidCopied)} className="flex items-center space-x-1 hover:underline">
+                {isDidCopied ? <CopyCheckIcon /> : <CopyIcon />} <span>DID</span>
               </button>
+              <span className="font-semibold text-sm truncate max-w-[150px]">
+                {did.replace(/^(.{6}).*(.{4})$/, "$1…$2")}
+              </span>
             </div>
-            <p className="break-all text-gray-700 dark:text-gray-300 text-sm">{email}</p>
 
+            {/* Email */}
+            <div className="flex justify-between">
+              <button onClick={() => copyText(email, setIsEmailCopied)} className="flex items-center space-x-1 hover:underline">
+                {isEmailCopied ? <CopyCheckIcon /> : <CopyIcon />} <span>Email</span>
+              </button>
+              <span className="font-semibold text-sm truncate max-w-[150px]">{email}</span>
+            </div>
+
+            {/* Disconnect */}
             <button
               onClick={signOut}
               className="w-full flex items-center justify-center space-x-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950 p-2 rounded-lg"
             >
-              <Power /> <span>Disconnect</span>
+              <Power /><span>Disconnect</span>
             </button>
           </div>
         </div>
