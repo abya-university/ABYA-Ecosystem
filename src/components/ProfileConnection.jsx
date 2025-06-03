@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import Modal from "../components/ui/Modal";
 import { useProfile } from "../contexts/ProfileContext";
 import {
   UserCircle,
@@ -8,19 +9,22 @@ import {
   Power,
   ChartNetwork,
   Check,
-  X,
 } from "lucide-react";
+import ConnectProfile from "../pages/ConnectProfile";
 
 export default function ProfileConnection() {
-  const { profile, clearProfile } = useProfile();
+  const { profile, setProfile, clearProfile } = useProfile();
   const navigate = useNavigate();
+
+  const [showConnectModal, setShowConnectModal] = useState(false);
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [isDidCopied, setIsDidCopied] = useState(false);
   const [isEmailCopied, setIsEmailCopied] = useState(false);
+
   const dropdownRef = useRef(null);
   const toggleRef = useRef(null);
 
-  // Close on outside click or ESC
+  // Close dropdown on outside click or ESC
   useEffect(() => {
     const handleClick = (e) => {
       if (
@@ -46,11 +50,10 @@ export default function ProfileConnection() {
   }, [dropdownVisible]);
 
   const copyText = (text, setter) => {
-    navigator.clipboard.writeText(text)
-      .then(() => {
-        setter(true);
-        setTimeout(() => setter(false), 2000);
-      });
+    navigator.clipboard.writeText(text).then(() => {
+      setter(true);
+      setTimeout(() => setter(false), 2000);
+    });
   };
 
   const signOut = () => {
@@ -59,16 +62,36 @@ export default function ProfileConnection() {
     navigate("/");
   };
 
-  // If no profile, show connect button
-  if (!profile || !profile.did) {
+  // Called by <ConnectProfile> once it has DID + profile data
+  const handleProfileConnected = (didDocument, profileData) => {
+    setProfile({
+      ...profileData,
+      did: didDocument,
+    });
+    setShowConnectModal(false);
+  };
+
+  // If not connected yet, show single button
+  if (!profile?.did) {
     return (
-      <button
-        onClick={() => navigate("/profile")}
-        className="flex items-center space-x-2 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
-      >
-        <UserCircle size={20} />
-        <span>Connect Profile</span>
-      </button>
+      <>
+        <button
+          onClick={() => setShowConnectModal(true)}
+          className="flex items-center space-x-2 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
+        >
+          <UserCircle size={20} />
+          <span>Connect Profile</span>
+        </button>
+
+        {showConnectModal && (
+          <Modal onClose={() => setShowConnectModal(false)}>
+            <ConnectProfile
+              onClose={() => setShowConnectModal(false)}
+              onProfileConnected={handleProfileConnected}
+            />
+          </Modal>
+        )}
+      </>
     );
   }
 
@@ -78,7 +101,7 @@ export default function ProfileConnection() {
     <div className="relative">
       <button
         ref={toggleRef}
-        onClick={() => setDropdownVisible(v => !v)}
+        onClick={() => setDropdownVisible((v) => !v)}
         className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
         aria-haspopup="menu"
         aria-expanded={dropdownVisible}
@@ -96,20 +119,31 @@ export default function ProfileConnection() {
           <div className="bg-blue-500/10 p-4 flex items-center space-x-3 border-b dark:border-gray-700">
             <UserCircle className="w-10 h-10 text-blue-600 dark:text-blue-400" />
             <div>
-              <h3 className="font-bold text-lg text-gray-800 dark:text-white">{firstName} {secondName}</h3>
+              <h3 className="font-bold text-lg text-gray-800 dark:text-white">
+                {firstName} {secondName}
+              </h3>
             </div>
           </div>
 
           <div className="p-4 space-y-3">
             {/* Status */}
             <div className="flex justify-between">
-              <span className="flex items-center space-x-2"><ChartNetwork /><span>Status</span></span>
-              <span className="flex items-center space-x-1 text-green-500"><Check /><span>Connected</span></span>
+              <span className="flex items-center space-x-2">
+                <ChartNetwork />
+                <span>Status</span>
+              </span>
+              <span className="flex items-center space-x-1 text-green-500">
+                <Check />
+                <span>Connected</span>
+              </span>
             </div>
 
             {/* DID */}
             <div className="flex justify-between">
-              <button onClick={() => copyText(did, setIsDidCopied)} className="flex items-center space-x-1 hover:underline">
+              <button
+                onClick={() => copyText(did, setIsDidCopied)}
+                className="flex items-center space-x-1 hover:underline"
+              >
                 {isDidCopied ? <CopyCheckIcon /> : <CopyIcon />} <span>DID</span>
               </button>
               <span className="font-semibold text-sm truncate max-w-[150px]">
@@ -119,10 +153,16 @@ export default function ProfileConnection() {
 
             {/* Email */}
             <div className="flex justify-between">
-              <button onClick={() => copyText(email, setIsEmailCopied)} className="flex items-center space-x-1 hover:underline">
-                {isEmailCopied ? <CopyCheckIcon /> : <CopyIcon />} <span>Email</span>
+              <button
+                onClick={() => copyText(email, setIsEmailCopied)}
+                className="flex items-center space-x-1 hover:underline"
+              >
+                {isEmailCopied ? <CopyCheckIcon /> : <CopyIcon />}{" "}
+                <span>Email</span>
               </button>
-              <span className="font-semibold text-sm truncate max-w-[150px]">{email}</span>
+              <span className="font-semibold text-sm truncate max-w-[150px]">
+                {email}
+              </span>
             </div>
 
             {/* Disconnect */}
@@ -130,7 +170,8 @@ export default function ProfileConnection() {
               onClick={signOut}
               className="w-full flex items-center justify-center space-x-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950 p-2 rounded-lg"
             >
-              <Power /><span>Disconnect</span>
+              <Power />
+              <span>Disconnect</span>
             </button>
           </div>
         </div>

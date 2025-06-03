@@ -11,11 +11,13 @@ import {
   UserCircle,
 } from "lucide-react";
 import { useAccount } from "wagmi";
+import { useProfile } from "../contexts/ProfileContext";
 import Modal from "../components/ui/Modal";
 import ProfileForm from "./ProfileForm";
 import UpdateProfileForm from "./UpdateProfileForm";
 import ConnectProfile from "./ConnectProfile";
 import ProfileDash from "./ProfileDash";
+
 
 const SettingsPage = () => {
   const [activeSection, setActiveSection] = useState("profile");
@@ -98,6 +100,9 @@ const SettingsPage = () => {
     setShowConnectModal(false);
   };
 
+  const { profile } = useProfile();
+  const { did, firstName, secondName, email } = profile || {};
+
   return (
     <div
       className="dark:bg-gray-900 dark:text-gray-100 bg-white text-gray-900
@@ -176,12 +181,12 @@ const SettingsPage = () => {
                       </div>
 
                       <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-medium">Connect Profile</h3>
+                        <h3 className="font-medium">Profile Account</h3>
                         <button
                           onClick={() => setShowConnectModal(true)}
                           className="text-yellow-500 hover:underline"
                         >
-                          Connect
+                          Open
                         </button>
                       </div>
 
@@ -189,11 +194,12 @@ const SettingsPage = () => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
                             <Link2 className="w-5 h-5 text-yellow-500" />
-                            <span>No linked accounts</span>
+                            {did} {firstName} {secondName} <span>No linked accounts</span>
                           </div>
                           <QrCode className="w-6 h-6 text-gray-500" />
                         </div>
                       </div>
+                      
                     </div>
                   </>
                 )}
