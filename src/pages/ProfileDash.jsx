@@ -44,9 +44,9 @@ export default function ProfileDashboard({ profile, did }) {
   // Destructure profile data with defaults
   const {
     firstName = "N/A",
-    secondName = "",
+    secondName = "N/A",
     email = "Email Not Provided",
-    location: loc = "Lower Orbit",
+    countryOfResidence = "N/A",
 
   } = profile.profile || {};
 
@@ -127,7 +127,7 @@ export default function ProfileDashboard({ profile, did }) {
           darkMode={darkMode}
           fullName={fullName}
           userRole={userRole}
-          loc={loc}
+          loc={countryOfResidence}
           email={email}
           did={did}
           showDid={showDid}

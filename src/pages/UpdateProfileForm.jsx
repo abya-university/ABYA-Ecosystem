@@ -1,7 +1,6 @@
-// src/pages/UpdateProfileForm.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertOctagonIcon, ArrowLeft, Clipboard, Loader } from 'lucide-react';
+import { AlertOctagonIcon, ArrowLeft, Clipboard, Loader, Trash2, Plus } from 'lucide-react';
 import { useDid } from '../contexts/DidContext';
 import { resolveDid } from '../services/didService';
 import { storeStudentProfile, unpinCID } from '../services/ipfsService';
@@ -14,9 +13,16 @@ const UpdateProfileForm = () => {
 
   const [resolvedDid, setResolvedDid] = useState(null);
   const [existingProfile, setExistingProfile] = useState(null);
-  const [firstName, setFirstName] = useState('');
-  const [secondName, setSecondName] = useState('');
-  const [email, setEmail] = useState('');
+  const [formData, setFormData] = useState({
+    firstName: '',
+    secondName: '',
+    dateOfBirth: '',
+    gender: '',
+    email: '',
+    countryOfResidence: '',
+    preferredLanguages: [''],
+  });
+  const [genderOptions] = useState(['Male', 'Female', 'Other']);
   const [profileCid, setProfileCid] = useState('');
   const [oldCid, setOldCid] = useState('');
   const [profileTxHash, setProfileTxHash] = useState('');
@@ -25,7 +31,7 @@ const UpdateProfileForm = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // Fetch and resolve the DID document and existing profile
+  // Fetch existing DID and profile
   useEffect(() => {
     if (!ethrDid) return;
     (async () => {
@@ -47,14 +53,18 @@ const UpdateProfileForm = () => {
         const existingCid = await contract.getProfileCID(identity);
         if (existingCid) {
           setOldCid(existingCid);
-          const profileJson = await (await fetch(
-            `https://ipfs.io/ipfs/${existingCid}`
-          )).json();
-          setExistingProfile(profileJson.profile);
+          const profileJson = await (await fetch(`https://ipfs.io/ipfs/${existingCid}`)).json();
+          setExistingProfile(profileJson);
           setProfileCid(existingCid);
-          setFirstName(profileJson.profile.firstName);
-          setSecondName(profileJson.profile.secondName);
-          setEmail(profileJson.profile.email);
+          setFormData({
+            firstName: profileJson.profile.firstName || '',
+            secondName: profileJson.profile.secondName || '',
+            dateOfBirth: profileJson.profile.dateOfBirth || '',
+            gender: profileJson.profile.gender || '',
+            email: profileJson.profile.email || '',
+            countryOfResidence: profileJson.profile.countryOfResidence || '',
+            preferredLanguages: profileJson.profile.preferredLanguages || [''],
+          });
         }
       } catch (err) {
         console.error('Error loading existing profile:', err);
@@ -66,40 +76,48 @@ const UpdateProfileForm = () => {
   const getBrowserSigner = async () => {
     if (!window.ethereum) throw new Error('No Ethereum provider');
     const browserProvider = new ethers.BrowserProvider(window.ethereum);
-    return await browserProvider.getSigner();
+    return browserProvider.getSigner();
+  };
+
+  // Form handlers
+  const handleInputChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
+  const handleArrayChange = (field, idx, value) => {
+    const arr = [...formData[field]];
+    arr[idx] = value;
+    setFormData(prev => ({ ...prev, [field]: arr }));
+  };
+  const addArrayItem = (field) => setFormData(prev => ({ ...prev, [field]: [...prev[field], ''] }));
+  const removeArrayItem = (field, idx) => {
+    const arr = prev[field].filter((_, i) => i !== idx);
+    setFormData(prev => ({ ...prev, [field]: arr }));
   };
 
   const handleUpdateProfile = async () => {
     setError('');
     setSuccessMessage('');
+    const { firstName, secondName, dateOfBirth, gender, email, countryOfResidence } = formData;
     if (!ethrDid) return setError('Connect wallet first');
-    if (!firstName || !secondName || !email) return setError('All fields required');
+    if (!firstName || !secondName || !dateOfBirth || !gender || !email || !countryOfResidence)
+      return setError('All fields required');
 
     setLoading(true);
     try {
-      const updatedProfile = {
+      const updated = {
         did: ethrDid,
         owner: existingProfile.owner,
-        profile: { firstName, secondName, email },
+        profile: { ...formData },
         didDocumentCid: existingProfile.didDocumentCid,
         timestamp: new Date().toISOString(),
       };
 
-      // store updated JSON on IPFS
-      const newCid = await storeStudentProfile(ethrDid, updatedProfile);
+      // store updated on IPFS
+      const newCid = await storeStudentProfile(ethrDid, updated);
       setProfileCid(newCid);
 
-      // unpin old CID to clean up
-      if (oldCid) {
-        try {
-          await unpinCID(oldCid);
-          console.log(`Unpinned old CID ${oldCid}`);
-        } catch (unpErr) {
-          console.warn('Failed to unpin old CID:', unpErr);
-        }
-      }
+      // unpin old
+      if (oldCid) await unpinCID(oldCid);
 
-      // write new profile CID on-chain
+      // on-chain update
       const signer = await getBrowserSigner();
       const contract = new ethers.Contract(
         import.meta.env.VITE_CONTRACT_ADDRESS,
@@ -118,14 +136,11 @@ const UpdateProfileForm = () => {
     }
   };
 
-  if (!ethrDid) {
-    return (
-      <p className="p-4 text-red-500 flex items-center">
-        <AlertOctagonIcon size={24} className="mr-2" />
-        Please connect your wallet first.
-      </p>
-    );
-  }
+  if (!ethrDid) return (
+    <p className="p-4 text-red-500 flex items-center">
+      <AlertOctagonIcon size={24} className="mr-2" /> Please connect your wallet first.
+    </p>
+  );
 
   return (
     <div className="max-w-lg mx-auto p-6 bg-white rounded shadow">
@@ -134,35 +149,93 @@ const UpdateProfileForm = () => {
       </button>
 
       <h2 className="text-xl font-semibold mb-2">Update Student Profile</h2>
-      <div className="space-y-3">
-        <input
-          value={firstName}
-          onChange={e => setFirstName(e.target.value)}
-          placeholder="First Name"
-          className="w-full p-2 border rounded"
-        />
-        <input
-          value={secondName}
-          onChange={e => setSecondName(e.target.value)}
-          placeholder="Second Name"
-          className="w-full p-2 border rounded"
-        />
-        <input
-          type="email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          placeholder="Email"
-          className="w-full p-2 border rounded"
-        />
-      </div>
+      <section className="bg-white p-6 rounded-lg shadow-sm">
+        <h3 className="text-lg font-medium mb-4">Personal Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">First Name</label>
+            <input
+              type="text"
+              value={formData.firstName}
+              onChange={e => handleInputChange('firstName', e.target.value)}
+              className="w-full p-3 border rounded focus:ring-2 focus:ring-yellow-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Second Name</label>
+            <input
+              type="text"
+              value={formData.secondName}
+              onChange={e => handleInputChange('secondName', e.target.value)}
+              className="w-full p-3 border rounded focus:ring-2 focus:ring-yellow-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Date of Birth</label>
+            <input
+              type="date"
+              value={formData.dateOfBirth}
+              onChange={e => handleInputChange('dateOfBirth', e.target.value)}
+              className="w-full p-3 border rounded focus:ring-2 focus:ring-yellow-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Gender</label>
+            <select
+              value={formData.gender}
+              onChange={e => handleInputChange('gender', e.target.value)}
+              className="w-full p-3 border rounded focus:ring-2 focus:ring-yellow-500"
+            >
+              <option value="">Select Gender</option>
+              {genderOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Email</label>
+            <input
+              type="email"
+              value={formData.email}
+              onChange={e => handleInputChange('email', e.target.value)}
+              className="w-full p-3 border rounded focus:ring-2 focus:ring-yellow-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Country of Residence</label>
+            <input
+              type="text"
+              value={formData.countryOfResidence}
+              onChange={e => handleInputChange('countryOfResidence', e.target.value)}
+              className="w-full p-3 border rounded focus:ring-2 focus:ring-yellow-500"
+            />
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-sm font-medium mb-2">Preferred Languages</label>
+          {formData.preferredLanguages.map((lang, i) => (
+            <div key={i} className="flex items-center gap-2 mb-2">
+              <input
+                type="text"
+                value={lang}
+                onChange={e => handleArrayChange('preferredLanguages', i, e.target.value)}
+                className="flex-1 p-3 border rounded focus:ring-2 focus:ring-yellow-500"
+                placeholder="Language"
+              />
+              <button type="button" onClick={() => removeArrayItem('preferredLanguages', i)} className="text-red-500">
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+          <button type="button" onClick={() => addArrayItem('preferredLanguages')} className="flex items-center text-yellow-600">
+            <Plus size={16} /> Add Language
+          </button>
+        </div>
+      </section>
 
       <button
         onClick={handleUpdateProfile}
         disabled={loading}
-        className={`mt-4 w-full p-2 rounded text-white flex items-center justify-center ${
-          loading ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'
-        }`}
-      >
+        className={`mt-4 w-full p-2 rounded text-white flex items-center justify-center ${loading ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'}`}>
         {loading ? <Loader className="animate-spin" size={18} /> : 'Update Profile'}
       </button>
 

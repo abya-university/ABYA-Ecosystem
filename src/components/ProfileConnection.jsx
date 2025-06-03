@@ -147,7 +147,7 @@ export default function ProfileConnection() {
                 {isDidCopied ? <CopyCheckIcon /> : <CopyIcon />} <span>DID</span>
               </button>
               <span className="font-semibold text-sm truncate max-w-[150px]">
-                {did.replace(/^(.{6}).*(.{4})$/, "$1…$2")}
+                {did.replace(/^(.{12}).*(.{4})$/, "$1…$2")}
               </span>
             </div>
 

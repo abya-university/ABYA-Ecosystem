@@ -68,7 +68,11 @@ const ConnectProfile = ({ onClose, onProfileConnected }) => {
         did:       ethrDid,
         firstName: json.profile?.firstName || "",
         secondName: json.profile?.secondName || "",
-        email:      json.profile?.email || ""
+        dateOfBirth: json.profile?.dateOfBirth || "",
+        gender: json.profile?.gender || "",
+        email: json.profile?.email || "",
+        countryOfResidence: json.profile?.countryOfResidence || "",
+        preferredLanguages: json.profile?.preferredLanguages || ""
       });
 
     } catch (err) {

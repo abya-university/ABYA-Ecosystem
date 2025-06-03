@@ -219,7 +219,7 @@ export const registerDidOnIpfs = async (did) => {
     // 3. upload the updated registry
     const registryString = JSON.stringify(registry, null, 2);
     const blob = new Blob([registryString], { type: "application/json" });
-    const file = new File([blob], "did-registry.json", { type: "application/json" });
+    // const file = new File([blob], "did-registry.json", { type: "application/json" });
     const uploadResponse = await pinata.upload.file(file, {
       pinataMetadata: { name: "did-registry.json" },
     });

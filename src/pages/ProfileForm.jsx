@@ -1,7 +1,6 @@
-// src/pages/DidProfileForm.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertOctagonIcon, ArrowLeft, Clipboard, Loader } from 'lucide-react';
+import { AlertOctagonIcon, ArrowLeft, Clipboard, Loader, Trash2, Plus } from 'lucide-react';
 import { useDid } from '../contexts/DidContext';
 import { resolveDid } from '../services/didService';
 import { storeDidDocument, storeStudentProfile } from '../services/ipfsService';
@@ -14,9 +13,16 @@ const DidProfileForm = () => {
 
   const [resolvedDid, setResolvedDid] = useState(null);
   const [owner, setOwner] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [secondName, setSecondName] = useState('');
-  const [email, setEmail] = useState('');
+  const [formData, setFormData] = useState({
+    firstName: '',
+    secondName: '',
+    dateOfBirth: '',
+    gender: '',
+    email: '',
+    countryOfResidence: '',
+    preferredLanguages: [''],
+  });
+  const [genderOptions] = useState(['Male', 'Female', 'Other']);
   const [didCid, setDidCid] = useState('');
   const [profileCid, setProfileCid] = useState('');
   const [docTxHash, setDocTxHash] = useState('');
@@ -64,12 +70,34 @@ const DidProfileForm = () => {
     return { existingDocCid, existingProfileCid };
   };
 
+  // Form handlers
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleArrayChange = (field, index, value) => {
+    const arr = [...formData[field]];
+    arr[index] = value;
+    setFormData(prev => ({ ...prev, [field]: arr }));
+  };
+
+  const addArrayItem = (field) => {
+    setFormData(prev => ({ ...prev, [field]: [...prev[field], ''] }));
+  };
+
+  const removeArrayItem = (field, index) => {
+    const arr = formData[field].filter((_, i) => i !== index);
+    setFormData(prev => ({ ...prev, [field]: arr }));
+  };
+
   const handleCreateProfile = async () => {
     setError('');
     setSuccessMessage('');
 
+    const { firstName, secondName, dateOfBirth, gender, email, countryOfResidence } = formData;
     if (!ethrDid) return setError('Connect wallet first');
-    if (!firstName || !secondName || !email) return setError('All profile fields are required');
+    if (!firstName || !secondName || !dateOfBirth || !gender || !email || !countryOfResidence)
+      return setError('All profile fields are required');
 
     setLoading(true);
     try {
@@ -94,7 +122,13 @@ const DidProfileForm = () => {
 
       const cidProfile = existingProfileCid || await storeStudentProfile(
         ethrDid,
-        { did: ethrDid, owner: ownerAddr, profile: { firstName, secondName, email }, didDocumentCid: cidDoc, timestamp: new Date().toISOString() }
+        {
+          did: ethrDid,
+          owner: ownerAddr,
+          profile: { ...formData },
+          didDocumentCid: cidDoc,
+          timestamp: new Date().toISOString(),
+        }
       );
       setProfileCid(cidProfile);
 
@@ -167,14 +201,105 @@ const DidProfileForm = () => {
         </button>
       </div>
 
-      <h2 className="text-xl font-semibold mb-2">Create Student Profile</h2>
-      <div className="space-y-3">
-        <input value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First Name" className="w-full p-2 border rounded" />
-        <input value={secondName} onChange={e => setSecondName(e.target.value)} placeholder="Second Name" className="w-full p-2 border rounded" />
-        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" className="w-full p-2 border rounded" />
-      </div>
+      {/* Personal Information */}
+      <section className="bg-white p-6 rounded-lg shadow-sm">
+        <h3 className="text-xl font-semibold mb-4 text-gray-800 border-b border-gray-300 pb-2">Personal Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+            <input
+              type="text"
+              value={formData.firstName}
+              onChange={(e) => handleInputChange('firstName', e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Second Name</label>
+            <input
+              type="text"
+              value={formData.secondName}
+              onChange={(e) => handleInputChange('secondName', e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+            <input
+              type="date"
+              value={formData.dateOfBirth}
+              onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+            <select
+              value={formData.gender}
+              onChange={(e) => handleInputChange('gender', e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+            >
+              <option value="">Select Gender</option>
+              {genderOptions.map(option => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(e) => handleInputChange('email', e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Country of Residence</label>
+            <input
+              type="text"
+              value={formData.countryOfResidence}
+              onChange={(e) => handleInputChange('countryOfResidence', e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+            />
+          </div>
+        </div>
 
-      <button onClick={handleCreateProfile} disabled={loading} className={`mt-4 w-full p-2 rounded text-white flex items-center justify-center ${loading ? 'bg-gray-400' : 'bg-yellow-500 hover:bg-yellow-600'}`}>        {loading ? <Loader className="animate-spin" size={18} /> : 'Submit Profile'}
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Languages</label>
+          {formData.preferredLanguages.map((lang, index) => (
+            <div key={index} className="flex items-center gap-2 mb-2">
+              <input
+                type="text"
+                value={lang}
+                onChange={(e) => handleArrayChange('preferredLanguages', index, e.target.value)}
+                className="flex-1 p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                placeholder="Language"
+              />
+              <button
+                type="button"
+                onClick={() => removeArrayItem('preferredLanguages', index)}
+                className="text-red-500 hover:text-red-700"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => addArrayItem('preferredLanguages')}
+            className="flex items-center gap-1 text-yellow-600 hover:text-yellow-800"
+          >
+            <Plus size={16} /> Add Language
+          </button>
+        </div>
+      </section>
+
+      <button
+        onClick={handleCreateProfile}
+        disabled={loading}
+        className={`mt-4 w-full p-2 rounded text-white flex items-center justify-center ${loading ? 'bg-gray-400' : 'bg-yellow-500 hover:bg-yellow-600'}`}>
+        {loading ? <Loader className="animate-spin" size={18} /> : 'Submit Profile'}
       </button>
 
       {error && <p className="mt-2 text-red-500">{error}</p>}

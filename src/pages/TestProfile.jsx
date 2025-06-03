@@ -4,12 +4,10 @@ import { useProfile } from '../contexts/ProfileContext';
 /**
  * ProfileConsumer
  * ---------------
- * Reads the current profile from ProfileContext and renders
- * DID, First Name, Second Name, and Email in a simple card.
  */
 export default function ProfileConsumer() {
   const { profile } = useProfile();
-  const { did, firstName, secondName, email } = profile || {};
+  const { did, firstName, secondName, dateOfBirth, gender, email, countryOfResidence, preferredLanguages } = profile || {};
 
   // If no profile data is set yet
   if (!did) {
@@ -34,7 +32,19 @@ export default function ProfileConsumer() {
           <strong>Second Name:</strong> {secondName || '—'}
         </li>
         <li>
+          <strong>Date Of Birth:</strong> {dateOfBirth || '—'}
+        </li>
+        <li>
+          <strong>Gender:</strong> {gender || '—'}
+        </li>
+        <li>
           <strong>Email:</strong> {email || '—'}
+        </li>
+        <li>
+          <strong>Country:</strong> {countryOfResidence || '—'}
+        </li>
+        <li>
+          <strong>Language:</strong> {preferredLanguages || '—'}
         </li>
       </ul>
     </div>

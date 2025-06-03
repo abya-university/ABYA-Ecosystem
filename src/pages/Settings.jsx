@@ -194,7 +194,7 @@ const SettingsPage = () => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
                             <Link2 className="w-5 h-5 text-yellow-500" />
-                            {did} {firstName} {secondName} <span>No linked accounts</span>
+                            {firstName} {secondName} - {did.replace(/^(.{20}).*(.{4})$/, "$1…$2")}
                           </div>
                           <QrCode className="w-6 h-6 text-gray-500" />
                         </div>
