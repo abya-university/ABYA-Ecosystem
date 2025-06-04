@@ -7,7 +7,11 @@ const EMPTY_PROFILE = {
   did: null,
   firstName: '',
   secondName: '',
+  dateOfBirth: '',
+  gender: '',
   email: '',
+  countryOfResidence: '',
+  preferredLanguages: '',
 };
 
 export const ProfileProvider = ({ children }) => {
