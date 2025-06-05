@@ -24,6 +24,12 @@ const Dashboard = () => {
   const handleFormSubmit = (formData) => {
     console.log('Form submitted:', formData);
     // Process the form data here
+    try {
+      const response = axios.post('http://localhost:8000/analyze-single', formData);
+      console.log('Analysis Result:', response.data);
+    } catch (error) {
+      console.error('Error:', error.response.data);
+    }
 
     setIsPopupOpen(false);
   };
@@ -116,7 +122,7 @@ const Dashboard = () => {
             onClick={() => setIsPopupOpen(true)}
             className="px-6 py-3 bg-yellow-500 text-gray-800 rounded-md hover:bg-yellow-600 transition-colors font-medium"
           >
-            Open Profile Form
+            Take Survey
           </button>
             </div>
           </div>
