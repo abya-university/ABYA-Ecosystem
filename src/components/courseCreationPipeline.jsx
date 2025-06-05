@@ -8,7 +8,8 @@ import {
   CheckCircle,
   AlertCircle,
 } from "lucide-react";
-import Ecosystem2ABI from "../artifacts/contracts/Ecosystem Contracts/Ecosystem2.sol/Ecosystem2.json";
+import Ecosystem1FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem1Facet.sol/Ecosystem1Facet.json";
+import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import { useEthersSigner } from "../components/useClientSigner";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
@@ -18,10 +19,12 @@ import { LessonContext } from "../contexts/lessonContext";
 import { QuizContext } from "../contexts/quizContext";
 import { uploadFileToPinata, uploadMetadataToIPFS } from "../components/pinata";
 import PreviewCourse from "../pages/PreviewCourse";
+import { toast, ToastContainer } from "react-toastify";
 
-const Ecosystem2ContractAddress = import.meta.env
-  .VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
-const Ecosystem2_ABI = Ecosystem2ABI.abi;
+const EcosystemDiamondAddress = import.meta.env
+  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
+const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
 const CourseCreationPipeline = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -29,6 +32,7 @@ const CourseCreationPipeline = () => {
     basicInfo: {
       name: "",
       description: "",
+      difficulty_level: 0,
       image: null,
     },
     chapters: [],
@@ -49,110 +53,68 @@ const CourseCreationPipeline = () => {
   console.log("Courses Data:", courses);
 
   const createCourse = async () => {
-    if (isConnected && address) {
-      console.log("Wallet Connection Details:", {
-        isConnected,
-        address,
-        addressType: typeof address,
-        addressLength: address?.length,
+    setLoading(true);
+    try {
+      const signer = await signerPromise;
+      const diamondContract = new ethers.Contract(
+        EcosystemDiamondAddress,
+        Ecosystem1Facet_ABI,
+        signer
+      );
+
+      console.log("Contract Details:", diamondContract);
+      console.log("Transaction Params:", courseData.basicInfo);
+
+      const tx = await diamondContract.createCourse(
+        courseData.basicInfo.name,
+        courseData.basicInfo.description,
+        courseData.basicInfo.difficulty_level
+      );
+      console.log("Transaction sent:", tx.hash);
+      const receipt = await tx.wait();
+      console.log("Transaction confirmed:", receipt.transactionHash);
+      toast.success("Course created successfully!");
+      setCourseData({
+        basicInfo: {
+          name: "",
+          description: "",
+          difficulty_level: 0,
+          image: null,
+        },
       });
 
-      try {
-        setLoading(true);
-        setError("");
-        setSuccess("");
+      // Check if the role has been granted
+      const hasRole = await diamondContract.hasCourseOwnerRole(
+        signer.getAddress()
+      );
+      console.log("Has COURSE_OWNER_ROLE:", hasRole);
 
-        const signer = await signerPromise;
-        if (!signer) {
-          throw new Error("Signer is required to access the contract.");
-        }
-
-        // Validate and clean the address
-        const validatedAddress = ethers.getAddress(address);
-        console.log("Validated Contract Address:", validatedAddress);
-
-        const contract = new ethers.Contract(
-          Ecosystem2ContractAddress,
-          Ecosystem2_ABI,
-          signer
-        );
-
-        // Safe logging with optional chaining
-        console.log("Contract Details:", {
-          address: Ecosystem2ContractAddress,
-          methods: contract.interface
-            ? Object.keys(contract.interface.functions || {})
-            : "No interface",
-        });
-
-        // Check if the contract method is callable
-        if (typeof contract.createCourse !== "function") {
-          throw new Error(
-            "createCourse method is not available on the contract."
-          );
-        }
-
-        // Detailed logging before transaction
-        console.log("Transaction Params:", {
-          name: courseData.basicInfo.name,
-          description: courseData.basicInfo.description,
-        });
-
-        // Validate input before transaction
-        if (!courseData.basicInfo.name || !courseData.basicInfo.description) {
-          throw new Error("Course name and description are required");
-        }
-
-        const tx = await contract.createCourse(
-          courseData.basicInfo.name,
-          courseData.basicInfo.description
-        );
-
-        console.log("Transaction Sent:", {
-          hash: tx.hash,
-          from: tx.from,
-          to: tx.to,
-        });
-
-        const receipt = await tx.wait();
-
-        console.log("Transaction Receipt:", {
-          status: receipt.status,
-          blockNumber: receipt.blockNumber,
-          transactionHash: receipt.transactionHash,
-        });
-
-        if (receipt.status === 1) {
-          setSuccess(`${courseData.basicInfo.name} created successfully!`);
-        } else {
-          setError("Transaction failed. Please try again.");
-        }
-      } catch (err) {
-        // Comprehensive error logging with fallback values
-        console.error("Full Error Details:", {
-          name: err.name || "Unknown Error",
-          code: err.code || "No Error Code",
-          message: err.message || "No Error Message",
-          stack: err.stack || "No Stack Trace",
-        });
-
-        // More specific error handling
-        if (err.code === "INVALID_ARGUMENT") {
-          setError("Invalid transaction parameters. Please check your input.");
-        } else if (err.code === "UNSUPPORTED_OPERATION") {
-          setError(
-            "Unsupported network operation. Check your network settings."
-          );
-        } else {
-          setError(
-            `Failed to create course: ${err.message || "Unknown error"}`
-          );
-        }
-      } finally {
-        setLoading(false);
+      if (hasRole) {
+        console.log("Role granted successfully");
+      } else {
+        console.error("Role not granted");
       }
-    } else {
-      setError("Wallet is not connected or address is missing.");
+    } catch (err) {
+      console.error("Full Error Details:", {
+        name: err.name || "Unknown Error",
+        code: err.code || "No Error Code",
+        message: err.message || "No Error Message",
+        stack: err.stack || "No Stack Trace",
+      });
+
+      if (err.code === "INVALID_ARGUMENT") {
+        toast.error("Invalid transaction parameters. Please check your input.");
+      } else if (err.code === "UNSUPPORTED_OPERATION") {
+        toast.error(
+          "Unsupported network operation. Check your network settings."
+        );
+      } else {
+        toast.error(
+          `Failed to create course: ${err.message || "Unknown error"}`
+        );
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -211,6 +173,24 @@ const CourseCreationPipeline = () => {
               }
             />
 
+            <select
+              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+              value={courseData.basicInfo.difficulty_level}
+              onChange={(e) =>
+                setCourseData((prev) => ({
+                  ...prev,
+                  basicInfo: {
+                    ...prev.basicInfo,
+                    difficulty_level: Number(e.target.value),
+                  },
+                }))
+              }
+            >
+              <option value={0}>Beginner</option>
+              <option value={1}>Intermediate</option>
+              <option value={2}>Advanced</option>
+            </select>
+
             <textarea
               placeholder="Course Description"
               className="w-full p-3 border rounded-lg h-32 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
@@ -237,9 +217,12 @@ const CourseCreationPipeline = () => {
 
               <button
                 onClick={createCourse}
-                className="rounded-lg bg-yellow-500 p-2 px-6 hover:bg-yellow-600 transition-colors"
+                disabled={loading}
+                className={`rounded-lg bg-yellow-500 p-2 px-6 hover:bg-yellow-600 transition-colors ${
+                  loading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               >
-                Create Course
+                {loading ? "Creating..." : "Create Course"}
               </button>
             </div>
           </div>
@@ -272,85 +255,67 @@ const CourseCreationPipeline = () => {
 
   const ChapterCreation = () => {
     const [chapterName, setChapterName] = useState("");
+    const [duration, setDuration] = useState(""); // Changed from durations array to single duration
     const [chapters, setChapters] = useState([]);
+    const [durations, setDurations] = useState([]); // Separate array for all durations
     const [courseId, setCourseId] = useState("");
+    const [success, setSuccess] = useState(""); // Added missing state
+    const [error, setError] = useState(""); // Added missing state
+
+    console.log("Coursess: ", courses);
 
     const createChapter = async () => {
       if (isConnected) {
+        setLoading(true);
         try {
           const signer = await signerPromise;
           if (!signer) {
             throw new Error("Signer is required to access the contract.");
           }
 
-          // Ensure courseId is a number
           const parsedCourseId = Number(courseId);
 
           if (chapters.length === 0) {
             throw new Error("Chapters array cannot be empty");
           }
 
-          const contract = new ethers.Contract(
-            Ecosystem2ContractAddress,
-            Ecosystem2_ABI,
+          // Verify that chapters and durations arrays have the same length
+          if (chapters.length !== durations.length) {
+            throw new Error("Number of chapters and durations must match");
+          }
+
+          const diamondContract = new ethers.Contract(
+            EcosystemDiamondAddress,
+            Ecosystem2Facet_ABI,
             signer
           );
 
-          // Verify course exists before adding chapters
-          try {
-            // Log the raw course object to understand its structure
-            const rawCourseObject = await contract.courseObject(parsedCourseId);
-            console.log("Raw Course Object:", rawCourseObject);
-
-            // Destructure the course object carefully
-            const [
-              contractCourseId,
-              courseName,
-              description,
-              approved,
-              approvalCount,
-              creator,
-            ] = rawCourseObject;
-
-            console.log("Extracted Course Details:", {
-              courseId: contractCourseId.toString(),
-              courseName,
-              description,
-              approved,
-              approvalCount: approvalCount.toString(),
-              creator,
-            });
-
-            // Optional: Additional validation
-            if (contractCourseId.toString() !== parsedCourseId.toString()) {
-              throw new Error("Course ID mismatch!");
-            }
-          } catch (courseCheckError) {
-            console.error("Course Verification Error:", courseCheckError);
-            setError(`Course verification failed: ${courseCheckError.message}`);
-            return;
-          }
-
-          const tx = await contract.addChapters(parsedCourseId, chapters);
+          const tx = await diamondContract.addChapters(
+            parsedCourseId,
+            chapters,
+            durations
+          );
           const receipt = await tx.wait();
           console.log(receipt);
           setChapters([]);
+          setDurations([]);
           setCourseId("");
-          setSuccess("Chapters created successfully!");
+          toast.success("Chapters created successfully!");
         } catch (err) {
           console.error("Full Error:", err);
-          setError(`Failed to create chapters: ${err.message}`);
+          toast.error(`Failed to create chapters: ${err.message}`);
+        } finally {
+          setLoading(false);
         }
       }
     };
 
-    console.log("Course Id: ", courseId);
-    console.log("Chapters: ", chapters);
-
     const addChapter = () => {
-      if (chapterName.trim()) {
+      if (chapterName.trim() && duration) {
         setChapters([...chapters, chapterName.trim()]);
+        setDurations([...durations, Number(duration)]); // Convert duration to number
         setChapterName("");
+        setDuration(""); // Reset single duration input
       }
     };
 
@@ -381,6 +346,13 @@ const CourseCreationPipeline = () => {
             value={chapterName}
             onChange={(e) => setChapterName(e.target.value)}
           />
+          <input
+            type="number"
+            placeholder="Duration in Weeks"
+            className="flex-grow p-3 border rounded-lg"
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+          />
           <button
             onClick={addChapter}
             className="bg-yellow-500 text-black px-4 py-2 rounded-lg flex items-center"
@@ -401,11 +373,14 @@ const CourseCreationPipeline = () => {
             className="w-full p-3 border rounded-lg"
           >
             <option value="">Choose a course</option>
-            {courses.map((course) => (
-              <option key={course.courseId} value={course.courseId}>
-                {course.courseName}
-              </option>
-            ))}
+            {courses.map(
+              (course) =>
+                course.creator === address && (
+                  <option key={course.courseId} value={course.courseId}>
+                    {course.courseName}
+                  </option>
+                )
+            )}
           </select>
         </div>
 
@@ -420,11 +395,19 @@ const CourseCreationPipeline = () => {
                   key={index}
                   className="bg-gray-100 p-2 rounded-lg flex justify-between items-center"
                 >
-                  {chapter}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {chapter}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Duration: {durations[index]} weeks
+                    </p>
+                  </div>
                   <button
-                    onClick={() =>
-                      setChapters(chapters.filter((_, i) => i !== index))
-                    }
+                    onClick={() => {
+                      setChapters(chapters.filter((_, i) => i !== index));
+                      setDurations(durations.filter((_, i) => i !== index));
+                    }}
                     className="text-red-500"
                   >
                     Remove
@@ -432,11 +415,20 @@ const CourseCreationPipeline = () => {
                 </div>
               ))}
             </div>
-            <button
+            {/* <button
               onClick={createChapter}
               className="bg-yellow-500 mt-4 text-black px-4 py-2 rounded-lg flex items-center"
             >
               Create Chapters
+            </button> */}
+            <button
+              onClick={createChapter}
+              disabled={loading}
+              className={`rounded-lg bg-yellow-500 mt-4 py-2 px-6 hover:bg-yellow-600 transition-colors ${
+                loading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            >
+              {loading ? "Creating..." : "Create Chapters"}
             </button>
           </div>
         )}
@@ -460,34 +452,37 @@ const CourseCreationPipeline = () => {
         setError("Wallet is not connected");
         return;
       } else {
+        setLoading(true);
         try {
           const signer = await signerPromise;
           if (!signer) {
             throw new Error("Signer is required to access the contract.");
           }
 
-          const contract = new ethers.Contract(
-            Ecosystem2ContractAddress,
-            Ecosystem2_ABI,
+          const diamondContract = new ethers.Contract(
+            EcosystemDiamondAddress,
+            Ecosystem2Facet_ABI,
             signer
           );
           console.log("Chapter ID: ", chapterId);
           console.log("Lesson Name: ", lessonName);
           console.log("Lesson Content: ", lessonContent);
 
-          const tx = await contract.addLesson(
+          const tx = await diamondContract.addLesson(
             chapterId.toString(),
             lessonName,
             lessonContent
           );
           const receipt = await tx.wait();
           console.log(receipt);
-          setSuccess(`${lessonName} lesson created successfully!`);
+          toast.success(`${lessonName} lesson created successfully!`);
           setLessonName("");
           setLessonContent("");
         } catch (err) {
           console.error("Full Error:", err);
-          setError(`Failed to create lessons: ${err.message}`);
+          toast.error(`Failed to create lessons: ${err.message}`);
+        } finally {
+          setLoading(false);
         }
       }
     };
@@ -507,20 +502,32 @@ const CourseCreationPipeline = () => {
     useEffect(() => {
       if (courseId) {
         console.log("Fetching chapters for courseId:", courseId);
-        fetchChapters(courseId).then((fetchedChapters) => {
+        fetchChapters().then((fetchedChapters) => {
           if (fetchedChapters) {
-            const formattedChapters = fetchedChapters.map((chapter) => ({
-              chapterId: Number(chapter.chapterId),
-              chapterName: chapter.chapterName,
-            }));
+            // Add debug logs
+            console.log("Raw fetched chapters:", fetchedChapters);
+
+            const formattedChapters = fetchedChapters
+              .filter((chapter) => {
+                // Convert both to strings or numbers for comparison
+                const chapterCourseId = Number(chapter.courseId);
+                const targetCourseId = Number(courseId);
+                console.log("Comparing:", chapterCourseId, targetCourseId);
+                return chapterCourseId === targetCourseId;
+              })
+              .map((chapter) => ({
+                chapterId: Number(chapter.chapterId),
+                chapterName: chapter.chapterName,
+              }));
+
+            console.log("Formatted chapters:", formattedChapters);
             setChapters(formattedChapters);
-            console.log("Chapters: ", formattedChapters);
           } else {
             setChapters([]);
           }
         });
       }
-    }, [courseId, fetchChapters]);
+    }, [courseId, fetchChapters, chapters]);
 
     return (
       <div className="space-y-6">
@@ -566,13 +573,16 @@ const CourseCreationPipeline = () => {
             className="w-full p-3 border rounded-lg"
           >
             <option value="">Choose a course</option>
-            {courses.map((course) => (
-              <option key={course.courseId} value={course.courseId}>
-                {course.courseName}
-              </option>
-            ))}
+            {courses.map(
+              (course) =>
+                course.creator === address && (
+                  <option key={course.courseId} value={course.courseId}>
+                    {course.courseName}
+                  </option>
+                )
+            )}
           </select>
-          <p>{courseId}</p>
+          {/* <p>{courseId}</p> */}
         </div>
 
         {/* Chapter Selection */}
@@ -594,11 +604,20 @@ const CourseCreationPipeline = () => {
           </select>
         </div>
 
-        <button
+        {/* <button
           onClick={createLesson}
           className="bg-yellow-500 text-black px-4 py-2 rounded-lg flex items-center"
         >
           Create Lesson
+        </button> */}
+        <button
+          onClick={createLesson}
+          disabled={loading}
+          className={`rounded-lg bg-yellow-500 mt-4 py-2 px-6 hover:bg-yellow-600 transition-colors ${
+            loading ? "opacity-50 cursor-not-allowed" : ""
+          }`}
+        >
+          {loading ? "Creating..." : "Create Lesson"}
         </button>
       </div>
     );
@@ -622,6 +641,7 @@ const CourseCreationPipeline = () => {
     const [quizError, setQuizError] = useState("");
     const [questionSuccess, setQuestionSuccess] = useState("");
     const [questionError, setQuestionError] = useState("");
+    const [quizLoading, setQuizLoading] = useState(false);
 
     console.log("Lessons: ", lessons);
     console.log("Quizzes: ", quizzes);
@@ -630,29 +650,31 @@ const CourseCreationPipeline = () => {
       if (!isConnected || !address) {
         throw new Error("Please connect to a blockchain network");
       }
-
+      setQuizLoading(true);
       try {
         // const lesson = lessons.find((lesson) => lesson.lessonId === lessonId);
         const signer = await signerPromise;
 
-        const contract = new ethers.Contract(
-          Ecosystem2ContractAddress,
-          Ecosystem2_ABI,
+        const diamondContract = new ethers.Contract(
+          EcosystemDiamondAddress,
+          Ecosystem2Facet_ABI,
           signer
         );
 
         console.log("Lesson Id: ", lessonId);
         console.log("Quiz Title: ", quizTitle);
 
-        const tx = await contract.createQuiz(lessonId, quizTitle);
+        const tx = await diamondContract.createQuiz(lessonId, quizTitle);
         const receipt = await tx.wait();
         console.log("Quiz created: ", receipt);
         setLessonId("");
         setQuizTitle("");
-        setQuizSuccess(`${quizTitle} created successfully!!`);
+        toast.success(`${quizTitle} created successfully!!`);
       } catch (error) {
         console.error("Error creating quiz: ", error);
-        setQuizError("Error creating quiz");
+        toast.error("Error creating quiz");
+      } finally {
+        setQuizLoading(false);
       }
     };
 
@@ -680,12 +702,12 @@ const CourseCreationPipeline = () => {
         if (!isConnected || !address) {
           throw new Error("Please connect to a blockchain network");
         }
-
+        setLoading(true);
         try {
           const signer = await signerPromise;
-          const contract = new ethers.Contract(
-            Ecosystem2ContractAddress,
-            Ecosystem2_ABI,
+          const diamondContract = new ethers.Contract(
+            EcosystemDiamondAddress,
+            Ecosystem2Facet_ABI,
             signer
           );
 
@@ -697,7 +719,7 @@ const CourseCreationPipeline = () => {
           );
           console.log("Correct Option Index: ", correctOptionIndex);
 
-          const tx = await contract.createQuestionWithChoices(
+          const tx = await diamondContract.createQuestionWithChoices(
             quizId,
             question,
             options.map((option) => option.text),
@@ -705,7 +727,7 @@ const CourseCreationPipeline = () => {
           );
 
           const receipt = await tx.wait();
-          setQuestionSuccess("Question created successfully!!");
+          toast.success("Question created successfully!!");
 
           // Reset inputs after adding
           setQuestion("");
@@ -717,7 +739,9 @@ const CourseCreationPipeline = () => {
           ]);
         } catch (err) {
           console.error("Error creating question: ", err);
-          setQuestionError("Error creating question");
+          toast.error("Error creating question");
+        } finally {
+          setLoading(false);
         }
       } else {
         alert(
@@ -787,9 +811,12 @@ const CourseCreationPipeline = () => {
 
           <button
             onClick={createQuiz}
-            className="bg-yellow-500 text-black px-4 py-2 w-[120px] rounded-lg flex items-center"
+            disabled={quizLoading}
+            className={`rounded-lg bg-yellow-500 py-2 px-4 w-[120px] hover:bg-yellow-600 transition-colors ${
+              quizLoading ? "opacity-50 cursor-not-allowed" : ""
+            }`}
           >
-            Create Quiz
+            {quizLoading ? "Creating..." : "Create Quiz"}
           </button>
 
           {(questionSuccess || questionError) && (
@@ -869,15 +896,20 @@ const CourseCreationPipeline = () => {
 
             <button
               onClick={createQuestion}
-              className="bg-yellow-500 text-black px-4 py-2 rounded-lg flex items-center"
+              disabled={loading}
+              className={`rounded-lg bg-yellow-500 mt-4 py-2 px-6 hover:bg-yellow-600 transition-colors ${
+                loading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
             >
-              Create Question
+              {loading ? "Creating..." : "Create Question"}
             </button>
 
             {/* Added Questions List */}
             {questions.length > 0 && (
               <div className="mt-4">
-                <h3 className="font-semibold mb-2">Added Questions:</h3>
+                <h3 className="font-semibold mb-2 dark:text-gray-200 text-gray-800">
+                  Added Questions:
+                </h3>
                 <div className="space-y-2">
                   {questions.map((q, index) => (
                     <div
@@ -982,14 +1014,14 @@ const CourseCreationPipeline = () => {
         };
 
         const signer = await signerPromise;
-        const contract = new ethers.Contract(
-          Ecosystem2ContractAddress,
-          Ecosystem2_ABI,
+        const diamondContract = new ethers.Contract(
+          EcosystemDiamondAddress,
+          Ecosystem2Facet_ABI,
           signer
         );
 
         // Call contract with the new parameters
-        const tx = await contract.addResourcesToLesson(
+        const tx = await diamondContract.addResourcesToLesson(
           lessonId,
           ContentTypeEnum[contentType],
           [newResource] // Pass as array to match contract function
@@ -1008,16 +1040,15 @@ const CourseCreationPipeline = () => {
           },
         ]);
 
-        setSuccess("Resource added successfully!");
-
         // Reset form
         setResourceName("");
         setResourceLink("");
         setFile(null);
         setContentType("");
+        toast.success("Resource added successfully!");
       } catch (error) {
         console.error("Error adding resource:", error);
-        setError("Error adding resource. Please try again.");
+        toast.error("Error adding resource. Please try again.");
       } finally {
         setIsUploading(false);
       }
@@ -1226,6 +1257,7 @@ const CourseCreationPipeline = () => {
   return (
     <div className="w-[90%] md:w-[60%] lg:w-[50%] mx-auto p-8 bg-white dark:bg-gray-900 rounded-lg shadow-lg mt-[100px]">
       <ProgressBar />
+      <ToastContainer position="bottom-right" theme="colored" />
 
       {showPreview ? (
         <PreviewCourse />

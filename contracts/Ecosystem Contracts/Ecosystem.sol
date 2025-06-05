@@ -44,7 +44,10 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
         address creator;
         bool exists;
         address[] enrolledStudents;
+        DifficultyLevel difficultyLevel;
     }
+
+    enum DifficultyLevel { Beginner, Intermediate, Advanced }
 
     struct Review {
         uint256 learnerAgency;
@@ -68,6 +71,7 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
         uint256 courseId;
         uint256 chapterId;
         string chapterName;
+        uint256 duration; //Duration in weeks
         bool exists;
     }
 
@@ -171,11 +175,11 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
 
 
     // function to create course
-    function createCourse(string memory _courseName, string memory _description) external returns(bool) {
+    function createCourse(string memory _courseName, string memory _description, DifficultyLevel _difficultyLevel) external returns(bool) {
         // require(nextCourseId > 0, "All course IDs have been assigned");
-        require(courseObject[nextCourseId].creator == address(0), "Course ID already exists");
+        require(!courseObject[nextCourseId].exists, "Course already exists");
 
-        Course memory newCourse = Course(nextCourseId,_courseName, _description, false, 0, msg.sender, true, new address[](0));
+        Course memory newCourse = Course(nextCourseId,_courseName, _description, false, 0, msg.sender, true, new address[](0), _difficultyLevel);
         courseObject[nextCourseId] = newCourse;
 
         listOfCourses.push(newCourse);
@@ -203,7 +207,8 @@ contract Ecosystem is LMSToken, ReentrancyGuard {
                 listOfCourses[i].approvalCount,
                 listOfCourses[i].creator,
                 listOfCourses[i].exists,
-                listOfCourses[i].enrolledStudents
+                listOfCourses[i].enrolledStudents,
+                listOfCourses[i].difficultyLevel
             );
         }
         return courses;

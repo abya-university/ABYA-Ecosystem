@@ -8,8 +8,21 @@ import {
   Link2,
   CopyIcon,
   CopyCheckIcon,
+  ListFilterPlus,
+  PlusCircle,
+  Search,
+  Trash2,
+  UsersIcon,
+  BadgeCent,
   UserCircle,
 } from "lucide-react";
+
+import { Link } from "react-router-dom";
+import { ethers } from "ethers";
+import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
+import { useEthersSigner } from "../components/useClientSigner";
+import { toast, ToastContainer } from "react-toastify";
+import SFuelDistributor from "../providers/SFuelDistribution";
 import { useAccount } from "wagmi";
 import { useProfile } from "../contexts/ProfileContext";
 import Modal from "../components/ui/Modal";
@@ -18,6 +31,9 @@ import UpdateProfileForm from "./UpdateProfileForm";
 import ConnectProfile from "./ConnectProfile";
 import ProfileDash from "./ProfileDash";
 
+
+const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
+const Community_ABI = CommunityABI.abi;
 
 const SettingsPage = () => {
   const [activeSection, setActiveSection] = useState("profile");
@@ -34,6 +50,10 @@ const SettingsPage = () => {
     push: false,
     sms: false,
   });
+  const [activeRoleTab, setActiveRoleTab] = useState("Admin");
+  const [showAddRoleModal, setShowAddRoleModal] = useState(false);
+  const signerPromise = useEthersSigner();
+  const [newRoleAddress, setNewRoleAddress] = useState("");
 
   const formatAddress = (addr) => {
     if (!addr) return "Not Connected";
@@ -55,6 +75,46 @@ const SettingsPage = () => {
         });
     }
   };
+
+  //handle add multisig approver
+  const handleAddMultisigApprover = async () => {
+    try {
+      const signer = await signerPromise;
+      const contract = new ethers.Contract(
+        CommunityAddress,
+        Community_ABI,
+        signer
+      );
+      const tx = await contract.addMultiSigApprover(newRoleAddress);
+      await tx.wait();
+      toast.success("Multisig Approver added successfully");
+      // setTimeout(() => {
+      //   setShowAddRoleModal(false);
+      // }, 2000);
+    } catch (error) {
+      toast.error("Failed to add multisig approver", error);
+    }
+  };
+
+  //handle add reviewer
+  const handleAddReviewer = async () => {
+    try {
+      const signer = await signerPromise;
+      const contract = new ethers.Contract(
+        CommunityAddress,
+        Community_ABI,
+        signer
+      );
+      const tx = await contract.addReviewer(newRoleAddress);
+      await tx.wait();
+      toast.success("Reviewer added successfully");
+      // setTimeout(() => {
+      //   setShowAddRoleModal(false);
+      // }, 2000);
+    } catch (error) {
+      toast.error("Failed to add reviewer", error);
+    }
+  }; // FIXED: Added missing closing brace
 
   const toggleNotification = (type) => {
     setNotifications((prev) => ({
@@ -83,6 +143,16 @@ const SettingsPage = () => {
       icon: <Wallet className="w-5 h-5" />,
       label: "Wallet",
       key: "wallet",
+    },
+    {
+      icon: <ListFilterPlus className="w-5 h-5" />,
+      label: "Manage Roles",
+      key: "roles",
+    },
+    {
+      icon: <BadgeCent className="w-5 h-5" />,
+      label: "SFuel Details",
+      key: "sfuelDetails",
     },
   ];
 
@@ -116,6 +186,8 @@ const SettingsPage = () => {
             Account Settings
           </h1>
         </div>
+
+        <ToastContainer position="bottom-right" theme="colored" />
 
         {/* Settings Layout */}
         <div className="grid grid-cols-4 gap-6">
@@ -194,7 +266,7 @@ const SettingsPage = () => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
                             <Link2 className="w-5 h-5 text-yellow-500" />
-                            {firstName} {secondName} - {did.replace(/^(.{20}).*(.{4})$/, "$1…$2")}
+                            {firstName} {secondName} - {did && did.replace(/^(.{20}).*(.{4})$/, "$1…$2")}
                           </div>
                           <QrCode className="w-6 h-6 text-gray-500" />
                         </div>
@@ -298,6 +370,184 @@ const SettingsPage = () => {
                 </div>
               </div>
             )}
+
+            {/* //Roles */}
+            {activeSection === "roles" && (
+              <div className="pb-8">
+                <h2 className="text-2xl font-semibold mb-6 text-yellow-500">
+                  Roles Management
+                </h2>
+
+                {/* Role Type Navigation */}
+                <div className="flex overflow-x-auto mb-6 pb-2 border-b dark:border-gray-800">
+                  {[
+                    "Admin",
+                    "Multisig Approver",
+                    "Community Manager",
+                    "Reviewer",
+                  ].map((roleType) => (
+                    <button
+                      key={roleType}
+                      onClick={() => setActiveRoleTab(roleType)}
+                      className={`px-4 py-2 mr-4 whitespace-nowrap font-medium rounded-t-lg transition-colors ${
+                        activeRoleTab === roleType
+                          ? "bg-yellow-500 text-white"
+                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      }`}
+                    >
+                      {roleType}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 p-6 border dark:border-gray-800 rounded-lg shadow-sm">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-medium">
+                      {activeRoleTab}{" "}
+                      {activeRoleTab !== "Admin" ? "Accounts" : ""}
+                    </h3>
+
+                    {activeRoleTab !== "Admin" && (
+                      <button
+                        onClick={() => setShowAddRoleModal(true)}
+                        className="flex items-center space-x-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors"
+                      >
+                        <PlusCircle className="w-4 h-4" />
+                        <span>Add {activeRoleTab}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Search and Filter */}
+                  <div className="mb-6 flex">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <input
+                        type="text"
+                        placeholder={`Search ${activeRoleTab.toLowerCase()} accounts...`}
+                        className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg focus:ring-2 focus:ring-yellow-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Role Accounts List */}
+                  <div className="border dark:border-gray-800 rounded-lg overflow-hidden">
+                    <div className="grid grid-cols-[auto_1fr_auto] gap-4 px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700 font-medium">
+                      <span>Status</span>
+                      <span>Address</span>
+                      <span>Actions</span>
+                    </div>
+
+                    <div className="divide-y dark:divide-gray-800">
+                      {[1, 2, 3].map((item) => (
+                        <div
+                          key={item}
+                          className="grid grid-cols-[auto_1fr_auto] gap-4 px-4 py-4 items-center"
+                        >
+                          <div className="flex items-center justify-center">
+                            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                          </div>
+                          <div>
+                            <div className="font-mono text-sm">
+                              0x7F5E835B94a381f898612538485ad18E5CfE7Eb5
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              Added on Feb 20, 2025
+                            </div>
+                          </div>
+                          <div>
+                            <button className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Empty State */}
+                  {false && (
+                    <div className="py-12 flex flex-col items-center justify-center text-center">
+                      <UsersIcon className="w-12 h-12 text-gray-300 dark:text-gray-700 mb-4" />
+                      <h4 className="text-lg font-medium mb-2">
+                        No {activeRoleTab} Accounts
+                      </h4>
+                      <p className="text-gray-500 dark:text-gray-400 max-w-md mb-6">
+                        There are currently no accounts with the {activeRoleTab}{" "}
+                        role assigned.
+                      </p>
+                      <button className="flex items-center space-x-2 px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors">
+                        <PlusCircle className="w-4 h-4" />
+                        <span>Add {activeRoleTab}</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Add Role Modal (hidden by default) */}
+                {showAddRoleModal && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-gray-900 rounded-lg p-6 w-full max-w-md">
+                      <h3 className="text-xl font-medium mb-4">
+                        Add New {activeRoleTab}
+                      </h3>
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium mb-2">
+                          Wallet Address
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="0x..."
+                          value={newRoleAddress}
+                          onChange={(e) => setNewRoleAddress(e.target.value)}
+                          className="w-full p-3 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg focus:ring-2 focus:ring-yellow-500"
+                        />
+                      </div>
+                      <div className="flex justify-end space-x-3">
+                        <button
+                          onClick={() => setShowAddRoleModal(false)}
+                          className="px-4 py-2 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => {
+                            // if (
+                            //   !newRoleAddress ||
+                            //   !newRoleAddress.startsWith("0x") ||
+                            //   newRoleAddress.length !== 42
+                            // ) {
+                            //   // Show error message
+                            //   toast.error(
+                            //     "Please enter a valid Ethereum address"
+                            //   );
+                            //   return;
+                            // }
+                            // Call the appropriate function based on activeRoleTab
+                            if (activeRoleTab === "Multisig Approver") {
+                              handleAddMultisigApprover(newRoleAddress);
+                            } else if (activeRoleTab === "Reviewer") {
+                              handleAddReviewer(newRoleAddress);
+                            } else if (activeRoleTab === "Community Manager") {
+                              // handleAddCommunityManager(newRoleAddress); // You'll need to implement this function
+                            }
+
+                            // Clear the input and close the modal
+                            setNewRoleAddress("");
+                            setShowAddRoleModal(false);
+                          }}
+                          className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors"
+                        >
+                          Confirm
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeSection === "sfuelDetails" && <SFuelDistributor />}
           </div>
         </div>
       </div>

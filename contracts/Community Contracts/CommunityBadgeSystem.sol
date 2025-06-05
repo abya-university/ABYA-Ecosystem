@@ -35,9 +35,16 @@ contract CommunityBadgeSystem {
     uint256 public constant LEADER_BADGE_THRESHOLD = 5;
     uint256 public constant CHAMPION_BADGE_THRESHOLD = 10;
 
+    //Badge Token Rewards
+    uint256 public constant PARTICIPANT_REWARD = 1 * 10**18; // 1 ABYTKN token
+    uint256 public constant CONTRIBUTOR_REWARD = 2 * 10**18; // 2 ABYTKN tokens
+    uint256 public constant LEADER_REWARD = 3 * 10**18; // 3 ABYTKN tokens
+    uint256 public constant CHAMPION_REWARD = 4 * 10**18; // 4 ABYTKN tokens
+
     // Events for badge achievements
     event BadgeAwarded(address indexed member, BadgeLevel badge);
     event EventParticipationRecorded(address indexed member, uint256 totalEvents);
+    event MemberRegistered(address indexed member);
 
     constructor() {
         // Define badge metadata with names, icon URIs, and token rewards
@@ -50,26 +57,40 @@ contract CommunityBadgeSystem {
         badgeMetadata[BadgeLevel.PARTICIPANT] = BadgeMetadata({
             name: "Participant",
             iconURI: "ipfs://participant-badge-icon",
-            tokenReward: 1 * 10**18 // 1 ABYTKN token
+            tokenReward: PARTICIPANT_REWARD // 1 ABYTKN token
         });
         
         badgeMetadata[BadgeLevel.CONTRIBUTOR] = BadgeMetadata({
             name: "Contributor",
             iconURI: "ipfs://contributor-badge-icon",
-            tokenReward: 2 * 10**18 // 2 ABYTKN tokens
+            tokenReward: CONTRIBUTOR_REWARD // 2 ABYTKN tokens
         });
         
         badgeMetadata[BadgeLevel.LEADER] = BadgeMetadata({
             name: "Leader",
             iconURI: "ipfs://leader-badge-icon",
-            tokenReward: 3 * 10**18 // 3 ABYTKN tokens
+            tokenReward: LEADER_REWARD // 3 ABYTKN tokens
         });
         
         badgeMetadata[BadgeLevel.CHAMPION] = BadgeMetadata({
             name: "Champion",
             iconURI: "ipfs://champion-badge-icon",
-            tokenReward: 4 * 10**18 // 4  ABYTKN tokens
+            tokenReward: CHAMPION_REWARD // 4  ABYTKN tokens
         });
+    }
+
+    // Internal function to register a new community member
+    function _registerMember(address _member) internal {
+        CommunityMember storage member = communityMembers[_member];
+        
+        // Only register if not already a member
+        if (member.currentBadge == BadgeLevel(0)) {
+            member.currentBadge = BadgeLevel.NONE;
+            member.totalEventsAttended = 0;
+            member.totalContributions = 0;
+            
+            emit MemberRegistered(_member);
+        }
     }
 
     // Internal function to update badge status
@@ -108,6 +129,9 @@ contract CommunityBadgeSystem {
 
     // Function to record event participation
     function recordEventParticipation(address _participant) internal {
+        // Ensure member is registered
+        _registerMember(_participant);
+
         CommunityMember storage member = communityMembers[_participant];
         
         // Increment total events attended

@@ -2,9 +2,9 @@
 
 pragma solidity ^0.8.24;
 
-import { Ecosystem } from "./Ecosystem.sol";
+import { Ecosystem2 } from "./Ecosystem2.sol";
 
-contract Ecosystem3 is Ecosystem {
+contract Ecosystem3 is Ecosystem2 {
     uint256 public constant COURSE_COMPLETION_REWARD = 2 * 10 ** 18;
     uint256 public constant QUIZ_COMPLETION_REWARD = 1 * 10 ** 18;
 
@@ -19,14 +19,14 @@ contract Ecosystem3 is Ecosystem {
     }
 
     mapping(uint256 => mapping(address => bool)) public courseCompleted;
-    mapping(uint256 => mapping(address => bool)) public lessonRead;
+    
     mapping(address => mapping(uint256 => uint256)) public userScores;
     mapping(uint256 => mapping(address => bool)) public completedQuizzes;
     mapping(uint256 => Certificate) public certificates;
 
 
     event CourseDeleteSuccess(uint256 indexed _courseId, address owner);
-    event LessonMarkedAsRead(uint256 indexed _chapterId, uint256 indexed _lessonId, address learner);
+    
     event ChapterDeletedSuccess(uint256 indexed _courseId, uint256 indexed _chaterId);
     event LessonDeleted(uint256 indexed _chapterId, uint256 indexed _lessonId);
     event QuizDeleted(uint256 indexed _lessonId, uint256 indexed _quizId);
@@ -39,7 +39,7 @@ contract Ecosystem3 is Ecosystem {
     event QuizEdited(uint256 indexed _lessonId, uint256 indexed _quizId, string _quizTitle);
 
 
-    constructor(address[] memory _reviewers) Ecosystem(_reviewers) {}
+    constructor(address[] memory _reviewers) Ecosystem2(_reviewers) {}
 
     //function to delete a course
     function deleteCourse(uint256 _courseId) external onlyRole(COURSE_OWNER_ROLE) returns(bool) {
@@ -60,17 +60,7 @@ contract Ecosystem3 is Ecosystem {
         return true;
     }
 
-    //function to mark lesson as read
-    function markAsRead(uint256 _chapterId, uint256 _lessonId) external returns(bool) {
-        require(!lessonRead[_lessonId][msg.sender], "You have already marked this lesson as read");
-        require(lesson[_lessonId].lessonId != 0, "Lesson doesn't exist");
-
-        lessonRead[_lessonId][msg.sender] = true;
-
-        emit LessonMarkedAsRead(_chapterId, _lessonId, msg.sender);
-
-        return true;
-    }
+    
 
     //function to take/submit quiz
     function submitQuiz(uint256 _quizId, uint256[] memory _answers) public returns (uint256 score) {

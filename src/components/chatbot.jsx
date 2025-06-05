@@ -21,9 +21,9 @@ const AbyaChatbot = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (inputMessage.trim() === "") return;
-
+  
     // Add user message
     const userMessage = {
       id: messages.length + 1,
@@ -31,18 +31,50 @@ const AbyaChatbot = () => {
       content: inputMessage,
     };
     setMessages((prev) => [...prev, userMessage]);
-
-    // Simulate bot response
-    setTimeout(() => {
-      const botResponse = {
-        id: messages.length + 2,
-        type: "bot",
-        content: `I'm processing your request about: ${inputMessage}`,
-      };
-      setMessages((prev) => [...prev, botResponse]);
-      setInputMessage("");
-    }, 1000);
+  
+    // Clear input field
+    setInputMessage("");
+  
+    try {
+      // Send API request asynchronously
+      const response = await fetch("http://localhost:5000/api/v1/ai/completion", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: inputMessage,
+          // model: "", // Adjust if needed
+        }),
+      });
+      
+  
+      const data = await response.json();
+      console.log("API Response:", data.data);
+  
+      if (data.success) {
+        const botResponse = {
+          id: messages.length + 2,
+          type: "bot",
+          content: data.data?.content || "Sorry, I couldn't process that.", // Extract the content field
+        };
+        setMessages((prev) => [...prev, botResponse]);
+      } else {
+        throw new Error(data.error || "Failed to get response");
+      }
+    } catch (error) {
+      console.error("Error fetching chatbot response:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: messages.length + 2,
+          type: "bot",
+          content: "Sorry, something went wrong. Please try again.",
+        },
+      ]);
+    }
   };
+
 
   const renderMessageBubble = (message) => {
     return message.type === "user" ? (

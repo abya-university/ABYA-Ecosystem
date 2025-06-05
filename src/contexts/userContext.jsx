@@ -18,6 +18,9 @@ const COURSE_OWNER_ROLE = ethers.keccak256(
 const DEFAULT_ADMIN_ROLE = ethers.keccak256(
   ethers.toUtf8Bytes("DEFAULT_ADMIN_ROLE")
 );
+const COMMUNITY_MANAGER = ethers.keccak256(
+  ethers.toUtf8Bytes("COMMUNITY_MANAGER")
+);
 
 const UserContext = createContext();
 
@@ -62,6 +65,10 @@ export const UserProvider = ({ children }) => {
           DEFAULT_ADMIN_ROLE,
           address
         );
+        const isCommunityManager = await contract.hasRole(
+          COMMUNITY_MANAGER,
+          address
+        );
 
         if (isReviewer) {
           setRole("Reviewer");
@@ -69,6 +76,8 @@ export const UserProvider = ({ children }) => {
           setRole("Multisig Approver");
         } else if (isCourseOwner) {
           setRole("Course Owner");
+        } else if (isCommunityManager) {
+          setRole("Community Manager");
         } else if (isDefaultAdmin) {
           setRole("ADMIN");
         } else {

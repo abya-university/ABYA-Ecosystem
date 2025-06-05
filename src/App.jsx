@@ -14,6 +14,7 @@ import WalletConnection from './components/WalletConnection';
 import { DidProvider } from './contexts/DidContext';
 import { ProfileProvider } from './contexts/ProfileContext';
 import NotFoundPage from "./pages/404Page";
+import CourseMetricsPage from "./pages/CourseMetricsPage";
 
 function App() {
   return (
@@ -30,6 +31,10 @@ function App() {
           <Route path="/TestProfile" element={<TestProfile />} />
           <Route path="/VcForm" element={<VcForm />} />
           <Route path="/VerifyVc" element={<VerifyVc />} />
+          <Route
+          path="/course-metrics/:courseId"
+          element={<CourseMetricsPage />}
+        />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </ProfileProvider>

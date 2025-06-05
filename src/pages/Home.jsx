@@ -225,7 +225,9 @@ const Home = () => {
         <div className="container mx-auto flex justify-between items-center p-4">
           <div className="flex items-center space-x-2">
             <Globe className="text-yellow-500" size={32} />
-            <span className="text-2xl font-bold text-yellow-500">ABYA Uni</span>
+            <span className="text-2xl font-bold text-yellow-500">
+              ABYA University
+            </span>
           </div>
           <div className="flex space-x-6">
             <a href="#" className="hover:text-yellow-500 transition-colors">

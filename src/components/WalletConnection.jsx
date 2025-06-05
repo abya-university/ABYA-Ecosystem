@@ -40,10 +40,10 @@ const WalletConnection = () => {
     let mounted = true;
     (async () => {
       try {
-        const signer = await signerPromise;
-        const registry = import.meta.env.VITE_CONTRACT_ADDRESS;
-        const did = await createDidFromSigner(signer, registry, 'sepolia');
-        if (!mounted) return;
+        const signer = await signerPromise; // 1️⃣ Wait for an ethers.js signer (provided by Wagmi + your `useEthersSigner` hook)
+        const registry = import.meta.env.VITE_CONTRACT_ADDRESS; // 2️⃣ Read your registry contract address from VITE_CONTRACT_ADDRESS
+        const did = await createDidFromSigner(signer, registry, 'sepolia'); // 3️⃣ Create an Ethereum-based DID for this signer on Sepolia
+        if (!mounted) return; // 4️⃣ Only update state if the component is still mounted
         setEthrDid(did);
         await registerDidOnIpfs(did);
       } catch (err) {
@@ -52,6 +52,7 @@ const WalletConnection = () => {
     })();
     return () => { mounted = false; };
   }, [isConnected, signerPromise, setEthrDid]);
+
 
   // Outside click / ESC
   useEffect(() => {

@@ -1,12 +1,12 @@
 import React, { createContext, useEffect, useState } from "react";
-import Ecosystem2ABI from "../artifacts/contracts/Ecosystem Contracts/Ecosystem2.sol/Ecosystem2.json";
+import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import { useEthersSigner } from "../components/useClientSigner";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
 
-const Ecosystem2ContractAddress = import.meta.env
-  .VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
-const Ecosystem2_ABI = Ecosystem2ABI.abi;
+const EcosystemDiamondAddress = import.meta.env
+  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
 const QuizContext = createContext();
 
@@ -23,14 +23,11 @@ const QuizProvider = ({ children }) => {
     if (resolvedSigner) {
       try {
         const contract = new ethers.Contract(
-          Ecosystem2ContractAddress,
-          Ecosystem2_ABI,
+          EcosystemDiamondAddress,
+          Ecosystem2Facet_ABI,
           resolvedSigner
         );
         console.log("Contract instance created");
-
-        // Log the contract address to verify
-        console.log("Contract address:", Ecosystem2ContractAddress);
 
         // Call the function to get lessons from the mapping
         const quizzesData = await contract.getAllQuizzes();
@@ -40,6 +37,7 @@ const QuizProvider = ({ children }) => {
           lessonId: Number(quiz.lessonId),
           quizId: Number(quiz.quizId),
           quizTitle: quiz.quizTitle,
+          exists: quiz.exists,
           questions: quiz.questions.map((question) => ({
             quizId: Number(question.quizId),
             questionId: Number(question.questionId),
@@ -66,7 +64,7 @@ const QuizProvider = ({ children }) => {
     if (signer) {
       fetchQuizzes();
     }
-  }, [signer, address]);
+  }, [signer, address, quizzes]);
 
   return (
     <QuizContext.Provider value={{ quizzes, fetchQuizzes, setQuizzes }}>

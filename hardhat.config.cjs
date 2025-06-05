@@ -1,11 +1,19 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("@nomicfoundation/hardhat-verify");
 require("dotenv").config();
+require("hardhat-contract-sizer");
 
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: "0.8.27",
+  contractSizer: {
+    alphaSort: true,
+    disambiguatePaths: false,
+    runOnCompile: true,
+    strict: true,
+    only: [':ERC20$'],
+  },
   settings: {
     optimizer: {
       enabled: true,
@@ -16,11 +24,17 @@ module.exports = {
   networks: {
     hardhat: {
       chainId: 31337,
+      allowUnlimitedContractSize: true,
     },
     skale: {
       url: process.env.VITE_APP_RPC_URL,
       accounts: [process.env.VITE_APP_PRIVATE_KEY],
       chainId: 1020352220,
+      allowUnlimitedContractSize: true,
+    },
+    localhost: {
+      chainId: 31337,
+      allowUnlimitedContractSize: true,
     },
   },
   paths: {
