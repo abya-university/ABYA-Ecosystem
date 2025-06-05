@@ -1,38 +1,46 @@
-import { Route, Routes } from "react-router-dom";
+// src/App.jsx
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Home from "./pages/Home";
-// import Navbar from "./components/Navbar";
 import MasterPage from "./pages/MasterPage";
 import CourseCreationPipeline from "./components/courseCreationPipeline";
-import DidForm from "./pages/DidForm";
-import OwnerCheck from "./pages/DidOwnerCheck";
-import ChangeOwner from "./pages/ChangeOwner";
-import AddDelegate from "./pages/AddDelegate";
-import CheckDelegate from "./pages/CheckDelegate";
-import RevokeDelegate from "./pages/RevokeDelegate";
+import ProfileDash from "./pages/ProfileDash";
+import ProfileForm from "./pages/ProfileForm";
+import ConnectProfile from "./pages/ConnectProfile";
+import TestProfile from "./pages/TestProfile";
+import VcForm from "./pages/VcForm";
+import VerifyVc from "./pages/VerifyVc";
+import WalletConnection from './components/WalletConnection';
+import { DidProvider } from './contexts/DidContext';
+import { ProfileProvider } from './contexts/ProfileContext';
 import NotFoundPage from "./pages/404Page";
 import CourseMetricsPage from "./pages/CourseMetricsPage";
 
 function App() {
   return (
-    <>
-      {/* <Navbar /> */}
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/mainpage" element={<MasterPage />} />
-        <Route path="create-course" element={<CourseCreationPipeline />} />
-        <Route path="/Didpage" element={<DidForm />} />
-        <Route path="/Ownercheck" element={<OwnerCheck />} />
-        <Route path="/Changeowner" element={<ChangeOwner />} />
-        <Route path="/AddDelegate" element={<AddDelegate />} />
-        <Route path="/CheckDelegate" element={<CheckDelegate />} />
-        <Route path="/RevokeDelegate" element={<RevokeDelegate />} />
-        <Route
-          path="/course-metrics/:courseId"
-          element={<CourseMetricsPage />}
-        />
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-    </>
+    <DidProvider>
+      <ProfileProvider>
+      <WalletConnection />
+    <Routes>
+      
+      <Route path="/" element={<Home />} />
+      <Route path="/mainpage" element={<MasterPage />} />
+      <Route path="create-course" element={<CourseCreationPipeline />} />
+      <Route path="/ProfileDash" element={<ProfileDash />} />
+      <Route path="/ProfileForm" element={<ProfileForm />} />
+      <Route path="/ConnectProfile" element={<ConnectProfile />} />
+      <Route path="/TestProfile" element={<TestProfile />} />
+      <Route path="/VcForm" element={<VcForm />} />
+      <Route path="/VerifyVc" element={<VerifyVc />} />
+      <Route
+        path="/course-metrics/:courseId"
+        element={<CourseMetricsPage />}
+      />
+      <Route path="*" element={<NotFoundPage />} />
+     
+    </Routes>
+    </ProfileProvider>
+    </DidProvider>
   );
 }
 

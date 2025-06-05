@@ -1,6 +1,4 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import { Home, ArrowLeft } from "lucide-react";
 import { ethers } from "ethers";
 import { EthereumDIDRegistry } from "ethr-did-registry";
 
@@ -58,7 +56,7 @@ const VerifyDIDOwner = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-100">
+    <div className="flex flex-col items-center justify-center p-4 bg-gray-200 rounded-lg">
       <div className="max-w-md w-full bg-white p-6 rounded-lg shadow-md">
         <h1 className="flex justify-center text-2xl font-semibold mb-6 text-yellow-500">Verify DID Owner</h1>
 
@@ -84,15 +82,6 @@ const VerifyDIDOwner = () => {
             Owner Address: {owner}
           </p>
         )}
-      </div>
-      <div className="flex justify-center space-x-4 p-6">
-        <button
-          onClick={() => window.history.back()}
-          className="border border-yellow-500 text-yellow-500 px-6 py-3 rounded-lg flex items-center space-x-2 hover:bg-yellow-500 hover:text-white transition-colors"
-        >
-          <ArrowLeft size={20} />
-          <span>Go Back</span>
-        </button>
       </div>
     </div>
   

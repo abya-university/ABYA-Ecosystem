@@ -1,12 +1,9 @@
 import React, { useState } from "react";
 import {
   Settings,
-  User,
   Bell,
   Shield,
-  Lock,
   Wallet,
-  Key,
   QrCode,
   Link2,
   CopyIcon,
@@ -17,24 +14,34 @@ import {
   Trash2,
   UsersIcon,
   BadgeCent,
+  UserCircle,
 } from "lucide-react";
-import { useAccount } from "wagmi";
+
 import { Link } from "react-router-dom";
 import { ethers } from "ethers";
 import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
 import { useEthersSigner } from "../components/useClientSigner";
 import { toast, ToastContainer } from "react-toastify";
 import SFuelDistributor from "../providers/SFuelDistribution";
+import { useAccount } from "wagmi";
+import { useProfile } from "../contexts/ProfileContext";
+import Modal from "../components/ui/Modal";
+import ProfileForm from "./ProfileForm";
+import UpdateProfileForm from "./UpdateProfileForm";
+import ConnectProfile from "./ConnectProfile";
+import ProfileDash from "./ProfileDash";
+
 
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
 const Community_ABI = CommunityABI.abi;
 
 const SettingsPage = () => {
-  const [activeSection, setActiveSection] = useState("did");
+  const [activeSection, setActiveSection] = useState("profile");
   const { address } = useAccount();
   const [isCopied, setIsCopied] = useState(false);
-  const [didManagement, setDidManagement] = useState({
-    didDocument: null,
+  const [profileManagement, setProfileManagement] = useState({
+    didDocument: null,  // This will hold the DID when connected.
+    profile: null,      // This will hold the profile JSON once connected.
     verifiableCredentials: [],
     linkedAccounts: [],
   });
@@ -107,13 +114,20 @@ const SettingsPage = () => {
     } catch (error) {
       toast.error("Failed to add reviewer", error);
     }
+  }; // FIXED: Added missing closing brace
+
+  const toggleNotification = (type) => {
+    setNotifications((prev) => ({
+      ...prev,
+      [type]: !prev[type],
+    }));
   };
 
   const settingsSections = [
     {
-      icon: <Key className="w-5 h-5" />,
-      label: "DID",
-      key: "did",
+      icon: <UserCircle className="w-5 h-5" />,
+      label: "Profile",
+      key: "profile",
     },
     {
       icon: <Bell className="w-5 h-5" />,
@@ -142,34 +156,22 @@ const SettingsPage = () => {
     },
   ];
 
-  const mockDidDocument = {
-    id: "did:ethr:0x1234567890abcdef",
-    controller: "0x1234567890abcdef",
-    verificationMethod: [
-      {
-        id: "#key1",
-        type: "Ed25519VerificationKey2020",
-        controller: "did:web3:0x1234567890abcdef",
-      },
-    ],
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showUpdateProfileModal, setShowUpdateProfileModal] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState(false);
+
+  // Callback to update profile information after ConnectProfile succeeds
+  const handleProfileConnected = (did, profile) => {
+    setProfileManagement((prev) => ({
+      ...prev,
+      didDocument: did,
+      profile: profile,
+    }));
+    setShowConnectModal(false);
   };
 
-  const mockVerifiableCredentials = [
-    {
-      id: "vc1",
-      type: ["VerifiableCredential", "KYCCredential"],
-      issuer: "did:web3:trusted-authority",
-      issuanceDate: "2024-01-15T00:00:00Z",
-      expirationDate: "2025-01-15T00:00:00Z",
-    },
-    {
-      id: "vc2",
-      type: ["VerifiableCredential", "MembershipCredential"],
-      issuer: "did:web3:community-dao",
-      issuanceDate: "2024-02-01T00:00:00Z",
-      expirationDate: "2025-02-01T00:00:00Z",
-    },
-  ];
+  const { profile } = useProfile();
+  const { did, firstName, secondName, email } = profile || {};
 
   return (
     <div
@@ -180,10 +182,7 @@ const SettingsPage = () => {
         {/* Header */}
         <div className="flex items-center mb-8 space-x-4">
           <Settings className="w-8 h-8 text-yellow-500" />
-          <h1
-            className="text-3xl font-bold 
-              dark:text-yellow-400 text-yellow-500"
-          >
+          <h1 className="text-3xl font-bold dark:text-yellow-400 text-yellow-500">
             Account Settings
           </h1>
         </div>
@@ -201,11 +200,10 @@ const SettingsPage = () => {
               <button
                 key={section.key}
                 onClick={() => setActiveSection(section.key)}
-                className={`w-full flex items-center space-x-3 p-3 rounded-lg mb-2 transition-all ${
-                  activeSection === section.key
+                className={`w-full flex items-center space-x-3 p-3 rounded-lg mb-2 transition-all ${activeSection === section.key
                     ? "bg-yellow-500/20 text-yellow-500"
                     : "text-gray-400 dark:hover:bg-gray-700 hover:bg-yellow-500/20 dark:hover:text-white hover:text-gray-500"
-                }`}
+                  }`}
               >
                 {section.icon}
                 <span>{section.label}</span>
@@ -218,163 +216,64 @@ const SettingsPage = () => {
             className="col-span-3 p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200
                 transform hover:scale-105 transition-transform duration-1000"
           >
-            {activeSection === "did" && (
+            {activeSection === "profile" && (
               <div>
                 <h2 className="text-2xl font-semibold mb-6 text-yellow-500">
-                  DID Management
+                  Profile Management
                 </h2>
 
-                {/* DID Document Section */}
-                <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 border dark:border-none rounded-lg p-4 mb-4">
-                  {/* Header */}
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-medium">DID Document</h3>
-                    <Link
-                      to="/Didpage"
-                      className="text-yellow-500 hover:underline"
-                    >
-                      Generate New DID
-                    </Link>
-                  </div>
+                {/* Render ProfileDash if a profile is connected */}
+                {profileManagement.didDocument && profileManagement.profile ? (
+                  <ProfileDash
+                    did={profileManagement.didDocument}
+                    profile={profileManagement.profile}
+                  />
+                ) : (
+                  <>
+                    <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 border dark:border-none rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-medium">Create Profile</h3>
+                        <button
+                          onClick={() => setShowCreateModal(true)}
+                          className="text-yellow-500 hover:underline"
+                        >
+                          New Profile
+                        </button>
+                      </div>
 
-                  {/* DID Details */}
-                  <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-gray-400">DID</span>
-                      <span className="font-mono text-sm">
-                        {mockDidDocument.id}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-400">Controller</span>
-                      <span className="font-mono text-sm">
-                        {mockDidDocument.controller}
-                      </span>
-                    </div>
-                  </div>
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-medium">Update Profile</h3>
+                        <button
+                          onClick={() => setShowUpdateProfileModal(true)}
+                          className="text-yellow-500 hover:underline"
+                        >
+                          Update
+                        </button>
+                      </div>
 
-                  {/* DID Owner */}
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-medium">DID Owner</h3>
-                    <Link
-                      to="/Ownercheck"
-                      className="text-yellow-500 hover:underline"
-                    >
-                      View owner
-                    </Link>
-                  </div>
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-medium">Profile Account</h3>
+                        <button
+                          onClick={() => setShowConnectModal(true)}
+                          className="text-yellow-500 hover:underline"
+                        >
+                          Open
+                        </button>
+                      </div>
 
-                  {/* DID Transfer */}
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-medium">DID Transfer</h3>
-                    <Link
-                      to="/Changeowner"
-                      className="text-yellow-500 hover:underline"
-                    >
-                      Change owner
-                    </Link>
-                  </div>
-                </div>
-
-                {/* DID Delegate Section */}
-                <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 border dark:border-none rounded-lg p-4 mb-4">
-                  {/* Add Delegate */}
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-medium">DID Delegates</h3>
-                    <Link
-                      to="/AddDelegate"
-                      className="text-yellow-500 hover:underline"
-                    >
-                      Add Delegate
-                    </Link>
-                  </div>
-
-                  {/* Look up Delegate */}
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-medium">Look up Delegate</h3>
-                    <Link
-                      to="/CheckDelegate"
-                      className="text-yellow-500 hover:underline"
-                    >
-                      Validity check
-                    </Link>
-                  </div>
-
-                  {/* Revoke Delegate */}
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-medium">Revoke Delegate</h3>
-                    <Link
-                      to="/RevokeDelegate"
-                      className="text-red-500 hover:underline"
-                    >
-                      Revoke
-                    </Link>
-                  </div>
-                </div>
-
-                {/* Verifiable Credentials Section */}
-                <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 border dark:border-none rounded-lg p-4 mb-4">
-                  {/* Header */}
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-medium">Verifiable Credentials</h3>
-                    <button className="text-yellow-500 hover:underline">
-                      Add Credential
-                    </button>
-                  </div>
-
-                  {/* Credentials List */}
-                  {mockVerifiableCredentials.length > 0 ? (
-                    mockVerifiableCredentials.map((vc) => (
-                      <div
-                        key={vc.id}
-                        className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 rounded-lg p-3 mb-2 last:mb-0"
-                      >
-                        <div className="flex justify-between items-center">
-                          {/* Credential Info */}
-                          <div>
-                            <span className="font-medium">
-                              {vc.type.join(", ")}
-                            </span>
-                            <p className="text-sm text-gray-400">
-                              Issued:{" "}
-                              {new Date(vc.issuanceDate).toLocaleDateString()}
-                            </p>
+                      <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 rounded-lg p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <Link2 className="w-5 h-5 text-yellow-500" />
+                            {firstName} {secondName} - {did && did.replace(/^(.{20}).*(.{4})$/, "$1…$2")}
                           </div>
-                          {/* View Details Button */}
-                          <button
-                            className="text-yellow-500 hover:underline"
-                            onClick={() => handleViewCredential(vc.id)}
-                          >
-                            View Details
-                          </button>
+                          <QrCode className="w-6 h-6 text-gray-500" />
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-center text-gray-400">
-                      No credentials available.
-                    </p>
-                  )}
-                </div>
 
-                {/* Linked Accounts/DIDs */}
-                <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 border dark:border-none rounded-lg p-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-medium">Linked Accounts</h3>
-                    <button className="text-yellow-500 hover:underline">
-                      Link New Account
-                    </button>
-                  </div>
-                  <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 rounded-lg p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <Link2 className="w-5 h-5 text-yellow-500" />
-                        <span>No linked accounts</span>
-                      </div>
-                      <QrCode className="w-6 h-6 text-gray-500" />
                     </div>
-                  </div>
-                </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -392,14 +291,12 @@ const SettingsPage = () => {
                       <span className="capitalize">{type} Notifications</span>
                       <button
                         onClick={() => toggleNotification(type)}
-                        className={`w-14 h-7 rounded-full transition-all ${
-                          enabled ? "bg-yellow-500" : "bg-gray-700"
-                        }`}
+                        className={`w-14 h-7 rounded-full transition-all ${enabled ? "bg-yellow-500" : "bg-gray-700"
+                          }`}
                       >
                         <div
-                          className={`w-5 h-5 bg-white rounded-full transform transition-transform ${
-                            enabled ? "translate-x-[26px]" : "translate-x-1"
-                          }`}
+                          className={`w-5 h-5 bg-white rounded-full transform transition-transform ${enabled ? "translate-x-[26px]" : "translate-x-1"
+                            }`}
                         />
                       </button>
                     </div>
@@ -489,11 +386,10 @@ const SettingsPage = () => {
                     <button
                       key={roleType}
                       onClick={() => setActiveRoleTab(roleType)}
-                      className={`px-4 py-2 mr-4 whitespace-nowrap font-medium rounded-t-lg transition-colors ${
-                        activeRoleTab === roleType
+                      className={`px-4 py-2 mr-4 whitespace-nowrap font-medium rounded-t-lg transition-colors ${activeRoleTab === roleType
                           ? "bg-yellow-500 text-white"
                           : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                      }`}
+                        }`}
                     >
                       {roleType}
                     </button>
@@ -629,7 +525,7 @@ const SettingsPage = () => {
                             } else if (activeRoleTab === "Reviewer") {
                               handleAddReviewer(newRoleAddress);
                             } else if (activeRoleTab === "Community Manager") {
-                              handleAddCommunityManager(newRoleAddress);
+                              // handleAddCommunityManager(newRoleAddress); // You'll need to implement this function
                             }
 
                             // Clear the input and close the modal
@@ -651,6 +547,30 @@ const SettingsPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal for New Profile */}
+      {showCreateModal && (
+        <Modal onClose={() => setShowCreateModal(false)}>
+          <ProfileForm onClose={() => setShowCreateModal(false)} />
+        </Modal>
+      )}
+
+      {/* Modal for Update Profile */}
+      {showUpdateProfileModal && (
+        <Modal onClose={() => setShowUpdateProfileModal(false)}>
+          <UpdateProfileForm onClose={() => setShowUpdateProfileModal(false)} />
+        </Modal>
+      )}
+
+      {/* Modal for Connect Profile */}
+      {showConnectModal && (
+        <Modal onClose={() => setShowConnectModal(false)}>
+          <ConnectProfile
+            onClose={() => setShowConnectModal(false)}
+            onProfileConnected={handleProfileConnected}
+          />
+        </Modal>
+      )}
     </div>
   );
 };
