@@ -74,6 +74,8 @@ const AchievementsPage = () => {
   const [showEventPopup, setShowEventPopup] = useState(false);
   const { members, fetchMembers } = useCommunityMembers();
 
+  console.log("Certificates: ", certificates);
+
   useEffect(() => {
     fetchEvents();
     fetchMemberBadgeDetails(address);
