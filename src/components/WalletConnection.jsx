@@ -17,6 +17,7 @@ import { createDidFromSigner } from "../services/didService";
 import { registerDidOnIpfs } from "../services/ipfsService";
 import { useEthersSigner } from "./useClientSigner";
 import { useDid } from "../contexts/DidContext";
+import { useProfile } from "../contexts/ProfileContext";
 
 const WalletConnection = () => {
   const { isConnected, address } = useAccount();
@@ -30,6 +31,7 @@ const WalletConnection = () => {
   const toggleRef = useRef(null);
   const { data: balanceData } = useBalance({ address });
   const signerPromise = useEthersSigner();
+  const { clearProfile } = useProfile();
 
   // Fetch DID on connect
   useEffect(() => {
@@ -93,6 +95,7 @@ const WalletConnection = () => {
 
   const signOut = () => {
     disconnect();
+    clearProfile();
     setDropdownVisible(false);
     navigate("/");
   };
