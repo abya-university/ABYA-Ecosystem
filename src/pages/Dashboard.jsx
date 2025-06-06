@@ -11,12 +11,17 @@ import {
 import { CourseContext } from "../contexts/courseContext";
 import { useUser } from "../contexts/userContext";
 import { useAccount } from "wagmi";
+import ProfileConnection from "../components/ProfileConnection";
+import { useProfile } from "../contexts/ProfileContext";
 
 const Dashboard = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const { courses } = useContext(CourseContext);
   const { role } = useUser();
+  const { profile } = useProfile();
   const { address } = useAccount();
+
+  console.log("Profile", profile);
 
   // Sample stats data (keep as is or modify based on your needs)
   const stats = [
@@ -98,6 +103,7 @@ const Dashboard = () => {
               Your blockchain education journey
             </p>
           </div>
+          {profile.did === null && <ProfileConnection />}
         </div>
 
         {/* Stats Grid */}

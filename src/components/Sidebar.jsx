@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 const Sidebar = ({ setActiveSection }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const sidebarItems = [
     {
