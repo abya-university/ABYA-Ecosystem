@@ -3,10 +3,12 @@ import { Moon, Sun, Menu, X } from "lucide-react";
 import WalletConnection from "./WalletConnection";
 import ProfileConnection from "./ProfileConnection";
 import { useState, useEffect } from "react";
+import { useProfile } from "../contexts/ProfileContext";
 
 export default function Navbar() {
   const [darkMode, setDarkMode] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { profile } = useProfile();
 
   useEffect(() => {
     document.body.classList.toggle("dark", darkMode);
@@ -18,7 +20,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-gray-100/80 dark:bg-gray-900 backdrop-blur-lg shadow-lg transition duration-1000">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-gray-100/80 dark:bg-gray-900 backdrop-blur-lg dark:shadow-sm dark:shadow-white transition-all duration-1000">
       <div className="container mx-auto flex justify-between items-center p-4">
         {/* Logo */}
         <div className="flex items-center space-x-2">
@@ -52,14 +54,16 @@ export default function Navbar() {
 
         {/* Actions: Profile, Wallet, Theme, Mobile Menu */}
         <div className="flex items-center space-x-4">
-          <ProfileConnection />
+          {profile.did !== null && <ProfileConnection />}
           <WalletConnection />
 
           {/* Dark Mode Toggle */}
           <button
             onClick={() => setDarkMode(!darkMode)}
-            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-            aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-yellow-500"
+            aria-label={
+              darkMode ? "Switch to light mode" : "Switch to dark mode"
+            }
           >
             {darkMode ? <Sun size={24} /> : <Moon size={24} />}
           </button>

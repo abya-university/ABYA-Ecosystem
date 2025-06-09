@@ -221,7 +221,7 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-cyan-950 via-gray-900 to-black text-white">
       {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-black/40 backdrop-blur-lg">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-black/70 backdrop-blur-lg">
         <div className="container mx-auto flex justify-between items-center p-4">
           <div className="flex items-center space-x-2">
             <Globe className="text-yellow-500" size={32} />

@@ -14,33 +14,40 @@ import { CommunityEventsProvider } from "./contexts/communityEventsContext.jsx";
 import { CommunityMembersProvider } from "./contexts/communityMembersContext.jsx";
 import { ProjectProposalsProvider } from "./contexts/projectProposalsContext.jsx";
 import { AirdropProposalProvider } from "./contexts/airdropProposalContext.jsx";
+import { DidProvider } from "./contexts/DidContext.jsx";
+import { ProfileProvider } from "./contexts/ProfileContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <Providers>
-      <BrowserRouter>
-        <CourseProvider>
-          <ChapterProvider>
-            <LessonProvider>
-              <QuizProvider>
-                <UserProvider>
-                  <CertificatesProvider>
-                    <CommunityEventsProvider>
-                      <CommunityMembersProvider>
-                        <ProjectProposalsProvider>
-                          <AirdropProposalProvider>
-                            <App />
-                          </AirdropProposalProvider>
-                        </ProjectProposalsProvider>
-                      </CommunityMembersProvider>
-                    </CommunityEventsProvider>
-                  </CertificatesProvider>
-                </UserProvider>
-              </QuizProvider>
-            </LessonProvider>
-          </ChapterProvider>
-        </CourseProvider>
-      </BrowserRouter>
-    </Providers>
+    {/* Render WalletConnection globally */}
+    <DidProvider>
+      <ProfileProvider>
+        <Providers>
+          <BrowserRouter>
+            <CourseProvider>
+              <ChapterProvider>
+                <LessonProvider>
+                  <QuizProvider>
+                    <UserProvider>
+                      <CertificatesProvider>
+                        <CommunityEventsProvider>
+                          <CommunityMembersProvider>
+                            <ProjectProposalsProvider>
+                              <AirdropProposalProvider>
+                                <App />
+                              </AirdropProposalProvider>
+                            </ProjectProposalsProvider>
+                          </CommunityMembersProvider>
+                        </CommunityEventsProvider>
+                      </CertificatesProvider>
+                    </UserProvider>
+                  </QuizProvider>
+                </LessonProvider>
+              </ChapterProvider>
+            </CourseProvider>
+          </BrowserRouter>
+        </Providers>
+      </ProfileProvider>
+    </DidProvider>
   </StrictMode>
 );

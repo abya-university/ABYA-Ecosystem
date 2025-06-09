@@ -11,29 +11,13 @@ import {
 import { CourseContext } from "../contexts/courseContext";
 import { useUser } from "../contexts/userContext";
 import { useAccount } from "wagmi";
-import ProfileFormPopup from "../components/ProfileSurveyForm";
-import axios from "axios";
 
 const Dashboard = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const { courses } = useContext(CourseContext);
   const { role } = useUser();
+  const { profile } = useProfile();
   const { address } = useAccount();
-  const [isPopupOpen, setIsPopupOpen] = useState(false);
-
-  const handleFormSubmit = (formData) => {
-    console.log('Form submitted:', formData);
-    // Process the form data here
-    try {
-      const response = axios.post('http://localhost:8000/analyze-single', formData);
-      console.log('Analysis Result:', response.data);
-    } catch (error) {
-      console.error('Error:', error.response.data);
-    }
-
-    setIsPopupOpen(false);
-  };
-
 
   // Sample stats data (keep as is or modify based on your needs)
   const stats = [
@@ -126,6 +110,7 @@ const Dashboard = () => {
           </button>
             </div>
           </div>
+          {profile.did === null && <ProfileConnection />}
         </div>
 
         <ProfileFormPopup

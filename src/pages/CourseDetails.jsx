@@ -33,6 +33,7 @@ import { ethers } from "ethers";
 import { useEthersSigner } from "../components/useClientSigner";
 import Certificate from "../components/Certificate";
 import { useCertificates } from "../contexts/certificatesContext";
+import { useProfile } from "../contexts/ProfileContext";
 
 const EcosystemDiamondAddress = import.meta.env
   .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
@@ -773,6 +774,7 @@ const CourseDetails = memo(({ courseId }) => {
   const [showCertificate, setShowCertificate] = useState(false);
   const [certificateData, setCertificateData] = useState(null);
   const { certificates } = useCertificates();
+  const { profile } = useProfile();
 
   // Update both fetch functions to filter out invalid IDs
 
@@ -1128,9 +1130,22 @@ const CourseDetails = memo(({ courseId }) => {
         throw new Error("No signer available");
       }
 
+      // Check if profile is missing
+      if (!profile || profile.firstName === null) {
+        alert("Profile not found. Please connect your profile first.");
+        return;
+      }
+
+      // Set learner name from profile
+      const fullName = `${profile.firstName} ${profile.secondName}`;
+      setLearnerName(fullName);
+
+      // Optional: update learnerName local variable directly if needed
+      const learner = fullName;
+
       // Ensure learner name is provided
-      if (!learnerName.trim()) {
-        alert("Please enter your name for the certificate");
+      if (!learner.trim()) {
+        alert("Profile not found. Please connect your profile first.");
         return;
       }
 
@@ -1140,13 +1155,12 @@ const CourseDetails = memo(({ courseId }) => {
         signer
       );
 
-      const learner = learnerName;
       const cert_issuer = "ABYA UNIVERSITY";
       const issue_date = new Date().toISOString();
 
       // Create certificate data object
       const newCertificateData = {
-        learner: learnerName,
+        learner,
         courseName: currentCourse.courseName,
         issuer: cert_issuer,
         issueDate: issue_date,
@@ -1409,58 +1423,185 @@ const CourseDetails = memo(({ courseId }) => {
       {showCongratsPopup && (
         <div
           id="popup"
-          className="absolute z-50 inset-0 items-center justify-center bg-black bg-opacity-40 overflow-auto"
+          className="fixed z-50 inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn"
         >
-          <div
-            className="relative bg-cyan-950 text-white lg:w-[30%] w-[380px] h-[400px] lg:h-[40%] mt-[200px] rounded-lg p-4 mx-auto my-auto lg:flex lg:items-center lg:justify-center flex-col"
-            style={{
-              background: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('/congratulations.jpg')`,
-            }}
-          >
-            <div className="flex flex-col gap-4 w-[90%]">
-              <h2 className="text-2xl font-bold mb-4 flex mx-auto justify-center items-center text-white">
-                Congratulations!
-              </h2>
-              <p className="text-center">
-                You have successfully completed the{" "}
-                <span className="text-yellow-400">
-                  {currentCourse?.courseName}
-                </span>{" "}
-                course.
-              </p>
-              {/* //input field to enter name */}
-              <input
-                name="learner"
-                id="learner"
-                onChange={(e) => setLearnerName(e.target.value)}
-                value={learnerName}
-                className="w-[90%] p-2 text-gray-200 bg-transparent shadow-md shadow-white text-lg items-center mx-auto justify-center mb-4"
-                placeholder="Enter your official names.."
-              />
-              <p>
-                Click the "Generate Certificate" button to access your
-                Certificate.
-              </p>
+          <div className="relative bg-white dark:bg-gray-800 max-w-lg w-full rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden transform animate-scaleIn">
+            {/* Decorative Header Background */}
+            <div
+              className="relative h-32 bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600"
+              style={{
+                background: `linear-gradient(135deg, rgba(251, 191, 36, 0.95), rgba(245, 158, 11, 0.95)), url('/congratulations.jpg')`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/20 to-yellow-600/40"></div>
+
+              {/* Celebration Elements */}
+              <div className="absolute top-4 left-4 text-yellow-200 animate-bounce">
+                <svg
+                  className="w-6 h-6"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+              </div>
+              <div className="absolute top-6 right-6 text-yellow-200 animate-pulse">
+                <svg
+                  className="w-8 h-8"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+
+              {/* Trophy Icon */}
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2">
+                <div className="bg-white dark:bg-gray-800 p-4 rounded-full shadow-lg border-4 border-yellow-400">
+                  <svg
+                    className="w-8 h-8 text-yellow-500"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                </div>
+              </div>
             </div>
-            <div className="flex mx-auto space-x-2 mt-[90px] items-center justify-center">
-              <button
-                onClick={handleClaimCertificate}
-                id="generateCertificate"
-                class="bg-yellow-500 text-white rounded-lg px-4 py-2 mt-4 hover:bg-yellow-400"
-              >
-                Claim Certificate
-              </button>
-              <button
-                onClick={handleClosePopup}
-                id="closePopup"
-                class="bg-yellow-500 text-white rounded-lg px-4 py-2 mt-4 hover:bg-yellow-400"
-              >
-                Close
-              </button>
+
+            {/* Content */}
+            <div className="pt-12 pb-8 px-8">
+              <div className="text-center space-y-6">
+                {/* Main Heading */}
+                <div>
+                  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                    🎉 Congratulations!
+                  </h2>
+                  <div className="w-16 h-1 bg-gradient-to-r from-yellow-400 to-yellow-600 mx-auto rounded-full"></div>
+                </div>
+
+                {/* Success Message */}
+                <div className="space-y-4">
+                  <p className="text-lg text-gray-700 dark:text-gray-300 leading-relaxed">
+                    You have successfully completed the{" "}
+                    <span className="font-semibold text-yellow-600 dark:text-yellow-400 px-2 py-1 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg">
+                      {currentCourse?.courseName}
+                    </span>{" "}
+                    course.
+                  </p>
+
+                  {/* Certificate Info */}
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-start space-x-3">
+                      <div className="bg-blue-500 p-1 rounded-full flex-shrink-0 mt-0.5">
+                        <svg
+                          className="w-4 h-4 text-white"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                          Certificate Information
+                        </p>
+                        <p className="text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
+                          Certificate will be issued to:
+                          <span className="font-semibold text-blue-900 dark:text-blue-100 ml-1">
+                            {profile?.firstName} {profile?.secondName}
+                          </span>
+                        </p>
+                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                          If this name is incorrect, please update your profile
+                          in Settings before claiming your certificate.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-gray-600 dark:text-gray-400">
+                    Click the "Claim Certificate" button to generate and
+                    download your certificate.
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3 mt-8">
+                <button
+                  onClick={handleClaimCertificate}
+                  id="generateCertificate"
+                  className="flex-1 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center justify-center space-x-2"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  <span>Claim Certificate</span>
+                </button>
+
+                <button
+                  onClick={handleClosePopup}
+                  id="closePopup"
+                  className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium py-3 px-6 rounded-xl transition-all duration-200 border border-gray-300 dark:border-gray-600"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.9) translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+
+        .animate-scaleIn {
+          animation: scaleIn 0.4s ease-out;
+        }
+      `}</style>
 
       {showCertificate && certificateData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 overflow-auto">

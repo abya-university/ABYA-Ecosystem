@@ -102,12 +102,14 @@ export default function ProfileConnection() {
       <button
         ref={toggleRef}
         onClick={() => setDropdownVisible((v) => !v)}
-        className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+        className="flex items-center space-x-2 bg-gray-200 dark:bg-gray-700 text-white px-4 py-2 rounded-lg shadow-lg"
         aria-haspopup="menu"
         aria-expanded={dropdownVisible}
       >
-        <UserCircle size={20} />
-        <span>{firstName}</span>
+        <UserCircle size={20} className="text-gray-700 dark:text-gray-50" />
+        <span className="text-gray-700 font-semibold dark:text-gray-50">
+          {firstName}
+        </span>
       </button>
 
       {dropdownVisible && (
@@ -128,7 +130,7 @@ export default function ProfileConnection() {
           <div className="p-4 space-y-3">
             {/* Status */}
             <div className="flex justify-between">
-              <span className="flex items-center space-x-2">
+              <span className="flex items-center space-x-2 dark:text-gray-300">
                 <ChartNetwork />
                 <span>Status</span>
               </span>
@@ -144,9 +146,14 @@ export default function ProfileConnection() {
                 onClick={() => copyText(did, setIsDidCopied)}
                 className="flex items-center space-x-1 hover:underline"
               >
-                {isDidCopied ? <CopyCheckIcon /> : <CopyIcon />} <span>DID</span>
+                {isDidCopied ? (
+                  <CopyCheckIcon className="w-5 h-5 text-yellow-500" />
+                ) : (
+                  <CopyIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                )}{" "}
+                <span className="dark:text-gray-300">DID</span>
               </button>
-              <span className="font-semibold text-sm truncate max-w-[150px]">
+              <span className="font-semibold text-sm truncate max-w-[150px] dark:text-gray-400">
                 {did.replace(/^(.{12}).*(.{4})$/, "$1…$2")}
               </span>
             </div>
@@ -157,10 +164,14 @@ export default function ProfileConnection() {
                 onClick={() => copyText(email, setIsEmailCopied)}
                 className="flex items-center space-x-1 hover:underline"
               >
-                {isEmailCopied ? <CopyCheckIcon /> : <CopyIcon />}{" "}
-                <span>Email</span>
+                {isEmailCopied ? (
+                  <CopyCheckIcon className="w-5 h-5 text-yellow-500" />
+                ) : (
+                  <CopyIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                )}{" "}
+                <span className="dark:text-gray-300">Email</span>
               </button>
-              <span className="font-semibold text-sm truncate max-w-[150px]">
+              <span className="font-semibold text-sm truncate max-w-[150px] dark:text-yellow-500">
                 {email}
               </span>
             </div>
