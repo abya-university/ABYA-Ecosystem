@@ -31,7 +31,8 @@ import UpdateProfileForm from "./UpdateProfileForm";
 import ConnectProfile from "./ConnectProfile";
 import ProfileDash from "./ProfileDash";
 
->>>>>>>>> Temporary merge branch 2
+const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
+const Community_ABI = CommunityABI.abi;
 
 const SettingsPage = () => {
   const [activeSection, setActiveSection] = useState("profile");
@@ -264,41 +265,12 @@ const SettingsPage = () => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
                             <Link2 className="w-5 h-5 text-yellow-500" />
-                            {firstName} {secondName} - {did.replace(/^(.{20}).*(.{4})$/, "$1…$2")}
->>>>>>>>> Temporary merge branch 2
+                            {firstName} {secondName} -{" "}
+                            {did && did.replace(/^(.{20}).*(.{4})$/, "$1…$2")}
                           </div>
                           <QrCode className="w-6 h-6 text-gray-500" />
                         </div>
                       </div>
-<<<<<<<<< Temporary merge branch 1
-                    ))
-                  ) : (
-                    <p className="text-center text-gray-400">
-                      No credentials available.
-                    </p>
-                  )}
-                </div>
-
-                {/* Linked Accounts/DIDs */}
-                <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 border dark:border-none rounded-lg p-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-medium">Linked Accounts</h3>
-                    <button className="text-yellow-500 hover:underline">
-                      Link New Account
-                    </button>
-                  </div>
-                  <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 rounded-lg p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <Link2 className="w-5 h-5 text-yellow-500" />
-                        <span>No linked accounts</span>
-                      </div>
-                      <QrCode className="w-6 h-6 text-gray-500" />
-                    </div>
-                  </div>
-                </div>
-=========
-                      
                     </div>
                   </>
                 )}
