@@ -10,7 +10,7 @@ import { getResolver } from "ethr-did-resolver";
  * Create an Ethr-DID instance (and return its DID URI)
  * directly from a connected ethers.js Signer.
  */
-export const createDidFromSigner = async (signer, registryAddress, chainName = "skaleTitanTestnet") => {
+export const createDidFromSigner = async (signer, registryAddress, chainName = "sepolia") => {
   if (!signer) throw new Error("Ethers signer is required");
 
   const address = await signer.getAddress();
@@ -22,7 +22,7 @@ export const createDidFromSigner = async (signer, registryAddress, chainName = "
     registry: registryAddress,
   });
 
-  return ethrDid.did;
+  return ethrDid.did;          
 };
 
 /**
@@ -43,7 +43,7 @@ export const createDid = async (privateKey, infuraUrl, contractAddress) => {
       identifier: wallet.address,
       privateKey: wallet.privateKey.replace(/^0x/, ""),
       provider,
-      chainNameOrId: "skaleTitanTestnet",
+      chainNameOrId: "sepolia",
     });
 
     console.log("Generated DID:", ethrDid.did);
@@ -65,7 +65,7 @@ export const resolveDid = async (did, infuraUrl, contractAddress) => {
       getResolver({
         networks: [
           {
-            name: "skaleTitanTestnet",
+            name: "sepolia",
             rpcUrl: infuraUrl,
             registry: contractAddress,
           },

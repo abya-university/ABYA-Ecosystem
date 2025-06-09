@@ -77,9 +77,9 @@ const ConnectProfile = ({ onClose, onProfileConnected }) => {
     setStatus("Verifying DID...");
 
     try {
-      const RPC_URL = import.meta.env.VITE_APP_RPC_URL;
+      const RPC_URL = import.meta.env.VITE_INFURA_URL;
       const CONTRACT_ADDRESS = import.meta.env
-        .VITE_APP_DID_REGISTRY_CONTRACT_ADDRESS;
+        .VITE_CONTRACT_ADDRESS;
 
       // DID format: did:ethr:0x123...
       const parts = ethrDid.split(":");

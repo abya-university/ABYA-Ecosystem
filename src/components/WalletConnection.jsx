@@ -44,11 +44,11 @@ const WalletConnection = () => {
       try {
         const signer = await signerPromise;
         console.log("Signer:", signer);
-        const registry = import.meta.env.VITE_APP_DID_REGISTRY_CONTRACT_ADDRESS;
+        const registry = import.meta.env.VITE_CONTRACT_ADDRESS;
         const did = await createDidFromSigner(
           signer,
           registry,
-          "skaleTitanTestnet"
+          "sepolia"
         );
         if (!mounted) return;
         setEthrDid(did);

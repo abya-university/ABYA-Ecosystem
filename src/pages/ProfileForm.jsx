@@ -49,8 +49,8 @@ const DidProfileForm = ({ onClose }) => {
       try {
         const resolved = await resolveDid(
           ethrDid,
-          import.meta.env.VITE_APP_RPC_URL,
-          import.meta.env.VITE_APP_DID_REGISTRY_CONTRACT_ADDRESS
+          import.meta.env.VITE_INFURA_URL,
+          import.meta.env.VITE_CONTRACT_ADDRESS
         );
         setResolvedDid(resolved);
       } catch (err) {
@@ -61,7 +61,7 @@ const DidProfileForm = ({ onClose }) => {
 
   // Provider & signer helpers
   const getProvider = () =>
-    new ethers.JsonRpcProvider(import.meta.env.VITE_APP_RPC_URL);
+    new ethers.JsonRpcProvider(import.meta.env.VITE_INFURA_URL);
   const getBrowserSigner = async () => {
     if (!window.ethereum) throw new Error("No Ethereum provider");
     const browserProvider = new ethers.BrowserProvider(window.ethereum);
@@ -72,7 +72,7 @@ const DidProfileForm = ({ onClose }) => {
   const fetchOnChainCIDs = async (identityAddress) => {
     const provider = getProvider();
     const contract = new ethers.Contract(
-      import.meta.env.VITE_APP_DID_REGISTRY_CONTRACT_ADDRESS,
+      import.meta.env.VITE_CONTRACT_ADDRESS,
       EthereumDIDRegistryArtifact.abi,
       provider
     );
@@ -129,7 +129,7 @@ const DidProfileForm = ({ onClose }) => {
       const identityAddress = ethrDid.split(":")[3];
       const provider = getProvider();
       const contractRead = new ethers.Contract(
-        import.meta.env.VITE_APP_DID_REGISTRY_CONTRACT_ADDRESS,
+        import.meta.env.VITE_CONTRACT_ADDRESS,
         EthereumDIDRegistryArtifact.abi,
         provider
       );
@@ -162,7 +162,7 @@ const DidProfileForm = ({ onClose }) => {
       // On-chain writes
       const signer = await getBrowserSigner();
       const contractWrite = new ethers.Contract(
-        import.meta.env.VITE_APP_DID_REGISTRY_CONTRACT_ADDRESS,
+        import.meta.env.VITE_CONTRACT_ADDRESS,
         EthereumDIDRegistryArtifact.abi,
         signer
       );
