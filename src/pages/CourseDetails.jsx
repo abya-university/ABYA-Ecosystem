@@ -34,6 +34,7 @@ import { useEthersSigner } from "../components/useClientSigner";
 import Certificate from "../components/Certificate";
 import { useCertificates } from "../contexts/certificatesContext";
 import { useProfile } from "../contexts/ProfileContext";
+import { CSSTransition } from "react-transition-group";
 
 const EcosystemDiamondAddress = import.meta.env
   .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
@@ -775,6 +776,10 @@ const CourseDetails = memo(({ courseId }) => {
   const [certificateData, setCertificateData] = useState(null);
   const { certificates } = useCertificates();
   const { profile } = useProfile();
+  const [hasCertificate, setHasCertificate] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [selectedCertificate, setSelectedCertificate] = useState(null);
 
   // Update both fetch functions to filter out invalid IDs
 
@@ -931,15 +936,6 @@ const CourseDetails = memo(({ courseId }) => {
     [courses, courseId]
   );
 
-  useEffect(() => {
-    const hasCertificate = certificates.some(
-      (cert) => cert.courseName === currentCourse.courseName
-    );
-    if (!hasCertificate) {
-      setShowCongratsPopup(true);
-    }
-  }, [certificates, currentCourse.courseName]);
-
   // Memoize filtered chapters
   const filteredChapters = useMemo(
     () => chapters.filter((chapter) => chapter.courseID === courseId),
@@ -973,6 +969,24 @@ const CourseDetails = memo(({ courseId }) => {
 
     // console.log("Total quizzes:", totalQuizzes2);
   }, [quizzes, lessons, filteredChapters]);
+
+  useEffect(() => {
+    const hasCertificate = certificates.some(
+      (cert) =>
+        cert.courseId === currentCourse.courseId.toString() &&
+        cert.owner.toLowerCase() === address.toLowerCase()
+    );
+
+    console.log("Checking for certificate:", hasCertificate);
+
+    if (hasCertificate) {
+      setShowCongratsPopup(false);
+      setHasCertificate(true);
+      // alert("You have already claimed a certificate for this course.");
+    } else {
+      setShowCongratsPopup(true);
+    }
+  }, [certificates, currentCourse.courseId, address]);
 
   // Fetch chapters only when courseId changes or when chapters are empty
   useEffect(() => {
@@ -1052,6 +1066,18 @@ const CourseDetails = memo(({ courseId }) => {
       ratings.engagementAndMotivation
     );
   }, []);
+
+  const handleCertificateClick = (cert) => {
+    setLoading(true);
+    setSelectedCertificate(cert);
+    setShowPopup(true);
+    setLoading(false);
+  };
+
+  const handleCloseCertPopup = () => {
+    setShowPopup(false);
+    setTimeout(() => setSelectedCertificate(null), 300); // Delay unmounting to allow transition
+  };
 
   // Memoize chapter content rendering
   const renderChapterContent = useCallback(
@@ -1368,59 +1394,297 @@ const CourseDetails = memo(({ courseId }) => {
           </div>
 
           {/* Right Sidebar Navigation (20%) */}
-          <div className="w-[20%] bg-white dark:bg-gray-800 p-6 rounded-lg h-fit sticky top-[100px]">
-            <ProgressBar
-              completedLessons={completedLessonIds.size + completedQuizIds.size}
-              totalLessons={totalLessons + totalQuizzes}
-            />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 pt-2">
-              Course Navigation
-            </h3>
-            <div className="space-y-2">
-              {filteredChapters.map((chapter, index) => (
-                <div
-                  key={chapter.chapterId}
-                  onClick={() => setActiveChapterId(chapter.chapterId)}
-                  className={`p-3 rounded-lg cursor-pointer transition-all duration-200 flex items-center gap-2 ${
-                    activeChapterId === chapter.chapterId
-                      ? "bg-gradient-to-r from-yellow-500/20 to-green-500/20 dark:text-white"
-                      : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                  }`}
-                >
-                  <Book className="w-4 h-4" />
-                  <span className="text-sm">
-                    Module {index + 1}: {chapter.chapterName}
-                  </span>
-                  {activeChapterId === chapter.chapterId && (
-                    <CheckCircle2 className="w-4 h-4 ml-auto text-yellow-500" />
+          <div className="w-[20%] bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-fit sticky top-[100px] overflow-hidden">
+            {/* Certificate Status Section */}
+            {certificates.some(
+              (cert) =>
+                cert.courseId === currentCourse.courseId.toString() &&
+                cert.owner.toLowerCase() === address.toLowerCase()
+            ) && (
+              <div className="relative bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 dark:from-emerald-900/30 dark:via-green-900/20 dark:to-teal-900/20 border-b border-emerald-200 dark:border-emerald-700/50">
+                {/* Decorative background pattern */}
+                <div className="absolute inset-0 opacity-10 dark:opacity-5">
+                  <svg
+                    className="w-full h-full"
+                    viewBox="0 0 100 100"
+                    fill="none"
+                  >
+                    <defs>
+                      <pattern
+                        id="certificate-pattern"
+                        x="0"
+                        y="0"
+                        width="20"
+                        height="20"
+                        patternUnits="userSpaceOnUse"
+                      >
+                        <circle
+                          cx="10"
+                          cy="10"
+                          r="1"
+                          fill="currentColor"
+                          className="text-emerald-400"
+                        />
+                      </pattern>
+                    </defs>
+                    <rect
+                      width="100"
+                      height="100"
+                      fill="url(#certificate-pattern)"
+                    />
+                  </svg>
+                </div>
+
+                <div className="relative p-4">
+                  <div className="flex items-start gap-3">
+                    {/* Certificate Icon */}
+                    <div className="flex-shrink-0 bg-gradient-to-br from-emerald-500 to-green-600 p-2 rounded-lg shadow-md">
+                      <svg
+                        className="w-5 h-5 text-white"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    </div>
+
+                    {/* Certificate Status Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                          Certificate Earned
+                        </h4>
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                          <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                            CLAIMED
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">
+                        Congratulations! You've successfully completed this
+                        course and earned your certificate.
+                      </p>
+
+                      {/* View Certificate Button */}
+                      <button
+                        className="mt-3 w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-emerald-700 dark:text-emerald-300 text-xs font-medium py-2 px-3 rounded-lg border border-emerald-200 dark:border-emerald-600 transition-all duration-200 hover:shadow-sm flex items-center justify-center gap-2"
+                        onClick={() => {
+                          // Find the certificate for this course and user
+                          const userCertificate = certificates.find(
+                            (cert) =>
+                              cert.courseId ===
+                                currentCourse.courseId.toString() &&
+                              cert.owner.toLowerCase() === address.toLowerCase()
+                          );
+
+                          if (userCertificate) {
+                            handleCertificateClick(userCertificate);
+                          }
+                        }}
+                      >
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
+                        </svg>
+                        View Certificate
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Certificate Popup */}
+            <CSSTransition
+              in={showPopup}
+              timeout={300}
+              classNames="popup"
+              unmountOnExit
+            >
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center overflow-auto"
+                style={{ backgroundColor: "rgba(0, 0, 0, 0.1)" }}
+              >
+                <div className="relative bg-transparent rounded-lg max-w-6xl w-full max-h-[87vh] shadow-lg">
+                  <button
+                    onClick={handleCloseCertPopup}
+                    className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10 bg-white rounded-full p-1"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+
+                  {loading ? (
+                    <div className="flex justify-center items-center h-full">
+                      <div className="loader"></div>
+                    </div>
+                  ) : (
+                    <Certificate certificateData={selectedCertificate} />
                   )}
                 </div>
-              ))}
+              </div>
+            </CSSTransition>
+
+            {/* Main Content Area */}
+            <div className="p-6">
+              {/* Progress Section */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Course Progress
+                  </h3>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
+                    {Math.round(
+                      ((completedLessonIds.size + completedQuizIds.size) /
+                        (totalLessons + totalQuizzes)) *
+                        100
+                    )}
+                    %
+                  </span>
+                </div>
+                <ProgressBar
+                  completedLessons={
+                    completedLessonIds.size + completedQuizIds.size
+                  }
+                  totalLessons={totalLessons + totalQuizzes}
+                />
+              </div>
+
+              {/* Navigation Section */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                  <svg
+                    className="w-4 h-4 text-gray-500 dark:text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                    />
+                  </svg>
+                  Course Modules
+                </h3>
+
+                <div className="space-y-1">
+                  {filteredChapters.map((chapter, index) => {
+                    const isActive = activeChapterId === chapter.chapterId;
+                    const isCompleted =
+                      completedLessonIds.has(chapter.chapterId) ||
+                      completedQuizIds.has(chapter.chapterId);
+
+                    return (
+                      <div
+                        key={chapter.chapterId}
+                        onClick={() => setActiveChapterId(chapter.chapterId)}
+                        className={`group relative p-3 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-sm ${
+                          isActive
+                            ? "bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border border-yellow-200 dark:border-yellow-700/50 shadow-sm"
+                            : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          {/* Module Icon */}
+                          <div
+                            className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-semibold transition-colors ${
+                              isActive
+                                ? "bg-gradient-to-br from-yellow-400 to-amber-500 text-white shadow-sm"
+                                : isCompleted
+                                ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                                : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                            }`}
+                          >
+                            {isCompleted ? (
+                              <svg
+                                className="w-4 h-4"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            ) : (
+                              index + 1
+                            )}
+                          </div>
+
+                          {/* Module Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`text-xs font-medium truncate ${
+                                  isActive
+                                    ? "text-yellow-800 dark:text-yellow-200"
+                                    : "text-gray-700 dark:text-gray-300"
+                                }`}
+                              >
+                                {chapter.chapterName}
+                              </span>
+                              {isActive && (
+                                <div className="flex-shrink-0 w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                              Module {index + 1}
+                            </p>
+                          </div>
+
+                          {/* Status Indicator */}
+                          {isCompleted && !isActive && (
+                            <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                          )}
+                        </div>
+
+                        {/* Active indicator line */}
+                        {isActive && (
+                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-yellow-400 to-amber-500 rounded-r-full"></div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </div>
-        {/* {role === "Reviewer" && !currentCourse.approved && (
-          <button
-            onClick={() => {
-              // setCourseId(currentCourse.courseId);
-              setIsReviewModalOpen(true);
-            }}
-            className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg"
-          >
-            Review Course
-          </button>
-        )} */}
-
-        <ReviewModal
-          isOpen={isReviewModalOpen}
-          onClose={() => setIsReviewModalOpen(false)}
-          onSubmit={handleSubmitReview}
-          courseId={courseId}
-        />
       </div>
 
       {/* i want a show congratulation popup when user complete all the lessons */}
-      {showCongratsPopup && (
+      {!hasCertificate && showCongratsPopup && (
         <div
           id="popup"
           className="fixed z-50 inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn"

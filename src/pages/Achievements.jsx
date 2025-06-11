@@ -375,8 +375,11 @@ const AchievementsPage = () => {
             classNames="popup"
             unmountOnExit
           >
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 overflow-auto">
-              <div className="relative bg-white rounded-lg max-w-7xl w-full max-h-[87vh] overflow-auto p-8 shadow-lg">
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center overflow-auto"
+              style={{ backgroundColor: "rgba(0, 0, 0, 0.1)" }}
+            >
+              <div className="relative bg-transparent rounded-lg max-w-6xl w-full max-h-[87vh] shadow-lg">
                 <button
                   onClick={handleClosePopup}
                   className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10 bg-white rounded-full p-1"
