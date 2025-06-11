@@ -16,7 +16,8 @@ import {
 import { createDidFromSigner } from "../services/didService";
 import { registerDidOnIpfs } from "../services/ipfsService";
 import { useEthersSigner } from "./useClientSigner";
-import { useDid } from '../contexts/DidContext';
+import { useDid } from "../contexts/DidContext";
+import { useProfile } from "../contexts/ProfileContext";
 
 const WalletConnection = () => {
   const { isConnected, address } = useAccount();
@@ -30,40 +31,50 @@ const WalletConnection = () => {
   const toggleRef = useRef(null);
   const { data: balanceData } = useBalance({ address });
   const signerPromise = useEthersSigner();
+  const { clearProfile } = useProfile();
 
   // Fetch DID on connect
   useEffect(() => {
     if (!isConnected) {
-      setEthrDid('');
+      setEthrDid("");
       return;
     }
     let mounted = true;
     (async () => {
       try {
         const signer = await signerPromise;
-        const registry = import.meta.env.VITE_CONTRACT_ADDRESS;
-        const did = await createDidFromSigner(signer, registry, 'sepolia');
+        console.log("Signer:", signer);
+        const registry = import.meta.env.VITE_APP_DID_REGISTRY_CONTRACT_ADDRESS;
+        const did = await createDidFromSigner(
+          signer,
+          registry,
+          "skaleTitanTestnet"
+        );
         if (!mounted) return;
         setEthrDid(did);
         await registerDidOnIpfs(did);
       } catch (err) {
-        console.error(err);
+        console.error("Error in DID creation or IPFS registration:", err);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [isConnected, signerPromise, setEthrDid]);
 
   // Outside click / ESC
   useEffect(() => {
-    const onClick = e => {
+    const onClick = (e) => {
       if (
         dropdownVisible &&
         dropdownRef.current &&
         !dropdownRef.current.contains(e.target) &&
         !toggleRef.current.contains(e.target)
-      ) setDropdownVisible(false);
+      )
+        setDropdownVisible(false);
     };
-    const onKey = e => e.key === "Escape" && dropdownVisible && setDropdownVisible(false);
+    const onKey = (e) =>
+      e.key === "Escape" && dropdownVisible && setDropdownVisible(false);
     document.addEventListener("mousedown", onClick);
     document.addEventListener("keydown", onKey);
     return () => {
@@ -73,7 +84,8 @@ const WalletConnection = () => {
   }, [dropdownVisible]);
 
   const copyText = (text, setCopied) => {
-    navigator.clipboard.writeText(text)
+    navigator.clipboard
+      .writeText(text)
       .then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
@@ -83,6 +95,7 @@ const WalletConnection = () => {
 
   const signOut = () => {
     disconnect();
+    clearProfile();
     setDropdownVisible(false);
     navigate("/");
   };
@@ -93,7 +106,7 @@ const WalletConnection = () => {
     <div className="relative">
       <button
         ref={toggleRef}
-        onClick={() => setDropdownVisible(v => !v)}
+        onClick={() => setDropdownVisible((v) => !v)}
         className="flex items-center space-x-2 bg-yellow-500 text-black px-4 py-2 rounded-lg hover:bg-yellow-600"
         aria-haspopup="menu"
         aria-expanded={dropdownVisible}
@@ -114,7 +127,9 @@ const WalletConnection = () => {
           <div className="bg-yellow-500/10 p-4 flex items-center space-x-3 border-b dark:border-gray-700">
             <Wallet2Icon className="w-10 h-10 text-yellow-600 dark:text-yellow-400" />
             <div>
-              <h3 className="font-bold text-lg text-gray-800 dark:text-white">Wallet Details</h3>
+              <h3 className="font-bold text-lg text-gray-800 dark:text-white">
+                Wallet Details
+              </h3>
               {/* <p className="text-xs text-gray-600 dark:text-gray-300 truncate max-w-[200px]">{address}</p> */}
             </div>
           </div>
@@ -122,43 +137,74 @@ const WalletConnection = () => {
           <div className="p-4 space-y-3">
             {/* Status */}
             <div className="flex justify-between">
-              <span className="flex items-center space-x-2"><ChartNetwork /><span>Status</span></span>
-              <span className="flex items-center space-x-1 text-green-500"><Check /><span>Connected</span></span>
+              <span className="flex items-center space-x-2 dark:text-gray-300">
+                <ChartNetwork />
+                <span>Status</span>
+              </span>
+              <span className="flex items-center space-x-1 text-green-500">
+                <Check />
+                <span>Connected</span>
+              </span>
             </div>
 
             {/* Copy Address */}
-            <div className="flex justify-between">
-              <button onClick={() => copyText(address, setIsCopied)} className="flex items-center space-x-1 hover:underline">
-                {isCopied ? <CopyCheckIcon /> : <CopyIcon />} <span>Address</span>
+            <div className="flex justify-between dark:text-gray-300">
+              <button
+                onClick={() => copyText(address, setIsCopied)}
+                className="flex items-center space-x-1 hover:underline"
+              >
+                {isCopied ? (
+                  <CopyCheckIcon className="w-5 h-5 text-yellow-500" />
+                ) : (
+                  <CopyIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                )}{" "}
+                <span>Address</span>
               </button>
               <span className="font-semibold text-sm truncate max-w-[150px]">
-                {address.slice(0,6)}...{address.slice(-4)}
+                {address.slice(0, 6)}...{address.slice(-4)}
               </span>
             </div>
 
             {/* Copy DID */}
             {ethrDid && (
-              <div className="flex justify-between">
-                <button onClick={() => copyText(ethrDid, setIsDidCopied)} className="flex items-center space-x-1 hover:underline">
-                  {isDidCopied ? <CopyCheckIcon /> : <CopyIcon />} <span>DID</span>
+              <div className="flex justify-between dark:text-gray-300">
+                <button
+                  onClick={() => copyText(ethrDid, setIsDidCopied)}
+                  className="flex items-center space-x-1 hover:underline"
+                >
+                  {isDidCopied ? (
+                    <CopyCheckIcon className="w-5 h-5 text-yellow-500" />
+                  ) : (
+                    <CopyIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                  )}{" "}
+                  <span>DID</span>
                 </button>
-                <span className="font-semibold text-sm break-all max-w-[200px]">
+                <span className="font-semibold text-sm break-all max-w-[200px] dark:text-blue-500">
                   {ethrDid.replace(/^(.{12}).*(.{8})$/, "$1…$2")}
                 </span>
               </div>
             )}
 
             {/* Ether Balance */}
-            <div className="flex justify-between">
-              <span className="flex items-center space-x-2"><Wallet /><span>Balance</span></span>
+            <div className="flex justify-between dark:text-gray-300">
+              <span className="flex items-center space-x-2">
+                <Wallet />
+                <span>Balance</span>
+              </span>
               <span className="font-semibold dark:text-yellow-500">
-                {balanceData ? parseFloat(balanceData.formatted).toFixed(5) : '0.00000'} {balanceData?.symbol}
+                {balanceData
+                  ? parseFloat(balanceData.formatted).toFixed(5)
+                  : "0.00000"}{" "}
+                {balanceData?.symbol}
               </span>
             </div>
 
             {/* Token Balance Placeholder */}
-            <div className="flex justify-between">
-              <span className="flex items-center space-x-2"><Aperture /><span>Token Balance</span></span>
+            <div className="flex justify-between dark:text-gray-300">
+              <span className="flex items-center space-x-2">
+                <Aperture />
+                <span>Token Balance</span>
+              </span>
               <span className="font-semibold dark:text-purple-600">--</span>
             </div>
 
@@ -167,7 +213,8 @@ const WalletConnection = () => {
               onClick={signOut}
               className="w-full flex items-center justify-center space-x-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950 p-2 rounded-lg"
             >
-              <Power /><span>Disconnect</span>
+              <Power />
+              <span>Disconnect</span>
             </button>
           </div>
         </div>

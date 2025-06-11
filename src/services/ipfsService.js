@@ -4,8 +4,8 @@ import { PinataSDK } from "pinata-web3";
 
 // Initialize Pinata SDK using JWT and Gateway URL from environment variables
 const pinata = new PinataSDK({
-  pinataJwt: import.meta.env.VITE_PINATA_JWT,
-  pinataGateway: import.meta.env.VITE_PINATA_GATEWAY,
+  pinataJwt: import.meta.env.VITE_APP_PINATA_JWT,
+  pinataGateway: import.meta.env.VITE_APP_PINATA_GATEWAY,
 });
 
 /**
@@ -37,7 +37,7 @@ export const storeDidDocument = async (did, didDocument) => {
 export const fetchDidDocument = async (cid) => {
   try {
     const response = await fetch(
-      `${import.meta.env.VITE_PINATA_GATEWAY}/ipfs/${cid}`
+      `${import.meta.env.VITE_APP_PINATA_GATEWAY}/ipfs/${cid}`
     );
     if (!response.ok) {
       throw new Error("Failed to fetch DID document from IPFS");
@@ -56,9 +56,19 @@ export const fetchDidDocument = async (cid) => {
  */
 const getDidRegistryCid = async () => {
   try {
-    const response = await pinata.pinList({ name: "did.json" });
-    if (response.count > 0 && response.rows.length > 0) {
-      return response.rows[0].ipfs_pin_hash;
+    const response = await fetch(
+      `${import.meta.env.VITE_APP_PINATA_GATEWAY}/data/pinList?metadata[name]=did.json`,
+      {
+        headers: {
+          Authorization: `Bearer ${import.meta.env.VITE_APP_PINATA_JWT}`,
+        },
+      }
+    );
+    const data = await response?.json();
+    console.log("Pinata response for DID registry:", data);
+
+    if (data.count > 0 && data.rows.length > 0) {
+      return data.rows[0].ipfs_pin_hash;
     }
     return null;
   } catch (error) {
@@ -93,9 +103,10 @@ export const updateDidRegistry = async ({ did, didDocumentCid, didOwner }) => {
     });
     const registryString = JSON.stringify(registry, null, 2);
     const blob = new Blob([registryString], { type: "application/json" });
-    const file = new File([blob], "did.json", { type: "application/json" });
+    const file = new File([blob], "did-registry.json", { type: "application/json" });
+
     const uploadResponse = await pinata.upload.file(file, {
-      pinataMetadata: { name: "did.json" },
+      pinataMetadata: { name: "did-registry.json" },
     });
     return uploadResponse.IpfsHash;
   } catch (error) {
@@ -165,7 +176,7 @@ export async function registerDidInGlobalRegistry({ did, cid, owner }) {
     const list = await pinata.pinList({ name: "did.json" });
     if (list.count > 0) {
       const latestHash = list.rows[0].ipfs_pin_hash;
-      const resp = await fetch(`${process.env.VITE_PINATA_GATEWAY}/ipfs/${latestHash}`);
+      const resp = await fetch(`${process.env.VITE_APP_PINATA_GATEWAY}/ipfs/${latestHash}`);
       existing = await resp.json();
     }
   } catch (err) {
@@ -199,27 +210,24 @@ export async function registerDidInGlobalRegistry({ did, cid, owner }) {
  */
 export const registerDidOnIpfs = async (did) => {
   try {
-    // 1. see if we already have a registry pinned:
-    const existingCid = await getDidRegistryCid(/* look for “did-registry.json” */);
+    const existingCid = await getDidRegistryCid();
     let registry;
 
     if (existingCid) {
-      // fetch the old registry array
       registry = await fetchDidDocument(existingCid);
     } else {
       registry = { dids: [] };
     }
 
-    // 2. append the new entry
     registry.dids.push({
       did,
       timestamp: new Date().toISOString(),
     });
 
-    // 3. upload the updated registry
     const registryString = JSON.stringify(registry, null, 2);
     const blob = new Blob([registryString], { type: "application/json" });
-    // const file = new File([blob], "did-registry.json", { type: "application/json" });
+    const file = new File([blob], "did-registry.json", { type: "application/json" });
+
     const uploadResponse = await pinata.upload.file(file, {
       pinataMetadata: { name: "did-registry.json" },
     });

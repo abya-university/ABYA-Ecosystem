@@ -3,10 +3,12 @@ import { Moon, Sun, Menu, X } from "lucide-react";
 import WalletConnection from "./WalletConnection";
 import ProfileConnection from "./ProfileConnection";
 import { useState, useEffect } from "react";
+import { useProfile } from "../contexts/ProfileContext";
 
 export default function Navbar() {
   const [darkMode, setDarkMode] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { profile } = useProfile();
 
   useEffect(() => {
     document.body.classList.toggle("dark", darkMode);
@@ -52,14 +54,16 @@ export default function Navbar() {
 
         {/* Actions: Profile, Wallet, Theme, Mobile Menu */}
         <div className="flex items-center space-x-4">
-          <ProfileConnection />
+          {profile.did !== null && <ProfileConnection />}
           <WalletConnection />
 
           {/* Dark Mode Toggle */}
           <button
             onClick={() => setDarkMode(!darkMode)}
-            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-            aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-yellow-500"
+            aria-label={
+              darkMode ? "Switch to light mode" : "Switch to dark mode"
+            }
           >
             {darkMode ? <Sun size={24} /> : <Moon size={24} />}
           </button>

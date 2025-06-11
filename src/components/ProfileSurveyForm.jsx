@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { useProfile } from '../contexts/ProfileContext';
 
+
 const ProfileFormPopup = ({ isOpen, onClose, onSubmit, initialData = {} }) => {
     const { profile } = useProfile(); // Use the profile context
     const [formData, setFormData] = useState({
@@ -152,7 +153,7 @@ const ProfileFormPopup = ({ isOpen, onClose, onSubmit, initialData = {} }) => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
                 <input
                   type="text"
-                  value={formData.fullName}
+                  value={`${profile.firstName || ''} ${profile.secondName || ''}`.trim()}
                   onChange={(e) => handleInputChange('fullName', e.target.value)}
                   className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                 />

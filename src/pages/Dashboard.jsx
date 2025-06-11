@@ -13,11 +13,14 @@ import { useUser } from "../contexts/userContext";
 import { useAccount } from "wagmi";
 import ProfileFormPopup from "../components/ProfileSurveyForm";
 import axios from "axios";
+import ProfileConnection from "../components/ProfileConnection";
+import { useProfile } from "../contexts/ProfileContext";
 
 const Dashboard = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const { courses } = useContext(CourseContext);
   const { role } = useUser();
+  const { profile } = useProfile();
   const { address } = useAccount();
   const [isPopupOpen, setIsPopupOpen] = useState(false);
 
@@ -34,6 +37,8 @@ const Dashboard = () => {
     setIsPopupOpen(false);
   };
 
+
+  console.log("Profile", profile);
 
   // Sample stats data (keep as is or modify based on your needs)
   const stats = [
@@ -126,6 +131,7 @@ const Dashboard = () => {
           </button>
             </div>
           </div>
+          {profile.did === null && <ProfileConnection />}
         </div>
 
         <ProfileFormPopup
