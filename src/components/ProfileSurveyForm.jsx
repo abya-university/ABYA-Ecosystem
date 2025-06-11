@@ -1,8 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
+import { useProfile } from '../contexts/ProfileContext';
 
 const ProfileFormPopup = ({ isOpen, onClose, onSubmit, initialData = {} }) => {
+    const { profile } = useProfile(); // Use the profile context
     const [formData, setFormData] = useState({
         // Personal Information
         fullName: '',
@@ -69,6 +71,25 @@ const ProfileFormPopup = ({ isOpen, onClose, onSubmit, initialData = {} }) => {
         positiveAspects: '',
         areasForImprovement: ''
       });
+
+    // Use useEffect to update formData when the profile changes or when the popup opens
+    useEffect(() => {
+      if (isOpen && profile) {
+          setFormData(prev => ({
+              ...prev,
+              // Personal Information auto-fill
+              fullName: `${profile.firstName || ''} ${profile.secondName || ''}`.trim(),
+              dateOfBirth: profile.dateOfBirth || '',
+              gender: profile.gender || '',
+              email: profile.email || '',
+              countryOfResidence: profile.countryOfResidence || '',
+              preferredLanguages: profile.preferredLanguages ? 
+                                  (Array.isArray(profile.preferredLanguages) ? profile.preferredLanguages : profile.preferredLanguages.split(',').map(lang => lang.trim())) 
+                                  : ['English'], // Handle potential string or array for languages
+          }));
+      }
+  }, [isOpen, profile]); // Depend on isOpen and profile
+
 
   const proficiencyLevels = ['Basic', 'Intermediate', 'Advanced', 'Expert'];
   const genderOptions = ['Male', 'Female', 'Prefer not to say'];
