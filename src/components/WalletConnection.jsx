@@ -31,7 +31,7 @@ const WalletConnection = () => {
   const toggleRef = useRef(null);
   const { data: balanceData } = useBalance({ address });
   const signerPromise = useEthersSigner();
-  const { clearProfile } = useProfile();
+  const { clearProfile, profile } = useProfile();
 
   // Fetch DID on connect
   useEffect(() => {
@@ -95,8 +95,11 @@ const WalletConnection = () => {
 
   const signOut = () => {
     disconnect();
-    clearProfile();
     setDropdownVisible(false);
+    if (profile.did !== null) {
+      // If profile is connected, clear it
+      clearProfile();
+    }
     navigate("/");
   };
 
