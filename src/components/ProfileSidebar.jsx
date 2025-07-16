@@ -1,6 +1,6 @@
 // ProfileSidebar.jsx
 import { Link } from "react-router-dom";
-import { Home, Bell, IdCardIcon, ChevronDown, ChevronUp, Settings, Copy, UserPlus2, VerifiedIcon } from "lucide-react";
+import { IdCardIcon, ChevronDown, ChevronUp, UserPlus2, VerifiedIcon } from "lucide-react";
 
 export default function ProfileSidebar({
   isDidOpen,
@@ -12,7 +12,7 @@ export default function ProfileSidebar({
   openModal
 }) {
   return (
-    <aside className="w-64 border-r border-gray-300 flex flex-col h-full">
+    <aside className="w-64 border-r border-yellow-300 flex flex-col h-full">
       
       
       {/* Bottom Row: Scrollable Navigation */}
@@ -115,7 +115,14 @@ export default function ProfileSidebar({
             </div>
             {isVcOpen && (
               <ul className="ml-6 mt-2 space-y-2 text-gray-600 dark:text-gray-400">
-                <li className="hover:text-blue-400 cursor-pointer">Request Credentials</li>
+                <li className="hover:text-blue-400 cursor-pointer">
+                  <button 
+                    className="flex items-center gap-2"
+                    onClick={() => openModal("requestVc")}
+                  >
+                    Request VC
+                  </button>
+                </li>
                 <li className="hover:text-blue-400 cursor-pointer">Verify Credentials</li>
                 <li className="hover:text-blue-400 cursor-pointer">Revoke Credentials</li>
               </ul>

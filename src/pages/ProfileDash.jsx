@@ -13,6 +13,7 @@ const ChangeOwner = lazy(() => import("./ChangeOwner"));
 const AddDelegate = lazy(() => import("./AddDelegate"));
 const CheckDelegate = lazy(() => import("./CheckDelegate"));
 const RevokeDelegate = lazy(() => import("./RevokeDelegate"));
+const VcForm = lazy(() => import("./VcForm"));
 
 export default function ProfileDashboard({ profile, did }) {
   // Show error if required props are missing.
@@ -159,6 +160,7 @@ export default function ProfileDashboard({ profile, did }) {
             {modalType === "addDelegate" && <AddDelegate />}
             {modalType === "checkDelegate" && <CheckDelegate />}
             {modalType === "revokeDelegate" && <RevokeDelegate />}
+            {modalType === "requestVc" && <VcForm />}
           </Modal>
         </Suspense>
       )}

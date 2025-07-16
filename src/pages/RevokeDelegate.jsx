@@ -67,8 +67,8 @@ const RevokeDelegate = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center bg-gray-200 p-6">
-      <div className="bg-white p-8 rounded shadow-md max-w-md w-full">
+    <div className="flex flex-col items-center justify-center bg-gray-200 dark:bg-gray-900 p-6">
+      <div className="bg-white dark:bg-gray-900 p-8 rounded shadow-md max-w-md w-full">
         <button type="button" onClick={() => navigate(-1)} className="mb-4 flex items-center text-sm text-gray-600">
           <ArrowLeft size={16} className="mr-1" /> Back
         </button>
@@ -77,9 +77,9 @@ const RevokeDelegate = () => {
           Revoke Delegate
         </h1>
 
-        <div className="mb-4 w-full p-2 border rounded bg-gray-100">
-          <label className="block text-sm font-medium text-gray-700">Your DID</label>
-          <p className="mt-1 text-gray-900 break-all">{ethrDid}</p>
+        <div className="mb-4 w-full p-2 rounded bg-gray-100 dark:bg-gray-900">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-500">Your DID</label>
+          <p className="mt-1 text-gray-900 dark:text-gray-100 break-all">{ethrDid}</p>
         </div>
 
         <input

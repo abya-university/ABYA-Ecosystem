@@ -56,8 +56,8 @@ const VerifyDIDOwner = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center p-4 bg-gray-200 rounded-lg">
-      <div className="max-w-md w-full bg-white p-6 rounded-lg shadow-md">
+    <div className="flex flex-col items-center justify-center p-4 bg-gray-200 dark:bg-gray-900 rounded-lg">
+      <div className="max-w-md w-full bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md">
         <h1 className="flex justify-center text-2xl font-semibold mb-6 text-yellow-500">Verify DID Owner</h1>
 
         <input

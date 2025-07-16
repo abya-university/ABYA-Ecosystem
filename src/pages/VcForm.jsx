@@ -1,253 +1,149 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Loader } from "lucide-react";
 import { ethers } from "ethers";
+import { useDid } from "../contexts/DidContext";
+import { useProfile } from '../contexts/ProfileContext';
 
-// Configuration (ideally moved to environment variables)
-const VITE_VC_INFURA_URL = "https://sepolia.infura.io/v3/189303beb46d46d8a0327f90f441168d";
-const VITE_VC_CONTRACT_ADDRESS = "0xBe203f08DC55566fe826c6aAE8eb29cfE69Ae520";
-const VITE_VC_PINATA_JWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiI1NmQ0MjZjNi0yOWVhLTRhMjctYjM4NS1mNzhiYWFhMjllODUiLCJlbWFpbCI6Im5vcm1hbmdpdG9uZ2EzODhAZ21haWwuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsInBpbl9wb2xpY3kiOnsicmVnaW9ucyI6W3siZGVzaXJlZFJlcGxpY2F0aW9uQ291bnQiOjEsImlkIjoiRlJBMSJ9LHsiZGVzaXJlZFJlcGxpY2F0aW9uQ291bnQiOjEsImlkIjoiTllDMSJ9XSwidmVyc2lvbiI6MX0sIm1mYV9lbmFibGVkIjpmYWxzZSwic3RhdHVzIjoiQUNUSVZFIn0sImF1dGhlbnRpY2F0aW9uVHlwZSI6InNjb3BlZEtleSIsInNjb3BlZEtleUtleSI6ImQxYjhiMDM5ZjMyMTIyYjk5ODQzIiwic2NvcGVkS2V5U2VjcmV0IjoiMjFjN2U2YTE1ZTI1MDY5NzcxMjllNzBmMTQ5NWY3MWJkZjJlZjYxY2YwODk3MmY0YTRmNmM4MWE4MDkzZDBiZCIsImV4cCI6MTc3MTA1ODAzOH0.lPxRPlBrKhtWuiu4BSiN2gSCl7B-dVVITUS9OmLqtx0";
-const VITE_VC_PINATA_GATEWAY = "sapphire-near-whippet-156.mypinata.cloud";
+// Configuration
+const VITE_VC_INFURA_URL = import.meta.env.VITE_VC_INFURA_URL;
+const VITE_VC_CONTRACT_ADDRESS = import.meta.env.VITE_VC_CONTRACT_ADDRESS;
+const VITE_VC_PINATA_JWT = import.meta.env.VITE_VC_PINATA_JWT;
+const VITE_VC_PINATA_GATEWAY = import.meta.env.VITE_VC_PINATA_GATEWAY;
 
-// Smart contract ABI
+// ABI
 const contractABI = [
-  "function issueCredential(string studentDID, string credentialType, string metadata, string credentialHash, string signature) public",
+  "function issueCredential(string studentDID, string credentialType, string metadata, string credentialHash, string signature, string mappingCID) public",
+  "function getCredentialsForStudent(string studentDID) public view returns (uint256[])",
+  "function credentials(uint256) public view returns (uint256 id, string studentDID, string issuerDID, string credentialType, uint256 issueDate, string metadata, string credentialHash, string signature, string mappingCID, bool valid)"
 ];
 
-// Mock issuer credentials (to be handled securely in the backend)
-const mockIssuerPrivateKey = "2d8b27effca40c55ff022b5ffa1d135fa99b5b701b5d4b511418b08ba38b117a";
+const mockIssuerPrivateKey = import.meta.env.VITE_VC_ISSUER_KEY;
 
-// Available courses
+// Courses
 const mockCourses = [
-  {
-    courseId: "vc-101",
-    title: "Introduction to Verifiable Credentials",
-    description: "Learn the fundamentals of Verifiable Credentials.",
-    instructor: "Dr. Jane Doe",
-    duration: "4 weeks",
-    level: "Intermediate",
-  },
-  {
-    courseId: "vc-102",
-    title: "Blockchain Basics",
-    description: "Understand the core principles of blockchain technology.",
-    instructor: "Prof. John Smith",
-    duration: "6 weeks",
-    level: "Beginner",
-  },
+  { courseId: "vc-101", title: "Introduction to Verifiable Credentials", instructor: "Dr. Jane Doe" },
+  { courseId: "vc-102", title: "Blockchain Basics", instructor: "Prof. John Smith" },
 ];
 
-// Helper function to upload a JSON document to Pinata
-const uploadJSONToIPFS = async (document, name) => {
-  const url = "https://api.pinata.cloud/pinning/pinJSONToIPFS";
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${VITE_VC_PINATA_JWT}`,
-      },
-      body: JSON.stringify({
-        pinataMetadata: { name },
-        pinataContent: document,
-      }),
-    });
-    if (!response.ok) {
-      throw new Error(`Pinata upload failed: ${response.statusText}`);
-    }
-    const data = await response.json();
-    return data.IpfsHash;
-  } catch (error) {
-    console.error("Error uploading JSON to IPFS:", error);
-    throw error;
-  }
+// IPFS upload
+const uploadJSONToIPFS = async (doc, name) => {
+  const res = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${VITE_VC_PINATA_JWT}` },
+    body: JSON.stringify({ pinataMetadata: { name }, pinataContent: doc }),
+  });
+  if (!res.ok) throw new Error(`Pinata upload failed: ${res.statusText}`);
+  return (await res.json()).IpfsHash;
 };
 
 const VCIssuanceForm = () => {
-  // State for the VC holder's DID (user-provided) and course selection
-  const [holderDID, setHolderDID] = useState("");
+  const { ethrDid } = useDid();
+  const { profile } = useProfile();
+  const holderDID = profile?.did || ethrDid;
+  const fullName = [profile?.firstName, profile?.secondName].filter(Boolean).join(" ");
+
   const [selectedCourses, setSelectedCourses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [txHash, setTxHash] = useState("");
   const [error, setError] = useState("");
   const [vcDocument, setVcDocument] = useState(null);
-  const [mappingCID, setMappingCID] = useState("");
+  const [onchainCID, setOnchainCID] = useState("");
 
-  const toggleCourseSelection = (courseId) => {
-    setSelectedCourses((prev) =>
-      prev.includes(courseId)
-        ? prev.filter((id) => id !== courseId)
-        : [...prev, courseId]
-    );
+  useEffect(() => {
+    if (!holderDID) setError("Connect your wallet or complete profile to get DID.");
+  }, [holderDID]);
+
+  const toggleCourseSelection = (id) => {
+    setSelectedCourses(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
-  // This function either issues a new credential or re-issues (updates) the VC document.
   const handleIssueOrUpdateCredential = async () => {
-    if (!holderDID.trim() || selectedCourses.length === 0) {
-      setError("Please enter the holder's DID and select at least one course.");
-      return;
-    }
-    setError("");
-    setLoading(true);
-    setTxHash("");
-    setVcDocument(null);
-    setMappingCID("");
+    setError(""); setTxHash(""); setVcDocument(null); setOnchainCID("");
+    if (!holderDID) return setError("No DID available.");
+    if (!selectedCourses.length) return setError("Select at least one course.");
 
+    setLoading(true);
     try {
-      // Use the mock issuer's private key for signing
       const provider = new ethers.JsonRpcProvider(VITE_VC_INFURA_URL);
       const wallet = new ethers.Wallet(mockIssuerPrivateKey, provider);
       const contract = new ethers.Contract(VITE_VC_CONTRACT_ADDRESS, contractABI, wallet);
 
-      const issuanceDate = new Date().toISOString();
-
-      // Merge previously issued courses (if any) with newly selected courses
-      const previousCourses = vcDocument ? vcDocument.credentialSubject.courses : [];
-      const newCourses = mockCourses.filter((course) => selectedCourses.includes(course.courseId));
-      // Merge courses without duplicates
-      const mergedCourses = [...previousCourses];
-      newCourses.forEach((course) => {
-        if (!mergedCourses.some((c) => c.courseId === course.courseId)) {
-          mergedCourses.push(course);
-        }
-      });
-
-      // Create metadata as JSON string of merged courses
-      const metadata = JSON.stringify(mergedCourses);
+      // merge courses
+      const merged = [...(vcDocument?.credentialSubject?.courses || []),
+        ...mockCourses.filter(c => selectedCourses.includes(c.courseId))
+      ].filter((v, i, a) => a.findIndex(t => t.courseId === v.courseId) === i);
+      const metadata = JSON.stringify(merged);
       const credentialHash = ethers.keccak256(ethers.toUtf8Bytes(metadata));
       const signature = await wallet.signMessage(credentialHash);
 
-      // Call the smart contract to issue (or re-issue) the credential
-      const tx = await contract.issueCredential(
-        holderDID,
-        "CourseCompletion",
-        metadata,
-        credentialHash,
-        signature
-      );
-      await tx.wait();
-      setTxHash(tx.hash);
-
-      // Determine the version number (default is 1, or increment if updating)
-      const version = vcDocument && vcDocument.version ? vcDocument.version + 1 : 1;
-
-      // Build the new VC Document including versioning metadata
+      // build VC
+      const issuanceDate = new Date().toISOString();
+      const version = vcDocument?.version ? vcDocument.version + 1 : 1;
       const vcDoc = {
         "@context": "https://www.w3.org/ns/credentials/v2",
-        id: `vc-${holderDID}-${Date.now()}`, // unique ID using the DID and timestamp
+        id: `vc-${holderDID}-${Date.now()}`,
         type: ["VerifiableCredential", "CourseCompletion"],
-        issuer: {
-          id: "did:example:abya-university",
-          name: "ABYA University",
-        },
-        issuanceDate,
-        version,
-        credentialSubject: {
-          id: holderDID,
-          courses: mergedCourses,
-        },
-        proof: {
-          type: "EcdsaSecp256k1Signature2019",
-          created: issuanceDate,
-          proofPurpose: "assertionMethod",
-          verificationMethod: "did:ethr:sepolia:0xBe203f08DC55566fe826c6aAE8eb29cfE69Ae520#key-1",
-          signatureValue: signature,
-        },
+        issuer: { id: profile?.issuerDID || "did:example:abya-university", name: profile?.universityName || "ABYA University" },
+        issuanceDate, version,
+        credentialSubject: { id: holderDID, name: fullName, courses: merged },
+        credentialHash,
+        proof: { type: "EcdsaSecp256k1Signature2019", created: issuanceDate, proofPurpose: "assertionMethod", verificationMethod: `${holderDID}#key-1`, signatureValue: signature }
       };
 
-      // Upload the new VC document to IPFS (naming it with the holder's DID)
-      const vcDocName = `vc-${holderDID}-${Date.now()}`;
-      const vcCID = await uploadJSONToIPFS(vcDoc, vcDocName);
+      // upload VC
+      const vcCID = await uploadJSONToIPFS(vcDoc, `vc-${holderDID}-${Date.now()}`);
 
-      // Create a mapping document that links the holder's DID to the new VC document's CID and version
-      const mappingDoc = {
-        holderDID,
-        vcCID,
-        version,
-        issuedAt: issuanceDate,
-      };
-      const mappingName = `vc-mapping-${holderDID}-${Date.now()}`;
-      const mappingDocCID = await uploadJSONToIPFS(mappingDoc, mappingName);
+      // send transaction and get hash immediately
+      const tx = await contract.issueCredential(holderDID, "CourseCompletion", metadata, credentialHash, signature, vcCID, { gasLimit: 800000 });
+      setTxHash(tx.hash);                // immediate tx hash display
+      const receipt = await tx.wait();
 
-      const updatedVCDoc = {
-        ...vcDoc,
-        ipfsCID: vcCID,
-        ipfsUrl: `https://${VITE_VC_PINATA_GATEWAY}/ipfs/${vcCID}`,
-      };
+      setVcDocument({ ...vcDoc, ipfsCID: vcCID, ipfsUrl: `https://${VITE_VC_PINATA_GATEWAY}/ipfs/${vcCID}` });
 
-      setVcDocument(updatedVCDoc);
-      setMappingCID(mappingDocCID);
-    } catch (err) {
-      console.error(err);
-      setError("Credential issuance/update failed.");
+      // fetch on-chain CID
+      const ids = await contract.getCredentialsForStudent(holderDID);
+      const lastId = ids[ids.length - 1];
+      const onchain = await contract.credentials(lastId);
+      setOnchainCID(onchain.mappingCID);
+
+    } catch (e) {
+      console.error(e);
+      setError(`Issuance failed: ${e.reason || e.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
-      <div className="bg-white p-8 rounded shadow-md w-full max-w-lg">
-        <h1 className="text-2xl font-semibold mb-6 text-yellow-500 text-center">
-          {vcDocument ? "Update Credential" : "Issue Credential"}
-        </h1>
-        {error && <p className="text-red-500 mb-4">{error}</p>}
-        <div className="mb-4">
-          <label className="block text-gray-700 font-medium mb-1">Holder DID</label>
-          <input
-            type="text"
-            value={holderDID}
-            onChange={(e) => setHolderDID(e.target.value)}
-            placeholder="Enter the VC holder's DID"
-            className="mt-1 p-2 w-full border border-gray-300 rounded-md shadow-sm focus:ring-yellow-300 focus:border-yellow-300"
-          />
-        </div>
+    <div className="flex flex-col items-center justify-center p-6 bg-gray-100 dark:bg-gray-900">
+      <div className="max-w-lg w-full bg-white dark:bg-gray-800 p-8 rounded shadow-md">
+        <h1 className="text-2xl font-semibold text-center mb-6 text-yellow-500">{vcDocument ? "Update Credential" : "Issue Credential"}</h1>
+        {error && <p className="text-red-500 mb-4 whitespace-pre-wrap">{error}</p>}
+
+        <p className="text-sm mb-4 break-all"><strong>Your DID:</strong> {holderDID || "Not available"}</p>
+        {fullName && <p className="text-sm mb-4"><strong>Name:</strong> {fullName}</p>}
+
         <h2 className="text-lg font-semibold mb-2">Select Courses</h2>
-        {mockCourses.map((course) => (
-          <div key={course.courseId} className="flex items-center mb-2">
-            <input
-              type="checkbox"
-              checked={selectedCourses.includes(course.courseId)}
-              onChange={() => toggleCourseSelection(course.courseId)}
-              className="mr-2"
-            />
-            <label>{course.title}</label>
+        {mockCourses.map(c => (
+          <div key={c.courseId} className="flex items-center mb-2">
+            <input type="checkbox" checked={selectedCourses.includes(c.courseId)} onChange={() => toggleCourseSelection(c.courseId)} className="mr-2" />
+            <label>{c.title}</label>
           </div>
         ))}
-        <button
-          onClick={handleIssueOrUpdateCredential}
-          className="w-full mt-4 p-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600"
-          disabled={loading}
-        >
+
+        <button onClick={handleIssueOrUpdateCredential} disabled={loading || !holderDID} className="w-full mt-4 p-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-md">
           {loading ? <Loader size={20} className="animate-spin mx-auto" /> : vcDocument ? "Update Credential" : "Issue Credential"}
         </button>
-        {txHash && (
-          <p className="mt-4 p-4 text-green-500 overflow-x-auto">
-            Transaction Hash: {txHash}
-          </p>
-        )}
+
+        {txHash && <p className="mt-4 text-green-500 break-all"><strong>Transaction Hash:</strong> {txHash}</p>}
+
         {vcDocument && (
-          <div className="mt-6 p-4 bg-gray-100 border rounded">
+          <div className="mt-6 p-4 bg-gray-100 dark:bg-gray-700 border rounded">
             <h3 className="font-semibold">Generated VC Document (v{vcDocument.version}):</h3>
-            <pre className="text-sm text-gray-700 whitespace-pre-wrap overflow-x-auto">
-              {JSON.stringify(vcDocument, null, 2)}
-            </pre>
-            <p className="mt-2">
-              View on IPFS:{" "}
-              <a
-                href={vcDocument.ipfsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 underline"
-              >
-                {vcDocument.ipfsUrl}
-              </a>
-            </p>
-          </div>
-        )}
-        {mappingCID && (
-          <div className="mt-6 p-4 bg-gray-100 border rounded">
-            <h3 className="font-semibold">VC Mapping Document CID:</h3>
-            <p className="text-sm text-gray-700 overflow-x-auto">{mappingCID}</p>
+            <pre className="text-sm whitespace-pre-wrap overflow-x-auto text-gray-700 dark:text-gray-100">{JSON.stringify(vcDocument, null, 2)}</pre>
+            <p className="mt-2 text-sm break-all"><strong>IPFS CID:</strong> {vcDocument.ipfsCID}</p>
+            <p className="mt-2 text-sm break-all"><strong>On-chain CID:</strong> {onchainCID}</p>
+            <p className="mt-2 text-sm break-all"><strong>Transaction Hash:</strong> {txHash}</p>
           </div>
         )}
       </div>

@@ -63,8 +63,8 @@ const AddDelegate = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center p-4 bg-gray-200 rounded-lg">
-      <div className="max-w-md w-full bg-white p-6 rounded-lg shadow-md">
+    <div className="flex flex-col items-center justify-center p-4 bg-gray-200 dark:bg-gray-900 rounded-lg">
+      <div className="max-w-md w-full bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md">
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -78,9 +78,9 @@ const AddDelegate = () => {
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="w-full p-2 border rounded bg-gray-100">
-            <label className="block text-sm font-medium text-gray-700">Your DID</label>
-            <p className="mt-1 text-gray-900 break-all">{ethrDid}</p>
+          <div className="w-full p-2 rounded bg-gray-100 dark:bg-gray-900">
+            <label className="block text-sm font-medium text-gray-500">Your DID</label>
+            <p className="mt-1 text-gray-900 dark:text-gray-100 break-all">{ethrDid}</p>
           </div>
 
           <input

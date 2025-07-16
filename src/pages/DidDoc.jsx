@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Loader, AlertOctagonIcon } from "lucide-react";
 import { useDid } from "../contexts/DidContext";
 import { ethers } from "ethers";
-import EthereumDIDRegistryArtifact from "../artifacts/contracts/EthereumDIDRegistry.sol/EthereumDIDRegistry.json";
+import EthereumDIDRegistryArtifact from "../artifacts/contracts/EthereumDIDRegistry/EthereumDIDRegistry.sol/EthereumDIDRegistry.json";
 
 const DidDoc = () => {
   const { ethrDid } = useDid();
@@ -73,7 +73,7 @@ const DidDoc = () => {
   }
 
   return (
-    <div className="max-w-lg mx-auto p-6 bg-white rounded shadow">
+    <div className="max-w-lg mx-auto p-6 bg-white dark:bg-gray-900 rounded shadow">
       <h2 className="text-2xl font-semibold mb-6 text-yellow-500">
         DID Document
       </h2>
@@ -94,7 +94,7 @@ const DidDoc = () => {
       )}
 
       {didDoc && (
-        <pre className="bg-gray-100 p-4 rounded overflow-x-auto text-sm">
+        <pre className="bg-gray-300 text-black p-4 rounded overflow-x-auto text-sm">
           {JSON.stringify(didDoc, null, 2)}
         </pre>
       )}
