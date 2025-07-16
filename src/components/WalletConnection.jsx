@@ -100,7 +100,7 @@ const WalletConnection = () => {
       // If profile is connected, clear it
       clearProfile();
     }
-    navigate("/");
+    // navigate("/");
   };
 
   if (!isConnected) return <ConnectButton />;
