@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAccount } from "wagmi";
+import { useEthersSigner } from "../useClientSigner";
 
 import CONTRACT_ABI from "../../artifacts/fake-liquidity-abis/add_swap_contract.json";
 import { useTransactionHistory } from "../../contexts/fake-liquidity-test-contexts/historyContext";
@@ -25,6 +26,7 @@ const AddLiquidity = () => {
   const { address, isConnected } = useAccount();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const signerPromise = useEthersSigner();
   const {
     refreshHistory,
     loadBalances,
@@ -341,6 +343,50 @@ const AddLiquidity = () => {
         setError("");
       }, 5000);
     }
+  };
+
+  // Set max balance
+  const setMaxBalance = (tokenSymbol) => {
+    const balance = balances[tokenSymbol];
+    if (activeTab === "swap") {
+      setSwapData({ ...swapData, inputAmount: balance });
+    } else if (activeTab === "liquidity") {
+      if (tokenSymbol === "TOKEN0") {
+        const maxAmount = balances.TOKEN0;
+        handleUSDCAmountChangeWithPoolPrice(maxAmount, poolPrice);
+        setLiquidityData({ ...liquidityData, token0Amount: balance });
+      } else {
+        const maxAmount = balances.TOKEN1;
+        handleABYTKNAmountChangeWithPoolPrice(maxAmount, poolPrice);
+        setLiquidityData({ ...liquidityData, token1Amount: balance });
+      }
+    }
+  };
+
+  const handleUSDCAmountChangeWithPoolPrice = async (value, poolPrice) => {
+    // Since your UI shows USDC as token0 but contract has it as token1,
+    // we need to handle this correctly
+    const newLiquidityData = {
+      ...liquidityData,
+      token0Amount: value, // This is USDC amount in your UI
+      token1Amount:
+        value && poolPrice ? (parseFloat(value) * poolPrice).toFixed(6) : "", // This is ABYTKN amount in your UI
+    };
+
+    setLiquidityData(newLiquidityData);
+  };
+
+  const handleABYTKNAmountChangeWithPoolPrice = async (value, poolPrice) => {
+    // Since your UI shows ABYTKN as token1 but contract has it as token0,
+    // we need to handle this correctly
+    const newLiquidityData = {
+      ...liquidityData,
+      token1Amount: value, // This is ABYTKN amount in your UI
+      token0Amount:
+        value && poolPrice ? (parseFloat(value) / poolPrice).toFixed(6) : "", // This is USDC amount in your UI
+    };
+
+    setLiquidityData(newLiquidityData);
   };
 
   return (
