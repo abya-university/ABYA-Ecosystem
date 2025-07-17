@@ -16,6 +16,8 @@ import { ProjectProposalsProvider } from "./contexts/projectProposalsContext.jsx
 import { AirdropProposalProvider } from "./contexts/airdropProposalContext.jsx";
 import { DidProvider } from "./contexts/DidContext.jsx";
 import { ProfileProvider } from "./contexts/ProfileContext.jsx";
+import { UserPositionProvider } from "./contexts/fake-liquidity-test-contexts/userPositionContext.jsx";
+import { TransactionHistoryProvider } from "./contexts/fake-liquidity-test-contexts/historyContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -34,7 +36,11 @@ createRoot(document.getElementById("root")).render(
                           <CommunityMembersProvider>
                             <ProjectProposalsProvider>
                               <AirdropProposalProvider>
-                                <App />
+                                <TransactionHistoryProvider>
+                                  <UserPositionProvider>
+                                    <App />
+                                  </UserPositionProvider>
+                                </TransactionHistoryProvider>
                               </AirdropProposalProvider>
                             </ProjectProposalsProvider>
                           </CommunityMembersProvider>

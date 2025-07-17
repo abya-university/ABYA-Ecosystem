@@ -1,238 +1,202 @@
 import React, { useState } from "react";
-import { BarChart3, ArrowDown, ArrowUp } from "lucide-react";
+import SwapComponent from "../components/Liquidity-Components/SwapComponent";
+import AddLiquidity from "../components/Liquidity-Components/AddLiquidity";
+import HistoryComponent from "../components/Liquidity-Components/HistroryComponent";
+import MintComponent from "../components/Liquidity-Components/MintComponent";
+import LiquiditySidebar from "../components/Liquidity-Components/LiquiditySidebar";
+import RemoveLiquidity from "../components/Liquidity-Components/removeLiquidity";
+import { Clock, Minus, ArrowDownUp, Droplet, Plus } from "lucide-react";
 
 const LiquidityPage = () => {
-  const [stakeAmount, setStakeAmount] = useState("");
-  const [unstakeAmount, setUnstakeAmount] = useState("");
-
-  // Mock data - replace with actual Web3 calls
-  const stats = {
-    totalLiquidity: "1,000,000 ABYTKN",
-    totalStaked: "750,000 ABYTKN",
-    rewardRate: "0.3%",
-    yourStake: "5,000 ABYTKN",
-    yourRewards: "150 ABYTKN",
-    apr: "12.5%",
-    balance: 10000, // Added numeric balance for calculations
-    stakedBalance: 5000, // Added numeric staked balance
-  };
-
-  // Handler for stake input
-  const handleStakeInput = (value) => {
-    // Remove any non-numeric characters
-    const numericValue = value.replace(/[^0-9.]/g, "");
-
-    // Validate the input
-    if (numericValue === "" || parseFloat(numericValue) <= stats.balance) {
-      setStakeAmount(numericValue);
-    }
-  };
-
-  // Handler for unstake input
-  const handleUnstakeInput = (value) => {
-    // Remove any non-numeric characters
-    const numericValue = value.replace(/[^0-9.]/g, "");
-
-    // Validate the input
-    if (
-      numericValue === "" ||
-      parseFloat(numericValue) <= stats.stakedBalance
-    ) {
-      setUnstakeAmount(numericValue);
-    }
-  };
-
-  // Handler for MAX buttons
-  const handleMaxStake = () => {
-    setStakeAmount(stats.balance.toString());
-  };
-
-  const handleMaxUnstake = () => {
-    setUnstakeAmount(stats.stakedBalance.toString());
-  };
-
-  // Handler for stake submission
-  const handleStakeSubmit = () => {
-    if (!stakeAmount || parseFloat(stakeAmount) <= 0) {
-      alert("Please enter a valid amount to stake");
-      return;
-    }
-    if (parseFloat(stakeAmount) > stats.balance) {
-      alert("Insufficient balance");
-      return;
-    }
-    // Add your staking logic here
-    console.log("Staking:", stakeAmount, "ABYTKN");
-  };
-
-  // Handler for unstake submission
-  const handleUnstakeSubmit = () => {
-    if (!unstakeAmount || parseFloat(unstakeAmount) <= 0) {
-      alert("Please enter a valid amount to unstake");
-      return;
-    }
-    if (parseFloat(unstakeAmount) > stats.stakedBalance) {
-      alert("Insufficient staked balance");
-      return;
-    }
-    // Add your unstaking logic here
-    console.log("Unstaking:", unstakeAmount, "ABYTKN");
-  };
+  const [activeTab, setActiveTab] = useState("swap");
 
   return (
-    <div className="dark:bg-gray-900 dark:text-gray-100 bg-white text-gray-900 min-h-screen p-6 transition-colors duration-300 pt-[100px]">
-      {/* Main Stats */}
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold text-yellow-500 mb-8">
-          Liquidity Pool
-        </h1>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div
-            className="p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200
-                transform hover:scale-105 transition-transform duration-1000"
-          >
-            <div className="flex items-center gap-2 text-gray-800 dark:text-gray-400 mb-2">
-              <BarChart3 size={20} />
-              <span>Total TVL</span>
-            </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-300">
-              {stats.totalLiquidity}
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+      {/* Main Container */}
+      <div className="pt-[100px] px-4 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header Section */}
+          <div className="mb-8">
+            <div className="text-center lg:text-left">
+              <h1 className="text-4xl lg:text-5xl font-bold text-yellow-500 mb-2">
+                Liquidity Pool
+              </h1>
+              <p className="text-lg text-gray-600 dark:text-gray-300">
+                Your journey of swapping & earning rewards
+              </p>
             </div>
           </div>
 
-          <div
-            className="p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200
-                transform hover:scale-105 transition-transform duration-1000"
-          >
-            <div className="flex items-center gap-2 text-gray-800 dark:text-gray-400 mb-2">
-              <BarChart3 size={20} />
-              <span>Total Staked</span>
-            </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-300">
-              {stats.totalStaked}
-            </div>
-          </div>
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Main Trading Panel */}
+            <div className="lg:col-span-3">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
+                {/* Tab Navigation */}
+                <div className="border-b border-gray-200 dark:border-gray-700">
+                  <nav className="flex">
+                    <button
+                      onClick={() => setActiveTab("swap")}
+                      className={`flex-1 px-6 py-4 font-semibold transition-all duration-200 flex items-center justify-center gap-2 relative ${
+                        activeTab === "swap"
+                          ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
+                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      <ArrowDownUp size={20} />
+                      Swap
+                      {activeTab === "swap" && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-500"></div>
+                      )}
+                    </button>
 
-          <div
-            className="p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200
-                transform hover:scale-105 transition-transform duration-1000"
-          >
-            <div className="flex items-center gap-2 text-gray-800 dark:text-gray-400 mb-2">
-              <BarChart3 size={20} />
-              <span>APR</span>
-            </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-300">
-              {stats.apr}
-            </div>
-          </div>
-        </div>
+                    <button
+                      onClick={() => setActiveTab("liquidity")}
+                      className={`flex-1 px-6 py-4 font-semibold transition-all duration-200 flex items-center justify-center gap-2 relative ${
+                        activeTab === "liquidity"
+                          ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
+                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      <Plus size={20} />
+                      Add Liquidity
+                      {activeTab === "liquidity" && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-500"></div>
+                      )}
+                    </button>
 
-        {/* Staking Interface */}
-        <div className="p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200 transform hover:scale-105 transition-transform duration-1000 mb-8">
-          <div className="flex flex-col md:flex-row gap-8">
-            {/* Stake Section */}
-            <div className="flex-1">
-              <h3 className="text-yellow-500 text-xl font-semibold mb-4">
-                Stake
-              </h3>
-              <div className="p-4 mb-4 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200">
-                <input
-                  type="number"
-                  placeholder="Enter amount to stake"
-                  value={stakeAmount}
-                  onChange={(e) => handleStakeInput(e.target.value)}
-                  min="0"
-                  max={stats.balance}
-                  step="any"
-                  className="w-full p-3 border dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 dark:bg-gray-800 dark:text-white"
-                />
-                <div className="flex justify-between mt-2 text-sm text-gray-300">
-                  <span>Balance: {stats.balance.toLocaleString()} ABYTKN</span>
-                  <button
-                    onClick={handleMaxStake}
-                    className="text-yellow-500 hover:text-yellow-400"
-                  >
-                    MAX
-                  </button>
+                    <button
+                      onClick={() => setActiveTab("removeLiquidity")}
+                      className={`flex-1 px-6 py-4 font-semibold transition-all duration-200 flex items-center justify-center gap-2 relative ${
+                        activeTab === "removeLiquidity"
+                          ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
+                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      <Minus size={20} />
+                      Remove Liquidity
+                      {activeTab === "removeLiquidity" && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-500"></div>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab("history")}
+                      className={`flex-1 px-6 py-4 font-semibold transition-all duration-200 flex items-center justify-center gap-2 relative ${
+                        activeTab === "history"
+                          ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
+                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      <Clock size={20} />
+                      History
+                      {activeTab === "history" && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-500"></div>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab("mint")}
+                      className={`flex-1 px-6 py-4 font-semibold transition-all duration-200 flex items-center justify-center gap-2 relative ${
+                        activeTab === "mint"
+                          ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
+                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      <Droplet size={20} />
+                      Mint Tokens
+                      {activeTab === "mint" && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-500"></div>
+                      )}
+                    </button>
+                  </nav>
+                </div>
+
+                {/* Tab Content */}
+                <div className="p-6 lg:p-8">
+                  {/* Swap Tab */}
+                  {activeTab === "swap" && (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                          Swap Tokens
+                        </h2>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          Trade tokens instantly
+                        </div>
+                      </div>
+                      <SwapComponent />
+                    </div>
+                  )}
+
+                  {/* Add Liquidity Tab */}
+                  {activeTab === "liquidity" && (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                          Add Liquidity
+                        </h2>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          Earn fees by providing liquidity
+                        </div>
+                      </div>
+                      <AddLiquidity />
+                    </div>
+                  )}
+
+                  {/* Remove Liquidity Tab */}
+                  {activeTab === "removeLiquidity" && (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                          Remove Liquidity
+                        </h2>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          Withdraw your liquidity position
+                        </div>
+                      </div>
+                      <RemoveLiquidity />
+                    </div>
+                  )}
+
+                  {/* Transaction History Tab */}
+                  {activeTab === "history" && (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                          Transaction History
+                        </h2>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          View your trading activity
+                        </div>
+                      </div>
+                      <HistoryComponent />
+                    </div>
+                  )}
+
+                  {/* Mint Tokens Tab */}
+                  {activeTab === "mint" && (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                          Mint Tokens
+                        </h2>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          Create new tokens for testing
+                        </div>
+                      </div>
+                      <MintComponent />
+                    </div>
+                  )}
                 </div>
               </div>
-              <button
-                onClick={handleStakeSubmit}
-                disabled={
-                  !stakeAmount ||
-                  parseFloat(stakeAmount) <= 0 ||
-                  parseFloat(stakeAmount) > stats.balance
-                }
-                className="w-full bg-yellow-500 hover:bg-yellow-400 text-gray-900 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ArrowDown size={20} />
-                Stake Tokens
-              </button>
             </div>
 
-            {/* Unstake Section */}
-            <div className="flex-1">
-              <h3 className="text-yellow-500 text-xl font-semibold mb-4">
-                Unstake
-              </h3>
-              <div className="p-4 mb-4 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200">
-                <input
-                  type="number"
-                  placeholder="Enter amount to unstake"
-                  value={unstakeAmount}
-                  onChange={(e) => handleUnstakeInput(e.target.value)}
-                  min="0"
-                  max={stats.stakedBalance}
-                  step="any"
-                  className="w-full p-3 border dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 dark:bg-gray-800 dark:text-white"
-                />
-                <div className="flex justify-between mt-2 text-sm text-gray-300">
-                  <span>
-                    Staked: {stats.stakedBalance.toLocaleString()} ABYTKN
-                  </span>
-                  <button
-                    onClick={handleMaxUnstake}
-                    className="text-yellow-500 hover:text-yellow-400"
-                  >
-                    MAX
-                  </button>
-                </div>
+            {/* Sidebar */}
+            <div className="lg:col-span-1">
+              <div className="sticky top-[120px]">
+                <LiquiditySidebar />
               </div>
-              <button
-                onClick={handleUnstakeSubmit}
-                disabled={
-                  !unstakeAmount ||
-                  parseFloat(unstakeAmount) <= 0 ||
-                  parseFloat(unstakeAmount) > stats.stakedBalance
-                }
-                className="w-full bg-cyan-950 hover:bg-cyan-900 text-gray-300 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ArrowUp size={20} />
-                Unstake Tokens
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Your Position */}
-        <div
-          className="p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200
-                transform hover:scale-105 transition-transform duration-1000"
-        >
-          <h3 className="text-yellow-500 text-xl font-semibold mb-4">
-            Your Position
-          </h3>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center w-full p-3 border dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 dark:bg-gray-800 dark:text-white">
-              <span className="text-gray-300">Staked Balance</span>
-              <span className="text-gray-300 font-bold">{stats.yourStake}</span>
-            </div>
-            <div className="flex justify-between items-center w-full p-3 border dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 dark:bg-gray-800 dark:text-white">
-              <span className="text-gray-300">Pending Rewards</span>
-              <span className="text-yellow-500 font-bold">
-                {stats.yourRewards}
-              </span>
             </div>
           </div>
         </div>
