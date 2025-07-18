@@ -3,6 +3,7 @@ import { useState, useEffect, Suspense, lazy } from "react";
 import ProfileHeader from "../components/ProfileHeader";
 import ProfileSidebar from "../components/ProfileSidebar";
 import DelegateListSection from "../components/DelegateList";
+import VcSection from "../components/Vcdetails";
 import Modal from "../components/ui/Modal";
 import defaultCover from "../assets/cover.jpg";
 
@@ -14,6 +15,8 @@ const AddDelegate = lazy(() => import("./AddDelegate"));
 const CheckDelegate = lazy(() => import("./CheckDelegate"));
 const RevokeDelegate = lazy(() => import("./RevokeDelegate"));
 const VcForm = lazy(() => import("./VcForm"));
+const VcUpdate = lazy(() => import("./VcUpdate"));
+const VerifyVc = lazy(() => import("./VerifyVc"));
 
 export default function ProfileDashboard({ profile, did }) {
   // Show error if required props are missing.
@@ -141,6 +144,7 @@ export default function ProfileDashboard({ profile, did }) {
         {/* Main Content */}
         <main className="mt-10 p-6 space-y-8 flex-1">
           <DelegateListSection did={did} />
+          <VcSection did={did} />
         </main>
       </div>
 
@@ -161,6 +165,8 @@ export default function ProfileDashboard({ profile, did }) {
             {modalType === "checkDelegate" && <CheckDelegate />}
             {modalType === "revokeDelegate" && <RevokeDelegate />}
             {modalType === "requestVc" && <VcForm />}
+            {modalType === "VcUpdate" && <VcUpdate />}
+            {modalType === "VerifyVc" && <VerifyVc />}
           </Modal>
         </Suspense>
       )}

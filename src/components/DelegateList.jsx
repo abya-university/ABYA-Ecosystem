@@ -1,19 +1,17 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ethers } from "ethers";
 import { EthereumDIDRegistry } from "ethr-did-registry";
-import { VerifiedIcon } from "lucide-react";
+import { VerifiedIcon, RefreshCw } from "lucide-react";
+
+const AUTO_REFRESH_INTERVAL_MS = 60000; // 60 seconds
 
 const DelegateList = ({ did }) => {
   const [delegates, setDelegates] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (!did) return; // No DID provided, do not fetch delegates.
-    fetchDelegates();
-  }, [did]);
-
-  const fetchDelegates = async () => {
+  const fetchDelegates = useCallback(async () => {
+    if (!did) return;
     setLoading(true);
     setError(null);
     setDelegates([]);
@@ -25,14 +23,18 @@ const DelegateList = ({ did }) => {
         throw new Error("Missing environment variables.");
       }
 
-      // Extract the identity address from the DID (e.g. did:ethr:sepolia:0xABC... becomes 0xABC...)
+      // Extract the identity address from the DID
       const identity = did.split(":").pop();
       console.log(`Fetching delegates for identity: ${identity}`);
 
       const provider = new ethers.JsonRpcProvider(INFURA_URL);
-      const DidReg = new ethers.Contract(CONTRACT_ADDRESS, EthereumDIDRegistry.abi, provider);
+      const DidReg = new ethers.Contract(
+        CONTRACT_ADDRESS,
+        EthereumDIDRegistry.abi,
+        provider
+      );
 
-      // Create a filter for DIDDelegateChanged events for this identity.
+      // Create a filter for DIDDelegateChanged events
       const filter = DidReg.filters.DIDDelegateChanged(identity);
       const events = await DidReg.queryFilter(filter);
       console.log("Fetched events:", events);
@@ -40,11 +42,9 @@ const DelegateList = ({ did }) => {
       const currentTimestamp = Math.floor(Date.now() / 1000);
       const delegateMap = {};
 
-      // Process events to build the current delegate list.
-      events.forEach(event => {
+      events.forEach((event) => {
         const { delegateType, delegate, validTo } = event.args;
         const validToNumber = Number(validTo);
-        // Only include delegates that are still valid.
         if (validToNumber > currentTimestamp) {
           const key = `${delegateType.toString()}_${delegate.toLowerCase()}`;
           delegateMap[key] = {
@@ -57,26 +57,48 @@ const DelegateList = ({ did }) => {
 
       setDelegates(Object.values(delegateMap));
     } catch (err) {
+      console.error(err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [did]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchDelegates();
+  }, [fetchDelegates]);
+
+  // Auto-refresh
+  useEffect(() => {
+    if (!did) return;
+    const interval = setInterval(fetchDelegates, AUTO_REFRESH_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [did, fetchDelegates]);
 
   return (
     <div className="p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-lg">
-      <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">
-        Delegates Lists
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+          Delegates List
+        </h2>
+        <button
+          onClick={fetchDelegates}
+          disabled={loading}
+          className="flex items-center space-x-2 text-sm text-blue-600 hover:underline disabled:opacity-50"
+        >
+          <RefreshCw className="w-4 h-4" />
+          {/* <span>Refresh</span> */}
+        </button>
+      </div>
+
       {loading && (
         <p className="text-center text-lg text-gray-600 dark:text-gray-300 animate-pulse">
           Loading delegates...
         </p>
       )}
       {error && (
-        <p className="text-center text-red-500 mb-4">
-          Error: {error}
-        </p>
+        <p className="text-center text-red-500 mb-4">Error: {error}</p>
       )}
       {!loading && delegates.length === 0 && !error && (
         <p className="text-center text-gray-700 dark:text-gray-300">
@@ -94,7 +116,9 @@ const DelegateList = ({ did }) => {
                 <h3 className="text-md font-bold text-gray-900 dark:text-gray-100">
                   Delegate Type:
                 </h3>
-                <p className="text-green-600 dark:text-green-400">{<VerifiedIcon size={40}/>}</p>
+                <p className="text-green-600 dark:text-green-400">
+                  <VerifiedIcon size={40} />
+                </p>
               </div>
               <p className="text-sm text-gray-700 dark:text-gray-300 break-all">
                 {delegate.delegateType}
@@ -104,13 +128,15 @@ const DelegateList = ({ did }) => {
                   <span className="font-medium">Address:</span> {delegate.delegateAddress}
                 </p>
                 <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-                  <span className="font-medium">Valid Until: </span> {new Date(delegate.validTo * 1000).toLocaleString()}
+                  <span className="font-medium">Valid Until: </span>
+                  {new Date(delegate.validTo * 1000).toLocaleString()}
                 </p>
               </div>
             </div>
           ))}
         </div>
       )}
+
       <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(10px); }

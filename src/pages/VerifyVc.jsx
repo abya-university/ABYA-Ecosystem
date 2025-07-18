@@ -1,237 +1,79 @@
-import React, { useState } from "react";
-import { Loader, Eye, EyeOff } from "lucide-react";
-import { ethers } from "ethers";
+// VerifyVc.jsx
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { ethers } from 'ethers';
 
-const VITE_VC_INFURA_URL = "https://sepolia.infura.io/v3/189303beb46d46d8a0327f90f441168d";
-const VITE_VC_CONTRACT_ADDRESS = "0xBe203f08DC55566fe826c6aAE8eb29cfE69Ae520";
+const VITE_VC_INFURA_URL = import.meta.env.VITE_VC_INFURA_URL;
+const VITE_VC_CONTRACT_ADDRESS = import.meta.env.VITE_VC_CONTRACT_ADDRESS;
+const VITE_VC_PINATA_GATEWAY = import.meta.env.VITE_VC_PINATA_GATEWAY;
 
 const contractABI = [
-  "function issueCredential(string studentDID, string credentialType, string metadata, string credentialHash, string signature) public",
-  "function verifyCredential(uint256 id, string credentialHash) public view returns (bool)",
+  "function getCredentialsForStudent(string studentDID) public view returns (uint256[])",
+  "function credentials(uint256) public view returns (uint256 id, string studentDID, string issuerDID, string credentialType, uint256 issueDate, string metadata, string credentialHash, string signature, string mappingCID, bool valid)"
 ];
 
-const mockStudentDID = "did:ethr:sepolia:0xa77759E342c83377449B2fB2eCe35b621de40Bf5";
+const PublicVerifyPage = () => {
+  const [searchParams] = useSearchParams();
+  const studentDID = searchParams.get("did");
 
-const mockCourses = [
-  {
-    courseId: "vc-101",
-    title: "Introduction to Verifiable Credentials",
-    description: "Learn the fundamentals of Verifiable Credentials.",
-    instructor: "Dr. Jane Doe",
-    duration: "4 weeks",
-    level: "Intermediate",
-  },
-  {
-    courseId: "vc-102",
-    title: "Blockchain Basics",
-    description: "Understand the core principles of blockchain technology.",
-    instructor: "Prof. John Smith",
-    duration: "6 weeks",
-    level: "Beginner",
-  },
-];
-
-const VCIssuanceForm = () => {
-  // States for issuing a credential
-  const [issuerPrivateKey, setIssuerPrivateKey] = useState("");
-  const [showPrivateKey, setShowPrivateKey] = useState(false);
-  const [selectedCourses, setSelectedCourses] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [txHash, setTxHash] = useState("");
-  const [error, setError] = useState("");
   const [vcDocument, setVcDocument] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // States for verifying a credential
-  const [verificationId, setVerificationId] = useState("");
-  const [verificationHash, setVerificationHash] = useState("");
-  const [verificationResult, setVerificationResult] = useState(null);
-  const [verificationLoading, setVerificationLoading] = useState(false);
-  const [verificationError, setVerificationError] = useState("");
-
-  const toggleCourseSelection = (courseId) => {
-    setSelectedCourses((prev) =>
-      prev.includes(courseId)
-        ? prev.filter((id) => id !== courseId)
-        : [...prev, courseId]
-    );
-  };
-
-  const handleIssueCredential = async () => {
-    if (!issuerPrivateKey.trim() || selectedCourses.length === 0) {
-      setError("Please enter the issuer's private key and select at least one course.");
-      return;
+  useEffect(() => {
+    if (studentDID) {
+      fetchVC();
     }
-    setError("");
-    setLoading(true);
-    setTxHash("");
-    setVcDocument(null);
+  }, [studentDID]);
 
+  const fetchVC = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const provider = new ethers.JsonRpcProvider(VITE_VC_INFURA_URL);
-      const wallet = new ethers.Wallet(issuerPrivateKey, provider);
-      const contract = new ethers.Contract(VITE_VC_CONTRACT_ADDRESS, contractABI, wallet);
+      const contract = new ethers.Contract(VITE_VC_CONTRACT_ADDRESS, contractABI, provider);
+      const ids = await contract.getCredentialsForStudent(studentDID);
+      if (!ids.length) throw new Error("No credentials found.");
+      const lastId = ids[ids.length - 1];
+      const onchain = await contract.credentials(Number(lastId));
+      const { mappingCID } = onchain;
+      const url = `https://${VITE_VC_PINATA_GATEWAY}/ipfs/${mappingCID}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch document from IPFS");
+      const doc = await res.json();
 
-      const issuanceDate = new Date().toISOString();
-      const issuedCourses = mockCourses.filter((course) => selectedCourses.includes(course.courseId));
-      const metadata = JSON.stringify(issuedCourses);
-      const credentialHash = ethers.keccak256(ethers.toUtf8Bytes(metadata));
-      const signature = await wallet.signMessage(credentialHash);
-
-      const tx = await contract.issueCredential(
-        mockStudentDID,
-        "CourseCompletion",
-        metadata,
-        credentialHash,
-        signature
-      );
-
-      await tx.wait();
-      setTxHash(tx.hash);
-
-      const vcDoc = {
-        "@context": "https://www.w3.org/ns/credentials/v2",
-        id: `urn:uuid:${Math.random().toString(36).substring(7)}`,
-        type: ["VerifiableCredential", "CourseCompletion"],
-        issuer: {
-          id: "did:example:abya-university",
-          name: "ABYA University",
+      setVcDocument({
+        ...doc,
+        onchain: {
+          id: Number(onchain.id),
+          issueDate: new Date(Number(onchain.issueDate) * 1000).toISOString(),
+          valid: onchain.valid,
         },
-        issuanceDate,
-        credentialSubject: {
-          id: mockStudentDID,
-          courses: issuedCourses,
-        },
-        proof: {
-          type: "EcdsaSecp256k1Signature2019",
-          created: issuanceDate,
-          proofPurpose: "assertionMethod",
-          verificationMethod: "did:ethr:sepolia:0xBe203f08DC55566fe826c6aAE8eb29cfE69Ae520#key-1",
-          signatureValue: signature,
-        },
-      };
-      setVcDocument(vcDoc);
+        ipfsCID: mappingCID,
+        ipfsUrl: url
+      });
     } catch (err) {
-      console.error(err);
-      setError("Credential issuance failed.");
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleVerifyCredential = async () => {
-    if (!verificationId || !verificationHash.trim()) {
-      setVerificationError("Please enter a credential ID and its hash for verification.");
-      return;
-    }
-    setVerificationError("");
-    setVerificationLoading(true);
-    setVerificationResult(null);
-
-    try {
-      const provider = new ethers.JsonRpcProvider(VITE_VC_INFURA_URL);
-      const contract = new ethers.Contract(VITE_VC_CONTRACT_ADDRESS, contractABI, provider);
-
-      const isValid = await contract.verifyCredential(verificationId, verificationHash);
-      setVerificationResult(isValid);
-    } catch (err) {
-      console.error(err);
-      setVerificationError("Verification failed.");
-    } finally {
-      setVerificationLoading(false);
-    }
-  };
+  if (loading) return <p>Loading credential...</p>;
+  if (error) return <p className="text-red-500">Error: {error}</p>;
+  if (!vcDocument) return <p>No credential found.</p>;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6 space-y-8">
-      {/* Credential Issuance Section */}
-      <div className="bg-white p-8 rounded shadow-md w-full max-w-lg">
-        <h1 className="text-2xl font-semibold mb-6 text-yellow-500 text-center">Issue Verifiable Credential</h1>
-        {error && <p className="text-red-500 mb-4">{error}</p>}
-        <div className="mb-4">
-          <label className="block text-gray-700 font-medium mb-1">Issuer Private Key</label>
-          <div className="relative">
-            <input
-              type={showPrivateKey ? "text" : "password"}
-              value={issuerPrivateKey}
-              onChange={(e) => setIssuerPrivateKey(e.target.value)}
-              className="mt-1 p-2 w-full border border-gray-300 rounded-md shadow-sm focus:ring-yellow-300 focus:border-yellow-300 pr-10"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPrivateKey(!showPrivateKey)}
-              className="absolute right-2 top-2 text-gray-500 hover:text-yellow-700"
-            >
-              {showPrivateKey ? <EyeOff size={20} /> : <Eye size={20} />}
-            </button>
-          </div>
-        </div>
-        <h2 className="text-lg font-semibold mb-2">Select Courses</h2>
-        {mockCourses.map((course) => (
-          <div key={course.courseId} className="flex items-center mb-2">
-            <input
-              type="checkbox"
-              checked={selectedCourses.includes(course.courseId)}
-              onChange={() => toggleCourseSelection(course.courseId)}
-              className="mr-2"
-            />
-            <label>{course.title}</label>
-          </div>
-        ))}
-        <button
-          onClick={handleIssueCredential}
-          className="w-full mt-4 p-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600"
-          disabled={loading}
-        >
-          {loading ? <Loader size={20} className="animate-spin mx-auto" /> : "Issue Credential"}
-        </button>
-        {txHash && <p className="mt-4 p-4 text-green-500 overflow-x-auto">Transaction Hash: {txHash}</p>}
-        {vcDocument && (
-          <div className="mt-6 p-4 bg-gray-100 border rounded">
-            <h3 className="font-semibold">Generated VC Document:</h3>
-            <pre className="text-sm text-gray-700 whitespace-pre-wrap overflow-x-auto">{JSON.stringify(vcDocument, null, 2)}</pre>
-          </div>
-        )}
-      </div>
-
-      {/* Credential Verification Section */}
-      <div className="bg-white p-8 rounded shadow-md w-full max-w-lg">
-        <h2 className="text-2xl font-semibold mb-6 text-yellow-500 text-center">Verify Credential</h2>
-        {verificationError && <p className="text-red-500 mb-4">{verificationError}</p>}
-        <div className="mb-4">
-          <label className="block text-gray-700 font-medium mb-1">Credential ID</label>
-          <input
-            type="number"
-            value={verificationId}
-            onChange={(e) => setVerificationId(e.target.value)}
-            placeholder="Enter credential ID"
-            className="mt-1 p-2 w-full border border-gray-300 rounded-md shadow-sm focus:ring-yellow-300 focus:border-yellow-300"
-          />
-        </div>
-        <div className="mb-4">
-          <label className="block text-gray-700 font-medium mb-1">Credential Hash</label>
-          <input
-            type="text"
-            value={verificationHash}
-            onChange={(e) => setVerificationHash(e.target.value)}
-            placeholder="Enter credential hash"
-            className="mt-1 p-2 w-full border border-gray-300 rounded-md shadow-sm focus:ring-yellow-300 focus:border-yellow-300"
-          />
-        </div>
-        <button
-          onClick={handleVerifyCredential}
-          className="w-full mt-4 p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-          disabled={verificationLoading}
-        >
-          {verificationLoading ? <Loader size={20} className="animate-spin mx-auto" /> : "Verify Credential"}
-        </button>
-        {verificationResult !== null && (
-          <p className={`mt-4 p-4 ${verificationResult ? "text-green-500" : "text-red-500"}`}>
-            {verificationResult ? "Credential is valid." : "Credential is invalid."}
-          </p>
-        )}
-      </div>
+    <div className="p-6 max-w-xl mx-auto bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl shadow-md">
+      <h2 className="text-lg font-bold mb-4">Credential Verification</h2>
+      <p><strong>Student DID:</strong> {vcDocument.credentialSubject.id}</p>
+      <p><strong>Issuer:</strong> {vcDocument.issuer.name} ({vcDocument.issuer.id})</p>
+      <p><strong>Issued On:</strong> {new Date(vcDocument.issuanceDate).toLocaleString()}</p>
+      <p><strong>Valid:</strong> {vcDocument.onchain.valid ? "Yes" : "No"}</p>
+      <p><strong>IPFS CID:</strong> {vcDocument.ipfsCID}</p>
+      <a className="text-blue-600 underline mt-2 block" href={vcDocument.ipfsUrl} target="_blank" rel="noopener noreferrer">View raw on IPFS</a>
     </div>
   );
 };
 
-export default VCIssuanceForm;
+export default PublicVerifyPage;

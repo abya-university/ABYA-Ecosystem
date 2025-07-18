@@ -120,10 +120,28 @@ export default function ProfileSidebar({
                     className="flex items-center gap-2"
                     onClick={() => openModal("requestVc")}
                   >
-                    Request VC
+                    Vc Request
                   </button>
                 </li>
-                <li className="hover:text-blue-400 cursor-pointer">Verify Credentials</li>
+
+                <li className="hover:text-blue-400 cursor-pointer">
+                  <button 
+                    className="flex items-center gap-2"
+                    onClick={() => openModal("VcUpdate")}
+                  >
+                    Update Credentials
+                  </button>
+                </li>
+
+                <li className="hover:text-blue-400 cursor-pointer">
+                  <button 
+                    className="flex items-center gap-2"
+                    onClick={() => openModal("VerifyVc")}
+                  >
+                    Verify Credentials
+                  </button>
+                </li>
+
                 <li className="hover:text-blue-400 cursor-pointer">Revoke Credentials</li>
               </ul>
             )}
