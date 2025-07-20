@@ -224,7 +224,8 @@ const RemoveLiquidity = () => {
             </div>
 
             <button
-              onClick={handleRemoveLiquidity}
+              // onClick={handleRemoveLiquidity}
+              onClick={() => alert("This feature is still under development.")}
               disabled={removing}
               className="w-full bg-yellow-500 dark:bg-yellow-600 text-white py-2 px-4 rounded-lg hover:bg-yellow-600 dark:hover:bg-yellow-700 disabled:bg-yellow-300 dark:disabled:bg-yellow-800 disabled:cursor-not-allowed transition-colors"
             >

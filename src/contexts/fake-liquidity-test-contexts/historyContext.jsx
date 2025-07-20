@@ -27,6 +27,7 @@ export function TransactionHistoryProvider({ children }) {
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const [isInitialRatio, setIsInitialRatio] = useState(true);
   const [poolPrice, setPoolPrice] = useState(1000);
+  const [slippageTolerance, setSlippageTolerance] = useState(0.5);
 
   const { address, isConnected } = useAccount();
   const signerPromise = useEthersSigner();
@@ -167,56 +168,79 @@ export function TransactionHistoryProvider({ children }) {
   }, [isConnected, address, signerPromise]);
 
   // Function to calculate output amount (replace with actual price calculation)
-  const calculateOutputAmount = async (
-    inputAmount,
-    inputTokenSymbol,
-    outputTokenSymbol
-  ) => {
-    if (!inputAmount || parseFloat(inputAmount) === 0)
-      return { output: "0", impact: 0, minReceived: "0" };
+  const calculateOutputAmount = useCallback(
+    async (inputAmount, inputTokenSymbol, outputTokenSymbol) => {
+      if (!inputAmount || parseFloat(inputAmount) === 0)
+        return { output: "0", impact: 0, minReceived: "0" };
 
-    try {
-      const provider = await signerPromise;
-      const contract = new ethers.Contract(
-        CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
-        contractAbi,
-        provider
-      );
+      try {
+        console.log("Starting price calculation...");
+        console.log("Contract address:", CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT);
+        console.log("Pool address:", CONTRACT_ADDRESSES.UNISWAP_POOL);
 
-      const poolAddress = CONTRACT_ADDRESSES.UNISWAP_POOL;
-      const token0Price = await contract.getTokenPrice(poolAddress);
+        const signer = await signerPromise;
+        console.log("Signer obtained:", !!signer);
 
-      // Ensure token0Price is valid before formatting
-      const rate =
-        inputTokenSymbol === "TOKEN0"
-          ? parseFloat(ethers.formatUnits(token0Price, 18)) || 0 // Fallback to 0 if invalid
-          : 1 / (parseFloat(ethers.formatUnits(token0Price, 18)) || 1); // Fallback to 1 if invalid
+        if (!signer) {
+          throw new Error("No signer available");
+        }
 
-      const output = (parseFloat(inputAmount) * rate).toFixed(6);
-      const impact = Math.min((parseFloat(inputAmount) / 1000) * 0.1, 5);
-      const minReceived = (
-        parseFloat(output) *
-        (1 - slippageTolerance / 100)
-      ).toFixed(6);
+        const contract = new ethers.Contract(
+          CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
+          contractAbi,
+          signer.provider || signer
+        );
 
-      console.log("Rate:", rate);
-      console.log("Input Amount:", inputAmount);
-      console.log("Output:", output);
+        console.log("Contract instance created");
 
-      return { output, impact, minReceived };
-    } catch (error) {
-      console.error("Price calculation error:", error);
-      // Fallback to mock calculation
-      const rate = inputTokenSymbol === "TOKEN0" ? 1.2345 : 0.8102;
-      const output = (parseFloat(inputAmount) * rate).toFixed(6);
-      const impact = Math.min((parseFloat(inputAmount) / 1000) * 0.1, 5);
-      const minReceived = (
-        parseFloat(output) *
-        (1 - slippageTolerance / 100)
-      ).toFixed(6);
-      return { output, impact, minReceived };
-    }
-  };
+        const poolAddress = CONTRACT_ADDRESSES.UNISWAP_POOL;
+
+        // Check if the contract method exists
+        if (!contract.getTokenPrice) {
+          throw new Error("getTokenPrice method not found on contract");
+        }
+
+        console.log("Calling getTokenPrice...");
+        const token0Price = await contract.getTokenPrice(poolAddress);
+        console.log("Token price retrieved:", token0Price.toString());
+
+        // Your existing logic continues...
+        const rate =
+          inputTokenSymbol === "TOKEN0"
+            ? parseFloat(ethers.formatUnits(token0Price, 18)) || 0
+            : 1 / (parseFloat(ethers.formatUnits(token0Price, 18)) || 1);
+
+        console.log("Calculated rate:", rate);
+
+        const output = (parseFloat(inputAmount) * rate).toFixed(6);
+        const impact = Math.min((parseFloat(inputAmount) / 1000) * 0.1, 5);
+        const minReceived = (
+          parseFloat(output) *
+          (1 - slippageTolerance / 100)
+        ).toFixed(6);
+
+        return { output, impact, minReceived };
+      } catch (error) {
+        console.error("Detailed price calculation error:", {
+          message: error.message,
+          code: error.code,
+          reason: error.reason,
+          stack: error.stack,
+        });
+
+        // Fallback calculation
+        const rate = inputTokenSymbol === "TOKEN0" ? 1.2345 : 0.8102;
+        const output = (parseFloat(inputAmount) * rate).toFixed(6);
+        const impact = Math.min((parseFloat(inputAmount) / 1000) * 0.1, 5);
+        const minReceived = (
+          parseFloat(output) *
+          (1 - slippageTolerance / 100)
+        ).toFixed(6);
+        return { output, impact, minReceived };
+      }
+    },
+    [signerPromise, slippageTolerance]
+  );
 
   // Wrap loadPoolInfo in useCallback
   const loadPoolInfo = async () => {
