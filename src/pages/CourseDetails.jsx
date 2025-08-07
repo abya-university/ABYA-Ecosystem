@@ -21,6 +21,7 @@ import {
   BookOpen,
   Book,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import ReviewModal from "../components/ReviewModal";
 import { useUser } from "../contexts/userContext";
@@ -780,6 +781,7 @@ const CourseDetails = memo(({ courseId }) => {
   const [showPopup, setShowPopup] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedCertificate, setSelectedCertificate] = useState(null);
+  const [markingAsReadIds, setMarkingAsReadIds] = useState(new Set());
 
   // Update both fetch functions to filter out invalid IDs
 
@@ -864,6 +866,10 @@ const CourseDetails = memo(({ courseId }) => {
   }, [courseId, signerPromise, quizzes]);
 
   const markAsRead = async (courseId, chapterId, lessonId) => {
+    // Add lesson to loading state
+    const lessonIdStr = lessonId.toString();
+    setMarkingAsReadIds((prev) => new Set([...prev, lessonIdStr]));
+
     try {
       // Convert parameters to BigInts for ethers v6
       const courseIdBN = BigInt(courseId);
@@ -905,7 +911,7 @@ const CourseDetails = memo(({ courseId }) => {
         console.log("Transaction confirmed:", receipt);
 
         // Update local state only after confirmation
-        setCompletedLessonIds((prev) => new Set([...prev, lessonId]));
+        setCompletedLessonIds((prev) => new Set([...prev, lessonIdStr]));
       } catch (contractError) {
         console.error("Contract interaction failed:", {
           error: contractError,
@@ -923,7 +929,75 @@ const CourseDetails = memo(({ courseId }) => {
     } catch (error) {
       console.error("Error in markAsRead:", error);
       throw error;
+    } finally {
+      // Remove lesson from loading state
+      setMarkingAsReadIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(lessonIdStr);
+        return newSet;
+      });
     }
+  };
+
+  const isUserEnrolled = (enrolledStudents, userAddress) => {
+    if (!enrolledStudents || !userAddress) {
+      console.log(
+        "Missing data - enrolledStudents:",
+        enrolledStudents,
+        "userAddress:",
+        userAddress
+      );
+      return false;
+    }
+
+    // If it's an array, check if it includes the address
+    if (Array.isArray(enrolledStudents)) {
+      const isEnrolled = enrolledStudents.some(
+        (addr) => addr.toLowerCase() === userAddress.toLowerCase()
+      );
+      console.log(
+        "Array check - enrolledStudents:",
+        enrolledStudents,
+        "userAddress:",
+        userAddress,
+        "isEnrolled:",
+        isEnrolled
+      );
+      return isEnrolled;
+    }
+
+    // Convert to string and check
+    const studentsStr = String(enrolledStudents);
+
+    // If it's a single address, check if it matches
+    if (studentsStr.startsWith("0x") && !studentsStr.includes(",")) {
+      const isEnrolled =
+        studentsStr.toLowerCase() === userAddress.toLowerCase();
+      console.log(
+        "Single address check - studentsStr:",
+        studentsStr,
+        "userAddress:",
+        userAddress,
+        "isEnrolled:",
+        isEnrolled
+      );
+      return isEnrolled;
+    }
+
+    // If multiple addresses, split and check
+    const addressList = studentsStr
+      .split(",")
+      .map((addr) => addr.trim().toLowerCase());
+    const isEnrolled = addressList.includes(userAddress.toLowerCase());
+    console.log(
+      "Multiple addresses check - addressList:",
+      addressList,
+      "userAddress:",
+      userAddress,
+      "isEnrolled:",
+      isEnrolled
+    );
+    return isEnrolled;
   };
 
   // Use refs to store previous values
@@ -1308,50 +1382,80 @@ const CourseDetails = memo(({ courseId }) => {
                                 )}
 
                                 {/* add a mark as read btn */}
-                                {role === "USER" ? (
-                                  <div className="flex justify-between items-center">
-                                    <button
-                                      className={`bg-yellow-500 text-gray-900 p-2 my-3 rounded-lg font-normal ${
-                                        completedLessonIds.has(
-                                          lesson.lessonId.toString()
-                                        ) // Ensure lessonId is a string
-                                          ? "opacity-50 cursor-not-allowed"
-                                          : "hover:bg-yellow-600"
-                                      }`}
-                                      onClick={async () => {
-                                        if (
-                                          !completedLessonIds.has(
-                                            lesson.lessonId.toString()
-                                          )
-                                        ) {
-                                          try {
-                                            await markAsRead(
-                                              currentCourse.courseId,
-                                              chapter.chapterId,
-                                              lesson.lessonId
-                                            );
-                                            // Show success message
-                                          } catch (error) {
-                                            // Show error message to user
-                                            console.error(
-                                              "Failed to mark lesson as read:",
-                                              error
-                                            );
+                                {currentCourse.approved && address && (
+                                  <>
+                                    {(() => {
+                                      const userEnrolled = isUserEnrolled(
+                                        currentCourse.enrolledStudents,
+                                        address
+                                      );
+                                      return userEnrolled;
+                                    })() ? (
+                                      <div className="flex justify-between items-center">
+                                        <button
+                                          className={`bg-yellow-500 text-gray-900 p-2 my-3 rounded-lg font-normal flex items-center gap-2 ${
+                                            completedLessonIds.has(
+                                              lesson.lessonId.toString()
+                                            ) ||
+                                            markingAsReadIds.has(
+                                              lesson.lessonId.toString()
+                                            ) // Ensure lessonId is a string
+                                              ? "opacity-50 cursor-not-allowed"
+                                              : "hover:bg-yellow-600"
+                                          }`}
+                                          onClick={async () => {
+                                            if (
+                                              !completedLessonIds.has(
+                                                lesson.lessonId.toString()
+                                              ) &&
+                                              !markingAsReadIds.has(
+                                                lesson.lessonId.toString()
+                                              )
+                                            ) {
+                                              try {
+                                                await markAsRead(
+                                                  currentCourse.courseId,
+                                                  chapter.chapterId,
+                                                  lesson.lessonId
+                                                );
+                                                // Show success message
+                                              } catch (error) {
+                                                // Show error message to user
+                                                console.error(
+                                                  "Failed to mark lesson as read:",
+                                                  error
+                                                );
+                                              }
+                                            }
+                                          }}
+                                          disabled={
+                                            completedLessonIds.has(
+                                              lesson.lessonId.toString()
+                                            ) ||
+                                            markingAsReadIds.has(
+                                              lesson.lessonId.toString()
+                                            )
                                           }
-                                        }
-                                      }}
-                                      disabled={completedLessonIds.has(
-                                        lesson.lessonId.toString()
-                                      )}
-                                    >
-                                      {completedLessonIds.has(
-                                        lesson.lessonId.toString()
-                                      )
-                                        ? "Completed"
-                                        : "Mark as Read"}
-                                    </button>
-                                  </div>
-                                ) : null}
+                                        >
+                                          {markingAsReadIds.has(
+                                            lesson.lessonId.toString()
+                                          ) ? (
+                                            <>
+                                              <Loader2 className="w-4 h-4 animate-spin" />
+                                              Marking...
+                                            </>
+                                          ) : completedLessonIds.has(
+                                              lesson.lessonId.toString()
+                                            ) ? (
+                                            "Completed"
+                                          ) : (
+                                            "Mark as Read"
+                                          )}
+                                        </button>
+                                      </div>
+                                    ) : null}
+                                  </>
+                                )}
 
                                 {lessonQuiz && (
                                   <div className="mt-6 p-6 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg dark:text-gray-300">
@@ -1389,6 +1493,7 @@ const CourseDetails = memo(({ courseId }) => {
                     </div>
                   );
                 }
+                return null;
               })}
             </div>
           </div>
