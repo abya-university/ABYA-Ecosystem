@@ -1058,7 +1058,8 @@ const CourseDetails = memo(({ courseId }) => {
       setHasCertificate(true);
       // alert("You have already claimed a certificate for this course.");
     } else {
-      setShowCongratsPopup(true);
+      setHasCertificate(false);
+      // Don't automatically show popup here - only show when course is completed
     }
   }, [certificates, currentCourse.courseId, address]);
 
@@ -1206,17 +1207,34 @@ const CourseDetails = memo(({ courseId }) => {
     ]
   );
 
-  //issueCertificate section
+  //issueCertificate section - only show congratulations popup when course is 100% complete AND user doesn't have certificate
   useEffect(() => {
-    if (
+    const isFullyCompleted =
       completedLessonIds.size + completedQuizIds.size !== 0 &&
       totalLessons + totalQuizzes !== 0 &&
       completedLessonIds.size + completedQuizIds.size ===
-        totalLessons + totalQuizzes
-    ) {
+        totalLessons + totalQuizzes;
+
+    console.log("=== CERTIFICATE POPUP DEBUG ===", {
+      completedItems: completedLessonIds.size + completedQuizIds.size,
+      totalItems: totalLessons + totalQuizzes,
+      isFullyCompleted,
+      hasCertificate,
+      shouldShowPopup: isFullyCompleted && !hasCertificate,
+    });
+
+    if (isFullyCompleted && !hasCertificate) {
       setShowCongratsPopup(true);
+    } else {
+      setShowCongratsPopup(false);
     }
-  }, [completedLessonIds, completedQuizIds, totalLessons, totalQuizzes]);
+  }, [
+    completedLessonIds,
+    completedQuizIds,
+    totalLessons,
+    totalQuizzes,
+    hasCertificate,
+  ]);
 
   const handleClosePopup = () => {
     setShowCongratsPopup(false);

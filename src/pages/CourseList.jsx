@@ -1002,7 +1002,7 @@ const CoursesPage = ({ onCourseSelect }) => {
                       </>
                     )}
                     {/* Debug info - remove this later */}
-                    {role === "USER" && (
+                    {/* {role === "USER" && (
                       <div className="text-xs text-gray-400 mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded">
                         Debug Info:
                         <br />
@@ -1020,7 +1020,7 @@ const CoursesPage = ({ onCourseSelect }) => {
                         EnrolledStudents:{" "}
                         {JSON.stringify(course.enrolledStudents)}
                       </div>
-                    )}
+                    )} */}
                   </div>
                 </div>
               </div>
