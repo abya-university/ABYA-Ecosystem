@@ -21,6 +21,11 @@ import { useEthersSigner } from "../components/useClientSigner";
 import { LessonContext } from "../contexts/lessonContext";
 import { QuizContext } from "../contexts/quizContext";
 import { ethers } from "ethers";
+import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
+
+const EcosystemDiamondAddress = import.meta.env
+  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
 const Dashboard = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -98,18 +103,69 @@ const Dashboard = () => {
     setIsDarkMode(!isDarkMode);
   };
 
-  const enrolledCourses = courses.filter((course) =>
-    course.enrolledStudents.includes(address)
-  );
+  // Helper function to check if user is enrolled (handles both array and string formats)
+  const isUserEnrolled = (enrolledStudents, userAddress) => {
+    if (!enrolledStudents || !userAddress) {
+      return false;
+    }
 
-  // Helper function to get lessons for a specific course
-  const getLessonsForCourse = (courseId) => {
-    return lessons.filter((lesson) => lesson.courseId === courseId);
+    // If it's an array, check if it includes the address
+    if (Array.isArray(enrolledStudents)) {
+      return enrolledStudents.some(
+        (addr) => addr.toLowerCase() === userAddress.toLowerCase()
+      );
+    }
+
+    // Convert to string and check
+    const studentsStr = String(enrolledStudents);
+
+    // If it's a single address, check if it matches
+    if (studentsStr.startsWith("0x") && !studentsStr.includes(",")) {
+      return studentsStr.toLowerCase() === userAddress.toLowerCase();
+    }
+
+    // If multiple addresses, split and check
+    const addressList = studentsStr
+      .split(",")
+      .map((addr) => addr.trim().toLowerCase());
+    return addressList.includes(userAddress.toLowerCase());
   };
 
-  // Helper function to get quizzes for a specific course
+  const enrolledCourses = courses.filter((course) =>
+    isUserEnrolled(course.enrolledStudents, address)
+  );
+
+  // Helper function to get lessons for a specific course (via chapters)
+  const getLessonsForCourse = (courseId) => {
+    // First, get all chapters for this course
+    const courseChapters = chapters.filter(
+      (chapter) => chapter.courseId.toString() === courseId.toString()
+    );
+
+    // Then get all lessons for these chapters
+    const courseLessons = lessons.filter((lesson) =>
+      courseChapters.some(
+        (chapter) =>
+          chapter.chapterId.toString() === lesson.chapterId.toString()
+      )
+    );
+
+    return courseLessons;
+  };
+
+  // Helper function to get quizzes for a specific course (via lessons)
   const getQuizzesForCourse = (courseId) => {
-    return quizzes.filter((quiz) => quiz.courseId === courseId);
+    // Get lessons for this course first
+    const courseLessons = getLessonsForCourse(courseId);
+
+    // Then get quizzes associated with these lessons
+    const courseQuizzes = quizzes.filter((quiz) =>
+      courseLessons.some(
+        (lesson) => lesson.lessonId.toString() === quiz.lessonId.toString()
+      )
+    );
+
+    return courseQuizzes;
   };
 
   // Function to fetch completion data for a specific course
@@ -170,12 +226,22 @@ const Dashboard = () => {
         completedQuizIds = new Set(quizIds);
       }
 
-      return {
+      const result = {
         completedLessons: completedLessonIds.size,
         completedQuizzes: completedQuizIds.size,
         totalLessons: courseLessons.length,
         totalQuizzes: courseQuizzes.length,
       };
+
+      console.log(`=== COMPLETION DATA FETCH - Course ID: ${courseId} ===`, {
+        courseLessons: courseLessons.length,
+        courseQuizzes: courseQuizzes.length,
+        completedLessonIds: Array.from(completedLessonIds),
+        completedQuizIds: Array.from(completedQuizIds),
+        result,
+      });
+
+      return result;
     } catch (error) {
       console.error(
         `Error fetching completion data for course ${courseId}:`,
@@ -190,10 +256,24 @@ const Dashboard = () => {
     }
   };
 
+  // Effect to fetch chapters for all enrolled courses
+  useEffect(() => {
+    const fetchChaptersForEnrolledCourses = async () => {
+      if (enrolledCourses.length === 0) return;
+
+      // Fetch chapters for each enrolled course
+      for (const course of enrolledCourses) {
+        await fetchChapters(course.courseId);
+      }
+    };
+
+    fetchChaptersForEnrolledCourses();
+  }, [enrolledCourses, fetchChapters]);
+
   // Effect to fetch completion data for all enrolled courses
   useEffect(() => {
     const fetchAllCompletionData = async () => {
-      if (enrolledCourses.length === 0) return;
+      if (enrolledCourses.length === 0 || chapters.length === 0) return;
 
       const completionPromises = enrolledCourses.map(async (course) => {
         const completionData = await fetchCompletionDataForCourse(
@@ -222,7 +302,7 @@ const Dashboard = () => {
     };
 
     fetchAllCompletionData();
-  }, [enrolledCourses, signerPromise, lessons, quizzes]);
+  }, [enrolledCourses, signerPromise, lessons, quizzes, chapters]);
 
   return (
     <div
@@ -309,6 +389,26 @@ const Dashboard = () => {
                   totalLessons: 0,
                   totalQuizzes: 0,
                 };
+
+                // Debug logging for each course
+                console.log(
+                  `=== DASHBOARD PROGRESS DEBUG - Course: ${course.courseName} ===`,
+                  {
+                    courseId: course.courseId,
+                    completionData,
+                    totalItems:
+                      completionData.totalLessons + completionData.totalQuizzes,
+                    completedItems:
+                      completionData.completedLessons +
+                      completionData.completedQuizzes,
+                    progressPercentage:
+                      ((completionData.completedLessons +
+                        completionData.completedQuizzes) /
+                        (completionData.totalLessons +
+                          completionData.totalQuizzes)) *
+                        100 || 0,
+                  }
+                );
 
                 return (
                   <div

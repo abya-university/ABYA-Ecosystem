@@ -1011,16 +1011,36 @@ const CourseDetails = memo(({ courseId }) => {
   );
 
   // Memoize filtered chapters
-  const filteredChapters = useMemo(
-    () => chapters.filter((chapter) => chapter.courseID === courseId),
-    [chapters, courseId]
-  );
+  const filteredChapters = useMemo(() => {
+    const filtered = chapters.filter(
+      (chapter) => chapter.courseId?.toString() === courseId?.toString()
+    );
+
+    console.log("=== CHAPTER FILTERING DEBUG ===", {
+      courseId,
+      totalChapters: chapters.length,
+      filteredChapters: filtered.length,
+      chapters: chapters.map((ch) => ({
+        chapterId: ch.chapterId,
+        courseId: ch.courseId,
+        chapterName: ch.chapterName,
+      })),
+      filtered: filtered.map((ch) => ({
+        chapterId: ch.chapterId,
+        courseId: ch.courseId,
+        chapterName: ch.chapterName,
+      })),
+    });
+
+    return filtered;
+  }, [chapters, courseId]);
 
   // Update totalLessons calculation
   const totalLessons = useMemo(() => {
     return lessons.filter((lesson) =>
       filteredChapters.some(
-        (chapter) => chapter.chapterId === lesson.chapterId.toString()
+        (chapter) =>
+          chapter.chapterId?.toString() === lesson.chapterId?.toString()
       )
     ).length;
   }, [lessons, filteredChapters]);
@@ -1031,7 +1051,8 @@ const CourseDetails = memo(({ courseId }) => {
     const lessonIds = lessons
       .filter((lesson) =>
         filteredChapters.some(
-          (chapter) => chapter.chapterId === lesson.chapterId.toString()
+          (chapter) =>
+            chapter.chapterId?.toString() === lesson.chapterId?.toString()
         )
       )
       .map((lesson) => lesson.lessonId.toString());
@@ -1069,7 +1090,15 @@ const CourseDetails = memo(({ courseId }) => {
       courseId &&
       (prevCourseIdRef.current !== courseId || chapters.length === 0);
 
+    console.log("=== CHAPTER FETCH DEBUG ===", {
+      courseId,
+      shouldFetchChapters,
+      chaptersLength: chapters.length,
+      prevCourseId: prevCourseIdRef.current,
+    });
+
     if (shouldFetchChapters) {
+      console.log("Fetching chapters for courseId:", courseId);
       fetchChapters(courseId);
       prevCourseIdRef.current = courseId;
     }
@@ -1077,28 +1106,17 @@ const CourseDetails = memo(({ courseId }) => {
 
   // Update chapters only when the chapters array actually changes
   useEffect(() => {
-    if (chapters !== prevChaptersRef.current) {
-      const formattedChapters = chapters.map((chapter) => ({
-        courseID: chapter.courseId.toString(),
-        chapterId: chapter.chapterId.toString(),
-        courseId: chapter.courseId.toString(),
-        chapterName: chapter.chapterName,
-      }));
-
-      // Only update the state if the formatted chapters are different
-      if (JSON.stringify(formattedChapters) !== JSON.stringify(chapters)) {
-        setChapters(formattedChapters);
-        console.log("Formatted chapters:", formattedChapters);
-      }
+    if (chapters !== prevChaptersRef.current && chapters.length > 0) {
+      console.log("Raw chapters received:", chapters);
 
       // Set first chapter as active only if there's no active chapter
-      if (formattedChapters.length > 0 && !activeChapterId) {
-        setActiveChapterId(formattedChapters[0].chapterId);
+      if (chapters.length > 0 && !activeChapterId) {
+        setActiveChapterId(chapters[0].chapterId?.toString());
       }
 
       prevChaptersRef.current = chapters;
     }
-  }, [chapters, setChapters, activeChapterId]);
+  }, [chapters, activeChapterId]);
 
   // Memoize lesson filtering function
   const getLessonsForChapter = useCallback(
@@ -1341,7 +1359,9 @@ const CourseDetails = memo(({ courseId }) => {
 
             <div className="space-y-8">
               {filteredChapters.map((chapter, chapterIndex) => {
-                if (chapter.chapterId === activeChapterId) {
+                if (
+                  chapter.chapterId?.toString() === activeChapterId?.toString()
+                ) {
                   return (
                     <div key={chapter.chapterId} className="p-6">
                       <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
@@ -1353,7 +1373,8 @@ const CourseDetails = memo(({ courseId }) => {
                         {lessons
                           .filter(
                             (lesson) =>
-                              lesson.chapterId.toString() === chapter.chapterId
+                              lesson.chapterId?.toString() ===
+                              chapter.chapterId?.toString()
                           )
                           .map((lesson) => {
                             const lessonQuiz = quizzes.find(
@@ -1722,15 +1743,19 @@ const CourseDetails = memo(({ courseId }) => {
 
                 <div className="space-y-1">
                   {filteredChapters.map((chapter, index) => {
-                    const isActive = activeChapterId === chapter.chapterId;
+                    const isActive =
+                      activeChapterId?.toString() ===
+                      chapter.chapterId?.toString();
                     const isCompleted =
-                      completedLessonIds.has(chapter.chapterId) ||
-                      completedQuizIds.has(chapter.chapterId);
+                      completedLessonIds.has(chapter.chapterId?.toString()) ||
+                      completedQuizIds.has(chapter.chapterId?.toString());
 
                     return (
                       <div
                         key={chapter.chapterId}
-                        onClick={() => setActiveChapterId(chapter.chapterId)}
+                        onClick={() =>
+                          setActiveChapterId(chapter.chapterId?.toString())
+                        }
                         className={`group relative p-3 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-sm ${
                           isActive
                             ? "bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border border-yellow-200 dark:border-yellow-700/50 shadow-sm"
