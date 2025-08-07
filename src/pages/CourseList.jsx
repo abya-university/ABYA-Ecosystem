@@ -154,6 +154,32 @@ const CoursesPage = ({ onCourseSelect }) => {
   };
 
   console.log("Courses:", courses);
+  console.log("Address:", address);
+  console.log("Role:", role);
+
+  // Debug useEffect to log enrollment status for all courses
+  useEffect(() => {
+    if (courses && courses.length > 0 && address) {
+      console.log("=== ENROLLMENT DEBUG INFO ===");
+      console.log("Current user address:", address);
+      console.log("Current role:", role);
+      courses.forEach((course) => {
+        const isEnrolled = isUserEnrolled(course.enrolledStudents, address);
+        console.log(`Course ${course.courseId}:`);
+        console.log(`  - Name: ${course.courseName}`);
+        console.log(`  - Approved: ${course.approved}`);
+        console.log(`  - enrolledStudents:`, course.enrolledStudents);
+        console.log(`  - User enrolled: ${isEnrolled}`);
+        console.log(
+          `  - Should show buttons: ${
+            role === "USER" && course.approved && address
+          }`
+        );
+        console.log("---");
+      });
+      console.log("=== END ENROLLMENT DEBUG ===");
+    }
+  }, [courses, address, role]);
 
   const getApprovalStatusStyle = (approved) => {
     if (approved) {
@@ -652,6 +678,9 @@ const CoursesPage = ({ onCourseSelect }) => {
       console.log(`Transaction Receipt: ${tx.hash}`);
       setEnrolled(true);
       toast.success(`Enrolled into course ${courseId} successfully!`);
+
+      // Refresh course data after enrollment
+      window.location.reload(); // Force page refresh to get updated course data
     } catch (error) {
       console.error("Error enrolling in course:", error);
       toast.error("Error enrolling in course. Please try again!");
@@ -674,10 +703,13 @@ const CoursesPage = ({ onCourseSelect }) => {
       await tx.wait();
       console.log(`Transaction Receipt: ${tx.hash}`);
       setUnEnrolled(true);
-      toast.success(`Unenrolled into course ${courseId} successfully!`);
+      toast.success(`Unenrolled from course ${courseId} successfully!`);
+
+      // Refresh course data after unenrollment
+      window.location.reload(); // Force page refresh to get updated course data
     } catch (error) {
-      console.error("Error enrolling in course:", error);
-      toast.error("Error enrolling in course. Please try again!");
+      console.error("Error unenrolling from course:", error);
+      toast.error("Error unenrolling from course. Please try again!");
       setUnEnrolled(false);
     } finally {
       setLoading(false);
@@ -688,16 +720,83 @@ const CoursesPage = ({ onCourseSelect }) => {
     // If empty or undefined, return 0
     if (!enrolledStudentsString) return 0;
 
+    // If it's an array, return its length
+    if (Array.isArray(enrolledStudentsString)) {
+      return enrolledStudentsString.length;
+    }
+
+    // Convert to string if it's not already a string
+    const studentsStr = String(enrolledStudentsString);
+
     // If it's a single address, return 1
-    if (
-      enrolledStudentsString.startsWith("0x") &&
-      !enrolledStudentsString.includes(",")
-    ) {
+    if (studentsStr.startsWith("0x") && !studentsStr.includes(",")) {
       return 1;
     }
 
     // If multiple addresses, split and count
-    return enrolledStudentsString.split(",").length;
+    return studentsStr.split(",").length;
+  };
+
+  // Helper function to check if current user is enrolled in a course
+  const isUserEnrolled = (enrolledStudents, userAddress) => {
+    if (!enrolledStudents || !userAddress) {
+      console.log(
+        "Missing data - enrolledStudents:",
+        enrolledStudents,
+        "userAddress:",
+        userAddress
+      );
+      return false;
+    }
+
+    // If it's an array, check if it includes the address
+    if (Array.isArray(enrolledStudents)) {
+      const isEnrolled = enrolledStudents.some(
+        (addr) => addr.toLowerCase() === userAddress.toLowerCase()
+      );
+      console.log(
+        "Array check - enrolledStudents:",
+        enrolledStudents,
+        "userAddress:",
+        userAddress,
+        "isEnrolled:",
+        isEnrolled
+      );
+      return isEnrolled;
+    }
+
+    // Convert to string and check
+    const studentsStr = String(enrolledStudents);
+
+    // If it's a single address, check if it matches
+    if (studentsStr.startsWith("0x") && !studentsStr.includes(",")) {
+      const isEnrolled =
+        studentsStr.toLowerCase() === userAddress.toLowerCase();
+      console.log(
+        "Single address check - studentsStr:",
+        studentsStr,
+        "userAddress:",
+        userAddress,
+        "isEnrolled:",
+        isEnrolled
+      );
+      return isEnrolled;
+    }
+
+    // If multiple addresses, split and check
+    const addressList = studentsStr
+      .split(",")
+      .map((addr) => addr.trim().toLowerCase());
+    const isEnrolled = addressList.includes(userAddress.toLowerCase());
+    console.log(
+      "Multiple addresses check - addressList:",
+      addressList,
+      "userAddress:",
+      userAddress,
+      "isEnrolled:",
+      isEnrolled
+    );
+    return isEnrolled;
   };
 
   return (
@@ -815,7 +914,7 @@ const CoursesPage = ({ onCourseSelect }) => {
 
                   {/* Action Buttons */}
                   <div className="flex space-x-3">
-                    {(role === "ADMIN" ||
+                    {/* {(role === "ADMIN" ||
                       role === "Course Owner" ||
                       role === "Reviewer") && (
                       <button
@@ -825,7 +924,7 @@ const CoursesPage = ({ onCourseSelect }) => {
                         <Eye className="w-5 h-5 mr-2" />
                         View Course
                       </button>
-                    )}
+                    )} */}
                     {!course.approved && course.creator === address && (
                       <button
                         onClick={async () => approveCourse(course)}
@@ -848,9 +947,21 @@ const CoursesPage = ({ onCourseSelect }) => {
                           : "Request Review"}
                       </button>
                     )}
-                    {role === "USER" && course.approved && address && (
+                    {/* Enroll/Unenroll Buttons */}
+                    {/* role === "USER" && */}
+                    {course.approved && address && (
                       <>
-                        {course.enrolledStudents?.includes(address) ? (
+                        {(() => {
+                          const userEnrolled = isUserEnrolled(
+                            course.enrolledStudents,
+                            address
+                          );
+                          console.log(
+                            `RENDER: Course ${course.courseId} - User ${address} enrolled:`,
+                            userEnrolled
+                          );
+                          return userEnrolled;
+                        })() ? (
                           <>
                             <button
                               onClick={() => viewCourse(course.courseId)}
@@ -859,13 +970,7 @@ const CoursesPage = ({ onCourseSelect }) => {
                               <Eye className="w-5 h-5 mr-2" />
                               View Course
                             </button>
-                            {/* <button
-                              onClick={() => unEnroll(course.courseId)}
-                              className="flex-1 bg-red-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center"
-                            >
-                              <WifiOff className="w-5 h-5 mr-2" />
-                              Unenroll
-                            </button> */}
+
                             <button
                               onClick={() => unEnroll(course.courseId)}
                               disabled={loading}
@@ -878,26 +983,44 @@ const CoursesPage = ({ onCourseSelect }) => {
                             </button>
                           </>
                         ) : (
-                          // <button
-                          //   onClick={() => enroll(course.courseId)}
-                          //   className="flex-1 bg-gray-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center"
-                          // >
-                          //   <Wifi className="w-5 h-5 mr-2" />
-                          //   Enroll
-                          // </button>
-                          <button
-                            onClick={() => enroll(course.courseId)}
-                            disabled={loading}
-                            className={`flex-1 bg-gray-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center ${
-                              loading ? "opacity-50 cursor-not-allowed" : ""
-                            }`}
-                          >
-                            <Wifi className="w-5 h-5 mr-2" />
-                            {loading ? "Enrolling..." : "Enroll"}
-                          </button>
+                          <>
+                            <button
+                              onClick={() => enroll(course.courseId)}
+                              disabled={loading}
+                              className={`flex-1 bg-gray-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center ${
+                                loading ? "opacity-50 cursor-not-allowed" : ""
+                              }`}
+                            >
+                              <Wifi className="w-5 h-5 mr-2" />
+                              {loading ? "Enrolling..." : "Enroll"}
+                            </button>
+                            {/* <div className="text-xs text-gray-500 mt-1">
+                              Debug: Not enrolled - showing enroll button
+                            </div> */}
+                          </>
                         )}
                       </>
                     )}
+                    {/* Debug info - remove this later */}
+                    {/* {role === "USER" && (
+                      <div className="text-xs text-gray-400 mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded">
+                        Debug Info:
+                        <br />
+                        Role: {role}
+                        <br />
+                        Approved: {course.approved ? "Yes" : "No"}
+                        <br />
+                        Address: {address ? "Connected" : "Not connected"}
+                        <br />
+                        Enrolled:{" "}
+                        {isUserEnrolled(course.enrolledStudents, address)
+                          ? "Yes"
+                          : "No"}
+                        <br />
+                        EnrolledStudents:{" "}
+                        {JSON.stringify(course.enrolledStudents)}
+                      </div>
+                    )} */}
                   </div>
                 </div>
               </div>

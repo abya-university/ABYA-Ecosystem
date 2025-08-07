@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import {
   Wallet,
   LineChart,
@@ -7,16 +7,41 @@ import {
   BookOpen,
   Book,
   Users,
+  ClipboardList,
+  X,
 } from "lucide-react";
 import { CourseContext } from "../contexts/courseContext";
 import { useUser } from "../contexts/userContext";
 import { useAccount } from "wagmi";
+import ProfileConnection from "../components/ProfileConnection";
+import { useProfile } from "../contexts/ProfileContext";
+import ProgressBar from "../components/progressBar";
+import { ChapterContext } from "../contexts/chapterContext";
+import { useEthersSigner } from "../components/useClientSigner";
+import { LessonContext } from "../contexts/lessonContext";
+import { QuizContext } from "../contexts/quizContext";
+import { ethers } from "ethers";
+import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
+
+const EcosystemDiamondAddress = import.meta.env
+  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
 const Dashboard = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const { courses } = useContext(CourseContext);
   const { role } = useUser();
+  const { profile } = useProfile();
   const { address } = useAccount();
+  const { chapters, fetchChapters, setChapters } = useContext(ChapterContext);
+  const signerPromise = useEthersSigner();
+  const { lessons } = useContext(LessonContext);
+  const { quizzes } = useContext(QuizContext);
+
+  // Store completion data for each course
+  const [courseCompletionData, setCourseCompletionData] = useState({});
+
+  console.log("Profile", profile);
 
   // Sample stats data (keep as is or modify based on your needs)
   const stats = [
@@ -78,9 +103,206 @@ const Dashboard = () => {
     setIsDarkMode(!isDarkMode);
   };
 
+  // Helper function to check if user is enrolled (handles both array and string formats)
+  const isUserEnrolled = (enrolledStudents, userAddress) => {
+    if (!enrolledStudents || !userAddress) {
+      return false;
+    }
+
+    // If it's an array, check if it includes the address
+    if (Array.isArray(enrolledStudents)) {
+      return enrolledStudents.some(
+        (addr) => addr.toLowerCase() === userAddress.toLowerCase()
+      );
+    }
+
+    // Convert to string and check
+    const studentsStr = String(enrolledStudents);
+
+    // If it's a single address, check if it matches
+    if (studentsStr.startsWith("0x") && !studentsStr.includes(",")) {
+      return studentsStr.toLowerCase() === userAddress.toLowerCase();
+    }
+
+    // If multiple addresses, split and check
+    const addressList = studentsStr
+      .split(",")
+      .map((addr) => addr.trim().toLowerCase());
+    return addressList.includes(userAddress.toLowerCase());
+  };
+
   const enrolledCourses = courses.filter((course) =>
-    course.enrolledStudents.includes(address)
+    isUserEnrolled(course.enrolledStudents, address)
   );
+
+  // Helper function to get lessons for a specific course (via chapters)
+  const getLessonsForCourse = (courseId) => {
+    // First, get all chapters for this course
+    const courseChapters = chapters.filter(
+      (chapter) => chapter.courseId.toString() === courseId.toString()
+    );
+
+    // Then get all lessons for these chapters
+    const courseLessons = lessons.filter((lesson) =>
+      courseChapters.some(
+        (chapter) =>
+          chapter.chapterId.toString() === lesson.chapterId.toString()
+      )
+    );
+
+    return courseLessons;
+  };
+
+  // Helper function to get quizzes for a specific course (via lessons)
+  const getQuizzesForCourse = (courseId) => {
+    // Get lessons for this course first
+    const courseLessons = getLessonsForCourse(courseId);
+
+    // Then get quizzes associated with these lessons
+    const courseQuizzes = quizzes.filter((quiz) =>
+      courseLessons.some(
+        (lesson) => lesson.lessonId.toString() === quiz.lessonId.toString()
+      )
+    );
+
+    return courseQuizzes;
+  };
+
+  // Function to fetch completion data for a specific course
+  const fetchCompletionDataForCourse = async (courseId) => {
+    try {
+      const signer = await signerPromise;
+      const contract = new ethers.Contract(
+        EcosystemDiamondAddress,
+        Ecosystem2Facet_ABI,
+        signer
+      );
+
+      // Get lessons and quizzes for this specific course
+      const courseLessons = getLessonsForCourse(courseId);
+      const courseQuizzes = getQuizzesForCourse(courseId);
+
+      // Fetch completed lessons for this course
+      const completedLessons = await contract.getUserCompletedLessonsByCourse(
+        courseId
+      );
+
+      let completedLessonIds = new Set();
+      if (
+        !(
+          completedLessons.length === 1 &&
+          completedLessons[0].toString() === "0" &&
+          !courseLessons.some((lesson) => lesson.lessonId.toString() === "0")
+        )
+      ) {
+        const lessonIds = completedLessons
+          .flatMap((lesson) => lesson.toString().split(","))
+          .filter((id) =>
+            courseLessons.some((lesson) => lesson.lessonId.toString() === id)
+          );
+
+        completedLessonIds = new Set(lessonIds);
+      }
+
+      // Fetch completed quizzes for this course
+      const completedQuizzes = await contract.getUserCompletedQuizzesByCourse(
+        courseId
+      );
+
+      let completedQuizIds = new Set();
+      if (
+        !(
+          completedQuizzes.length === 1 &&
+          completedQuizzes[0].toString() === "0" &&
+          !courseQuizzes.some((quiz) => quiz.quizId.toString() === "0")
+        )
+      ) {
+        const quizIds = completedQuizzes
+          .flatMap((quiz) => quiz.toString().split(","))
+          .filter((id) =>
+            courseQuizzes.some((quiz) => quiz.quizId.toString() === id)
+          );
+
+        completedQuizIds = new Set(quizIds);
+      }
+
+      const result = {
+        completedLessons: completedLessonIds.size,
+        completedQuizzes: completedQuizIds.size,
+        totalLessons: courseLessons.length,
+        totalQuizzes: courseQuizzes.length,
+      };
+
+      console.log(`=== COMPLETION DATA FETCH - Course ID: ${courseId} ===`, {
+        courseLessons: courseLessons.length,
+        courseQuizzes: courseQuizzes.length,
+        completedLessonIds: Array.from(completedLessonIds),
+        completedQuizIds: Array.from(completedQuizIds),
+        result,
+      });
+
+      return result;
+    } catch (error) {
+      console.error(
+        `Error fetching completion data for course ${courseId}:`,
+        error
+      );
+      return {
+        completedLessons: 0,
+        completedQuizzes: 0,
+        totalLessons: 0,
+        totalQuizzes: 0,
+      };
+    }
+  };
+
+  // Effect to fetch chapters for all enrolled courses
+  useEffect(() => {
+    const fetchChaptersForEnrolledCourses = async () => {
+      if (enrolledCourses.length === 0) return;
+
+      // Fetch chapters for each enrolled course
+      for (const course of enrolledCourses) {
+        await fetchChapters(course.courseId);
+      }
+    };
+
+    fetchChaptersForEnrolledCourses();
+  }, [enrolledCourses, fetchChapters]);
+
+  // Effect to fetch completion data for all enrolled courses
+  useEffect(() => {
+    const fetchAllCompletionData = async () => {
+      if (enrolledCourses.length === 0 || chapters.length === 0) return;
+
+      const completionPromises = enrolledCourses.map(async (course) => {
+        const completionData = await fetchCompletionDataForCourse(
+          course.courseId
+        );
+        return {
+          courseId: course.courseId,
+          ...completionData,
+        };
+      });
+
+      try {
+        const completionResults = await Promise.all(completionPromises);
+
+        // Convert array to object for easy lookup
+        const completionDataMap = {};
+        completionResults.forEach((result) => {
+          completionDataMap[result.courseId] = result;
+        });
+
+        setCourseCompletionData(completionDataMap);
+        console.log("All course completion data:", completionDataMap);
+      } catch (error) {
+        console.error("Error fetching completion data for courses:", error);
+      }
+    };
+
+    fetchAllCompletionData();
+  }, [enrolledCourses, signerPromise, lessons, quizzes, chapters]);
 
   return (
     <div
@@ -97,6 +319,21 @@ const Dashboard = () => {
             <p className="text-sm dark:text-gray-400 text-gray-600">
               Your blockchain education journey
             </p>
+          </div>
+          <div className="flex items-center gap-4">
+            <button
+              // onClick={() => setShowSurveyModal(true)}
+              onClick={() =>
+                alert("This feature is under development. Stay tuned!")
+              }
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-cyan-900 
+                       text-white rounded-lg hover:from-cyan-900 hover:to-yellow-700 
+                       transition-all duration-300 transform hover:scale-105 shadow-lg"
+            >
+              <ClipboardList className="w-4 h-4" />
+              Take Survey
+            </button>
+            {profile.did === null && <ProfileConnection />}
           </div>
         </div>
 
@@ -142,47 +379,82 @@ const Dashboard = () => {
             My Enrolled Courses
           </h2>
           {enrolledCourses.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {enrolledCourses.map((course) => (
-                <div
-                  key={course.courseId}
-                  className="rounded-lg overflow-hidden dark:bg-gray-700 bg-gray-50 hover:shadow-xl transition-shadow duration-300"
-                >
-                  <img
-                    src="/Vision.jpg"
-                    alt={course.courseName}
-                    className="w-full h-40 object-cover"
-                  />
-                  <div className="p-4">
-                    <h3 className="font-semibold text-lg mb-2 dark:text-white text-gray-900">
-                      {course.courseName}
-                    </h3>
-                    <p className="text-sm dark:text-gray-300 text-gray-600 mb-3 line-clamp-2">
-                      {course.description}
-                    </p>
-                    <div className="flex items-center gap-2 text-sm dark:text-gray-400 text-gray-500 mb-3">
-                      <Users className="w-4 h-4" />
-                      <span>
-                        {getEnrolledStudentsCount(course.enrolledStudents)}{" "}
-                        student(s) enrolled
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 p-3">
+              {enrolledCourses.map((course) => {
+                const completionData = courseCompletionData[
+                  course.courseId
+                ] || {
+                  completedLessons: 0,
+                  completedQuizzes: 0,
+                  totalLessons: 0,
+                  totalQuizzes: 0,
+                };
+
+                // Debug logging for each course
+                console.log(
+                  `=== DASHBOARD PROGRESS DEBUG - Course: ${course.courseName} ===`,
+                  {
+                    courseId: course.courseId,
+                    completionData,
+                    totalItems:
+                      completionData.totalLessons + completionData.totalQuizzes,
+                    completedItems:
+                      completionData.completedLessons +
+                      completionData.completedQuizzes,
+                    progressPercentage:
+                      ((completionData.completedLessons +
+                        completionData.completedQuizzes) /
+                        (completionData.totalLessons +
+                          completionData.totalQuizzes)) *
+                        100 || 0,
+                  }
+                );
+
+                return (
+                  <div
+                    key={course.courseId}
+                    className="rounded-lg overflow-hidden dark:bg-gray-700 bg-gray-50 hover:shadow-xl transition-shadow duration-300"
+                  >
+                    <img
+                      src="/Vision.jpg"
+                      alt={course.courseName}
+                      className="w-full h-40 object-cover"
+                    />
+                    <div className="p-4">
+                      <h3 className="font-semibold text-lg mb-2 dark:text-white text-gray-900">
+                        {course.courseName}
+                      </h3>
+                      <p className="text-sm dark:text-gray-300 text-gray-600 mb-3 line-clamp-2">
+                        {course.description}
+                      </p>
+                      <div className="flex items-center gap-2 text-sm dark:text-gray-400 text-gray-500 mb-3">
+                        <Users className="w-4 h-4" />
+                        <span>
+                          {getEnrolledStudentsCount(course.enrolledStudents)}{" "}
+                          student(s) enrolled
+                        </span>
+                      </div>
+                      <span className="mr-2 flex items-center dark:text-gray-400 text-gray-500">
+                        <Book className="inline-block w-4 h-4 mr-1 -mt-1" />
+                        <span className="truncate w-[300px] overflow-hidden text-ellipsis  whitespace-nowrap">
+                          Course Creator {course.creator}
+                        </span>
                       </span>
-                    </div>
-                    <span className="mr-2 flex items-center dark:text-gray-400 text-gray-500">
-                      <Book className="inline-block w-4 h-4 mr-1 -mt-1" />
-                      <span className="truncate w-[300px] overflow-hidden text-ellipsis  whitespace-nowrap">
-                        Course Creator {course.creator}
-                      </span>
-                    </span>
-                    {/* You can add progress tracking here once you have that data */}
-                    <div className="w-full bg-gray-200 dark:bg-gray-600 h-2 rounded-full mt-2">
-                      <div
-                        className="bg-yellow-500 h-2 rounded-full"
-                        style={{ width: `${41}%` }}
-                      ></div>
+
+                      <ProgressBar
+                        completedLessons={
+                          completionData.completedLessons +
+                          completionData.completedQuizzes
+                        }
+                        totalLessons={
+                          completionData.totalLessons +
+                          completionData.totalQuizzes
+                        }
+                      />
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12 dark:bg-gray-700 bg-gray-50 rounded-lg">

@@ -21,6 +21,7 @@ import {
   BookOpen,
   Book,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import ReviewModal from "../components/ReviewModal";
 import { useUser } from "../contexts/userContext";
@@ -33,6 +34,8 @@ import { ethers } from "ethers";
 import { useEthersSigner } from "../components/useClientSigner";
 import Certificate from "../components/Certificate";
 import { useCertificates } from "../contexts/certificatesContext";
+import { useProfile } from "../contexts/ProfileContext";
+import { CSSTransition } from "react-transition-group";
 
 const EcosystemDiamondAddress = import.meta.env
   .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
@@ -773,6 +776,12 @@ const CourseDetails = memo(({ courseId }) => {
   const [showCertificate, setShowCertificate] = useState(false);
   const [certificateData, setCertificateData] = useState(null);
   const { certificates } = useCertificates();
+  const { profile } = useProfile();
+  const [hasCertificate, setHasCertificate] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [selectedCertificate, setSelectedCertificate] = useState(null);
+  const [markingAsReadIds, setMarkingAsReadIds] = useState(new Set());
 
   // Update both fetch functions to filter out invalid IDs
 
@@ -857,6 +866,10 @@ const CourseDetails = memo(({ courseId }) => {
   }, [courseId, signerPromise, quizzes]);
 
   const markAsRead = async (courseId, chapterId, lessonId) => {
+    // Add lesson to loading state
+    const lessonIdStr = lessonId.toString();
+    setMarkingAsReadIds((prev) => new Set([...prev, lessonIdStr]));
+
     try {
       // Convert parameters to BigInts for ethers v6
       const courseIdBN = BigInt(courseId);
@@ -898,7 +911,7 @@ const CourseDetails = memo(({ courseId }) => {
         console.log("Transaction confirmed:", receipt);
 
         // Update local state only after confirmation
-        setCompletedLessonIds((prev) => new Set([...prev, lessonId]));
+        setCompletedLessonIds((prev) => new Set([...prev, lessonIdStr]));
       } catch (contractError) {
         console.error("Contract interaction failed:", {
           error: contractError,
@@ -916,7 +929,75 @@ const CourseDetails = memo(({ courseId }) => {
     } catch (error) {
       console.error("Error in markAsRead:", error);
       throw error;
+    } finally {
+      // Remove lesson from loading state
+      setMarkingAsReadIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(lessonIdStr);
+        return newSet;
+      });
     }
+  };
+
+  const isUserEnrolled = (enrolledStudents, userAddress) => {
+    if (!enrolledStudents || !userAddress) {
+      console.log(
+        "Missing data - enrolledStudents:",
+        enrolledStudents,
+        "userAddress:",
+        userAddress
+      );
+      return false;
+    }
+
+    // If it's an array, check if it includes the address
+    if (Array.isArray(enrolledStudents)) {
+      const isEnrolled = enrolledStudents.some(
+        (addr) => addr.toLowerCase() === userAddress.toLowerCase()
+      );
+      console.log(
+        "Array check - enrolledStudents:",
+        enrolledStudents,
+        "userAddress:",
+        userAddress,
+        "isEnrolled:",
+        isEnrolled
+      );
+      return isEnrolled;
+    }
+
+    // Convert to string and check
+    const studentsStr = String(enrolledStudents);
+
+    // If it's a single address, check if it matches
+    if (studentsStr.startsWith("0x") && !studentsStr.includes(",")) {
+      const isEnrolled =
+        studentsStr.toLowerCase() === userAddress.toLowerCase();
+      console.log(
+        "Single address check - studentsStr:",
+        studentsStr,
+        "userAddress:",
+        userAddress,
+        "isEnrolled:",
+        isEnrolled
+      );
+      return isEnrolled;
+    }
+
+    // If multiple addresses, split and check
+    const addressList = studentsStr
+      .split(",")
+      .map((addr) => addr.trim().toLowerCase());
+    const isEnrolled = addressList.includes(userAddress.toLowerCase());
+    console.log(
+      "Multiple addresses check - addressList:",
+      addressList,
+      "userAddress:",
+      userAddress,
+      "isEnrolled:",
+      isEnrolled
+    );
+    return isEnrolled;
   };
 
   // Use refs to store previous values
@@ -929,26 +1010,37 @@ const CourseDetails = memo(({ courseId }) => {
     [courses, courseId]
   );
 
-  useEffect(() => {
-    const hasCertificate = certificates.some(
-      (cert) => cert.courseName === currentCourse.courseName
-    );
-    if (!hasCertificate) {
-      setShowCongratsPopup(true);
-    }
-  }, [certificates, currentCourse.courseName]);
-
   // Memoize filtered chapters
-  const filteredChapters = useMemo(
-    () => chapters.filter((chapter) => chapter.courseID === courseId),
-    [chapters, courseId]
-  );
+  const filteredChapters = useMemo(() => {
+    const filtered = chapters.filter(
+      (chapter) => chapter.courseId?.toString() === courseId?.toString()
+    );
+
+    console.log("=== CHAPTER FILTERING DEBUG ===", {
+      courseId,
+      totalChapters: chapters.length,
+      filteredChapters: filtered.length,
+      chapters: chapters.map((ch) => ({
+        chapterId: ch.chapterId,
+        courseId: ch.courseId,
+        chapterName: ch.chapterName,
+      })),
+      filtered: filtered.map((ch) => ({
+        chapterId: ch.chapterId,
+        courseId: ch.courseId,
+        chapterName: ch.chapterName,
+      })),
+    });
+
+    return filtered;
+  }, [chapters, courseId]);
 
   // Update totalLessons calculation
   const totalLessons = useMemo(() => {
     return lessons.filter((lesson) =>
       filteredChapters.some(
-        (chapter) => chapter.chapterId === lesson.chapterId.toString()
+        (chapter) =>
+          chapter.chapterId?.toString() === lesson.chapterId?.toString()
       )
     ).length;
   }, [lessons, filteredChapters]);
@@ -959,7 +1051,8 @@ const CourseDetails = memo(({ courseId }) => {
     const lessonIds = lessons
       .filter((lesson) =>
         filteredChapters.some(
-          (chapter) => chapter.chapterId === lesson.chapterId.toString()
+          (chapter) =>
+            chapter.chapterId?.toString() === lesson.chapterId?.toString()
         )
       )
       .map((lesson) => lesson.lessonId.toString());
@@ -972,13 +1065,40 @@ const CourseDetails = memo(({ courseId }) => {
     // console.log("Total quizzes:", totalQuizzes2);
   }, [quizzes, lessons, filteredChapters]);
 
+  useEffect(() => {
+    const hasCertificate = certificates.some(
+      (cert) =>
+        cert.courseId === currentCourse.courseId.toString() &&
+        cert.owner.toLowerCase() === address.toLowerCase()
+    );
+
+    console.log("Checking for certificate:", hasCertificate);
+
+    if (hasCertificate) {
+      setShowCongratsPopup(false);
+      setHasCertificate(true);
+      // alert("You have already claimed a certificate for this course.");
+    } else {
+      setHasCertificate(false);
+      // Don't automatically show popup here - only show when course is completed
+    }
+  }, [certificates, currentCourse.courseId, address]);
+
   // Fetch chapters only when courseId changes or when chapters are empty
   useEffect(() => {
     const shouldFetchChapters =
       courseId &&
       (prevCourseIdRef.current !== courseId || chapters.length === 0);
 
+    console.log("=== CHAPTER FETCH DEBUG ===", {
+      courseId,
+      shouldFetchChapters,
+      chaptersLength: chapters.length,
+      prevCourseId: prevCourseIdRef.current,
+    });
+
     if (shouldFetchChapters) {
+      console.log("Fetching chapters for courseId:", courseId);
       fetchChapters(courseId);
       prevCourseIdRef.current = courseId;
     }
@@ -986,28 +1106,17 @@ const CourseDetails = memo(({ courseId }) => {
 
   // Update chapters only when the chapters array actually changes
   useEffect(() => {
-    if (chapters !== prevChaptersRef.current) {
-      const formattedChapters = chapters.map((chapter) => ({
-        courseID: chapter.courseId.toString(),
-        chapterId: chapter.chapterId.toString(),
-        courseId: chapter.courseId.toString(),
-        chapterName: chapter.chapterName,
-      }));
-
-      // Only update the state if the formatted chapters are different
-      if (JSON.stringify(formattedChapters) !== JSON.stringify(chapters)) {
-        setChapters(formattedChapters);
-        console.log("Formatted chapters:", formattedChapters);
-      }
+    if (chapters !== prevChaptersRef.current && chapters.length > 0) {
+      console.log("Raw chapters received:", chapters);
 
       // Set first chapter as active only if there's no active chapter
-      if (formattedChapters.length > 0 && !activeChapterId) {
-        setActiveChapterId(formattedChapters[0].chapterId);
+      if (chapters.length > 0 && !activeChapterId) {
+        setActiveChapterId(chapters[0].chapterId?.toString());
       }
 
       prevChaptersRef.current = chapters;
     }
-  }, [chapters, setChapters, activeChapterId]);
+  }, [chapters, activeChapterId]);
 
   // Memoize lesson filtering function
   const getLessonsForChapter = useCallback(
@@ -1050,6 +1159,18 @@ const CourseDetails = memo(({ courseId }) => {
       ratings.engagementAndMotivation
     );
   }, []);
+
+  const handleCertificateClick = (cert) => {
+    setLoading(true);
+    setSelectedCertificate(cert);
+    setShowPopup(true);
+    setLoading(false);
+  };
+
+  const handleCloseCertPopup = () => {
+    setShowPopup(false);
+    setTimeout(() => setSelectedCertificate(null), 300); // Delay unmounting to allow transition
+  };
 
   // Memoize chapter content rendering
   const renderChapterContent = useCallback(
@@ -1104,17 +1225,34 @@ const CourseDetails = memo(({ courseId }) => {
     ]
   );
 
-  //issueCertificate section
+  //issueCertificate section - only show congratulations popup when course is 100% complete AND user doesn't have certificate
   useEffect(() => {
-    if (
+    const isFullyCompleted =
       completedLessonIds.size + completedQuizIds.size !== 0 &&
       totalLessons + totalQuizzes !== 0 &&
       completedLessonIds.size + completedQuizIds.size ===
-        totalLessons + totalQuizzes
-    ) {
+        totalLessons + totalQuizzes;
+
+    console.log("=== CERTIFICATE POPUP DEBUG ===", {
+      completedItems: completedLessonIds.size + completedQuizIds.size,
+      totalItems: totalLessons + totalQuizzes,
+      isFullyCompleted,
+      hasCertificate,
+      shouldShowPopup: isFullyCompleted && !hasCertificate,
+    });
+
+    if (isFullyCompleted && !hasCertificate) {
       setShowCongratsPopup(true);
+    } else {
+      setShowCongratsPopup(false);
     }
-  }, [completedLessonIds, completedQuizIds, totalLessons, totalQuizzes]);
+  }, [
+    completedLessonIds,
+    completedQuizIds,
+    totalLessons,
+    totalQuizzes,
+    hasCertificate,
+  ]);
 
   const handleClosePopup = () => {
     setShowCongratsPopup(false);
@@ -1128,9 +1266,22 @@ const CourseDetails = memo(({ courseId }) => {
         throw new Error("No signer available");
       }
 
+      // Check if profile is missing
+      if (!profile || profile.firstName === null) {
+        alert("Profile not found. Please connect your profile first.");
+        return;
+      }
+
+      // Set learner name from profile
+      const fullName = `${profile.firstName} ${profile.secondName}`;
+      setLearnerName(fullName);
+
+      // Optional: update learnerName local variable directly if needed
+      const learner = fullName;
+
       // Ensure learner name is provided
-      if (!learnerName.trim()) {
-        alert("Please enter your name for the certificate");
+      if (!learner.trim()) {
+        alert("Profile not found. Please connect your profile first.");
         return;
       }
 
@@ -1140,13 +1291,12 @@ const CourseDetails = memo(({ courseId }) => {
         signer
       );
 
-      const learner = learnerName;
       const cert_issuer = "ABYA UNIVERSITY";
       const issue_date = new Date().toISOString();
 
       // Create certificate data object
       const newCertificateData = {
-        learner: learnerName,
+        learner,
         courseName: currentCourse.courseName,
         issuer: cert_issuer,
         issueDate: issue_date,
@@ -1209,7 +1359,9 @@ const CourseDetails = memo(({ courseId }) => {
 
             <div className="space-y-8">
               {filteredChapters.map((chapter, chapterIndex) => {
-                if (chapter.chapterId === activeChapterId) {
+                if (
+                  chapter.chapterId?.toString() === activeChapterId?.toString()
+                ) {
                   return (
                     <div key={chapter.chapterId} className="p-6">
                       <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
@@ -1221,7 +1373,8 @@ const CourseDetails = memo(({ courseId }) => {
                         {lessons
                           .filter(
                             (lesson) =>
-                              lesson.chapterId.toString() === chapter.chapterId
+                              lesson.chapterId?.toString() ===
+                              chapter.chapterId?.toString()
                           )
                           .map((lesson) => {
                             const lessonQuiz = quizzes.find(
@@ -1268,50 +1421,80 @@ const CourseDetails = memo(({ courseId }) => {
                                 )}
 
                                 {/* add a mark as read btn */}
-                                {role === "USER" ? (
-                                  <div className="flex justify-between items-center">
-                                    <button
-                                      className={`bg-yellow-500 text-gray-900 p-2 my-3 rounded-lg font-normal ${
-                                        completedLessonIds.has(
-                                          lesson.lessonId.toString()
-                                        ) // Ensure lessonId is a string
-                                          ? "opacity-50 cursor-not-allowed"
-                                          : "hover:bg-yellow-600"
-                                      }`}
-                                      onClick={async () => {
-                                        if (
-                                          !completedLessonIds.has(
-                                            lesson.lessonId.toString()
-                                          )
-                                        ) {
-                                          try {
-                                            await markAsRead(
-                                              currentCourse.courseId,
-                                              chapter.chapterId,
-                                              lesson.lessonId
-                                            );
-                                            // Show success message
-                                          } catch (error) {
-                                            // Show error message to user
-                                            console.error(
-                                              "Failed to mark lesson as read:",
-                                              error
-                                            );
+                                {currentCourse.approved && address && (
+                                  <>
+                                    {(() => {
+                                      const userEnrolled = isUserEnrolled(
+                                        currentCourse.enrolledStudents,
+                                        address
+                                      );
+                                      return userEnrolled;
+                                    })() ? (
+                                      <div className="flex justify-between items-center">
+                                        <button
+                                          className={`bg-yellow-500 text-gray-900 p-2 my-3 rounded-lg font-normal flex items-center gap-2 ${
+                                            completedLessonIds.has(
+                                              lesson.lessonId.toString()
+                                            ) ||
+                                            markingAsReadIds.has(
+                                              lesson.lessonId.toString()
+                                            ) // Ensure lessonId is a string
+                                              ? "opacity-50 cursor-not-allowed"
+                                              : "hover:bg-yellow-600"
+                                          }`}
+                                          onClick={async () => {
+                                            if (
+                                              !completedLessonIds.has(
+                                                lesson.lessonId.toString()
+                                              ) &&
+                                              !markingAsReadIds.has(
+                                                lesson.lessonId.toString()
+                                              )
+                                            ) {
+                                              try {
+                                                await markAsRead(
+                                                  currentCourse.courseId,
+                                                  chapter.chapterId,
+                                                  lesson.lessonId
+                                                );
+                                                // Show success message
+                                              } catch (error) {
+                                                // Show error message to user
+                                                console.error(
+                                                  "Failed to mark lesson as read:",
+                                                  error
+                                                );
+                                              }
+                                            }
+                                          }}
+                                          disabled={
+                                            completedLessonIds.has(
+                                              lesson.lessonId.toString()
+                                            ) ||
+                                            markingAsReadIds.has(
+                                              lesson.lessonId.toString()
+                                            )
                                           }
-                                        }
-                                      }}
-                                      disabled={completedLessonIds.has(
-                                        lesson.lessonId.toString()
-                                      )}
-                                    >
-                                      {completedLessonIds.has(
-                                        lesson.lessonId.toString()
-                                      )
-                                        ? "Completed"
-                                        : "Mark as Read"}
-                                    </button>
-                                  </div>
-                                ) : null}
+                                        >
+                                          {markingAsReadIds.has(
+                                            lesson.lessonId.toString()
+                                          ) ? (
+                                            <>
+                                              <Loader2 className="w-4 h-4 animate-spin" />
+                                              Marking...
+                                            </>
+                                          ) : completedLessonIds.has(
+                                              lesson.lessonId.toString()
+                                            ) ? (
+                                            "Completed"
+                                          ) : (
+                                            "Mark as Read"
+                                          )}
+                                        </button>
+                                      </div>
+                                    ) : null}
+                                  </>
+                                )}
 
                                 {lessonQuiz && (
                                   <div className="mt-6 p-6 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg dark:text-gray-300">
@@ -1349,118 +1532,488 @@ const CourseDetails = memo(({ courseId }) => {
                     </div>
                   );
                 }
+                return null;
               })}
             </div>
           </div>
 
           {/* Right Sidebar Navigation (20%) */}
-          <div className="w-[20%] bg-white dark:bg-gray-800 p-6 rounded-lg h-fit sticky top-[100px]">
-            <ProgressBar
-              completedLessons={completedLessonIds.size + completedQuizIds.size}
-              totalLessons={totalLessons + totalQuizzes}
-            />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 pt-2">
-              Course Navigation
-            </h3>
-            <div className="space-y-2">
-              {filteredChapters.map((chapter, index) => (
-                <div
-                  key={chapter.chapterId}
-                  onClick={() => setActiveChapterId(chapter.chapterId)}
-                  className={`p-3 rounded-lg cursor-pointer transition-all duration-200 flex items-center gap-2 ${
-                    activeChapterId === chapter.chapterId
-                      ? "bg-gradient-to-r from-yellow-500/20 to-green-500/20 dark:text-white"
-                      : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                  }`}
-                >
-                  <Book className="w-4 h-4" />
-                  <span className="text-sm">
-                    Module {index + 1}: {chapter.chapterName}
-                  </span>
-                  {activeChapterId === chapter.chapterId && (
-                    <CheckCircle2 className="w-4 h-4 ml-auto text-yellow-500" />
+          <div className="w-[20%] bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-fit sticky top-[100px] overflow-hidden">
+            {/* Certificate Status Section */}
+            {certificates.some(
+              (cert) =>
+                cert.courseId === currentCourse.courseId.toString() &&
+                cert.owner.toLowerCase() === address.toLowerCase()
+            ) && (
+              <div className="relative bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 dark:from-emerald-900/30 dark:via-green-900/20 dark:to-teal-900/20 border-b border-emerald-200 dark:border-emerald-700/50">
+                {/* Decorative background pattern */}
+                <div className="absolute inset-0 opacity-10 dark:opacity-5">
+                  <svg
+                    className="w-full h-full"
+                    viewBox="0 0 100 100"
+                    fill="none"
+                  >
+                    <defs>
+                      <pattern
+                        id="certificate-pattern"
+                        x="0"
+                        y="0"
+                        width="20"
+                        height="20"
+                        patternUnits="userSpaceOnUse"
+                      >
+                        <circle
+                          cx="10"
+                          cy="10"
+                          r="1"
+                          fill="currentColor"
+                          className="text-emerald-400"
+                        />
+                      </pattern>
+                    </defs>
+                    <rect
+                      width="100"
+                      height="100"
+                      fill="url(#certificate-pattern)"
+                    />
+                  </svg>
+                </div>
+
+                <div className="relative p-4">
+                  <div className="flex items-start gap-3">
+                    {/* Certificate Icon */}
+                    <div className="flex-shrink-0 bg-gradient-to-br from-emerald-500 to-green-600 p-2 rounded-lg shadow-md">
+                      <svg
+                        className="w-5 h-5 text-white"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    </div>
+
+                    {/* Certificate Status Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                          Certificate Earned
+                        </h4>
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                          <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                            CLAIMED
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">
+                        Congratulations! You've successfully completed this
+                        course and earned your certificate.
+                      </p>
+
+                      {/* View Certificate Button */}
+                      <button
+                        className="mt-3 w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-emerald-700 dark:text-emerald-300 text-xs font-medium py-2 px-3 rounded-lg border border-emerald-200 dark:border-emerald-600 transition-all duration-200 hover:shadow-sm flex items-center justify-center gap-2"
+                        onClick={() => {
+                          // Find the certificate for this course and user
+                          const userCertificate = certificates.find(
+                            (cert) =>
+                              cert.courseId ===
+                                currentCourse.courseId.toString() &&
+                              cert.owner.toLowerCase() === address.toLowerCase()
+                          );
+
+                          if (userCertificate) {
+                            handleCertificateClick(userCertificate);
+                          }
+                        }}
+                      >
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
+                        </svg>
+                        View Certificate
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Certificate Popup */}
+            <CSSTransition
+              in={showPopup}
+              timeout={300}
+              classNames="popup"
+              unmountOnExit
+            >
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center overflow-auto"
+                style={{ backgroundColor: "rgba(0, 0, 0, 0.1)" }}
+              >
+                <div className="relative bg-transparent rounded-lg max-w-6xl w-full max-h-[87vh] shadow-lg">
+                  <button
+                    onClick={handleCloseCertPopup}
+                    className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10 bg-white rounded-full p-1"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+
+                  {loading ? (
+                    <div className="flex justify-center items-center h-full">
+                      <div className="loader"></div>
+                    </div>
+                  ) : (
+                    <Certificate certificateData={selectedCertificate} />
                   )}
                 </div>
-              ))}
+              </div>
+            </CSSTransition>
+
+            {/* Main Content Area */}
+            <div className="p-6">
+              {/* Progress Section */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Course Progress
+                  </h3>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
+                    {Math.round(
+                      ((completedLessonIds.size + completedQuizIds.size) /
+                        (totalLessons + totalQuizzes)) *
+                        100
+                    )}
+                    %
+                  </span>
+                </div>
+                <ProgressBar
+                  completedLessons={
+                    completedLessonIds.size + completedQuizIds.size
+                  }
+                  totalLessons={totalLessons + totalQuizzes}
+                />
+              </div>
+
+              {/* Navigation Section */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                  <svg
+                    className="w-4 h-4 text-gray-500 dark:text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                    />
+                  </svg>
+                  Course Modules
+                </h3>
+
+                <div className="space-y-1">
+                  {filteredChapters.map((chapter, index) => {
+                    const isActive =
+                      activeChapterId?.toString() ===
+                      chapter.chapterId?.toString();
+                    const isCompleted =
+                      completedLessonIds.has(chapter.chapterId?.toString()) ||
+                      completedQuizIds.has(chapter.chapterId?.toString());
+
+                    return (
+                      <div
+                        key={chapter.chapterId}
+                        onClick={() =>
+                          setActiveChapterId(chapter.chapterId?.toString())
+                        }
+                        className={`group relative p-3 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-sm ${
+                          isActive
+                            ? "bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border border-yellow-200 dark:border-yellow-700/50 shadow-sm"
+                            : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          {/* Module Icon */}
+                          <div
+                            className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-semibold transition-colors ${
+                              isActive
+                                ? "bg-gradient-to-br from-yellow-400 to-amber-500 text-white shadow-sm"
+                                : isCompleted
+                                ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                                : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                            }`}
+                          >
+                            {isCompleted ? (
+                              <svg
+                                className="w-4 h-4"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            ) : (
+                              index + 1
+                            )}
+                          </div>
+
+                          {/* Module Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`text-xs font-medium truncate ${
+                                  isActive
+                                    ? "text-yellow-800 dark:text-yellow-200"
+                                    : "text-gray-700 dark:text-gray-300"
+                                }`}
+                              >
+                                {chapter.chapterName}
+                              </span>
+                              {isActive && (
+                                <div className="flex-shrink-0 w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                              Module {index + 1}
+                            </p>
+                          </div>
+
+                          {/* Status Indicator */}
+                          {isCompleted && !isActive && (
+                            <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                          )}
+                        </div>
+
+                        {/* Active indicator line */}
+                        {isActive && (
+                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-yellow-400 to-amber-500 rounded-r-full"></div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </div>
-        {/* {role === "Reviewer" && !currentCourse.approved && (
-          <button
-            onClick={() => {
-              // setCourseId(currentCourse.courseId);
-              setIsReviewModalOpen(true);
-            }}
-            className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg"
-          >
-            Review Course
-          </button>
-        )} */}
-
-        <ReviewModal
-          isOpen={isReviewModalOpen}
-          onClose={() => setIsReviewModalOpen(false)}
-          onSubmit={handleSubmitReview}
-          courseId={courseId}
-        />
       </div>
 
       {/* i want a show congratulation popup when user complete all the lessons */}
-      {showCongratsPopup && (
+      {!hasCertificate && showCongratsPopup && (
         <div
           id="popup"
-          className="absolute z-50 inset-0 items-center justify-center bg-black bg-opacity-40 overflow-auto"
+          className="fixed z-50 inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn"
         >
-          <div
-            className="relative bg-cyan-950 text-white lg:w-[30%] w-[380px] h-[400px] lg:h-[40%] mt-[200px] rounded-lg p-4 mx-auto my-auto lg:flex lg:items-center lg:justify-center flex-col"
-            style={{
-              background: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('/congratulations.jpg')`,
-            }}
-          >
-            <div className="flex flex-col gap-4 w-[90%]">
-              <h2 className="text-2xl font-bold mb-4 flex mx-auto justify-center items-center text-white">
-                Congratulations!
-              </h2>
-              <p className="text-center">
-                You have successfully completed the{" "}
-                <span className="text-yellow-400">
-                  {currentCourse?.courseName}
-                </span>{" "}
-                course.
-              </p>
-              {/* //input field to enter name */}
-              <input
-                name="learner"
-                id="learner"
-                onChange={(e) => setLearnerName(e.target.value)}
-                value={learnerName}
-                className="w-[90%] p-2 text-gray-200 bg-transparent shadow-md shadow-white text-lg items-center mx-auto justify-center mb-4"
-                placeholder="Enter your official names.."
-              />
-              <p>
-                Click the "Generate Certificate" button to access your
-                Certificate.
-              </p>
+          <div className="relative bg-white dark:bg-gray-800 max-w-lg w-full rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden transform animate-scaleIn">
+            {/* Decorative Header Background */}
+            <div
+              className="relative h-32 bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600"
+              style={{
+                background: `linear-gradient(135deg, rgba(251, 191, 36, 0.95), rgba(245, 158, 11, 0.95)), url('/congratulations.jpg')`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/20 to-yellow-600/40"></div>
+
+              {/* Celebration Elements */}
+              <div className="absolute top-4 left-4 text-yellow-200 animate-bounce">
+                <svg
+                  className="w-6 h-6"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+              </div>
+              <div className="absolute top-6 right-6 text-yellow-200 animate-pulse">
+                <svg
+                  className="w-8 h-8"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+
+              {/* Trophy Icon */}
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2">
+                <div className="bg-white dark:bg-gray-800 p-4 rounded-full shadow-lg border-4 border-yellow-400">
+                  <svg
+                    className="w-8 h-8 text-yellow-500"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                </div>
+              </div>
             </div>
-            <div className="flex mx-auto space-x-2 mt-[90px] items-center justify-center">
-              <button
-                onClick={handleClaimCertificate}
-                id="generateCertificate"
-                class="bg-yellow-500 text-white rounded-lg px-4 py-2 mt-4 hover:bg-yellow-400"
-              >
-                Claim Certificate
-              </button>
-              <button
-                onClick={handleClosePopup}
-                id="closePopup"
-                class="bg-yellow-500 text-white rounded-lg px-4 py-2 mt-4 hover:bg-yellow-400"
-              >
-                Close
-              </button>
+
+            {/* Content */}
+            <div className="pt-12 pb-8 px-8">
+              <div className="text-center space-y-6">
+                {/* Main Heading */}
+                <div>
+                  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                    🎉 Congratulations!
+                  </h2>
+                  <div className="w-16 h-1 bg-gradient-to-r from-yellow-400 to-yellow-600 mx-auto rounded-full"></div>
+                </div>
+
+                {/* Success Message */}
+                <div className="space-y-4">
+                  <p className="text-lg text-gray-700 dark:text-gray-300 leading-relaxed">
+                    You have successfully completed the{" "}
+                    <span className="font-semibold text-yellow-600 dark:text-yellow-400 px-2 py-1 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg">
+                      {currentCourse?.courseName}
+                    </span>{" "}
+                    course.
+                  </p>
+
+                  {/* Certificate Info */}
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-start space-x-3">
+                      <div className="bg-blue-500 p-1 rounded-full flex-shrink-0 mt-0.5">
+                        <svg
+                          className="w-4 h-4 text-white"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                          Certificate Information
+                        </p>
+                        <p className="text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
+                          Certificate will be issued to:
+                          <span className="font-semibold text-blue-900 dark:text-blue-100 ml-1">
+                            {profile?.firstName} {profile?.secondName}
+                          </span>
+                        </p>
+                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                          If this name is incorrect, please update your profile
+                          in Settings before claiming your certificate.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-gray-600 dark:text-gray-400">
+                    Click the "Claim Certificate" button to generate and
+                    download your certificate.
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3 mt-8">
+                <button
+                  onClick={handleClaimCertificate}
+                  id="generateCertificate"
+                  className="flex-1 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center justify-center space-x-2"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  <span>Claim Certificate</span>
+                </button>
+
+                <button
+                  onClick={handleClosePopup}
+                  id="closePopup"
+                  className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium py-3 px-6 rounded-xl transition-all duration-200 border border-gray-300 dark:border-gray-600"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.9) translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+
+        .animate-scaleIn {
+          animation: scaleIn 0.4s ease-out;
+        }
+      `}</style>
 
       {showCertificate && certificateData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 overflow-auto">
