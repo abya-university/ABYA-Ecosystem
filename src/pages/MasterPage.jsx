@@ -47,7 +47,7 @@ const MasterPage = () => {
 
     switch (activeSection) {
       case "dashboard":
-        return <Dashboard />;
+        return <Dashboard onCourseSelect={onCourseSelect} />;
       case "create-course":
         return <CourseCreationPipeline />;
       case "achievements":
