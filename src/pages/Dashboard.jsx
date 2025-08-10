@@ -435,17 +435,25 @@ const Dashboard = ({ onCourseSelect }) => {
                 return (
                   <div
                     key={course.courseId}
-                    className="rounded-lg overflow-hidden dark:bg-gray-700 bg-gray-50 hover:shadow-xl shadow-md dark:hover:shadow-sm dark:hover:shadow-white transition-shadow duration-300"
+                    className="rounded-lg overflow-hidden dark:bg-gray-700 bg-gray-50 hover:shadow-xl shadow-md dark:hover:shadow-sm dark:hover:shadow-white transition-shadow duration-300 relative"
                   >
-                    <img
-                      src="/Vision.jpg"
-                      alt={course.courseName}
-                      className="w-full h-40 object-cover"
-                    />
                     <div className="p-4">
-                      <h3 className="font-semibold text-lg mb-2 dark:text-white text-gray-900">
-                        {course.courseName}
-                      </h3>
+                      {/* Small course image in top-right corner */}
+                      <div className="absolute top-2 right-2 w-16 h-16 rounded-lg overflow-hidden shadow-lg border-2 border-white dark:border-gray-600">
+                        <img
+                          src="/Vision.jpg"
+                          alt={course.courseName}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+
+                      {/* Course title with proper spacing */}
+                      <div className="pr-20 mb-3">
+                        <h3 className="font-semibold text-lg leading-tight dark:text-white text-gray-900 line-clamp-2">
+                          {course.courseName}
+                        </h3>
+                      </div>
+
                       <p className="text-sm dark:text-gray-300 text-gray-600 mb-3 line-clamp-2">
                         {course.description}
                       </p>
