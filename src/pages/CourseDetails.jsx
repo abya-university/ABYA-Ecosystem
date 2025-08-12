@@ -1350,12 +1350,36 @@ const CourseDetails = memo(({ courseId }) => {
         <div className="flex gap-8">
           {/* Main Content Area (80%) */}
           <div className="w-[80%] mt-4">
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              {currentCourse?.courseName}
-            </h1>
-            <p className="text-gray-700 dark:text-gray-300 mb-8">
-              {currentCourse?.description}
-            </p>
+            {/* Simple Course Header */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 mb-8 border border-gray-200 dark:border-gray-700 shadow-sm">
+              <div className="flex items-start gap-3 mb-4">
+                {/* Simple status badges */}
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                    Course
+                  </span>
+                  <span
+                    className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                      currentCourse?.approved
+                        ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        : "bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+                    }`}
+                  >
+                    {currentCourse?.approved ? "Verified" : "Pending"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Course Title */}
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-3 leading-tight">
+                {currentCourse?.courseName}
+              </h1>
+
+              {/* Course Description */}
+              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                {currentCourse?.description}
+              </p>
+            </div>
 
             <div className="space-y-8">
               {filteredChapters.map((chapter, chapterIndex) => {
