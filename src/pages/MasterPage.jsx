@@ -56,6 +56,10 @@ const MasterPage = () => {
     setActiveSection("course-details");
   };
 
+  const onNavigateToCreateCourse = () => {
+    setActiveSection("create-course");
+  };
+
   const renderContent = () => {
     if (activeSection === "course-details" && selectedCourseId) {
       return <CourseDetails courseId={selectedCourseId} />;
@@ -73,7 +77,12 @@ const MasterPage = () => {
       case "settings":
         return <SettingsPage />;
       case "courses":
-        return <CoursesPage onCourseSelect={onCourseSelect} />;
+        return (
+          <CoursesPage
+            onCourseSelect={onCourseSelect}
+            onNavigateToCreateCourse={onNavigateToCreateCourse}
+          />
+        );
       case "discussions":
         return <DiscussionsPage />;
       case "liquidity":
