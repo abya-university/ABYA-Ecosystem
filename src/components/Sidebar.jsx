@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   Home,
@@ -15,8 +15,48 @@ import {
   Wallet,
 } from "lucide-react";
 
-const Sidebar = ({ setActiveSection }) => {
+const Sidebar = ({
+  setActiveSection,
+  onSidebarToggle,
+  isExpanded: parentExpanded,
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Handle responsive behavior
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768; // md breakpoint
+      setIsMobile(mobile);
+
+      // Set default expanded state based on screen size
+      const defaultExpanded = !mobile;
+      setIsExpanded(defaultExpanded);
+
+      // Notify parent component
+      if (onSidebarToggle) {
+        onSidebarToggle(defaultExpanded);
+      }
+    };
+
+    // Set initial state
+    handleResize();
+
+    // Add event listener
+    window.addEventListener("resize", handleResize);
+
+    // Cleanup
+    return () => window.removeEventListener("resize", handleResize);
+  }, [onSidebarToggle]);
+
+  // Handle toggle
+  const handleToggle = () => {
+    const newState = !isExpanded;
+    setIsExpanded(newState);
+    if (onSidebarToggle) {
+      onSidebarToggle(newState);
+    }
+  };
 
   const sidebarItems = [
     {
@@ -102,75 +142,87 @@ const Sidebar = ({ setActiveSection }) => {
   ];
 
   return (
-    <div
-      className={`fixed left-0 top-0 h-full bg-gray-100 dark:bg-gray-900 shadow-lg shadow-white transition-all duration-300 z-40 
-      ${isExpanded ? "w-64" : "w-20"} pt-20`}
-    >
-      {/* Collapse/Expand Button */}
+    <>
+      {/* Sidebar */}
+      <div
+        className={`fixed left-0 top-0 h-full bg-gray-100 dark:bg-gray-900 shadow-lg shadow-white transition-all duration-300 z-40 
+        ${isExpanded ? "w-64" : "w-20"} pt-20 ${
+          isMobile && !isExpanded ? "-translate-x-full" : "translate-x-0"
+        }`}
+      >
+        {/* Sidebar Content */}
+        <div className="px-4 mt-4">
+          {sidebarItems.map((section, sectionIndex) => (
+            <div key={sectionIndex} className="mb-6">
+              {isExpanded && (
+                <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase">
+                  {section.section}
+                </h3>
+              )}
+              {section.items.map((item, itemIndex) => (
+                <Link
+                  key={itemIndex}
+                  to="/mainpage"
+                  className={`flex items-center py-3 px-4 rounded-lg transition-all duration-300 
+                    hover:bg-yellow-500/10 dark:hover:bg-yellow-500/20 group
+                    ${isExpanded ? "justify-start" : "justify-center"}`}
+                  onClick={() => setActiveSection(item.section)}
+                >
+                  <div
+                    className={` dark:text-white
+                    ${isExpanded ? "mr-4" : "tooltip tooltip-right"}`}
+                    data-tip={!isExpanded ? item.name : ""}
+                  >
+                    {item.icon}
+                  </div>
+                  {isExpanded && (
+                    <span className="text-gray-700 dark:text-gray-200 group-hover:text-yellow-600">
+                      {item.name}
+                    </span>
+                  )}
+                </Link>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        {/* Bottom Section - Creator Mode */}
+        {isExpanded && (
+          <div className="absolute bottom-0 left-0 right-0 p-4">
+            <div className="bg-yellow-500/10 dark:bg-yellow-500/20 rounded-lg p-4 text-center">
+              <h4 className="text-lg font-bold text-gray-800 dark:text-white mb-2">
+                Creator Mode
+              </h4>
+              <p className="text-xs text-gray-600 dark:text-gray-300 mb-4">
+                Start creating and sharing your courses
+              </p>
+              <Link
+                to="/mainpage"
+                className="w-full bg-yellow-500 text-black py-2 rounded-lg hover:bg-yellow-600 transition-colors block"
+                onClick={() => setActiveSection("create-course")}
+              >
+                Create Course
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Toggle Button - Moves with sidebar */}
       <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="top-4 left-[200px] bg-yellow-500 text-black relative p-2 rounded-full hover:bg-yellow-600 transition-colors"
+        onClick={handleToggle}
+        className={`fixed top-24 bg-yellow-500 text-black p-2 rounded-r-lg hover:bg-yellow-600 transition-all duration-300 z-50 
+          ${
+            isMobile && !isExpanded
+              ? "left-0" // Show button at screen edge when sidebar is hidden on mobile
+              : isExpanded
+              ? "left-64" // At the right edge of expanded sidebar
+              : "left-20" // At the right edge of collapsed sidebar
+          }`}
       >
         {isExpanded ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
       </button>
-
-      {/* Sidebar Content */}
-      <div className="px-4 mt-4">
-        {sidebarItems.map((section, sectionIndex) => (
-          <div key={sectionIndex} className="mb-6">
-            {isExpanded && (
-              <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase">
-                {section.section}
-              </h3>
-            )}
-            {section.items.map((item, itemIndex) => (
-              <Link
-                key={itemIndex}
-                to="/mainpage"
-                className={`flex items-center py-3 px-4 rounded-lg transition-all duration-300 
-                  hover:bg-yellow-500/10 dark:hover:bg-yellow-500/20 group
-                  ${isExpanded ? "justify-start" : "justify-center"}`}
-                onClick={() => setActiveSection(item.section)}
-              >
-                <div
-                  className={` dark:text-white
-                  ${isExpanded ? "mr-4" : "tooltip tooltip-right"}`}
-                  data-tip={!isExpanded ? item.name : ""}
-                >
-                  {item.icon}
-                </div>
-                {isExpanded && (
-                  <span className="text-gray-700 dark:text-gray-200 group-hover:text-yellow-600">
-                    {item.name}
-                  </span>
-                )}
-              </Link>
-            ))}
-          </div>
-        ))}
-      </div>
-
-      {/* Bottom Section - Creator Mode */}
-      {isExpanded && (
-        <div className="absolute bottom-0 left-0 right-0 p-4">
-          <div className="bg-yellow-500/10 dark:bg-yellow-500/20 rounded-lg p-4 text-center">
-            <h4 className="text-lg font-bold text-gray-800 dark:text-white mb-2">
-              Creator Mode
-            </h4>
-            <p className="text-xs text-gray-600 dark:text-gray-300 mb-4">
-              Start creating and sharing your courses
-            </p>
-            <Link
-              to="/mainpage"
-              className="w-full bg-yellow-500 text-black py-2 rounded-lg hover:bg-yellow-600 transition-colors block"
-              onClick={() => setActiveSection("create-course")}
-            >
-              Create Course
-            </Link>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 };
 

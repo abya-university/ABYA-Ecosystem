@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import Dashboard from "./Dashboard";
 import CourseCreationPipeline from "../components/courseCreationPipeline";
@@ -19,6 +19,22 @@ const MasterPage = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
   const [theme, setTheme] = useState("dark");
   const [selectedCourseId, setSelectedCourseId] = useState(null);
+  const [sidebarExpanded, setSidebarExpanded] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Handle responsive behavior
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      setSidebarExpanded(!mobile); // Expanded on desktop, collapsed on mobile
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // 3D Illuminated Element Component
   const IlluminatedObject = ({ position, size, color, blur }) => (
@@ -135,11 +151,24 @@ const MasterPage = () => {
         setActiveSection={setActiveSection}
         theme={theme}
         setTheme={setTheme}
+        onSidebarToggle={setSidebarExpanded}
+        isExpanded={sidebarExpanded}
       />
 
       <AbyaChatbot />
 
-      <main className="flex-grow p-6 z-10 relative">{renderContent()}</main>
+      {/* Main Content - Adjusts margin based on sidebar state */}
+      <main
+        className={`flex-grow p-6 z-10 relative transition-all duration-300 ${
+          isMobile
+            ? "ml-0" // No margin on mobile (sidebar slides over content)
+            : sidebarExpanded
+            ? "ml-64" // Full sidebar width on desktop when expanded
+            : "ml-20" // Collapsed sidebar width on desktop
+        }`}
+      >
+        {renderContent()}
+      </main>
     </div>
   );
 };
