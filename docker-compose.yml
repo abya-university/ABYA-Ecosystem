@@ -1,0 +1,170 @@
+services:
+  # ABYA Ecosystem Frontend Application
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+        APP_VERSION: ${APP_VERSION:-1.0.0}
+    container_name: abya-frontend
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    environment:
+      # Blockchain Configuration
+      - VITE_APP_RPC_URL=${VITE_APP_RPC_URL:-https://mainnet.skalenodes.com/v1/honorable-steel-rasalhague}
+      - VITE_APP_CHAIN_ID=${VITE_APP_CHAIN_ID:-1020352220}
+      
+      # Smart Contract Addresses
+      - VITE_APP_LMS_TOKEN_ADDRESS=${VITE_APP_LMS_TOKEN_ADDRESS}
+      - VITE_APP_TREASURY_ADDRESS=${VITE_APP_TREASURY_ADDRESS}
+      - VITE_APP_VESTING_ADDRESS=${VITE_APP_VESTING_ADDRESS}
+      - VITE_APP_LIQUIDITY_ADDRESS=${VITE_APP_LIQUIDITY_ADDRESS}
+      - VITE_APP_SFUEL_DISTRIBUTOR_ADDRESS=${VITE_APP_SFUEL_DISTRIBUTOR_ADDRESS}
+      - VITE_APP_COMMUNITY_ADDRESS=${VITE_APP_COMMUNITY_ADDRESS}
+      - VITE_APP_ECOSYSTEM_ADDRESS=${VITE_APP_ECOSYSTEM_ADDRESS}
+      - VITE_APP_DID_REGISTRY_ADDRESS=${VITE_APP_DID_REGISTRY_ADDRESS}
+      
+      # IPFS Configuration
+      - VITE_APP_PINATA_API_KEY=${VITE_APP_PINATA_API_KEY}
+      - VITE_APP_PINATA_SECRET_KEY=${VITE_APP_PINATA_SECRET_KEY}
+      - VITE_APP_IPFS_GATEWAY=${VITE_APP_IPFS_GATEWAY:-https://gateway.pinata.cloud/ipfs/}
+      
+      # Feature Flags
+      - VITE_APP_ENABLE_TESTNET=${VITE_APP_ENABLE_TESTNET:-false}
+      - VITE_APP_DEBUG_MODE=${VITE_APP_DEBUG_MODE:-false}
+      
+      # Security
+      - VITE_APP_ALLOWED_ORIGINS=${VITE_APP_ALLOWED_ORIGINS:-https://passport.abyauniversity.com}
+      
+      # Fallback Configuration
+      - VITE_APP_FALLBACK_RPC_URL=${VITE_APP_FALLBACK_RPC_URL}
+      - VITE_APP_BACKUP_RPC_URL=${VITE_APP_BACKUP_RPC_URL}
+      
+      # Application Configuration
+      - NODE_ENV=production
+      - APP_VERSION=${APP_VERSION:-1.0.0}
+    
+    volumes:
+      # Optional: Mount SSL certificates
+      - ./certs:/etc/nginx/certs:ro
+    
+    networks:
+      - abya-network
+    
+    restart: unless-stopped
+    
+    # Security settings
+    security_opt:
+      - no-new-privileges:true
+    read_only: false  # Simplified for better compatibility
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+      - /var/tmp:noexec,nosuid,size=50m
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - NET_BIND_SERVICE
+      - DAC_OVERRIDE
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.abya.rule=Host(`passport.abyauniversity.com`)"
+      - "traefik.http.routers.abya.tls=true"
+      - "traefik.http.routers.abya.tls.certresolver=letsencrypt"
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+        reservations:
+          cpus: '0.5'
+          memory: 128M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+
+  # Redis Cache (Optional)
+  redis:
+    image: redis:7-alpine
+    container_name: abya-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - abya-network
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.25'
+          memory: 64M
+
+  # Nginx Reverse Proxy (Optional - for load balancing multiple frontend instances)
+  nginx-proxy:
+    image: nginx:1.25-alpine
+    container_name: abya-nginx-proxy
+    ports:
+      - "${PROXY_HTTP_PORT:-80}:80"
+      - "${PROXY_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/proxy.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/proxy-default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+      - nginx_cache:/var/cache/nginx
+    networks:
+      - abya-network
+    depends_on:
+      - frontend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.25'
+          memory: 64M
+
+volumes:
+  redis_data:
+    driver: local
+  nginx_cache:
+    driver: local
+
+networks:
+  abya-network:
+    driver: bridge
+    name: abya-network
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -1,0 +1,126 @@
+# ABYA Ecosystem Network Security Configuration
+# Docker Compose override for enhanced network security
+
+version: '3.8'
+
+services:
+  frontend:
+    networks:
+      - frontend-net
+      - monitoring-net
+    # Network security settings
+    sysctls:
+      - net.core.somaxconn=1024
+      - net.ipv4.tcp_syncookies=1
+      - net.ipv4.tcp_max_syn_backlog=2048
+      - net.ipv4.tcp_synack_retries=2
+      - net.ipv4.tcp_syn_retries=5
+    # Additional security
+    ulimits:
+      nproc: 1024
+      nofile:
+        soft: 1024
+        hard: 2048
+
+  nginx-proxy:
+    networks:
+      - frontend-net
+      - external-net
+    # Rate limiting and DDoS protection
+    sysctls:
+      - net.core.somaxconn=2048
+      - net.ipv4.tcp_syncookies=1
+      - net.ipv4.tcp_max_syn_backlog=4096
+      - net.ipv4.tcp_synack_retries=2
+      - net.ipv4.tcp_syn_retries=3
+      - net.ipv4.ip_local_port_range=1024 65535
+    ulimits:
+      nproc: 2048
+      nofile:
+        soft: 2048
+        hard: 4096
+
+  redis:
+    networks:
+      - backend-net
+    # Redis security
+    sysctls:
+      - net.core.somaxconn=512
+    ulimits:
+      nproc: 512
+      nofile:
+        soft: 512
+        hard: 1024
+
+  # Fail2ban for intrusion detection
+  fail2ban:
+    image: crazymax/fail2ban:latest
+    container_name: abya-fail2ban
+    network_mode: "host"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./fail2ban:/data
+      - /var/log:/var/log:ro
+    environment:
+      - TZ=UTC
+      - F2B_LOG_LEVEL=INFO
+      - F2B_LOG_TARGET=STDOUT
+    restart: unless-stopped
+
+networks:
+  # Frontend network (DMZ)
+  frontend-net:
+    driver: bridge
+    name: abya-frontend
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.1.0/24
+          gateway: 172.20.1.1
+    driver_opts:
+      com.docker.network.bridge.name: abya-frontend
+      com.docker.network.bridge.enable_icc: "false"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.driver.mtu: 1500
+
+  # Backend network (internal services)
+  backend-net:
+    driver: bridge
+    name: abya-backend
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.2.0/24
+          gateway: 172.20.2.1
+    driver_opts:
+      com.docker.network.bridge.name: abya-backend
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+
+  # External network (internet access)
+  external-net:
+    driver: bridge
+    name: abya-external
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.3.0/24
+          gateway: 172.20.3.1
+    driver_opts:
+      com.docker.network.bridge.name: abya-external
+      com.docker.network.bridge.enable_icc: "false"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+
+  # Monitoring network
+  monitoring-net:
+    driver: bridge
+    name: abya-monitoring
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.4.0/24
+          gateway: 172.20.4.1

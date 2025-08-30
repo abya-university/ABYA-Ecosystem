@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Loader, AlertOctagonIcon } from "lucide-react";
 import { useDid } from "../contexts/DidContext";
 import { ethers } from "ethers";
-import EthereumDIDRegistryArtifact from "../artifacts/contracts/EthereumDIDRegistry.sol/EthereumDIDRegistry.json";
+import EthereumDIDRegistryArtifact from "../artifacts/contracts/EthereumDIDRegistry/EthereumDIDRegistry.sol/EthereumDIDRegistry.json";
 
 const DidDoc = () => {
   const { ethrDid } = useDid();

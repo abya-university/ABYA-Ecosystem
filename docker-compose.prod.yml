@@ -1,0 +1,32 @@
+# Digital Ocean Production Override
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+version: '3.8'
+
+services:
+  frontend:
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - VITE_APP_ALLOWED_ORIGINS=https://passport.abyauniversity.com
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
+      - ./logs:/var/log/nginx
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.abya.rule=Host(`passport.abyauniversity.com`)"
+      - "traefik.http.routers.abya.tls=true"
+      - "traefik.http.routers.abya.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.abya-secure.entrypoints=websecure"
+      - "traefik.http.routers.abya-secure.rule=Host(`passport.abyauniversity.com`)"
+      - "traefik.http.routers.abya-secure.tls=true"
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"  # Bind to localhost only for security
+
+  nginx-proxy:
+    # Disable nginx-proxy in production if using Traefik or direct SSL
+    deploy:
+      replicas: 0

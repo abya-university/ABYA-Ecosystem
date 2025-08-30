@@ -1,0 +1,81 @@
+services:
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: abya-frontend-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount source code for hot reloading
+      - .:/app
+      # Use anonymous volume for node_modules to avoid conflicts
+      - /app/node_modules
+      # Mount cache directories for better performance
+      - node_modules_cache:/app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_HOST=0.0.0.0
+      - VITE_PORT=3000
+      # Blockchain Configuration
+      - VITE_APP_RPC_URL=${VITE_APP_RPC_URL:-https://testnet.skalenodes.com/v1/juicy-low-small-testnet}
+      - VITE_APP_CHAIN_ID=${VITE_APP_CHAIN_ID:-1351057110}
+      # Smart Contract Addresses
+      - VITE_APP_LMS_TOKEN_ADDRESS=${VITE_APP_LMS_TOKEN_ADDRESS}
+      - VITE_APP_TREASURY_ADDRESS=${VITE_APP_TREASURY_ADDRESS}
+      - VITE_APP_VESTING_ADDRESS=${VITE_APP_VESTING_ADDRESS}
+      - VITE_APP_LIQUIDITY_ADDRESS=${VITE_APP_LIQUIDITY_ADDRESS}
+      - VITE_APP_SFUEL_DISTRIBUTOR_ADDRESS=${VITE_APP_SFUEL_DISTRIBUTOR_ADDRESS}
+      - VITE_APP_COMMUNITY_ADDRESS=${VITE_APP_COMMUNITY_ADDRESS}
+      - VITE_APP_ECOSYSTEM_ADDRESS=${VITE_APP_ECOSYSTEM_ADDRESS}
+      - VITE_APP_DID_REGISTRY_ADDRESS=${VITE_APP_DID_REGISTRY_ADDRESS}
+      # IPFS Configuration
+      - VITE_APP_PINATA_API_KEY=${VITE_APP_PINATA_API_KEY}
+      - VITE_APP_PINATA_SECRET_KEY=${VITE_APP_PINATA_SECRET_KEY}
+      - VITE_APP_IPFS_GATEWAY=${VITE_APP_IPFS_GATEWAY:-https://gateway.pinata.cloud/ipfs/}
+      # Feature Flags
+      - VITE_APP_ENABLE_TESTNET=${VITE_APP_ENABLE_TESTNET:-true}
+      - VITE_APP_DEBUG_MODE=${VITE_APP_DEBUG_MODE:-true}
+      # Security
+      - VITE_APP_ALLOWED_ORIGINS=${VITE_APP_ALLOWED_ORIGINS:-http://localhost:3000}
+      # Fallback RPC endpoints
+      - VITE_APP_FALLBACK_RPC_URL=${VITE_APP_FALLBACK_RPC_URL}
+      - VITE_APP_BACKUP_RPC_URL=${VITE_APP_BACKUP_RPC_URL}
+    networks:
+      - abya-dev-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional Redis for development caching
+  redis-dev:
+    image: redis:7-alpine
+    container_name: abya-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - abya-dev-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  node_modules_cache:
+    driver: local
+  redis_dev_data:
+    driver: local
+
+networks:
+  abya-dev-network:
+    driver: bridge
+    name: abya-dev-network

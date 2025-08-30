@@ -25,6 +25,23 @@ dist-ssr
 
 node_modules
 .env
+.env.local
+.env.*.local
+
+# Production secrets (keep .env.production for deployment reference)
+# .env.production
+
+# SSL certificates and keys
+certs/*.key
+certs/*.crt
+certs/*.pem
+
+# Production logs
+logs/
+*.log
+
+# Docker volumes
+docker-volumes/
 
 # Hardhat files
 /cache
