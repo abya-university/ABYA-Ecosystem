@@ -34,7 +34,7 @@ const EcosystemDiamondAddress = import.meta.env
 const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
-const CoursesPage = ({ onCourseSelect }) => {
+const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const {
     courses,
     latestReviews,
@@ -811,7 +811,12 @@ const CoursesPage = ({ onCourseSelect }) => {
               Available Courses
             </h1>
           </div>
-          <button className="bg-yellow-500 text-black px-6 py-2 rounded-lg hover:bg-yellow-600 transition-colors">
+          <button
+            onClick={() =>
+              onNavigateToCreateCourse && onNavigateToCreateCourse()
+            }
+            className="bg-yellow-500 text-black px-6 py-2 rounded-lg hover:bg-yellow-600 transition-colors"
+          >
             Create New Course
           </button>
         </div>

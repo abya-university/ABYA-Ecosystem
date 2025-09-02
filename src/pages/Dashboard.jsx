@@ -9,6 +9,9 @@ import {
   Users,
   ClipboardList,
   X,
+  Award,
+  ExternalLink,
+  CheckCircle,
 } from "lucide-react";
 import { CourseContext } from "../contexts/courseContext";
 import { useUser } from "../contexts/userContext";
@@ -20,6 +23,7 @@ import { ChapterContext } from "../contexts/chapterContext";
 import { useEthersSigner } from "../components/useClientSigner";
 import { LessonContext } from "../contexts/lessonContext";
 import { QuizContext } from "../contexts/quizContext";
+import { useCertificates } from "../contexts/certificatesContext";
 import { ethers } from "ethers";
 import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 
@@ -27,7 +31,7 @@ const EcosystemDiamondAddress = import.meta.env
   .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
-const Dashboard = () => {
+const Dashboard = ({ onCourseSelect }) => {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const { courses } = useContext(CourseContext);
   const { role } = useUser();
@@ -37,6 +41,7 @@ const Dashboard = () => {
   const signerPromise = useEthersSigner();
   const { lessons } = useContext(LessonContext);
   const { quizzes } = useContext(QuizContext);
+  const { certificates } = useCertificates();
 
   // Store completion data for each course
   const [courseCompletionData, setCourseCompletionData] = useState({});
@@ -103,7 +108,7 @@ const Dashboard = () => {
     setIsDarkMode(!isDarkMode);
   };
 
-  // Helper function to check if user is enrolled (handles both array and string formats)
+  // Helper function to check if current user is enrolled (handles both array and string formats)
   const isUserEnrolled = (enrolledStudents, userAddress) => {
     if (!enrolledStudents || !userAddress) {
       return false;
@@ -129,6 +134,23 @@ const Dashboard = () => {
       .split(",")
       .map((addr) => addr.trim().toLowerCase());
     return addressList.includes(userAddress.toLowerCase());
+  };
+
+  // Helper function to check if user has claimed certificate for a course
+  const hasCertificateForCourse = (courseId) => {
+    return certificates.some(
+      (cert) => cert.courseId.toString() === courseId.toString()
+    );
+  };
+
+  // Helper function to navigate to course details
+  const navigateToCourseDetails = (courseId) => {
+    if (onCourseSelect) {
+      onCourseSelect(courseId);
+    } else {
+      // Fallback for direct URL navigation if onCourseSelect is not provided
+      window.location.href = `/course/${courseId}`;
+    }
   };
 
   const enrolledCourses = courses.filter((course) =>
@@ -413,17 +435,25 @@ const Dashboard = () => {
                 return (
                   <div
                     key={course.courseId}
-                    className="rounded-lg overflow-hidden dark:bg-gray-700 bg-gray-50 hover:shadow-xl transition-shadow duration-300"
+                    className="rounded-lg overflow-hidden dark:bg-gray-700 bg-gray-50 hover:shadow-xl shadow-md dark:hover:shadow-sm dark:hover:shadow-white transition-shadow duration-300 relative"
                   >
-                    <img
-                      src="/Vision.jpg"
-                      alt={course.courseName}
-                      className="w-full h-40 object-cover"
-                    />
                     <div className="p-4">
-                      <h3 className="font-semibold text-lg mb-2 dark:text-white text-gray-900">
-                        {course.courseName}
-                      </h3>
+                      {/* Small course image in top-right corner */}
+                      <div className="absolute top-2 right-2 w-16 h-16 rounded-lg overflow-hidden shadow-lg border-2 border-white dark:border-gray-600">
+                        <img
+                          src="/Vision.jpg"
+                          alt={course.courseName}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+
+                      {/* Course title with proper spacing */}
+                      <div className="pr-20 mb-3">
+                        <h3 className="font-semibold text-lg leading-tight dark:text-white text-gray-900 line-clamp-2">
+                          {course.courseName}
+                        </h3>
+                      </div>
+
                       <p className="text-sm dark:text-gray-300 text-gray-600 mb-3 line-clamp-2">
                         {course.description}
                       </p>
@@ -441,16 +471,100 @@ const Dashboard = () => {
                         </span>
                       </span>
 
-                      <ProgressBar
-                        completedLessons={
-                          completionData.completedLessons +
-                          completionData.completedQuizzes
-                        }
-                        totalLessons={
+                      {(() => {
+                        const totalItems =
                           completionData.totalLessons +
-                          completionData.totalQuizzes
+                          completionData.totalQuizzes;
+                        const completedItems =
+                          completionData.completedLessons +
+                          completionData.completedQuizzes;
+                        const progressPercentage =
+                          totalItems > 0
+                            ? (completedItems / totalItems) * 100
+                            : 0;
+                        const isCompleted = progressPercentage >= 100;
+                        const hasCertificate = hasCertificateForCourse(
+                          course.courseId
+                        );
+
+                        console.log(
+                          `Course ${course.courseId} - Progress: ${progressPercentage}%, HasCertificate: ${hasCertificate}`
+                        );
+
+                        if (isCompleted && hasCertificate) {
+                          // Course completed and certificate claimed
+                          return (
+                            <div className="space-y-2">
+                              <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg p-3 text-center">
+                                <div className="flex items-center justify-center mb-2">
+                                  <CheckCircle className="w-5 h-5 mr-2" />
+                                  <span className="text-sm font-semibold">
+                                    Course Completed!
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-center">
+                                  <Award className="w-4 h-4 mr-1" />
+                                  <span className="text-xs">
+                                    Certificate Claimed
+                                  </span>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() =>
+                                  navigateToCourseDetails(course.courseId)
+                                }
+                                className="w-full bg-gray-200 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 px-3 py-2 rounded text-sm font-medium flex items-center justify-center transition-colors"
+                              >
+                                <BookOpen className="w-4 h-4 mr-2" />
+                                View Course
+                                <ExternalLink className="w-3 h-3 ml-2" />
+                              </button>
+                            </div>
+                          );
+                        } else if (isCompleted && !hasCertificate) {
+                          // Course completed but certificate not claimed
+                          return (
+                            <div className="bg-gradient-to-r from-yellow-500 to-amber-600 text-white rounded-lg p-3 text-center">
+                              <div className="flex items-center justify-center mb-2">
+                                <Trophy className="w-5 h-5 mr-2" />
+                                <span className="text-sm font-semibold">
+                                  Ready to Claim!
+                                </span>
+                              </div>
+                              <button
+                                onClick={() =>
+                                  navigateToCourseDetails(course.courseId)
+                                }
+                                className="bg-white text-yellow-600 hover:text-yellow-700 px-3 py-1 rounded text-xs font-medium flex items-center justify-center w-full transition-colors"
+                              >
+                                <Award className="w-3 h-3 mr-1" />
+                                Claim Certificate
+                                <ExternalLink className="w-3 h-3 ml-1" />
+                              </button>
+                            </div>
+                          );
+                        } else {
+                          // Course in progress - show progress bar and continue button
+                          return (
+                            <div className="space-y-2 flex flex-col">
+                              <ProgressBar
+                                completedLessons={completedItems}
+                                totalLessons={totalItems}
+                              />
+                              <button
+                                onClick={() =>
+                                  navigateToCourseDetails(course.courseId)
+                                }
+                                className="w-full bg-yellow-500 mt-5 hover:bg-yellow-600 text-white px-3 py-2 rounded text-sm font-medium flex items-center justify-center transition-colors"
+                              >
+                                <BookOpen className="w-4 h-4 mr-2" />
+                                Continue Learning
+                                <ExternalLink className="w-3 h-3 ml-2" />
+                              </button>
+                            </div>
+                          );
                         }
-                      />
+                      })()}
                     </div>
                   </div>
                 );

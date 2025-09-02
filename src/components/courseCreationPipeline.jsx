@@ -137,7 +137,7 @@ const CourseCreationPipeline = () => {
     };
 
     return (
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="max-w-6xl mx-auto px-2 py-6">
         <h2 className="text-2xl font-bold text-yellow-500 mb-6">
           Course Basic Information
         </h2>
@@ -1255,7 +1255,7 @@ const CourseCreationPipeline = () => {
   };
 
   return (
-    <div className="w-[90%] md:w-[60%] lg:w-[50%] mx-auto p-8 bg-white dark:bg-gray-900 rounded-lg shadow-lg mt-[100px]">
+    <div className="w-[95%] md:w-[85%] lg:w-[80%] xl:w-[75%] mx-auto p-8 bg-white dark:bg-gray-900 rounded-lg shadow-lg mt-[100px]">
       <ProgressBar />
       <ToastContainer position="bottom-right" theme="colored" />
 
