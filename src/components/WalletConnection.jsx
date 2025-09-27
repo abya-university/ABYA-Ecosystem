@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDisconnect, useAccount, useBalance } from "wagmi";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+// import { ConnectButton } from "@rainbow-me/rainbowkit";
 import {
   Power,
   Wallet2Icon,
@@ -18,6 +18,7 @@ import { registerDidOnIpfs } from "../services/ipfsService";
 import { useEthersSigner } from "./useClientSigner";
 import { useDid } from "../contexts/DidContext";
 import { useProfile } from "../contexts/ProfileContext";
+import { AbyaConnectButton } from "../providers/Providers2";
 
 const WalletConnection = () => {
   const { isConnected, address } = useAccount();
@@ -32,6 +33,7 @@ const WalletConnection = () => {
   const { data: balanceData } = useBalance({ address });
   const signerPromise = useEthersSigner();
   const { clearProfile, profile } = useProfile();
+  // Remove incorrect destructuring. Import ConnectButton directly from Providers2 if needed.
 
   // Fetch DID on connect
   useEffect(() => {
@@ -103,7 +105,7 @@ const WalletConnection = () => {
     // navigate("/");
   };
 
-  if (!isConnected) return <ConnectButton />;
+  if (!isConnected) return <AbyaConnectButton />;
 
   return (
     <div className="relative">

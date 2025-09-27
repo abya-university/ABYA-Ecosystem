@@ -10,11 +10,17 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useAccount } from "wagmi";
-import { useEthersSigner } from "../useClientSigner";
 
 import CONTRACT_ABI from "../../artifacts/fake-liquidity-abis/add_swap_contract.json";
 import { useTransactionHistory } from "../../contexts/fake-liquidity-test-contexts/historyContext";
+import { client } from "../../services/client";
+import {
+  getContract,
+  prepareContractCall,
+  readContract,
+  sendTransaction,
+} from "thirdweb";
+import { defineChain } from "thirdweb/chains";
 
 const contractAbi = CONTRACT_ABI.abi;
 const usdcAbi = USDC_ABI.abi;
@@ -23,10 +29,11 @@ const abyatknAbi = ABYTKN_ABI.abi;
 const AddLiquidity = () => {
   const [error, setError] = useState(false);
   const [txHash, setTxHash] = useState("");
-  const { address, isConnected } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const signerPromise = useEthersSigner();
   const {
     refreshHistory,
     loadBalances,
@@ -86,19 +93,19 @@ const AddLiquidity = () => {
 
     setLoading(true);
     try {
-      const signer = await signerPromise;
+      const signer = await client;
       if (!signer) {
         setError("No signer available");
         setLoading(false);
         return;
       }
 
-      // Initialize the contract
-      const contract = new ethers.Contract(
-        CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
-        contractAbi,
-        signer
-      );
+      const contract = await getContract({
+        address: CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
+        abi: contractAbi,
+        signer,
+        chain: defineChain(1020352220),
+      });
 
       // Get contract token addresses
       const contractToken0Address = await contract.token0();
@@ -115,24 +122,45 @@ const AddLiquidity = () => {
         },
       });
 
-      // Get token contracts
-      const token0Contract = new ethers.Contract(
-        contractToken0Address,
-        USDC_ABI.abi, // Using as generic ERC20 ABI
-        signer
-      );
+      const token0Contract = await getContract({
+        address: contractToken0Address,
+        abi: usdcAbi,
+        signer,
+        chain: defineChain(1020352220),
+      });
 
-      const token1Contract = new ethers.Contract(
-        contractToken1Address,
-        ABYTKN_ABI.abi, // Using as generic ERC20 ABI
-        signer
-      );
+      const token1Contract = await getContract({
+        address: contractToken1Address,
+        abi: abyatknAbi,
+        signer,
+        chain: defineChain(1020352220),
+      });
 
       // Get token details
-      const token0Symbol = await token0Contract.symbol();
-      const token1Symbol = await token1Contract.symbol();
-      const token0Decimals = await token0Contract.decimals();
-      const token1Decimals = await token1Contract.decimals();
+      // const token0Symbol = await token0Contract.symbol();
+      const token0Symbol = await readContract({
+        contract: token0Contract,
+        method: "function symbol() view returns (string)",
+        params: [],
+      });
+      // const token1Symbol = await token1Contract.symbol();
+      const token1Symbol = await readContract({
+        contract: token1Contract,
+        method: "function symbol() view returns (string)",
+        params: [],
+      });
+      // const token0Decimals = await token0Contract.decimals();
+      const token0Decimals = await readContract({
+        contract: token0Contract,
+        method: "function decimals() view returns (uint8)",
+        params: [],
+      });
+      // const token1Decimals = await token1Contract.decimals();
+      const token1Decimals = await readContract({
+        contract: token1Contract,
+        method: "function decimals() view returns (uint8)",
+        params: [],
+      });
 
       console.log("Token details:", {
         token0: {
@@ -186,8 +214,18 @@ const AddLiquidity = () => {
       });
 
       // Check balances
-      const balance0 = await token0Contract.balanceOf(address);
-      const balance1 = await token1Contract.balanceOf(address);
+      // const balance0 = await token0Contract.balanceOf(address);
+      const balance0 = await readContract({
+        contract: token0Contract,
+        method: "function balanceOf(address account) view returns (uint256)",
+        params: [address],
+      });
+      // const balance1 = await token1Contract.balanceOf(address);
+      const balance1 = await readContract({
+        contract: token1Contract,
+        method: "function balanceOf(address account) view returns (uint256)",
+        params: [address],
+      });
 
       console.log("Current balances:", {
         [token0Symbol]: ethers.formatUnits(balance0, token0Decimals),
@@ -208,14 +246,19 @@ const AddLiquidity = () => {
       }
 
       // Check and approve allowances
-      const allowance0 = await token0Contract.allowance(
-        address,
-        CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT
-      );
-      const allowance1 = await token1Contract.allowance(
-        address,
-        CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT
-      );
+      const allowance0 = await readContract({
+        contract: token0Contract,
+        method:
+          "function allowance(address owner, address spender) view returns (uint256)",
+        params: [address, CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT],
+      });
+
+      const allowance1 = await readContract({
+        contract: token1Contract,
+        method:
+          "function allowance(address owner, address spender) view returns (uint256)",
+        params: [address, CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT],
+      });
 
       console.log("Current allowances:", {
         [token0Symbol]: ethers.formatUnits(allowance0, token0Decimals),
@@ -225,22 +268,28 @@ const AddLiquidity = () => {
       // Approve token0 if needed
       if (allowance0 < amount0Desired) {
         console.log(`Approving ${token0Symbol}...`);
-        const tx0 = await token0Contract.approve(
-          CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
-          ethers.MaxUint256
-        );
-        await tx0.wait();
+
+        const tx0 = await prepareContractCall({
+          contract: token0Contract,
+          method:
+            "function approve(address spender, uint256 amount) returns (bool)",
+          args: [CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT, ethers.MaxUint256],
+        });
+        await sendTransaction(tx0);
         console.log(`${token0Symbol} approved`);
       }
 
       // Approve token1 if needed
       if (allowance1 < amount1Desired) {
         console.log(`Approving ${token1Symbol}...`);
-        const tx1 = await token1Contract.approve(
-          CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
-          ethers.MaxUint256
-        );
-        await tx1.wait();
+
+        const tx1 = await prepareContractCall({
+          contract: token1Contract,
+          method:
+            "function approve(address spender, uint256 amount) returns (bool)",
+          args: [CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT, ethers.MaxUint256],
+        });
+        await sendTransaction(tx1);
         console.log(`${token1Symbol} approved`);
       }
 
@@ -249,18 +298,32 @@ const AddLiquidity = () => {
 
       // Try to estimate gas first
       try {
-        const gasEstimate = await contract.estimateGas.addLiquidity(
-          amount0Desired,
-          amount1Desired
-        );
+        // const gasEstimate = await contract.estimateGas.addLiquidity(
+        //   amount0Desired,
+        //   amount1Desired
+        // );
+        const gasEstimate = await prepareContractCall({
+          contract: contract,
+          method:
+            "function addLiquidity(uint256 amount0Desired, uint256 amount1Desired) returns (uint256 tokenId)",
+          args: [amount0Desired, amount1Desired],
+        }).then((tx) => tx.gasLimit);
+
         console.log("Gas estimate:", gasEstimate.toString());
 
         // Add 20% buffer to gas estimate
         const gasLimit = (gasEstimate * 120n) / 100n;
 
-        const tx = await contract.addLiquidity(amount0Desired, amount1Desired, {
-          gasLimit: gasLimit,
-        });
+        // const tx = await contract.addLiquidity(amount0Desired, amount1Desired, {
+        //   gasLimit: gasLimit,
+        // });
+        const tx = await prepareContractCall({
+          contract: contract,
+          method:
+            "function addLiquidity(uint256 amount0Desired, uint256 amount1Desired) returns (uint256 tokenId)",
+          params: [amount0Desired, amount1Desired],
+          options: { gasLimit },
+        }).then((tx) => sendTransaction(tx));
 
         setTxHash(tx.hash);
         console.log("Transaction sent:", tx.hash);
@@ -285,9 +348,16 @@ const AddLiquidity = () => {
         console.warn("Gas estimation failed:", gasError);
 
         // If gas estimation fails, try with fixed gas limit
-        const tx = await contract.addLiquidity(amount0Desired, amount1Desired, {
-          gasLimit: 1500000, // Set high fixed gas limit
-        });
+        // const tx = await contract.addLiquidity(amount0Desired, amount1Desired, {
+        //   gasLimit: 1500000, // Set high fixed gas limit
+        // });
+        const tx = await prepareContractCall({
+          contract: contract,
+          method:
+            "function addLiquidity(uint256 amount0Desired, uint256 amount1Desired) returns (uint256 tokenId)",
+          params: [amount0Desired, amount1Desired],
+          options: { gasLimit: 1500000 },
+        }).then((tx) => sendTransaction(tx));
 
         setTxHash(tx.hash);
         console.log("Transaction sent with fixed gas limit:", tx.hash);

@@ -4,15 +4,13 @@ import WalletConnection from "./WalletConnection";
 import ProfileConnection from "./ProfileConnection";
 import { useState, useEffect } from "react";
 import { useProfile } from "../contexts/ProfileContext";
+import { useDarkMode } from "../contexts/themeContext";
 
 export default function Navbar() {
-  const [darkMode, setDarkMode] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const { profile } = useProfile();
 
-  useEffect(() => {
-    document.body.classList.toggle("dark", darkMode);
-  }, [darkMode]);
+  const { darkMode, setDarkMode } = useDarkMode();
 
   // Close mobile menu on navigation
   const handleLinkClick = () => {

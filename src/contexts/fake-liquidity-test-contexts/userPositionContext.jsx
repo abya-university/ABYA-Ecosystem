@@ -6,9 +6,11 @@ import React, {
   useCallback,
 } from "react";
 import { ethers } from "ethers";
-import { useAccount } from "wagmi";
 import contractAbi from "../../artifacts/fake-liquidity-abis/add_swap_contract.json";
-import { useEthersSigner } from "../../components/useClientSigner";
+import { useActiveAccount } from "thirdweb/react";
+import { client } from "../../services/client";
+import { defineChain } from "thirdweb";
+import { getContract as thirdwebGetContract } from "thirdweb";
 
 // Create context
 const UserPositionContext = createContext();
@@ -28,26 +30,28 @@ export function UserPositionProvider({ children }) {
   const [error, setError] = useState(null);
   const [token0Decimals, setToken0Decimals] = useState(18);
   const [token1Decimals, setToken1Decimals] = useState(18);
-  const { isConnected } = useAccount();
-  const signerPromise = useEthersSigner();
+  const account = useActiveAccount();
+  const isConnected = !!account;
 
   // Initialize contract with user's signer
   const getContract = useCallback(async () => {
     try {
-      if (!signerPromise) return null;
-      const signer = await signerPromise;
+      if (!client) return null;
+      const signer = await client;
       if (!signer) throw new Error("No signer available");
-      return new ethers.Contract(
-        CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
-        contract_abi,
-        signer
-      );
+
+      return thirdwebGetContract({
+        address: CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
+        abi: contract_abi,
+        signer: signer,
+        chain: defineChain(1020352220),
+      });
     } catch (error) {
       console.error("Failed to initialize contract:", error);
       setError("Failed to connect to contract");
       return null;
     }
-  }, [signerPromise]);
+  }, [client]);
 
   // Fetch token decimals
   const fetchTokenDecimals = useCallback(async () => {

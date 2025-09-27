@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { ethers } from "ethers";
-import { useAccount } from "wagmi";
 import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
-import { useEthersSigner } from "../components/useClientSigner";
 import { toast } from "react-toastify";
+import { useActiveAccount } from "thirdweb/react";
+import { client } from "../services/client";
+import { getContract, readContract } from "thirdweb";
+import { defineChain } from "thirdweb/chains";
 
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
 const Community_ABI = CommunityABI.abi;
@@ -18,8 +19,9 @@ export const CommunityEventsProvider = ({ children }) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const signerPromise = useEthersSigner();
-  const { isConnected } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
 
   // Format events data from contract response
   const formatEvents = (eventsData) => {
@@ -61,14 +63,22 @@ export const CommunityEventsProvider = ({ children }) => {
     setError(null);
 
     try {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const signer = await client;
 
-      const allEvents = await contract.getAllCommunityEvents();
+      const contract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
+
+      // const allEvents = await contract.getAllCommunityEvents();
+      const allEvents = await readContract({
+        contract,
+        method:
+          "function getAllCommunityEvents() view returns ((uint256 id, string name, address creator, uint256 startTime, uint256 endTime, uint256 maxParticipants, uint256 currentParticipants, bool isActive, bool isOnline, string location, string additionalDetails)[])",
+        params: [],
+      });
       console.log("All Events b4 formatting: ", allEvents);
       const formattedEvents = formatEvents(allEvents);
       setEvents(formattedEvents);

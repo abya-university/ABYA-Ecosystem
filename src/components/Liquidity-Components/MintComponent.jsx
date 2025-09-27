@@ -1,13 +1,19 @@
 import { useState, useEffect } from "react";
 import { useTransactionHistory } from "../../contexts/fake-liquidity-test-contexts/historyContext";
 import { AlertCircle, CheckCircle } from "lucide-react";
-import { useAccount } from "wagmi";
-import { useEthersSigner } from "../useClientSigner";
 import { ethers } from "ethers";
 import USDC_ABI from "../../artifacts/fake-liquidity-abis/usdc.json";
 import ABYTKN_ABI from "../../artifacts/fake-liquidity-abis/abyatkn.json";
 
 import CONTRACT_ABI from "../../artifacts/fake-liquidity-abis/add_swap_contract.json";
+import { useActiveAccount } from "thirdweb/react";
+import { client } from "../../services/client";
+import {
+  defineChain,
+  getContract,
+  prepareContractCall,
+  sendTransaction,
+} from "thirdweb";
 
 const contractAbi = CONTRACT_ABI.abi;
 const usdcAbi = USDC_ABI.abi;
@@ -18,13 +24,14 @@ const MintComponent = () => {
     usdcAmount: "",
     abytknAmount: "",
   });
-  const { isConnected, address } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
   const { loadBalances, loadPoolInfo } = useTransactionHistory();
   const [loadingg, setLoadingg] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const signerPromise = useEthersSigner();
   const [txHash, setTxHash] = useState("");
 
   // Contract addresses
@@ -61,20 +68,26 @@ const MintComponent = () => {
     setLoading(true);
 
     try {
-      const signer = await signerPromise;
+      const signer = await client;
       if (!signer) return;
 
-      const contract = new ethers.Contract(
-        CONTRACT_ADDRESSES.TOKEN0,
-        USDC_ABI.abi,
-        signer
-      );
+      const contract = await getContract({
+        address: CONTRACT_ADDRESSES.TOKEN0,
+        abi: usdcAbi,
+        signer,
+        chainId: defineChain(1020352220),
+      });
 
       const parsedAmount = ethers.parseEther(amount.toString()); // Ensure amount is valid
-      const tx = await contract.mint(address, parsedAmount);
+      // const tx = await contract.mint(address, parsedAmount);
+      const tx = await prepareContractCall({
+        contract,
+        method: "function mint(address to, uint256 amount)",
+        params: [address, parsedAmount],
+      });
 
       setTxHash(tx.hash);
-      await tx.wait();
+      await sendTransaction(tx);
 
       setSuccess(`Successfully minted ${amount} USDC!`);
       loadBalances(); // Refresh balances
@@ -108,20 +121,31 @@ const MintComponent = () => {
     setLoadingg(true);
 
     try {
-      const signer = await signerPromise;
+      const signer = await client;
       if (!signer) return;
 
-      const contract = new ethers.Contract(
-        CONTRACT_ADDRESSES.TOKEN1,
-        ABYTKN_ABI.abi,
-        signer
-      );
+      // const contract = new ethers.Contract(
+      //   CONTRACT_ADDRESSES.TOKEN1,
+      //   ABYTKN_ABI.abi,
+      //   signer
+      // );
+      const contract = await getContract({
+        address: CONTRACT_ADDRESSES.TOKEN1,
+        abi: abyatknAbi,
+        signer,
+        chainId: defineChain(1020352220),
+      });
 
       const parsedAmount = ethers.parseEther(amount.toString()); // Ensure amount is valid
-      const tx = await contract.mint(address, parsedAmount);
+
+      const tx = await prepareContractCall({
+        contract,
+        method: "function mint(address to, uint256 amount)",
+        params: [address, parsedAmount],
+      });
 
       setTxHash(tx.hash);
-      await tx.wait();
+      await sendTransaction(tx);
 
       setSuccess(`Successfully minted ${amount} ABYATKN!`);
       loadBalances(); // Refresh balances

@@ -4,8 +4,8 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "../index.css";
 import { ethers } from "ethers";
-import { useEthersSigner } from "./useClientSigner";
 import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
+import { client } from "../services/client";
 
 const Community_ABI = CommunityABI.abi;
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
@@ -22,7 +22,6 @@ const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
   });
 
   const [isLoading, setIsLoading] = useState(false);
-  const signerPromise = useEthersSigner();
 
   const projectStageMapping = {
     IDEA: 0,
@@ -36,12 +35,13 @@ const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      const signer = await signerPromise;
-      const communityContract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const signer = await client;
+      const communityContract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        client,
+        chain: defineChain(1020352220),
+      });
 
       // Convert tech stack string to array
       const techStackArray = projectData.techStack
@@ -62,15 +62,20 @@ const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
         projectData.stage
       );
 
-      const tx = await communityContract.createProjectFundingProposal(
-        projectData.name,
-        projectData.description,
-        techStackArray,
-        projectData.blockchain,
-        projectData.requestedAmount,
-        timelineDays,
-        projectStageMapping[projectData.stage]
-      );
+      const tx = await prepareContractCall({
+        contract: communityContract,
+        method:
+          "function createProjectFundingProposal(string _name, string _description, string[] _techStack, string _blockchain, uint256 _requestedAmount, uint256 _timeline, uint8 _stage) returns (uint256)",
+        params: [
+          projectData.name,
+          projectData.description,
+          techStackArray,
+          projectData.blockchain,
+          ethers.parseEther(projectData.requestedAmount || "0"),
+          timelineDays,
+          projectStageMapping[projectData.stage],
+        ],
+      });
 
       await tx.wait();
       toast.success("Project proposal submitted successfully!");

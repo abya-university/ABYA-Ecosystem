@@ -1,10 +1,10 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { useEthersSigner } from "../components/useClientSigner";
 import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
 import CommunityBadgeABI from "../artifacts/contracts/Community Contracts/CommunityBadgeSystem.sol/CommunityBadgeSystem.json";
-import { ethers } from "ethers";
-import { useAccount } from "wagmi";
 import { toast } from "react-toastify";
+import { useActiveAccount } from "thirdweb/react";
+import { getContract, readContract } from "thirdweb";
+import { client } from "../services/client";
 
 const Community_ABI = CommunityABI.abi;
 const CommunityBadge_ABI = CommunityBadgeABI.abi;
@@ -23,8 +23,9 @@ export const CommunityMembersProvider = ({ children }) => {
   const [memberBadgeDetails, setMemberBadgeDetails] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const signerPromise = useEthersSigner();
-  const { isConnected, address } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
 
   // Fetch all members from the contract
   const fetchMembers = async () => {
@@ -32,14 +33,20 @@ export const CommunityMembersProvider = ({ children }) => {
     setError(null);
 
     try {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const signer = await client;
 
-      const communityMembers = await contract.getAllCommunityMembers();
+      const contract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+      });
+
+      const communityMembers = await readContract({
+        contract,
+        method: "function getAllCommunityMembers() view returns (address[])",
+        params: [],
+      });
+
       const formattedMembers = Array.from(communityMembers);
       setMembers(formattedMembers);
     } catch (error) {
@@ -56,15 +63,22 @@ export const CommunityMembersProvider = ({ children }) => {
     setError(null);
 
     try {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        CommunityBadgeAddress,
-        CommunityBadge_ABI,
-        signer
-      );
+      const signer = await client;
+
+      const contract = await getContract({
+        address: CommunityBadgeAddress,
+        abi: CommunityBadge_ABI,
+        signer,
+      });
 
       // Fetch raw badge details from the contract
-      const memberBadgeDetails = await contract.getMemberBadgeDetails(address);
+      // const memberBadgeDetails = await contract.getMemberBadgeDetails(address);
+      const memberBadgeDetails = await readContract({
+        contract,
+        method:
+          "function getMemberBadgeDetails(address _member) view returns (uint8 currentBadge, string badgeName, string iconURI, uint256 tokenReward, uint256 totalEventsAttended)",
+        params: [address],
+      });
 
       // Format the badge details into a structured object
       const formattedMemberBadgeDetails = {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Trophy,
   Medal,
@@ -21,8 +21,8 @@ import Certificate from "../components/Certificate";
 import { CSSTransition } from "react-transition-group";
 import "../index.css";
 import { useCommunityMembers } from "../contexts/communityMembersContext";
-import { useAccount } from "wagmi";
 import { useCommunityEvents } from "../contexts/communityEventsContext";
+import { useActiveAccount } from "thirdweb/react";
 
 const BADGE_DISPLAY_MAP = {
   0: {
@@ -66,7 +66,9 @@ const AchievementsPage = () => {
 
   const [userBadge, setUserBadge] = useState(null);
   const { memberBadgeDetails, fetchMemberBadgeDetails } = useCommunityMembers();
-  const { address, isConnected } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
   const currentBadgeLevel = memberBadgeDetails?.currentBadge || 0;
   const badgeInfo = BADGE_DISPLAY_MAP[currentBadgeLevel];
   const { events, fetchEvents } = useCommunityEvents();

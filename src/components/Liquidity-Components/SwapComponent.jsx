@@ -1,7 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { ArrowDownUp, Activity, Settings } from "lucide-react";
-import { useEthersSigner } from "../../components/useClientSigner";
-import { useAccount } from "wagmi";
 import { useTransactionHistory } from "../../contexts/fake-liquidity-test-contexts/historyContext";
 
 import { ethers } from "ethers";
@@ -9,6 +7,14 @@ import USDC_ABI from "../../artifacts/fake-liquidity-abis/usdc.json";
 import ABYTKN_ABI from "../../artifacts/fake-liquidity-abis/abyatkn.json";
 
 import CONTRACT_ABI from "../../artifacts/fake-liquidity-abis/add_swap_contract.json";
+import { useActiveAccount } from "thirdweb/react";
+import { client } from "../../services/client";
+import {
+  defineChain,
+  prepareContractCall,
+  readContract,
+  sendTransaction,
+} from "thirdweb";
 
 const contractAbi = CONTRACT_ABI.abi;
 const usdcAbi = USDC_ABI.abi;
@@ -22,8 +28,9 @@ const SwapComponent = () => {
   const [success, setSuccess] = useState("");
   const [showSettings, setShowSettings] = useState(false);
 
-  const signerPromise = useEthersSigner();
-  const { isConnected, address } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
   const {
     transactions,
     loading,
@@ -147,7 +154,7 @@ const SwapComponent = () => {
     setLoading(true);
 
     try {
-      const signer = await signerPromise;
+      const signer = await client;
       if (!signer) return;
 
       const amountToSwap = ethers.parseUnits(swapData.inputAmount, 18);
@@ -155,17 +162,21 @@ const SwapComponent = () => {
       // First approve the input token
       const inputTokenAbi =
         swapData.inputTokenSymbol === "TOKEN0" ? USDC_ABI.abi : ABYTKN_ABI.abi;
-      const inputTokenContract = new ethers.Contract(
-        inputToken,
-        inputTokenAbi,
-        signer
-      );
+
+      const inputTokenContract = await getContract({
+        address: inputToken,
+        abi: inputTokenAbi,
+        signer,
+        chain: defineChain(1020352220),
+      });
 
       // Check and approve if needed
-      const allowance = await inputTokenContract.allowance(
-        address,
-        CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT
-      );
+      const allowance = await readContract({
+        contract: inputTokenContract,
+        method:
+          "function allowance(address owner, address spender) view returns (uint256)",
+        params: [address, CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT],
+      });
       // If allowance is less than amount to swap, approve more
       if (allowance < amountToSwap) {
         console.log("Approving tokens for swapping...");
@@ -174,20 +185,23 @@ const SwapComponent = () => {
         const MAX_UINT256 = ethers.MaxUint256;
 
         try {
-          const approveTx = await inputTokenContract.approve(
-            CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
-            MAX_UINT256
-          );
+          const approveTx = await prepareContractCall({
+            contract: inputTokenContract,
+            method:
+              "function approve(address spender, uint256 amount) returns (bool)",
+            params: [CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT, MAX_UINT256],
+          });
 
           console.log("Approval transaction sent:", approveTx.hash);
-          await approveTx.wait();
+          await sendTransaction(approveTx);
           console.log("Token approved successfully");
 
-          // Check allowance after approval
-          const newAllowance = await inputTokenContract.allowance(
-            address,
-            CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT
-          );
+          const newAllowance = await readContract({
+            contract: inputTokenContract,
+            method:
+              "function allowance(address owner, address spender) view returns (uint256)",
+            params: [address, CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT],
+          });
           console.log("New allowance:", ethers.formatUnits(newAllowance, 18));
         } catch (approvalError) {
           console.error("Approval failed:", approvalError);
@@ -198,27 +212,34 @@ const SwapComponent = () => {
       }
 
       // Then perform the swap
-      const contract = new ethers.Contract(
-        CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
-        contractAbi,
-        signer
-      );
+      const contract = await getContract({
+        address: CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
+        abi: contractAbi,
+        signer,
+        chain: defineChain(1020352220),
+      });
 
-      const balance = await inputTokenContract.balanceOf(address);
+      // const balance = await inputTokenContract.balanceOf(address);
+      const balance = await readContract({
+        contract: inputTokenContract,
+        method: "function balanceOf(address account) view returns (uint256)",
+        params: [address],
+      });
       if (balance < amountToSwap) {
         setError(`Insufficient ${swapData.inputTokenSymbol} balance`);
         setLoading(false);
         return;
       }
 
-      const tx = await contract.swapExactInputSingle(
-        inputToken,
-        outputToken,
-        amountToSwap
-      );
+      const tx = await prepareContractCall({
+        contract,
+        method:
+          "function swapExactInputSingle(address inputToken, address outputToken, uint256 amountIn) returns (uint256 amountOut)",
+        params: [inputToken, outputToken, amountToSwap],
+      });
 
       setTxHash(tx.hash);
-      await tx.wait();
+      await sendTransaction(tx);
 
       setSwapData({ ...swapData, inputAmount: "", outputAmount: "0" });
       loadBalances();

@@ -24,10 +24,17 @@ import { LessonContext } from "../contexts/lessonContext";
 import { QuizContext } from "../contexts/quizContext";
 import Ecosystem1FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem1Facet.sol/Ecosystem1Facet.json";
 import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
-import { ethers } from "ethers";
-import { useEthersSigner } from "../components/useClientSigner";
-import { useAccount } from "wagmi";
 import { toast, ToastContainer } from "react-toastify";
+import { useActiveAccount, useSendTransaction } from "thirdweb/react";
+import { client } from "../services/client";
+import {
+  getContract,
+  prepareContractCall,
+  readContract,
+  toWei,
+} from "thirdweb";
+import { defineChain } from "thirdweb/chains";
+import { useChainMetadata } from "thirdweb/react";
 
 const EcosystemDiamondAddress = import.meta.env
   .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
@@ -44,6 +51,8 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     setLatestReviews,
     getCourseData,
   } = useContext(CourseContext);
+  const { mutateAsync: sendTransaction, isPending: isSending } =
+    useSendTransaction();
   const [courseId, setCourseId] = useState(null);
   const { role } = useUser();
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -57,8 +66,10 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     totalLessons: 0,
     totalQuizzes: 0,
   });
-  const { address, isConnected } = useAccount();
-  const signerPromise = useEthersSigner();
+  // const { address, isConnected } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
   const [requestSent, setRequestSent] = useState(false);
   const [success, setSuccess] = useState(null);
   const [error, setError] = useState(null);
@@ -70,9 +81,17 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const allReviews = courseReviews[courseId] || [];
   const feedback = courseFeedback[courseId];
 
+  console.log("Courses in courselist:", courses);
+
   console.log("Latest Review for course", courseId, ":", latestReview);
   console.log("All Reviews for course", courseId, ":", allReviews);
   console.log("Feedback for course", courseId, ":", feedback);
+
+  const { data: chainMetadata } = useChainMetadata(defineChain(1020352220));
+
+  console.log("Name:", chainMetadata?.name);
+  console.log("Faucets:", chainMetadata?.faucets);
+  console.log("Explorers:", chainMetadata?.explorers);
 
   const [activeTab, setActiveTab] = useState("details");
 
@@ -80,6 +99,37 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const [filteredLessons, setFilteredLessons] = useState([]);
   const [filteredQuizzes, setFilteredQuizzes] = useState([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+
+  // const customChain = defineChain({
+  //   id: 1020352220,
+  //   name: "Skale Titan Hub Testnet",
+  //   rpc: `https://1020352220.rpc.thirdweb.com/${
+  //     import.meta.env.VITE_APP_THIRDWEB_CLIENT_ID
+  //   }`,
+  //   nativeCurrency: {
+  //     name: "SKALE",
+  //     symbol: "SKL",
+  //     decimals: 18,
+  //   },
+  //   blockExplorers: [
+  //     {
+  //       name: "Blockscout",
+  //       url: import.meta.env.VITE_APP_BROCK_EXPLORER,
+  //     },
+  //   ],
+  // });
+
+  const skaleTitanTestnet = defineChain({
+    id: 1020352220,
+    rpc: `https://1020352220.rpc.thirdweb.com/${
+      import.meta.env.VITE_APP_THIRDWEB_CLIENT_ID
+    }`,
+    name: "SKALE Titan Hub Testnet",
+    nativeCurrency: { name: "sFUEL", symbol: "sFUEL", decimals: 18 },
+    blockExplorers: [
+      { name: "SKALE Explorer", url: "https://staging-explorer.skale.network" },
+    ],
+  });
 
   const getDifficultyLabel = (level) => {
     switch (Number(level)) {
@@ -241,24 +291,38 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       setIsLoading(true);
       setError(null);
 
-      const signer = await signerPromise;
-      const diamondContract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem1Facet_ABI,
-        signer
-      );
+      const contract = getContract({
+        address: EcosystemDiamondAddress,
+        abi: Ecosystem1Facet_ABI,
+        client,
+        chain: defineChain(1020352220),
+      });
 
       // First check if the course is ready for eligibility check
-      const isReadyForCheck =
-        await diamondContract.isCourseReadyForEligibilityCheck(courseId);
+      const isReadyForCheck = await readContract({
+        contract,
+        method:
+          "function isCourseReadyForEligibilityCheck(uint256 courseId) view returns (bool)",
+        params: [courseId],
+      });
 
       if (isReadyForCheck) {
-        // If ready, trigger the eligibility check
-        await diamondContract.checkCourseEligibilityAfterDelay(courseId);
+        await prepareContractCall({
+          contract,
+          method: "function checkCourseEligibilityAfterDelay(uint256 courseId)",
+          params: [courseId],
+        });
+
         toast.success("Course eligibility check completed!");
 
         // Get feedback if any
-        const feedback = await diamondContract.getCourseFeedback(courseId);
+        // const feedback = await diamondContract.getCourseFeedback(courseId);
+        const feedback = await readContract({
+          contract,
+          method:
+            "function getCourseFeedback(uint256 courseId) view returns (string)",
+          params: [courseId],
+        });
         if (feedback) {
           toast.success(`Course feedback: ${feedback}`);
         }
@@ -390,79 +454,80 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const approveCourse = async (course) => {
     try {
       setIsLoading(true);
-      const completeDetails = await getCompleteCourseDeatils(course.courseId);
 
+      // 1. Get complete course details
+      const completeDetails = await getCompleteCourseDeatils(course.courseId);
       if (!completeDetails) {
         toast.error("Failed to load course details for review.");
         return;
       }
 
-      // Generate and send markdown to evaluation service
+      // 2. Generate markdown for AI evaluation
       const courseMarkdown = generateCourseMarkdown(completeDetails);
       console.log("Generated markdown length:", courseMarkdown.length);
 
+      // 3. Send to AI microservice
       const formData = new FormData();
       const courseBlob = new Blob([courseMarkdown], { type: "text/plain" });
       formData.append("file", courseBlob, "course.txt");
 
-      console.log("Sending request to:", "http://localhost:5000/evaluate");
+      console.log("Sending request to AI microservice...");
       const response = await fetch("http://localhost:5000/evaluate", {
         method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error(`Evaluation failed: ${response.statusText}`);
+        throw new Error(`AI evaluation failed: ${response.statusText}`);
       }
 
-      // Process evaluation results
+      // 4. Process AI evaluation results
       const evaluationResult = await response.json();
-      console.log("Evaluation result:", evaluationResult);
+      console.log("AI Evaluation result:", evaluationResult);
 
       const finalScore = Math.floor(
         (evaluationResult.finalScore || evaluationResult.score || 0) * 100
       );
       const category = evaluationResult.category || "General";
-      const grades = evaluationResult.grades || {};
       const passed =
         evaluationResult.passed === "Yes" || evaluationResult.passed === true;
 
-      // Create review object for smart contract
+      // 5. Prepare review object for blockchain
       const ensureValidNumber = (value) => {
         const num = Number(value);
-        return isNaN(num) ? 0 : num;
+        return isNaN(num) ? 0 : Math.min(Math.max(num, 0), 100); // Clamp between 0-100
       };
 
       const review = {
         learnerAgency: ensureValidNumber(
-          grades.learnerAgency || grades["Learner Agency"]
+          evaluationResult.grades?.learnerAgency
         ),
         criticalThinking: ensureValidNumber(
-          grades.criticalThinking || grades["Critical Thinking"]
+          evaluationResult.grades?.criticalThinking
         ),
         collaborativeLearning: ensureValidNumber(
-          grades.collaborativeLearning || grades["Collaborative Learning"]
+          evaluationResult.grades?.collaborativeLearning
         ),
         reflectivePractice: ensureValidNumber(
-          grades.reflectivePractice || grades["Reflective Practice"]
+          evaluationResult.grades?.reflectivePractice
         ),
         adaptiveLearning: ensureValidNumber(
-          grades.adaptiveLearning || grades["Adaptive Learning"]
+          evaluationResult.grades?.adaptiveLearning
         ),
         authenticLearning: ensureValidNumber(
-          grades.authenticLearning || grades["Authentic Learning"]
+          evaluationResult.grades?.authenticLearning
         ),
         technologyIntegration: ensureValidNumber(
-          grades.technologyIntegration || grades["Technology Integration"]
+          evaluationResult.grades?.technologyIntegration
         ),
         learnerSupport: ensureValidNumber(
-          grades.learnerSupport || grades["Learner Support"]
+          evaluationResult.grades?.learnerSupport
         ),
         assessmentForLearning: ensureValidNumber(
-          grades.assessmentForLearning || grades["Assessment for Learning"]
+          evaluationResult.grades?.assessmentForLearning
         ),
         engagementAndMotivation: ensureValidNumber(
-          grades.engagementAndMotivation || grades["Engagement and Motivation"]
+          evaluationResult.grades?.engagementAndMotivation
         ),
         isSubmitted: true,
         category: category,
@@ -470,31 +535,25 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         passed: passed,
       };
 
-      console.log("Review object being sent to contract:", review);
-      const courseIdToApprove = course.courseId;
-      console.log("Approving course with ID:", courseIdToApprove);
+      console.log("Review object for blockchain:", review);
 
-      const signer = await signerPromise;
+      // 6. Send to blockchain
+      const contract = getContract({
+        address: EcosystemDiamondAddress,
+        abi: Ecosystem1Facet_ABI,
+        client,
+        chain: defineChain(1020352220),
+      });
 
-      console.log("Creating contract instance...");
-      const diamondContract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem1Facet_ABI,
-        signer
-      );
+      const transaction = prepareContractCall({
+        contract,
+        method:
+          "function approveCourse(uint256 _courseId, uint256 score, (uint256 learnerAgency, uint256 criticalThinking, uint256 collaborativeLearning, uint256 reflectivePractice, uint256 adaptiveLearning, uint256 authenticLearning, uint256 technologyIntegration, uint256 learnerSupport, uint256 assessmentForLearning, uint256 engagementAndMotivation, bool isSubmitted, string category, uint256 score, bool passed) review)",
+        params: [course.courseId, finalScore, review],
+      });
 
-      console.log("Sending transaction to approve course...");
-      const tx = await diamondContract.approveCourse(
-        courseIdToApprove,
-        finalScore,
-        review
-      );
-
-      console.log("Transaction sent:", tx.hash);
-      await tx.wait();
-
+      await sendTransaction(transaction);
       toast.success("Course approved successfully!");
-      console.log("Course approved successfully!");
     } catch (error) {
       console.error("Error in course approval process:", error);
       toast.error(`Failed to approve course: ${error.message}`);
@@ -596,30 +655,61 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       for (const course of courses) {
         if (!course.approved) {
           try {
-            const signer = await signerPromise;
-            const diamondContract = new ethers.Contract(
-              EcosystemDiamondAddress,
-              Ecosystem1Facet_ABI,
-              signer
-            );
+            // const signer = await signerPromise;
+            // const diamondContract = new ethers.Contract(
+            //   EcosystemDiamondAddress,
+            //   Ecosystem1Facet_ABI,
+            //   signer
+            // );
+
+            const contract = await getContract({
+              address: EcosystemDiamondAddress,
+              abi: Ecosystem1Facet_ABI,
+              client,
+              chain: defineChain(1020352220),
+            });
 
             // Check if eligibility check is ready
             const isReadyForCheck =
-              await diamondContract.isCourseReadyForEligibilityCheck(
-                course.courseId
-              );
+              // await diamondContract.isCourseReadyForEligibilityCheck(
+              //   course.courseId
+              // );
+              await readContract({
+                contract,
+                method:
+                  "function isCourseReadyForEligibilityCheck(uint256 courseId) view returns (bool)",
+                params: [courseId],
+              });
 
             if (isReadyForCheck) {
               console.log(
                 `Course ${course.courseId} is ready for eligibility check`
               );
-              await diamondContract.checkCourseEligibilityAfterDelay(
-                course.courseId
-              );
+              // await diamondContract.checkCourseEligibilityAfterDelay(
+              //   course.courseId
+              // );
+              await prepareContractCall({
+                contract,
+                method:
+                  "function checkCourseEligibilityAfterDelay(uint256 courseId)",
+                params: [courseId],
+              });
+
+              // Wait a bit for the eligibility check to process
+              await new Promise((resolve) => setTimeout(resolve, 15000));
 
               // If eligibility check passes, submit for AI review
-              const feedback = await diamondContract.getCourseFeedback(
-                course.courseId
+              // const feedback = await diamondContract.getCourseFeedback(
+              //   course.courseId
+              // );
+              const feedback = await readContract({
+                contract,
+                method:
+                  "function getCourseFeedback(uint256 courseId) view returns (string)",
+                params: [courseId],
+              });
+              console.log(
+                `Eligibility feedback for course ${course.courseId}: ${feedback}`
               );
               if (!feedback.includes("Course meets eligibility criteria")) {
                 console.log(
@@ -647,14 +737,22 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const fetchCourseFeedback = async (courseId) => {
     try {
       setFeedbackLoading(true);
-      const signer = await signerPromise;
-      const diamondContract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem1Facet_ABI,
-        signer
-      );
 
-      const feedback = await diamondContract.getCourseFeedback(courseId);
+      const contract = getContract({
+        address: EcosystemDiamondAddress,
+        abi: Ecosystem1Facet_ABI,
+        client,
+        chain: defineChain(1020352220),
+      });
+
+      // const feedback = await diamondContract.getCourseFeedback(courseId);
+      const feedback = await readContract({
+        contract,
+        method:
+          "function getCourseFeedback(uint256 courseId) view returns (string)",
+        params: [courseId],
+      });
+      console.log(`Fetched feedback for course ${courseId}: ${feedback}`);
       setCourseFeedback(feedback);
     } catch (error) {
       console.error("Error fetching course feedback:", error);
@@ -667,24 +765,78 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const enroll = async (courseId) => {
     try {
       setLoading(true);
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem2Facet_ABI,
-        signer
-      );
-      const tx = await contract.enroll(courseId);
-      await tx.wait();
-      console.log(`Transaction Receipt: ${tx.hash}`);
-      setEnrolled(true);
-      toast.success(`Enrolled into course ${courseId} successfully!`);
+      const contract = getContract({
+        address: EcosystemDiamondAddress,
+        abi: Ecosystem2Facet_ABI,
+        client,
+        chain: skaleTitanTestnet,
+      });
 
-      // Refresh course data after enrollment
-      window.location.reload(); // Force page refresh to get updated course data
+      const transaction = prepareContractCall({
+        contract,
+        method: "function enroll(uint256 _courseId) returns (bool)",
+        params: [courseId],
+        // Add manual gas settings to skip estimation
+        gas: 500000n, // Set a reasonable gas limit
+        gasPrice: 0n, // SKALE typically has 0 gas price
+        value: 0n, // Ensure no ETH is being sent
+      });
+
+      // Add timeout to sendTransaction
+      const transactionPromise = sendTransaction(transaction);
+      const timeoutPromise = new Promise(
+        (_, reject) =>
+          setTimeout(() => reject(new Error("Transaction timeout")), 30000) // 30 second timeout
+      );
+
+      const transactionHash = await Promise.race([
+        transactionPromise,
+        timeoutPromise,
+      ]);
+
+      console.log("Enrollment transaction hash:", transactionHash);
+
+      if (transactionHash) {
+        setEnrolled(true);
+        toast.success(
+          `Enrolled into course ${courseId} successfully! Transaction: ${transactionHash.slice(
+            0,
+            8
+          )}...`
+        );
+
+        // Optional: Wait for confirmation with shorter timeout
+        try {
+          const receiptPromise = waitForReceipt(client, transactionHash);
+          const receiptTimeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Receipt timeout")), 15000)
+          );
+
+          const receipt = await Promise.race([receiptPromise, receiptTimeout]);
+          console.log("Transaction confirmed:", receipt);
+        } catch (receiptError) {
+          console.warn(
+            "Transaction sent but confirmation failed:",
+            receiptError
+          );
+          // Transaction was still sent, just confirmation failed
+        }
+      } else {
+        throw new Error("Transaction failed - no transaction hash returned");
+      }
     } catch (error) {
       console.error("Error enrolling in course:", error);
-      toast.error("Error enrolling in course. Please try again!");
-      setEnrolled(false);
+
+      // More specific error messages
+      if (error.message.includes("timeout")) {
+        toast.error(
+          "Transaction timed out. Please try again with a faster connection."
+        );
+      } else if (error.message.includes("gas")) {
+        toast.error("Gas estimation failed. Please try again.");
+      } else {
+        toast.error("Error enrolling in course. Please try again!");
+      }
     } finally {
       setLoading(false);
     }
@@ -693,24 +845,26 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const unEnroll = async (courseId) => {
     try {
       setLoading(true);
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem2Facet_ABI,
-        signer
-      );
-      const tx = await contract.unEnroll(courseId);
-      await tx.wait();
-      console.log(`Transaction Receipt: ${tx.hash}`);
+      const contract = getContract({
+        address: EcosystemDiamondAddress,
+        abi: Ecosystem2Facet_ABI,
+        client,
+        chain: defineChain(1020352220),
+      });
+
+      const transaction = prepareContractCall({
+        contract,
+        method: "function unEnroll(uint256 _courseId)",
+        params: [courseId],
+      });
+
+      await sendTransaction(transaction);
       setUnEnrolled(true);
       toast.success(`Unenrolled from course ${courseId} successfully!`);
-
-      // Refresh course data after unenrollment
-      window.location.reload(); // Force page refresh to get updated course data
+      window.location.reload();
     } catch (error) {
       console.error("Error unenrolling from course:", error);
       toast.error("Error unenrolling from course. Please try again!");
-      setUnEnrolled(false);
     } finally {
       setLoading(false);
     }

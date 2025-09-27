@@ -13,7 +13,8 @@ import {
   Send,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+// import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { AbyaConnectButton } from "../providers/Providers2";
 
 import BitcoinLogo from "/bitcoin.svg";
 import EthereumLogo from "/ethereum3.svg";
@@ -244,7 +245,7 @@ const Home = () => {
             {/* <button className="bg-yellow-500 text-black px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors">
               Connect Wallet
             </button> */}
-            <ConnectButton />
+            <AbyaConnectButton />
           </div>
         </div>
       </nav>

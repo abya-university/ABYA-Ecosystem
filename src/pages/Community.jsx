@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from "react";
-import { useAccount } from "wagmi";
+import { useState, useEffect } from "react";
 import { parseEther, formatEther } from "viem";
 import {
   Users,
@@ -28,8 +27,6 @@ import { FaMedal, FaGem, FaTrophy } from "react-icons/fa";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "../index.css";
-import { ethers } from "ethers";
-import { useEthersSigner } from "../components/useClientSigner";
 import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
 import { useCommunityEvents } from "../contexts/communityEventsContext";
 import { useCommunityMembers } from "../contexts/communityMembersContext";
@@ -39,6 +36,15 @@ import ProjectFundingRequestModal from "../components/ProjectRequestFundsForm";
 import ProjectDetails from "./ProjectDetails";
 import AirdropModal from "../components/AirdropModal";
 import AirdropDetails from "../components/AirdropDetails";
+import { useActiveAccount } from "thirdweb/react";
+import {
+  defineChain,
+  getContract,
+  prepareContractCall,
+  readContract,
+  sendTransaction,
+} from "thirdweb";
+import { client } from "../services/client";
 
 const Community_ABI = CommunityABI.abi;
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
@@ -65,8 +71,9 @@ const CommunityPage = () => {
   });
   const [loading, setLoading] = useState(false);
   const [userBadge, setUserBadge] = useState(null);
-  const signerPromise = useEthersSigner();
-  const { address, isConnected } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
   const [badgeData, setBadgeData] = useState(null);
   const [tokenBalance, setTokenBalance] = useState(null);
   const [createEventLoading, setCreateEventLoading] = useState(false);
@@ -94,14 +101,22 @@ const CommunityPage = () => {
     if (!isConnected) return;
 
     try {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const signer = await client;
 
-      const badge = await contract.checkMemberBadge();
+      const contract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
+
+      // const badge = await contract.checkMemberBadge();
+      const badge = await readContract({
+        contract,
+        method: "function checkMemberBadge() view returns (uint8)",
+        params: [],
+      });
+
       setBadgeData(badge);
     } catch (error) {
       console.error("Error fetching badge data:", error);
@@ -113,14 +128,21 @@ const CommunityPage = () => {
     if (!isConnected || !address) return;
 
     try {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const signer = await client;
+      const contract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
 
-      const balance = await contract.balanceOf(address);
+      // const balance = await contract.balanceOf(address);
+      const balance = await readContract({
+        contract,
+        method: "function balanceOf(address account) view returns (uint256)",
+        params: [address],
+      });
+
       setTokenBalance(balance);
     } catch (error) {
       console.error("Error fetching token balance:", error);
@@ -145,14 +167,20 @@ const CommunityPage = () => {
     setJoinCommunityLoading(true);
 
     try {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const signer = await client;
+      const contract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
 
-      const tx = await contract.joinCommunity();
+      const tx = await readContract({
+        contract,
+        method: "function joinCommunity() returns (bool)",
+        params: [],
+      });
+
       await tx.wait();
 
       toast.success("You've successfully joined the community!");
@@ -175,24 +203,30 @@ const CommunityPage = () => {
       const startTimeUnix = new Date(eventData.startTime).getTime() / 1000;
       const endTimeUnix = new Date(eventData.endTime).getTime() / 1000;
 
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const signer = await client;
+      const contract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
 
-      const tx = await contract.createEvent(
-        eventData.name,
-        BigInt(startTimeUnix),
-        BigInt(endTimeUnix),
-        BigInt(eventData.maxParticipants),
-        eventData.isOnline,
-        eventData.location,
-        eventData.additionalDetails
-      );
+      const tx = await prepareContractCall({
+        contract,
+        method:
+          "function createEvent(string _name, uint256 _startTime, uint256 _endTime, uint256 _maxParticipants, bool _isOnline, string _location, string _additionalDetails) returns (uint256)",
+        params: [
+          eventData.name,
+          BigInt(startTimeUnix),
+          BigInt(endTimeUnix),
+          BigInt(eventData.maxParticipants),
+          eventData.isOnline,
+          eventData.location,
+          eventData.additionalDetails,
+        ],
+      });
 
-      await tx.wait();
+      await sendTransaction(tx);
 
       toast.success("Event created successfully!");
       setShowCreateEventModal(false);
@@ -215,6 +249,7 @@ const CommunityPage = () => {
   };
 
   // Example for handleAirdrop
+  //this function is just an example, does not exist on the contract
   const handleAirdrop = async () => {
     if (!isConnected) {
       openConnectModal();
@@ -229,19 +264,22 @@ const CommunityPage = () => {
         .map((addr) => addr.trim())
         .filter((addr) => addr);
 
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const signer = await client;
+      const contract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
 
-      const tx = await contract.distributeAirdrops(
-        parseEther(airdropData.amount),
-        addressList
-      );
+      const tx = await prepareContractCall({
+        contract,
+        method:
+          "function distributeAirdrops(uint256 _amount, address[] calldata _recipients) returns (bool)",
+        params: [parseEther(airdropData.amount), addressList],
+      });
 
-      await tx.wait();
+      await sendTransaction(tx);
 
       toast.success("Airdrop proposal created!");
       setShowAirdropModal(false);
@@ -256,6 +294,7 @@ const CommunityPage = () => {
   };
 
   // Handle Fund Project
+  //Also this function can't seem to find it in the contract
   const handleFundProject = async () => {
     if (!isConnected) {
       openConnectModal();
@@ -265,19 +304,25 @@ const CommunityPage = () => {
     setFundProjectLoading(true);
 
     try {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const signer = await client;
+      const contract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
 
-      const tx = await contract.fundCommunityProjects(
-        projectFundingData.projectAddress,
-        parseEther(projectFundingData.amount)
-      );
+      const tx = await prepareContractCall({
+        contract,
+        method:
+          "function fundCommunityProjects(address _project, uint256 _amount) returns (bool)",
+        params: [
+          projectFundingData.projectAddress,
+          parseEther(projectFundingData.amount),
+        ],
+      });
 
-      await tx.wait();
+      await sendTransaction(tx);
 
       toast.success("Project funding proposal created!");
       setShowProjectFundingModal(false);
@@ -301,15 +346,21 @@ const CommunityPage = () => {
     setParticipateLoading(true);
 
     try {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const signer = await client;
+      const contract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
 
-      const tx = await contract.participateInEvent(BigInt(eventId));
-      await tx.wait();
+      // const tx = await contract.participateInEvent(BigInt(eventId));
+      const tx = await prepareContractCall({
+        contract,
+        method: "function participateInEvent(uint256 _eventId)",
+        params: [eventId],
+      });
+      await sendTransaction(tx);
 
       toast.success("You're now participating in this event!");
       fetchEvents();

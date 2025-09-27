@@ -1,21 +1,28 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAirdropProposals } from "../contexts/airdropProposalContext";
 import { ethers } from "ethers";
-import { useAccount } from "wagmi";
-import { useEthersSigner } from "../components/useClientSigner";
 import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
 import { toast } from "react-toastify";
 import { useUser } from "../contexts/userContext";
 import { useCommunityMembers } from "../contexts/communityMembersContext";
 import { CheckCircle, Calendar, Award, Clock, Gift, Users } from "lucide-react";
+import {
+  getContract,
+  prepareContractCall,
+  readContract,
+  sendTransaction,
+} from "thirdweb";
+import { client } from "../services/client";
+import { defineChain } from "thirdweb/chains";
+import { useActiveAccount } from "thirdweb/react";
 
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
 const Community_ABI = CommunityABI.abi;
 
 const AirdropDetails = () => {
   const { airdropProposals, fetchAirdropProposals } = useAirdropProposals();
-  const { address } = useAccount();
-  const signerPromise = useEthersSigner();
+  const account = useActiveAccount();
+  const address = account?.address;
   const [approveLoadingId, setApproveLoadingId] = useState(null);
   const [activeAirdrop, setActiveAirdrop] = useState(null);
   const [claimLoading, setClaimLoading] = useState(false);
@@ -33,17 +40,20 @@ const AirdropDetails = () => {
     if (!activeAirdrop || !address) return;
 
     try {
-      const signer = await signerPromise;
-      const communityContract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const signer = await client;
+      const communityContract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
 
-      const claimed = await communityContract.checkClaimStatus(
-        address,
-        activeAirdrop.airdropId
-      );
+      const claimed = await readContract({
+        contract: communityContract,
+        method:
+          "function checkClaimStatus(address _address, uint256 _airdropId) view returns (bool)",
+        params: [address, activeAirdrop.airdropId],
+      });
       setHasClaimed(claimed);
     } catch (error) {
       console.error("Error checking claim status:", error);
@@ -92,15 +102,21 @@ const AirdropDetails = () => {
   const handleApprove = async (airdropId) => {
     setApproveLoadingId(airdropId);
     try {
-      const signer = await signerPromise;
-      const communityContract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
-      const tx = await communityContract.approveAirdropProposal(airdropId);
+      const signer = await client;
+      const communityContract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
+
+      const tx = await prepareContractCall({
+        contract: communityContract,
+        method: "function approveAirdropProposal(uint256 _airdropId)",
+        params: [airdropId],
+      });
       toast.info("Approving Airdrop Proposal...");
-      await tx.wait();
+      await sendTransaction(tx);
       toast.success("Airdrop Proposal Approved!");
       fetchAirdropProposals();
     } catch (error) {
@@ -115,15 +131,21 @@ const AirdropDetails = () => {
     if (!activeAirdrop) return;
     setClaimLoading(true);
     try {
-      const signer = await signerPromise;
-      const communityContract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
-      const tx = await communityContract.claimAirdrop(activeAirdrop.airdropId);
+      const signer = await client;
+      const communityContract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
+
+      const tx = await prepareContractCall({
+        contract: communityContract,
+        method: "function claimAirdrop(uint256 _airdropId)",
+        params: [activeAirdrop.airdropId],
+      });
       toast.info("Claiming Airdrop...");
-      await tx.wait();
+      await sendTransaction(tx);
       toast.success("Airdrop Claimed Successfully! 🎉");
       fetchAirdropProposals();
     } catch (error) {

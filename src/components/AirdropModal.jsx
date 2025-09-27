@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { X, Gift, Calendar } from "lucide-react";
 import { ethers } from "ethers";
-import { useEthersSigner } from "./useClientSigner";
 import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
 import { toast, ToastContainer } from "react-toastify";
+import { client } from "../services/client";
+import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
+import { defineChain } from "thirdweb/chains";
 
 const Community_ABI = CommunityABI.abi;
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
@@ -17,18 +19,18 @@ const AirdropModal = ({ setShowAirdropModal }) => {
   const [distributeAirdropsLoading, setDistributeAirdropsLoading] =
     useState(false);
   const [error, setError] = useState("");
-  const signerPromise = useEthersSigner();
 
   const handleAirdrop = async () => {
     try {
       setDistributeAirdropsLoading(true);
 
-      const signer = await signerPromise;
-      const communityContract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const signer = await client;
+      const communityContract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
 
       // Convert datetime strings to Unix timestamps
       const startTimestamp = Math.floor(
@@ -38,14 +40,18 @@ const AirdropModal = ({ setShowAirdropModal }) => {
         new Date(airdropData.endTime).getTime() / 1000
       );
 
-      // Call your contract function with the new parameters
-      const tx = await communityContract.createAirdropProposal(
-        ethers.parseEther(airdropData.amount),
-        startTimestamp,
-        endTimestamp
-      );
-
-      await tx.wait();
+      const tx = await prepareContractCall({
+        contract: communityContract,
+        method:
+          "function createAirdropProposal(uint256 _amount, uint256 _startTime, uint256 _endTime) returns (bool)",
+        params: [
+          ethers.parseEther(airdropData.amount),
+          startTimestamp,
+          endTimestamp,
+        ],
+      });
+      const response = await sendTransaction(tx);
+      await response.wait();
 
       // Success handling
       toast.success("Airdrop proposal submitted successfully");

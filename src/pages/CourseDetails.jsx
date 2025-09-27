@@ -36,6 +36,15 @@ import Certificate from "../components/Certificate";
 import { useCertificates } from "../contexts/certificatesContext";
 import { useProfile } from "../contexts/ProfileContext";
 import { CSSTransition } from "react-transition-group";
+import { useActiveAccount } from "thirdweb/react";
+import { client } from "../services/client";
+import {
+  getContract,
+  prepareContractCall,
+  readContract,
+  sendTransaction,
+} from "thirdweb";
+import { defineChain } from "thirdweb/chains";
 
 const EcosystemDiamondAddress = import.meta.env
   .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
@@ -205,23 +214,28 @@ const Quiz = memo(({ quiz, courseId }) => {
   const [attempts, setAttempts] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
   const [lockEndTime, setLockEndTime] = useState(null);
-  const signerPromise = useEthersSigner();
-  const { address } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
   const [completedQuizIds, setCompletedQuizIds] = useState(new Set());
   const { quizzes } = useContext(QuizContext);
 
   useEffect(() => {
     const fetchCompletedQuizzes = async () => {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem2Facet_ABI,
-        signer
-      );
+      const signer = await client;
 
-      const completedQuizzes = await contract.getUserCompletedQuizzesByCourse(
-        courseId
-      );
+      const contract = await getContract({
+        address: EcosystemDiamondAddress,
+        abi: Ecosystem2Facet_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
+
+      const completedQuizzes = await readContract({
+        contract,
+        method:
+          "function getUserCompletedQuizzesByCourse(uint256 _courseId) view returns (uint256[])",
+        params: [courseId],
+      });
 
       // Special case handling: if the only value is "0" and there's no quiz with ID 0
       if (
@@ -247,19 +261,26 @@ const Quiz = memo(({ quiz, courseId }) => {
     };
 
     fetchCompletedQuizzes();
-  }, [courseId, signerPromise, quizzes]);
+  }, [courseId, client, quizzes]);
 
   useEffect(() => {
     const checkQuizLock = async () => {
       try {
-        const signer = await signerPromise;
-        const contract = new ethers.Contract(
-          EcosystemDiamondAddress,
-          Ecosystem2Facet_ABI,
-          signer
-        );
+        const signer = await client;
+        const contract = await getContract({
+          address: EcosystemDiamondAddress,
+          abi: Ecosystem2Facet_ABI,
+          signer,
+          chain: defineChain(1020352220),
+        });
 
-        const lockTime = await contract.getQuizLockTime(quiz.quizId, address);
+        const lockTime = await readContract({
+          contract,
+          method:
+            "function getQuizLockTime(uint256 _quizId, address _user) view returns (uint256)",
+          params: [quiz.quizId, address],
+        });
+
         if (lockTime > 0) {
           const sixHoursInSeconds = BigInt(6 * 60 * 60);
           const currentTime = BigInt(Math.floor(Date.now() / 1000));
@@ -274,7 +295,7 @@ const Quiz = memo(({ quiz, courseId }) => {
     };
 
     checkQuizLock();
-  }, [quiz.quizId, signerPromise, address]);
+  }, [quiz.quizId, client, address]);
 
   const handleNext = useCallback(() => {
     if (currentQuestionIndex < quiz.questions.length - 1) {
@@ -333,12 +354,14 @@ const Quiz = memo(({ quiz, courseId }) => {
 
       if (attempts + 1 >= 3) {
         try {
-          const signer = await signerPromise;
-          const contract = new ethers.Contract(
-            EcosystemDiamondAddress,
-            Ecosystem2Facet_ABI,
-            signer
-          );
+          const signer = await client;
+
+          const contract = await getContract({
+            address: EcosystemDiamondAddress,
+            abi: Ecosystem2Facet_ABI,
+            signer,
+            chain: defineChain(1020352220),
+          });
 
           const courseIdBN = BigInt(courseId);
           const quizIdBN = BigInt(quiz.quizId);
@@ -348,11 +371,13 @@ const Quiz = memo(({ quiz, courseId }) => {
             quizId: quizIdBN.toString(),
           });
 
-          const tx = await contract.lockQuiz(courseIdBN, quizIdBN, {
-            gasLimit: 300000,
+          const tx = await prepareContractCall({
+            contract,
+            method: "function lockQuiz(uint256 _courseId, uint256 _quizId)",
+            params: [courseIdBN, quizIdBN],
           });
 
-          await tx.wait();
+          await sendTransaction(tx);
           console.log("Quiz locked successfully");
 
           // Update UI to reflect locked state
@@ -362,12 +387,14 @@ const Quiz = memo(({ quiz, courseId }) => {
         }
       }
 
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem2Facet_ABI,
-        signer
-      );
+      const signer = await client;
+
+      const contract = await getContract({
+        address: EcosystemDiamondAddress,
+        abi: Ecosystem2Facet_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
 
       // Convert IDs to numbers for validation
       const courseIdNum = Number(courseId);
@@ -399,17 +426,14 @@ const Quiz = memo(({ quiz, courseId }) => {
       );
 
       // Proceed with contract call...
-      const tx = await contract.submitQuiz(
-        courseIdBN,
-        quizIdBN,
-        answersArray,
-        BigInt(calculatedScore),
-        {
-          gasLimit: 500000,
-        }
-      );
+      const tx = await prepareContractCall({
+        contract,
+        method:
+          "function submitQuiz(uint256 _courseId, uint256 _quizId, uint256[] _answers, uint256 _score) returns (bool)",
+        params: [ourseIdBN, quizIdBN, answersArray, BigInt(calculatedScore)],
+      });
 
-      await tx.wait();
+      await sendTransaction(tx);
     } catch (error) {
       console.error("Quiz submission error:", {
         error,
@@ -424,14 +448,7 @@ const Quiz = memo(({ quiz, courseId }) => {
       });
       throw error;
     }
-  }, [
-    calculateScore,
-    attempts,
-    quiz,
-    selectedAnswers,
-    signerPromise,
-    courseId,
-  ]);
+  }, [calculateScore, attempts, quiz, selectedAnswers, client, courseId]);
 
   // Helper function to parse errors
   function parseSubmissionError(error) {
@@ -766,7 +783,8 @@ const CourseDetails = memo(({ courseId }) => {
   const [activeChapterId, setActiveChapterId] = useState(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const { role } = useUser();
-  const { address } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
   const [completedLessons, setCompletedLessons] = useState(0);
   const signerPromise = useEthersSigner();
   const [completedLessonIds, setCompletedLessonIds] = useState(new Set());
@@ -787,16 +805,21 @@ const CourseDetails = memo(({ courseId }) => {
 
   useEffect(() => {
     const fetchCompletedLessons = async () => {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem2Facet_ABI,
-        signer
-      );
+      const signer = await client;
 
-      const completedLessons = await contract.getUserCompletedLessonsByCourse(
-        courseId
-      );
+      const contract = await getContract({
+        address: EcosystemDiamondAddress,
+        abi: Ecosystem2Facet_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
+
+      const completedLessons = await readContract({
+        contract,
+        method:
+          "function getUserCompletedLessonsByCourse(uint256 _courseId) view returns (uint256[])",
+        params: [courseId],
+      });
 
       // Special case handling: if the only value is "0" and there's no lesson with ID 0
       if (
@@ -824,20 +847,25 @@ const CourseDetails = memo(({ courseId }) => {
     };
 
     fetchCompletedLessons();
-  }, [courseId, signerPromise, lessons]);
+  }, [courseId, client, lessons]);
 
   useEffect(() => {
     const fetchCompletedQuizzes = async () => {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem2Facet_ABI,
-        signer
-      );
+      const signer = await client;
 
-      const completedQuizzes = await contract.getUserCompletedQuizzesByCourse(
-        courseId
-      );
+      const contract = await getContract({
+        address: EcosystemDiamondAddress,
+        abi: Ecosystem2Facet_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
+
+      const completedQuizzes = await readContract({
+        contract,
+        method:
+          "function getUserCompletedQuizzesByCourse(uint256 _courseId) view returns (uint256[])",
+        params: [courseId],
+      });
 
       // Special case handling: if the only value is "0" and there's no quiz with ID 0
       if (
@@ -863,7 +891,7 @@ const CourseDetails = memo(({ courseId }) => {
     };
 
     fetchCompletedQuizzes();
-  }, [courseId, signerPromise, quizzes]);
+  }, [courseId, client, quizzes]);
 
   const markAsRead = async (courseId, chapterId, lessonId) => {
     // Add lesson to loading state
@@ -882,32 +910,27 @@ const CourseDetails = memo(({ courseId }) => {
         lessonId: lessonIdBN.toString(),
       });
 
-      const signer = await signerPromise;
-      if (!signer) {
-        throw new Error("No signer available");
-      }
+      const signer = await client;
 
-      const contract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem2Facet_ABI,
-        signer
-      );
+      const contract = await getContract({
+        address: EcosystemDiamondAddress,
+        abi: Ecosystem2Facet_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
 
       try {
-        // Send transaction with fixed gas limit for now
-        const tx = await contract.markAsRead(
-          courseIdBN,
-          chapterIdBN,
-          lessonIdBN,
-          {
-            gasLimit: 300000, // Fixed gas limit
-          }
-        );
+        const tx = await prepareContractCall({
+          contract,
+          method:
+            "function markAsRead(uint256 _courseId, uint256 _chapterId, uint256 _lessonId) returns (bool)",
+          params: [courseIdBN, chapterIdBN, lessonIdBN],
+        });
 
         console.log("Transaction sent:", tx.hash);
 
         // Wait for transaction confirmation
-        const receipt = await tx.wait();
+        const receipt = await sendTransaction(tx);
         console.log("Transaction confirmed:", receipt);
 
         // Update local state only after confirmation
@@ -1259,6 +1282,7 @@ const CourseDetails = memo(({ courseId }) => {
   };
 
   //handle claim certificate
+  //Leave it for now
   const handleClaimCertificate = async () => {
     try {
       const signer = await signerPromise;

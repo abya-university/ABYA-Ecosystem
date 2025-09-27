@@ -2,7 +2,13 @@ import React, { useEffect, useState } from "react";
 import { Award, CircleSlash2, Coins, Sparkles, Zap } from "lucide-react";
 import { Trophy, Medal } from "lucide-react";
 import { useCommunityMembers } from "../contexts/communityMembersContext";
-import { useAccount } from "wagmi";
+import { useActiveAccount } from "thirdweb/react";
+import {
+  defineChain,
+  getContract,
+  prepareContractCall,
+  sendTransaction,
+} from "thirdweb";
 
 // Mapping of BadgeLevel enum to display properties
 const BADGE_DISPLAY_MAP = {
@@ -42,7 +48,9 @@ const RewardsSection = () => {
   const [userBadge, setUserBadge] = useState(null);
   const { memberBadgeDetails, fetchMemberBadgeDetails, members } =
     useCommunityMembers();
-  const { address, isConnected } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
 
   useEffect(() => {
     fetchMemberBadgeDetails(address);
@@ -68,15 +76,20 @@ const RewardsSection = () => {
       setClaimRewardsLoading(true);
 
       try {
-        const signer = await signerPromise;
-        const contract = new ethers.Contract(
-          CommunityAddress,
-          Community_ABI,
-          signer
-        );
+        const signer = await client;
+        const contract = await getContract({
+          address: import.meta.env.VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS,
+          abi: Ecosystem2FacetABI.abi,
+          signer,
+          chain: defineChain(1020352220),
+        });
 
-        const tx = await contract.claimBadgeRewards();
-        await tx.wait();
+        const tx = await prepareContractCall({
+          contract,
+          method: "function claimBadgeRewards()",
+          params: [],
+        });
+        await sendTransaction(tx);
 
         toast.success("Badge rewards claimed successfully!");
       } catch (error) {
@@ -86,10 +99,12 @@ const RewardsSection = () => {
     };
 
     return (
-      <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-xl shadow-lg p-6 mb-6 text-white">
+      <div className="dark:bg-gradient-to-r dark:from-gray-800 dark:to-gray-900 rounded-xl shadow-lg p-6 mb-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-bold mb-2">Your Badge</h3>
+            <h3 className="text-xl font-bold mb-2 dark:text-gray-200 text-gray-600">
+              Your Badge
+            </h3>
             <div className="flex items-center gap-3">
               {members.includes(address) ? (
                 badgeInfo.icon
@@ -115,7 +130,7 @@ const RewardsSection = () => {
                 )}
               </span>
             </div>
-            <p className="text-gray-300 mt-2">
+            <p className="dark:text-gray-300 text-gray-500 mt-2">
               Current Level:{" "}
               {members.includes(address) ? badgeInfo.requirements : "N/A"}
             </p>

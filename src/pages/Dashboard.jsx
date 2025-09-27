@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from "react";
+import { useState, useContext, useEffect } from "react";
 import {
   Wallet,
   LineChart,
@@ -14,18 +14,19 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { CourseContext } from "../contexts/courseContext";
-import { useUser } from "../contexts/userContext";
-import { useAccount } from "wagmi";
 import ProfileConnection from "../components/ProfileConnection";
 import { useProfile } from "../contexts/ProfileContext";
 import ProgressBar from "../components/progressBar";
 import { ChapterContext } from "../contexts/chapterContext";
-import { useEthersSigner } from "../components/useClientSigner";
 import { LessonContext } from "../contexts/lessonContext";
 import { QuizContext } from "../contexts/quizContext";
 import { useCertificates } from "../contexts/certificatesContext";
-import { ethers } from "ethers";
 import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
+import { useActiveAccount } from "thirdweb/react";
+import { client } from "../services/client";
+import { getContract, readContract } from "thirdweb";
+import { useUser } from "../contexts/userContext";
+import { defineChain } from "thirdweb/chains";
 
 const EcosystemDiamondAddress = import.meta.env
   .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
@@ -36,9 +37,9 @@ const Dashboard = ({ onCourseSelect }) => {
   const { courses } = useContext(CourseContext);
   const { role } = useUser();
   const { profile } = useProfile();
-  const { address } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
   const { chapters, fetchChapters, setChapters } = useContext(ChapterContext);
-  const signerPromise = useEthersSigner();
   const { lessons } = useContext(LessonContext);
   const { quizzes } = useContext(QuizContext);
   const { certificates } = useCertificates();
@@ -193,21 +194,24 @@ const Dashboard = ({ onCourseSelect }) => {
   // Function to fetch completion data for a specific course
   const fetchCompletionDataForCourse = async (courseId) => {
     try {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem2Facet_ABI,
-        signer
-      );
+      const signer = await client;
+      const contract = await getContract({
+        address: EcosystemDiamondAddress,
+        abi: Ecosystem2Facet_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
 
       // Get lessons and quizzes for this specific course
       const courseLessons = getLessonsForCourse(courseId);
       const courseQuizzes = getQuizzesForCourse(courseId);
 
-      // Fetch completed lessons for this course
-      const completedLessons = await contract.getUserCompletedLessonsByCourse(
-        courseId
-      );
+      const completedLessons = await readContract({
+        contract,
+        method:
+          "function getUserCompletedLessonsByCourse(uint256 _courseId) view returns (uint256[])",
+        params: [courseId],
+      });
 
       let completedLessonIds = new Set();
       if (
@@ -324,7 +328,7 @@ const Dashboard = ({ onCourseSelect }) => {
     };
 
     fetchAllCompletionData();
-  }, [enrolledCourses, signerPromise, lessons, quizzes, chapters]);
+  }, [enrolledCourses, client, lessons, quizzes, chapters]);
 
   return (
     <div

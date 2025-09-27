@@ -1,11 +1,16 @@
 import { useProjectProposals } from "../contexts/projectProposalsContext";
 import { useEffect, useState } from "react";
 import { useUser } from "../contexts/userContext";
-import { ethers } from "ethers";
-import { useAccount } from "wagmi";
 import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
-import { useEthersSigner } from "../components/useClientSigner";
 import { toast } from "react-toastify";
+import { useActiveAccount } from "thirdweb/react";
+import { client } from "../services/client";
+import {
+  defineChain,
+  getContract,
+  prepareContractCall,
+  sendTransaction,
+} from "thirdweb";
 
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
 const Community_ABI = CommunityABI.abi;
@@ -15,13 +20,15 @@ const ProjectDetails = () => {
   const [selectedProject, setSelectedProject] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const { role } = useUser();
-  const { address } = useAccount();
-  const signerPromise = useEthersSigner();
+  const account = useActiveAccount();
+  const address = account?.address;
   const [isApproveLoading, setIsApproveLoading] = useState(false);
   const [isRejectLoading, setIsRejectLoading] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [showReasonInput, setShowReasonInput] = useState(false);
   const [error, setError] = useState("");
+
+  console.log("Projects:", proposals);
 
   useEffect(() => {
     fetchProposals();
@@ -89,17 +96,22 @@ const ProjectDetails = () => {
   const handleApprove = async () => {
     setIsApproveLoading(true);
     try {
-      const signer = await signerPromise;
-      const communityContract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const signer = await client;
 
-      const tx = await communityContract.approveProjectProposal(
-        selectedProject.id
-      );
-      await tx.wait();
+      const communityContract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
+
+      const tx = await prepareContractCall({
+        contract: communityContract,
+        method: "function approveProjectProposal(uint256 _proposalId)",
+        params: [selectedProject.id],
+      });
+
+      await sendTransaction(tx);
       toast.success("Project approved successfully");
       setIsApproveLoading(false);
       closeModal();
@@ -116,18 +128,21 @@ const ProjectDetails = () => {
   const handleReject = async () => {
     setIsRejectLoading(true);
     try {
-      const signer = await signerPromise;
-      const communityContract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const signer = await client;
+      const communityContract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+      });
       console.log("Payload: ", selectedProject.id, rejectReason);
-      const tx = await communityContract.rejectProjectProposal(
-        selectedProject.id,
-        rejectReason
-      );
-      await tx.wait();
+
+      const tx = await prepareContractCall({
+        contract: communityContract,
+        method:
+          "function rejectProjectProposal(uint256 _proposalId, string _reason)",
+        params: [selectedProject.id, rejectReason],
+      });
+      await sendTransaction(tx);
       toast.success("Project rejected successfully");
       setIsRejectLoading(false);
       setRejectReason("");

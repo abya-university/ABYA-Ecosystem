@@ -1,8 +1,9 @@
 import React, { createContext, useEffect, useState } from "react";
 import Ecosystem1FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem1Facet.sol/Ecosystem1Facet.json";
-import { useEthersSigner } from "../components/useClientSigner";
-import { useAccount } from "wagmi";
-import { ethers } from "ethers";
+import { defineChain } from "thirdweb/chains";
+import { useActiveAccount } from "thirdweb/react";
+import { getContract, readContract } from "thirdweb"; // Import readContract instead
+import { client } from "../services/client";
 
 const EcosystemDiamondAddress = import.meta.env
   .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
@@ -11,8 +12,8 @@ const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
 const CourseContext = createContext();
 
 const CourseProvider = ({ children }) => {
-  const { address } = useAccount();
-  const signer = useEthersSigner();
+  const account = useActiveAccount();
+  const address = account?.address || null;
   const [courses, setCourses] = useState([]);
   const [courseReviews, setCourseReviews] = useState({});
   const [latestReviews, setLatestReviews] = useState({});
@@ -20,54 +21,37 @@ const CourseProvider = ({ children }) => {
 
   useEffect(() => {
     const fetchCourses = async () => {
-      // Wait for signer to be fully resolved
-      const resolvedSigner = await signer;
-
+      const resolvedSigner = await client;
       console.log("Resolved Signer:", resolvedSigner);
 
       if (resolvedSigner) {
         try {
-          const contract = new ethers.Contract(
-            EcosystemDiamondAddress,
-            Ecosystem1Facet_ABI,
-            resolvedSigner
-          );
+          const contract = getContract({
+            address: EcosystemDiamondAddress,
+            abi: Ecosystem1Facet_ABI,
+            client,
+            chain: defineChain(1020352220),
+          });
 
           console.log("Contract instance:", contract);
 
           try {
-            const coursesData = await contract.getAllCourses();
-            console.log("Raw Courses Data:", coursesData);
-
-            // Debug raw approved values
-            coursesData.forEach((course, index) => {
-              console.log(
-                `Course ${index} raw approved value:`,
-                course.approved,
-                typeof course.approved
-              );
+            // Use readContract directly instead of useReadContract hook
+            const coursesData = await readContract({
+              contract,
+              method:
+                "function getAllCourses() view returns ((uint256 courseId, string courseName, string description, bool approved, uint256 score, address creator, bool exists, address[] enrolledStudents, uint8 difficultyLevel, uint256 creationTime)[])",
+              params: [],
             });
 
-            const formattedCourses = coursesData.map((course) => {
-              // For debugging
-              console.log(
-                `Course ${course.courseId.toString()} approved type:`,
-                typeof course.approved
-              );
-              console.log(
-                `Course ${course.courseId.toString()} approved value:`,
-                course.approved
-              );
+            console.log("Raw Courses Data:", coursesData);
 
+            const formattedCourses = coursesData.map((course) => {
               return {
                 courseId: course.courseId.toString(),
                 courseName: course.courseName,
                 description: course.description,
-                // More explicit conversion - handle both boolean and BigNumber types
-                approved:
-                  course.approved === true ||
-                  (typeof course.approved === "object" &&
-                    !course.approved.isZero()),
+                approved: course.approved,
                 score: course.score.toString(),
                 creator: course.creator,
                 enrolledStudents: course.enrolledStudents.map((student) =>
@@ -81,12 +65,12 @@ const CourseProvider = ({ children }) => {
             console.log("Formatted Courses:", formattedCourses);
             setCourses(formattedCourses);
 
-            // After fetching courses, fetch reviews and feedback for each
-            formattedCourses.forEach((course) => {
-              fetchCourseReviews(contract, course.courseId);
-              fetchLatestReview(contract, course.courseId);
-              fetchCourseFeedback(contract, course.courseId);
-            });
+            // Fetch reviews and feedback for each course
+            for (const course of formattedCourses) {
+              await fetchCourseReviews(contract, course.courseId);
+              await fetchLatestReview(contract, course.courseId);
+              await fetchCourseFeedback(contract, course.courseId);
+            }
           } catch (fetchError) {
             console.error("Error fetching courses:", fetchError);
           }
@@ -99,7 +83,7 @@ const CourseProvider = ({ children }) => {
     };
 
     fetchCourses();
-  }, [signer]); // Dependency on signer ensures it runs when signer is ready
+  }, [client]);
 
   // Function to fetch all reviews for a course
   const fetchCourseReviews = async (contract, courseId) => {
@@ -110,10 +94,17 @@ const CourseProvider = ({ children }) => {
 
     try {
       console.log(`Fetching all reviews for course ${courseId}`);
-      const reviews = await contract.getAllCourseReviews(courseId);
+
+      // Use readContract directly
+      const reviews = await readContract({
+        contract,
+        method:
+          "function getAllCourseReviews(uint256 courseId) view returns ((uint256 learnerAgency, uint256 criticalThinking, uint256 collaborativeLearning, uint256 reflectivePractice, uint256 adaptiveLearning, uint256 authenticLearning, uint256 technologyIntegration, uint256 learnerSupport, uint256 assessmentForLearning, uint256 engagementAndMotivation, bool isSubmitted, string category, uint256 score, bool passed)[])",
+        params: [courseId],
+      });
+
       console.log("Raw reviews data:", reviews);
 
-      // Check if we have reviews
       if (!reviews || reviews.length === 0) {
         console.log("No reviews found for this course");
         setCourseReviews((prev) => ({
@@ -123,35 +114,22 @@ const CourseProvider = ({ children }) => {
         return;
       }
 
-      // Format the reviews array, handling different possible formats
-      const formattedReviews = [];
-      for (let i = 0; i < reviews.length; i++) {
-        const review = reviews[i];
-        formattedReviews.push({
-          learnerAgency: Number(review.learnerAgency || review[0] || 0),
-          criticalThinking: Number(review.criticalThinking || review[1] || 0),
-          collaborativeLearning: Number(
-            review.collaborativeLearning || review[2] || 0
-          ),
-          reflectivePractice: Number(
-            review.reflectivePractice || review[3] || 0
-          ),
-          adaptiveLearning: Number(review.adaptiveLearning || review[4] || 0),
-          authenticLearning: Number(review.authenticLearning || review[5] || 0),
-          technologyIntegration: Number(
-            review.technologyIntegration || review[6] || 0
-          ),
-          learnerSupport: Number(review.learnerSupport || review[7] || 0),
-          assessmentForLearning: Number(
-            review.assessmentForLearning || review[8] || 0
-          ),
-          engagementAndMotivation: Number(
-            review.engagementAndMotivation || review[9] || 0
-          ),
-          isSubmitted: Boolean(review.isSubmitted || review[10] || false),
-          category: review.category || review[11] || "General",
-        });
-      }
+      const formattedReviews = reviews.map((review) => ({
+        learnerAgency: Number(review.learnerAgency),
+        criticalThinking: Number(review.criticalThinking),
+        collaborativeLearning: Number(review.collaborativeLearning),
+        reflectivePractice: Number(review.reflectivePractice),
+        adaptiveLearning: Number(review.adaptiveLearning),
+        authenticLearning: Number(review.authenticLearning),
+        technologyIntegration: Number(review.technologyIntegration),
+        learnerSupport: Number(review.learnerSupport),
+        assessmentForLearning: Number(review.assessmentForLearning),
+        engagementAndMotivation: Number(review.engagementAndMotivation),
+        isSubmitted: Boolean(review.isSubmitted),
+        category: review.category,
+        score: Number(review.score),
+        passed: Boolean(review.passed),
+      }));
 
       setCourseReviews((prev) => ({
         ...prev,
@@ -159,12 +137,10 @@ const CourseProvider = ({ children }) => {
       }));
     } catch (error) {
       console.error(`Error fetching reviews for course ${courseId}:`, error);
-      if (error.message.includes("No reviews for this course")) {
-        setCourseReviews((prev) => ({
-          ...prev,
-          [courseId]: [],
-        }));
-      }
+      setCourseReviews((prev) => ({
+        ...prev,
+        [courseId]: [],
+      }));
     }
   };
 
@@ -177,55 +153,35 @@ const CourseProvider = ({ children }) => {
 
     try {
       console.log(`Fetching latest review for course ${courseId}`);
-      const latestReview = await contract.getLatestCourseReview(courseId);
+
+      // Use readContract directly
+      const latestReview = await readContract({
+        contract,
+        method:
+          "function getLatestCourseReview(uint256 courseId) view returns ((uint256 learnerAgency, uint256 criticalThinking, uint256 collaborativeLearning, uint256 reflectivePractice, uint256 adaptiveLearning, uint256 authenticLearning, uint256 technologyIntegration, uint256 learnerSupport, uint256 assessmentForLearning, uint256 engagementAndMotivation, bool isSubmitted, string category, uint256 score, bool passed))",
+        params: [courseId],
+      });
+
       console.log("Raw latest review data:", latestReview);
 
-      const safeNumber = (value) => {
-        if (typeof value === "bigint") return Number(value);
-        return Number(value || 0);
-      };
-
-      // Create a properly formatted object, handling all possible formats
       const formattedReview = {
-        learnerAgency: safeNumber(
-          latestReview?.learnerAgency || latestReview[0] || 0
-        ),
-        criticalThinking: safeNumber(
-          latestReview?.criticalThinking || latestReview[1] || 0
-        ),
-        collaborativeLearning: safeNumber(
-          latestReview?.collaborativeLearning || latestReview[2] || 0
-        ),
-        reflectivePractice: safeNumber(
-          latestReview?.reflectivePractice || latestReview[3] || 0
-        ),
-        adaptiveLearning: safeNumber(
-          latestReview?.adaptiveLearning || latestReview[4] || 0
-        ),
-        authenticLearning: safeNumber(
-          latestReview?.authenticLearning || latestReview[5] || 0
-        ),
-        technologyIntegration: safeNumber(
-          latestReview?.technologyIntegration || latestReview[6] || 0
-        ),
-        learnerSupport: safeNumber(
-          latestReview?.learnerSupport || latestReview[7] || 0
-        ),
-        assessmentForLearning: safeNumber(
-          latestReview?.assessmentForLearning || latestReview[8] || 0
-        ),
-        engagementAndMotivation: safeNumber(
-          latestReview?.engagementAndMotivation || latestReview[9] || 0
-        ),
-        isSubmitted: Boolean(
-          latestReview?.isSubmitted || latestReview[10] || false
-        ),
-        category: latestReview?.category || latestReview[11] || "General",
-        score: safeNumber(latestReview?.score || latestReview[12] || 0),
-        passed: Boolean(latestReview?.passed || latestReview[13] || false),
+        learnerAgency: Number(latestReview.learnerAgency),
+        criticalThinking: Number(latestReview.criticalThinking),
+        collaborativeLearning: Number(latestReview.collaborativeLearning),
+        reflectivePractice: Number(latestReview.reflectivePractice),
+        adaptiveLearning: Number(latestReview.adaptiveLearning),
+        authenticLearning: Number(latestReview.authenticLearning),
+        technologyIntegration: Number(latestReview.technologyIntegration),
+        learnerSupport: Number(latestReview.learnerSupport),
+        assessmentForLearning: Number(latestReview.assessmentForLearning),
+        engagementAndMotivation: Number(latestReview.engagementAndMotivation),
+        isSubmitted: Boolean(latestReview.isSubmitted),
+        category: latestReview.category,
+        score: Number(latestReview.score),
+        passed: Boolean(latestReview.passed),
       };
 
-      console.log("Formated latest review data:", formattedReview);
+      console.log("Formatted latest review data:", formattedReview);
 
       setLatestReviews((prev) => ({
         ...prev,
@@ -251,7 +207,15 @@ const CourseProvider = ({ children }) => {
     }
 
     try {
-      const feedback = await contract.getCourseFeedback(courseId);
+      // Use readContract directly
+      const feedback = await readContract({
+        contract,
+        method:
+          "function getCourseFeedback(uint256 courseId) view returns (string)",
+        params: [courseId],
+      });
+
+      console.log(`Feedback for course ${courseId}:`, feedback);
 
       setCourseFeedback((prev) => ({
         ...prev,
@@ -264,24 +228,21 @@ const CourseProvider = ({ children }) => {
 
   // Function to fetch on demand for a specific course
   const getCourseData = async (courseId) => {
-    if (!courseId) {
-      console.warn("Invalid courseId passed to getCourseData");
-      return;
-    }
-
-    if (!signer) return;
-
-    const resolvedSigner = await signer;
-    const contract = new ethers.Contract(
-      EcosystemDiamondAddress,
-      Ecosystem1Facet_ABI,
-      resolvedSigner
-    );
+    if (!courseId || !client) return;
 
     try {
-      await fetchCourseReviews(contract, courseId);
-      await fetchLatestReview(contract, courseId);
-      await fetchCourseFeedback(contract, courseId);
+      const contract = getContract({
+        address: EcosystemDiamondAddress,
+        abi: Ecosystem1Facet_ABI,
+        client,
+        chain: defineChain(1020352220),
+      });
+
+      await Promise.all([
+        fetchCourseReviews(contract, courseId),
+        fetchLatestReview(contract, courseId),
+        fetchCourseFeedback(contract, courseId),
+      ]);
     } catch (error) {
       console.error(
         `Error fetching complete data for course ${courseId}:`,

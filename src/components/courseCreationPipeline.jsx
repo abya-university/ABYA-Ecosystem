@@ -10,8 +10,6 @@ import {
 } from "lucide-react";
 import Ecosystem1FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem1Facet.sol/Ecosystem1Facet.json";
 import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
-import { useEthersSigner } from "../components/useClientSigner";
-import { useAccount } from "wagmi";
 import { ethers } from "ethers";
 import { CourseContext } from "../contexts/courseContext";
 import { ChapterContext } from "../contexts/chapterContext";
@@ -20,6 +18,15 @@ import { QuizContext } from "../contexts/quizContext";
 import { uploadFileToPinata, uploadMetadataToIPFS } from "../components/pinata";
 import PreviewCourse from "../pages/PreviewCourse";
 import { toast, ToastContainer } from "react-toastify";
+import { useActiveAccount } from "thirdweb/react";
+import { client } from "../services/client";
+import {
+  getContract,
+  prepareContractCall,
+  readContract,
+  sendTransaction,
+} from "thirdweb";
+import { defineChain } from "thirdweb/chains";
 
 const EcosystemDiamondAddress = import.meta.env
   .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
@@ -40,10 +47,11 @@ const CourseCreationPipeline = () => {
     quizzes: [],
     resources: [],
   });
-  const signerPromise = useEthersSigner();
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
-  const { isConnected, address } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
   const [loading, setLoading] = useState(false);
   const { courses } = useContext(CourseContext);
   const { chapters, fetchChapters, setChapters } = useContext(ChapterContext);
@@ -55,23 +63,30 @@ const CourseCreationPipeline = () => {
   const createCourse = async () => {
     setLoading(true);
     try {
-      const signer = await signerPromise;
-      const diamondContract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem1Facet_ABI,
-        signer
-      );
+      const signer = await client;
+
+      const diamondContract = await getContract({
+        address: EcosystemDiamondAddress,
+        abi: Ecosystem1Facet_ABI,
+        signer: signer,
+        chain: defineChain(1020352220),
+      });
 
       console.log("Contract Details:", diamondContract);
       console.log("Transaction Params:", courseData.basicInfo);
 
-      const tx = await diamondContract.createCourse(
-        courseData.basicInfo.name,
-        courseData.basicInfo.description,
-        courseData.basicInfo.difficulty_level
-      );
+      const tx = await prepareContractCall({
+        contract: diamondContract,
+        method:
+          "function createCourse(string _courseName, string _description, uint8 _difficultyLevel) returns (bool)",
+        params: [
+          courseData.basicInfo.name,
+          courseData.basicInfo.description,
+          courseData.basicInfo.difficulty_level,
+        ],
+      });
       console.log("Transaction sent:", tx.hash);
-      const receipt = await tx.wait();
+      const receipt = await sendTransaction(tx);
       console.log("Transaction confirmed:", receipt.transactionHash);
       toast.success("Course created successfully!");
       setCourseData({
@@ -84,9 +99,15 @@ const CourseCreationPipeline = () => {
       });
 
       // Check if the role has been granted
-      const hasRole = await diamondContract.hasCourseOwnerRole(
-        signer.getAddress()
-      );
+      // const hasRole = await diamondContract.hasCourseOwnerRole(
+      //   signer.getAddress()
+      // );
+      const hasRole = await readContract({
+        contract: diamondContract,
+        method:
+          "function hasCourseOwnerRole(address account) view returns (bool)",
+        params: [account],
+      });
       console.log("Has COURSE_OWNER_ROLE:", hasRole);
 
       if (hasRole) {
@@ -268,7 +289,7 @@ const CourseCreationPipeline = () => {
       if (isConnected) {
         setLoading(true);
         try {
-          const signer = await signerPromise;
+          const signer = await client;
           if (!signer) {
             throw new Error("Signer is required to access the contract.");
           }
@@ -284,18 +305,26 @@ const CourseCreationPipeline = () => {
             throw new Error("Number of chapters and durations must match");
           }
 
-          const diamondContract = new ethers.Contract(
-            EcosystemDiamondAddress,
-            Ecosystem2Facet_ABI,
-            signer
-          );
+          const diamondContract = await getContract({
+            address: EcosystemDiamondAddress,
+            abi: Ecosystem2Facet_ABI,
+            signer: signer,
+            chain: defineChain(1020352220),
+          });
 
-          const tx = await diamondContract.addChapters(
-            parsedCourseId,
-            chapters,
-            durations
-          );
-          const receipt = await tx.wait();
+          // const tx = await diamondContract.addChapters(
+          //   parsedCourseId,
+          //   chapters,
+          //   durations
+          // );
+          const tx = await prepareContractCall({
+            contract: diamondContract,
+            method:
+              "function addChapters(uint256 _courseId, string[] _chapters, uint256[] _durations) returns (bool)",
+            params: [parsedCourseId, chapters, durations],
+          });
+          console.log("Transaction sent:", tx.hash);
+          const receipt = await sendTransaction(tx);
           console.log(receipt);
           setChapters([]);
           setDurations([]);
@@ -454,26 +483,29 @@ const CourseCreationPipeline = () => {
       } else {
         setLoading(true);
         try {
-          const signer = await signerPromise;
+          const signer = await client;
           if (!signer) {
             throw new Error("Signer is required to access the contract.");
           }
 
-          const diamondContract = new ethers.Contract(
-            EcosystemDiamondAddress,
-            Ecosystem2Facet_ABI,
-            signer
-          );
+          const diamondContract = await getContract({
+            address: EcosystemDiamondAddress,
+            abi: Ecosystem2Facet_ABI,
+            signer: signer,
+            chain: defineChain(1020352220),
+          });
           console.log("Chapter ID: ", chapterId);
           console.log("Lesson Name: ", lessonName);
           console.log("Lesson Content: ", lessonContent);
 
-          const tx = await diamondContract.addLesson(
-            chapterId.toString(),
-            lessonName,
-            lessonContent
-          );
-          const receipt = await tx.wait();
+          const tx = await prepareContractCall({
+            contract: diamondContract,
+            method:
+              "function addLesson(uint256 _chapterId, string _lessonName, string _lessonContent)",
+            params: [chapterId.toString(), lessonName, lessonContent],
+          });
+          console.log("Transaction sent:", tx.hash);
+          const receipt = await sendTransaction(tx);
           console.log(receipt);
           toast.success(`${lessonName} lesson created successfully!`);
           setLessonName("");
@@ -604,12 +636,6 @@ const CourseCreationPipeline = () => {
           </select>
         </div>
 
-        {/* <button
-          onClick={createLesson}
-          className="bg-yellow-500 text-black px-4 py-2 rounded-lg flex items-center"
-        >
-          Create Lesson
-        </button> */}
         <button
           onClick={createLesson}
           disabled={loading}
@@ -653,19 +679,27 @@ const CourseCreationPipeline = () => {
       setQuizLoading(true);
       try {
         // const lesson = lessons.find((lesson) => lesson.lessonId === lessonId);
-        const signer = await signerPromise;
+        const signer = await client;
 
-        const diamondContract = new ethers.Contract(
-          EcosystemDiamondAddress,
-          Ecosystem2Facet_ABI,
-          signer
-        );
+        const diamondContract = await getContract({
+          address: EcosystemDiamondAddress,
+          abi: Ecosystem2Facet_ABI,
+          signer: signer,
+          chain: defineChain(1020352220),
+        });
 
         console.log("Lesson Id: ", lessonId);
         console.log("Quiz Title: ", quizTitle);
 
-        const tx = await diamondContract.createQuiz(lessonId, quizTitle);
-        const receipt = await tx.wait();
+        // const tx = await diamondContract.createQuiz(lessonId, quizTitle);
+        const tx = await prepareContractCall({
+          contract: diamondContract,
+          method:
+            "function createQuiz(uint256 _lessonId, string _title) returns (uint256)",
+          params: [lessonId, quizTitle],
+        });
+        console.log("Transaction sent:", tx.hash);
+        const receipt = await sendTransaction(tx);
         console.log("Quiz created: ", receipt);
         setLessonId("");
         setQuizTitle("");
@@ -704,12 +738,14 @@ const CourseCreationPipeline = () => {
         }
         setLoading(true);
         try {
-          const signer = await signerPromise;
-          const diamondContract = new ethers.Contract(
-            EcosystemDiamondAddress,
-            Ecosystem2Facet_ABI,
-            signer
-          );
+          const signer = await client;
+
+          const diamondContract = await getContract({
+            address: EcosystemDiamondAddress,
+            abi: Ecosystem2Facet_ABI,
+            signer: signer,
+            chain: defineChain(1020352220),
+          });
 
           console.log("Quiz Id: ", quizId);
           console.log("Question: ", question);
@@ -719,14 +755,20 @@ const CourseCreationPipeline = () => {
           );
           console.log("Correct Option Index: ", correctOptionIndex);
 
-          const tx = await diamondContract.createQuestionWithChoices(
-            quizId,
-            question,
-            options.map((option) => option.text),
-            correctOptionIndex // Send the index of the correct option instead of boolean array
-          );
+          const tx = await prepareContractCall({
+            contract: diamondContract,
+            method:
+              "function createQuestionWithChoices(uint256 _quizId, string _questionText, string[] _options, uint8 _correctChoiceIndex)",
+            params: [
+              quizId,
+              question,
+              options.map((option) => option.text),
+              correctOptionIndex,
+            ],
+          });
+          console.log("Transaction sent:", tx.hash);
 
-          const receipt = await tx.wait();
+          const receipt = await sendTransaction(tx);
           toast.success("Question created successfully!!");
 
           // Reset inputs after adding
@@ -1013,21 +1055,24 @@ const CourseCreationPipeline = () => {
           name: resourceName,
         };
 
-        const signer = await signerPromise;
-        const diamondContract = new ethers.Contract(
-          EcosystemDiamondAddress,
-          Ecosystem2Facet_ABI,
-          signer
-        );
+        const signer = await client;
 
-        // Call contract with the new parameters
-        const tx = await diamondContract.addResourcesToLesson(
-          lessonId,
-          ContentTypeEnum[contentType],
-          [newResource] // Pass as array to match contract function
-        );
+        const diamondContract = await getContract({
+          address: EcosystemDiamondAddress,
+          abi: Ecosystem2Facet_ABI,
+          signer: signer,
+          chain: defineChain(1020352220),
+        });
 
-        const receipt = await tx.wait();
+        const tx = await prepareContractCall({
+          contract: diamondContract,
+          method:
+            "function addResourcesToLesson(uint256 _lessonId, uint8 contentType, (uint8 contentType, string url, string name)[] _resources)",
+          params: [lessonId, ContentTypeEnum[contentType], [newResource]],
+        });
+        console.log("Transaction sent:", tx.hash);
+
+        const receipt = await sendTransaction(tx);
         console.log("Resources added to lesson:", receipt);
 
         // Update local state

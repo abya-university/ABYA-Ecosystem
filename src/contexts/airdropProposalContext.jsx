@@ -1,9 +1,9 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { ethers } from "ethers";
-import { useAccount } from "wagmi";
+import { createContext, useContext, useState, useEffect } from "react";
 import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
-import { useEthersSigner } from "../components/useClientSigner";
 import { toast } from "react-toastify";
+import { useActiveAccount } from "thirdweb/react";
+import { client } from "../services/client";
+import { getContract, readContract } from "thirdweb";
 
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
 const Community_ABI = CommunityABI.abi;
@@ -18,8 +18,9 @@ export const AirdropProposalProvider = ({ children }) => {
   const [airdropProposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const signerPromise = useEthersSigner();
-  const { isConnected } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
 
   // Format proposals data from contract response
   const formatProposals = (proposalsData) => {
@@ -41,14 +42,20 @@ export const AirdropProposalProvider = ({ children }) => {
 
     setLoading(true);
     try {
-      const signer = await signerPromise;
-      const communityContract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const signer = await client;
+      const communityContract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+      });
 
-      const proposalsData = await communityContract.getAllAirdropProposals();
+      // const proposalsData = await communityContract.getAllAirdropProposals();
+      const proposalsData = await readContract({
+        contract: communityContract,
+        method:
+          "function getAllAirdropProposals() view returns ((uint256 airdropId, uint256 amount, uint256 startTime, uint256 endTime, bool isActive, uint256 approvalCount)[])",
+        params: [],
+      });
       const formattedProposals = formatProposals(proposalsData);
 
       setProposals(formattedProposals);
