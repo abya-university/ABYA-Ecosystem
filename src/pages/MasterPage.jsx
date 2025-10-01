@@ -14,6 +14,7 @@ import LiquidityPage from "./LiquidityPage";
 import AnalyticsPage from "./AnalyticsPage";
 import PortfolioPage from "./PortfolioPage";
 import LearningPath from "./LearningPath";
+import { useSearchParams } from "react-router-dom";
 
 const MasterPage = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -21,6 +22,7 @@ const MasterPage = () => {
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const [searchParams] = useSearchParams();
 
   // Handle responsive behavior
   useEffect(() => {
@@ -35,6 +37,13 @@ const MasterPage = () => {
 
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    const sectionFromUrl = searchParams.get("section");
+    if (sectionFromUrl) {
+      setActiveSection(sectionFromUrl);
+    }
+  }, [searchParams]);
 
   // 3D Illuminated Element Component
   const IlluminatedObject = ({ position, size, color, blur }) => (

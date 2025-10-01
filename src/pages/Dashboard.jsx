@@ -14,7 +14,6 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { CourseContext } from "../contexts/courseContext";
-import ProfileConnection from "../components/ProfileConnection";
 import { useProfile } from "../contexts/ProfileContext";
 import ProgressBar from "../components/progressBar";
 import { ChapterContext } from "../contexts/chapterContext";
@@ -359,7 +358,6 @@ const Dashboard = ({ onCourseSelect }) => {
               <ClipboardList className="w-4 h-4" />
               Take Survey
             </button>
-            {profile.did === null && <ProfileConnection />}
           </div>
         </div>
 

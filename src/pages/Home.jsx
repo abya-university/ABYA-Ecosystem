@@ -13,7 +13,7 @@ import {
   Send,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-// import { ConnectButton } from "@rainbow-me/rainbowkit";
+import AbyaLogo from "../assets/abya.svg";
 import { AbyaConnectButton } from "../providers/Providers2";
 
 import BitcoinLogo from "/bitcoin.svg";
@@ -142,8 +142,10 @@ const Footer = () => {
           {/* Brand Section */}
           <div>
             <div className="flex items-center space-x-2 mb-4">
-              <Globe className="text-yellow-500" size={32} />
-              <span className="text-2xl font-bold text-yellow-500">ABYA</span>
+              <div className="flex items-center space-x-2">
+                <img src={AbyaLogo} alt="ABYA Logo" className="w-30 h-10" />
+                <span className="text-2xl font-bold text-yellow-500">ABYA</span>
+              </div>
             </div>
             <p className="text-gray-400 mb-4">
               Revolutionizing education through blockchain and decentralized
@@ -225,10 +227,9 @@ const Home = () => {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-black/70 backdrop-blur-lg">
         <div className="container mx-auto flex justify-between items-center p-4">
           <div className="flex items-center space-x-2">
-            <Globe className="text-yellow-500" size={32} />
-            <span className="text-2xl font-bold text-yellow-500">
-              ABYA University
-            </span>
+            <div className="flex items-center space-x-2">
+              <img src="/abya_logo.jpg" alt="ABYA Logo" className="w-30 h-10" />
+            </div>
           </div>
           <div className="flex space-x-6">
             <a href="#" className="hover:text-yellow-500 transition-colors">

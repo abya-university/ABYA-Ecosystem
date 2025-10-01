@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   Settings,
   Bell,
@@ -17,7 +17,6 @@ import {
   UserCircle,
 } from "lucide-react";
 
-import { Link } from "react-router-dom";
 import { ethers } from "ethers";
 import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
 import { useEthersSigner } from "../components/useClientSigner";
@@ -25,11 +24,6 @@ import { toast, ToastContainer } from "react-toastify";
 import SFuelDistributor from "../providers/SFuelDistribution";
 import { useAccount } from "wagmi";
 import { useProfile } from "../contexts/ProfileContext";
-import Modal from "../components/ui/Modal";
-import ProfileForm from "./ProfileForm";
-import UpdateProfileForm from "./UpdateProfileForm";
-import ConnectProfile from "./ConnectProfile";
-import ProfileDash from "./ProfileDash";
 import ProfileDashboard from "./ProfileDash";
 
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
@@ -492,30 +486,6 @@ const SettingsPage = () => {
           </div>
         </div>
       </div>
-
-      {/* Modal for New Profile */}
-      {showCreateModal && (
-        <Modal onClose={() => setShowCreateModal(false)}>
-          <ProfileForm onClose={() => setShowCreateModal(false)} />
-        </Modal>
-      )}
-
-      {/* Modal for Update Profile */}
-      {showUpdateProfileModal && (
-        <Modal onClose={() => setShowUpdateProfileModal(false)}>
-          <UpdateProfileForm onClose={() => setShowUpdateProfileModal(false)} />
-        </Modal>
-      )}
-
-      {/* Modal for Connect Profile */}
-      {showConnectModal && (
-        <Modal onClose={() => setShowConnectModal(false)}>
-          <ConnectProfile
-            onClose={() => setShowConnectModal(false)}
-            onProfileConnected={handleProfileConnected}
-          />
-        </Modal>
-      )}
     </div>
   );
 };
