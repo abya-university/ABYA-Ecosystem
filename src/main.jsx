@@ -25,8 +25,8 @@ createRoot(document.getElementById("root")).render(
   <StrictMode>
     {/* Render WalletConnection globally */}
     <DidProvider>
-      <ProfileProvider>
-        <ThirdwebProvider>
+      <ThirdwebProvider>
+        <ProfileProvider>
           <ThemeProvider>
             <Providers>
               <BrowserRouter>
@@ -58,8 +58,8 @@ createRoot(document.getElementById("root")).render(
               </BrowserRouter>
             </Providers>
           </ThemeProvider>
-        </ThirdwebProvider>
-      </ProfileProvider>
+        </ProfileProvider>
+      </ThirdwebProvider>
     </DidProvider>
   </StrictMode>
 );

@@ -2,10 +2,9 @@ import { useState, useEffect } from "react";
 import { useTransactionHistory } from "../../contexts/fake-liquidity-test-contexts/historyContext";
 import { AlertCircle, CheckCircle } from "lucide-react";
 import { ethers } from "ethers";
-import USDC_ABI from "../../artifacts/fake-liquidity-abis/usdc.json";
-import ABYTKN_ABI from "../../artifacts/fake-liquidity-abis/abyatkn.json";
-
-import CONTRACT_ABI from "../../artifacts/fake-liquidity-abis/add_swap_contract.json";
+import CONTRACT_ABI from "../../artifacts/contracts/fake-liquidity-abis/add_swap_contract.json";
+import USDC_ABI from "../../artifacts/contracts/fake-liquidity-abis/usdc.json";
+import ABYTKN_ABI from "../../artifacts/contracts/fake-liquidity-abis/abyatkn.json";
 import { useActiveAccount } from "thirdweb/react";
 import { client } from "../../services/client";
 import {

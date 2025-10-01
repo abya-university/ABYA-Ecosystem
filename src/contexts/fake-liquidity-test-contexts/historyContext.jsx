@@ -6,9 +6,9 @@ import React, {
   useCallback,
 } from "react";
 import { ethers } from "ethers";
-import CONTRACT_ABI from "../../artifacts/fake-liquidity-abis/add_swap_contract.json";
-import USDC_ABI from "../../artifacts/fake-liquidity-abis/usdc.json";
-import ABYTKN_ABI from "../../artifacts/fake-liquidity-abis/abyatkn.json";
+import CONTRACT_ABI from "../../artifacts/contracts/fake-liquidity-abis/add_swap_contract.json";
+import USDC_ABI from "../../artifacts/contracts/fake-liquidity-abis/usdc.json";
+import ABYTKN_ABI from "../../artifacts/contracts/fake-liquidity-abis/abyatkn.json";
 import { useActiveAccount } from "thirdweb/react";
 import { getContract, readContract } from "thirdweb";
 import { client } from "../../services/client";

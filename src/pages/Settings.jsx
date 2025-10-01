@@ -30,6 +30,7 @@ import ProfileForm from "./ProfileForm";
 import UpdateProfileForm from "./UpdateProfileForm";
 import ConnectProfile from "./ConnectProfile";
 import ProfileDash from "./ProfileDash";
+import ProfileDashboard from "./ProfileDash";
 
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
 const Community_ABI = CommunityABI.abi;
@@ -216,66 +217,7 @@ const SettingsPage = () => {
             className="col-span-3 p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200
                 transform hover:scale-105 transition-transform duration-1000"
           >
-            {activeSection === "profile" && (
-              <div>
-                <h2 className="text-2xl font-semibold mb-6 text-yellow-500">
-                  Profile Management
-                </h2>
-
-                {/* Render ProfileDash if a profile is connected */}
-                {profileManagement.didDocument && profileManagement.profile ? (
-                  <ProfileDash
-                    did={profileManagement.didDocument}
-                    profile={profileManagement.profile}
-                  />
-                ) : (
-                  <>
-                    <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 border dark:border-none rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-medium">Create Profile</h3>
-                        <button
-                          onClick={() => setShowCreateModal(true)}
-                          className="text-yellow-500 hover:underline"
-                        >
-                          New Profile
-                        </button>
-                      </div>
-
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-medium">Update Profile</h3>
-                        <button
-                          onClick={() => setShowUpdateProfileModal(true)}
-                          className="text-yellow-500 hover:underline"
-                        >
-                          Update
-                        </button>
-                      </div>
-
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-medium">Profile Account</h3>
-                        <button
-                          onClick={() => setShowConnectModal(true)}
-                          className="text-yellow-500 hover:underline"
-                        >
-                          Open
-                        </button>
-                      </div>
-
-                      <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 rounded-lg p-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <Link2 className="w-5 h-5 text-yellow-500" />
-                            {firstName} {secondName} -{" "}
-                            {did && did.replace(/^(.{20}).*(.{4})$/, "$1…$2")}
-                          </div>
-                          <QrCode className="w-6 h-6 text-gray-500" />
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
+            {activeSection === "profile" && <ProfileDashboard />}
 
             {activeSection === "notifications" && (
               <div>

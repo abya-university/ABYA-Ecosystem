@@ -6,7 +6,7 @@ import React, {
   useCallback,
 } from "react";
 import { ethers } from "ethers";
-import contractAbi from "../../artifacts/fake-liquidity-abis/add_swap_contract.json";
+import contractAbi from "../../artifacts/contracts/fake-liquidity-abis/add_swap_contract.json";
 import { useActiveAccount } from "thirdweb/react";
 import { client } from "../../services/client";
 import { defineChain } from "thirdweb";
