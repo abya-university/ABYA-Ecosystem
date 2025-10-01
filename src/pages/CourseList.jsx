@@ -776,10 +776,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         contract,
         method: "function enroll(uint256 _courseId) returns (bool)",
         params: [courseId],
-        // Add manual gas settings to skip estimation
-        gas: 500000n, // Set a reasonable gas limit
-        gasPrice: 0n, // SKALE typically has 0 gas price
-        value: 0n, // Ensure no ETH is being sent
       });
 
       // Add timeout to sendTransaction
