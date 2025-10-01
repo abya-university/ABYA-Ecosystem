@@ -19,26 +19,27 @@ import {
 
 import { ethers } from "ethers";
 import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
-import { useEthersSigner } from "../components/useClientSigner";
 import { toast, ToastContainer } from "react-toastify";
 import SFuelDistributor from "../providers/SFuelDistribution";
-import { useAccount } from "wagmi";
 import { useProfile } from "../contexts/ProfileContext";
 import ProfileDashboard from "./ProfileDash";
+import { useActiveAccount } from "thirdweb/react";
+import { client } from "../services/client";
+import {
+  defineChain,
+  getContract,
+  prepareContractCall,
+  sendTransaction,
+} from "thirdweb";
 
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
 const Community_ABI = CommunityABI.abi;
 
 const SettingsPage = () => {
   const [activeSection, setActiveSection] = useState("profile");
-  const { address } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
   const [isCopied, setIsCopied] = useState(false);
-  const [profileManagement, setProfileManagement] = useState({
-    didDocument: null, // This will hold the DID when connected.
-    profile: null, // This will hold the profile JSON once connected.
-    verifiableCredentials: [],
-    linkedAccounts: [],
-  });
   const [notifications, setNotifications] = useState({
     email: true,
     push: false,
@@ -46,7 +47,6 @@ const SettingsPage = () => {
   });
   const [activeRoleTab, setActiveRoleTab] = useState("Admin");
   const [showAddRoleModal, setShowAddRoleModal] = useState(false);
-  const signerPromise = useEthersSigner();
   const [newRoleAddress, setNewRoleAddress] = useState("");
 
   const formatAddress = (addr) => {
@@ -73,18 +73,21 @@ const SettingsPage = () => {
   //handle add multisig approver
   const handleAddMultisigApprover = async () => {
     try {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
-      const tx = await contract.addMultiSigApprover(newRoleAddress);
-      await tx.wait();
+      const signer = await client;
+      const contract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
+      const tx = await prepareContractCall({
+        contract,
+        method: "function addMultiSigApprover(address newApprover)",
+        params: [newRoleAddress],
+      });
+
+      await sendTransaction(tx);
       toast.success("Multisig Approver added successfully");
-      // setTimeout(() => {
-      //   setShowAddRoleModal(false);
-      // }, 2000);
     } catch (error) {
       toast.error("Failed to add multisig approver", error);
     }
@@ -93,22 +96,25 @@ const SettingsPage = () => {
   //handle add reviewer
   const handleAddReviewer = async () => {
     try {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
-      const tx = await contract.addReviewer(newRoleAddress);
-      await tx.wait();
+      const signer = await client;
+      const contract = await getContract({
+        address: CommunityAddress,
+        abi: Community_ABI,
+        signer,
+        chain: defineChain(1020352220),
+      });
+
+      const tx = await prepareContractCall({
+        contract,
+        method: "function addReviewer(address newReviewer)",
+        params: [newRoleAddress],
+      });
+      await sendTransaction(tx);
       toast.success("Reviewer added successfully");
-      // setTimeout(() => {
-      //   setShowAddRoleModal(false);
-      // }, 2000);
     } catch (error) {
       toast.error("Failed to add reviewer", error);
     }
-  }; // FIXED: Added missing closing brace
+  };
 
   const toggleNotification = (type) => {
     setNotifications((prev) => ({
@@ -165,7 +171,6 @@ const SettingsPage = () => {
   };
 
   const { profile } = useProfile();
-  const { did, firstName, secondName, email } = profile || {};
 
   return (
     <div
@@ -447,17 +452,6 @@ const SettingsPage = () => {
                         </button>
                         <button
                           onClick={() => {
-                            // if (
-                            //   !newRoleAddress ||
-                            //   !newRoleAddress.startsWith("0x") ||
-                            //   newRoleAddress.length !== 42
-                            // ) {
-                            //   // Show error message
-                            //   toast.error(
-                            //     "Please enter a valid Ethereum address"
-                            //   );
-                            //   return;
-                            // }
                             // Call the appropriate function based on activeRoleTab
                             if (activeRoleTab === "Multisig Approver") {
                               handleAddMultisigApprover(newRoleAddress);
