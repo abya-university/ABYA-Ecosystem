@@ -6,6 +6,18 @@ import { createWallet, inAppWallet } from "thirdweb/wallets";
 import AbyaLogo from "../assets/abya.svg";
 import { useDarkMode } from "../contexts/themeContext";
 
+const skaleTitanTestnet = defineChain({
+  id: 1020352220,
+  rpc: `https://1020352220.rpc.thirdweb.com/${
+    import.meta.env.VITE_APP_THIRDWEB_CLIENT_ID
+  }`,
+  name: "SKALE Titan Hub Testnet",
+  nativeCurrency: { name: "sFUEL", symbol: "sFUEL", decimals: 18 },
+  blockExplorers: [
+    { name: "SKALE Explorer", url: "https://staging-explorer.skale.network" },
+  ],
+});
+
 export function AbyaConnectButton() {
   const { darkMode } = useDarkMode();
 
@@ -32,7 +44,7 @@ export function AbyaConnectButton() {
           sponsorGas: true,
         },
         smartAccount: {
-          chain: defineChain(1020352220),
+          chain: skaleTitanTestnet,
           sponsorGas: true,
         },
       }),

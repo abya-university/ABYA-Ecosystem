@@ -40,11 +40,10 @@ const AirdropDetails = () => {
     if (!activeAirdrop || !address) return;
 
     try {
-      const signer = await client;
       const communityContract = await getContract({
         address: CommunityAddress,
         abi: Community_ABI,
-        signer,
+        client,
         chain: defineChain(1020352220),
       });
 

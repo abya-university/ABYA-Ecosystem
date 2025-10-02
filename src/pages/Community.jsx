@@ -93,20 +93,18 @@ const CommunityPage = () => {
     fetchMembers();
   }, [members]);
 
-  console.log("Events: ", events);
-  console.log("Members: ", members);
+  // console.log("Events: ", events);
+  // console.log("Members: ", members);
 
   // Fetch badge data
   const fetchBadgeData = async () => {
     if (!isConnected) return;
 
     try {
-      const signer = await client;
-
       const contract = await getContract({
         address: CommunityAddress,
         abi: Community_ABI,
-        signer,
+        client,
         chain: defineChain(1020352220),
       });
 
@@ -128,11 +126,10 @@ const CommunityPage = () => {
     if (!isConnected || !address) return;
 
     try {
-      const signer = await client;
       const contract = await getContract({
         address: CommunityAddress,
         abi: Community_ABI,
-        signer,
+        client,
         chain: defineChain(1020352220),
       });
 
@@ -164,30 +161,48 @@ const CommunityPage = () => {
 
   //handle join community
   const handleJoinCommunity = async () => {
+    if (!isConnected) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+
     setJoinCommunityLoading(true);
 
     try {
-      const signer = await client;
-      const contract = await getContract({
+      const contract = getContract({
         address: CommunityAddress,
         abi: Community_ABI,
-        signer,
+        client,
         chain: defineChain(1020352220),
       });
 
-      const tx = await readContract({
+      const transaction = prepareContractCall({
         contract,
         method: "function joinCommunity() returns (bool)",
         params: [],
       });
 
-      await tx.wait();
+      const transactionHash = await sendTransaction(transaction);
+
+      console.log("Join community transaction hash:", transactionHash);
 
       toast.success("You've successfully joined the community!");
-      setJoinCommunityLoading(false);
+
+      // Refresh members list
+      fetchMembers();
     } catch (error) {
       console.error("Error joining community:", error);
-      toast.error("Failed to join community");
+
+      // More specific error messages
+      if (error.message.includes("already a member")) {
+        toast.error("You are already a member of this community");
+      } else if (error.message.includes("paymaster")) {
+        toast.error("Transaction failed. Please try again.");
+      } else {
+        toast.error("Failed to join community. Please try again!");
+      }
+    } finally {
+      setJoinCommunityLoading(false);
     }
   };
 
@@ -203,11 +218,10 @@ const CommunityPage = () => {
       const startTimeUnix = new Date(eventData.startTime).getTime() / 1000;
       const endTimeUnix = new Date(eventData.endTime).getTime() / 1000;
 
-      const signer = await client;
       const contract = await getContract({
         address: CommunityAddress,
         abi: Community_ABI,
-        signer,
+        client,
         chain: defineChain(1020352220),
       });
 
@@ -264,11 +278,10 @@ const CommunityPage = () => {
         .map((addr) => addr.trim())
         .filter((addr) => addr);
 
-      const signer = await client;
       const contract = await getContract({
         address: CommunityAddress,
         abi: Community_ABI,
-        signer,
+        client,
         chain: defineChain(1020352220),
       });
 
@@ -304,11 +317,10 @@ const CommunityPage = () => {
     setFundProjectLoading(true);
 
     try {
-      const signer = await client;
       const contract = await getContract({
         address: CommunityAddress,
         abi: Community_ABI,
-        signer,
+        client,
         chain: defineChain(1020352220),
       });
 

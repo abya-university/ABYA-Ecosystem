@@ -28,7 +28,7 @@ const ProjectDetails = () => {
   const [showReasonInput, setShowReasonInput] = useState(false);
   const [error, setError] = useState("");
 
-  console.log("Projects:", proposals);
+  // console.log("Projects:", proposals);
 
   useEffect(() => {
     fetchProposals();

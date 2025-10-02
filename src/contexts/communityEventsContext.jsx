@@ -63,12 +63,10 @@ export const CommunityEventsProvider = ({ children }) => {
     setError(null);
 
     try {
-      const signer = await client;
-
       const contract = await getContract({
         address: CommunityAddress,
         abi: Community_ABI,
-        signer,
+        client,
         chain: defineChain(1020352220),
       });
 
@@ -79,10 +77,10 @@ export const CommunityEventsProvider = ({ children }) => {
           "function getAllCommunityEvents() view returns ((uint256 id, string name, address creator, uint256 startTime, uint256 endTime, uint256 maxParticipants, uint256 currentParticipants, bool isActive, bool isOnline, string location, string additionalDetails)[])",
         params: [],
       });
-      console.log("All Events b4 formatting: ", allEvents);
+      // console.log("All Events b4 formatting: ", allEvents);
       const formattedEvents = formatEvents(allEvents);
       setEvents(formattedEvents);
-      console.log("All Events after formatting: ", formattedEvents);
+      // console.log("All Events after formatting: ", formattedEvents);
     } catch (err) {
       console.error("Error fetching community events:", err);
       setError("Failed to load events. Please try again later.");

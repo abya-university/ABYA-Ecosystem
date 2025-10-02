@@ -4,6 +4,8 @@ import { toast } from "react-toastify";
 import { useActiveAccount } from "thirdweb/react";
 import { client } from "../services/client";
 import { getContract, readContract } from "thirdweb";
+import { defineChain } from "thirdweb/chains";
+import { ethers } from "ethers";
 
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
 const Community_ABI = CommunityABI.abi;
@@ -42,11 +44,11 @@ export const AirdropProposalProvider = ({ children }) => {
 
     setLoading(true);
     try {
-      const signer = await client;
       const communityContract = await getContract({
         address: CommunityAddress,
         abi: Community_ABI,
-        signer,
+        client,
+        chain: defineChain(1020352220),
       });
 
       // const proposalsData = await communityContract.getAllAirdropProposals();

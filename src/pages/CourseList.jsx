@@ -776,6 +776,9 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         contract,
         method: "function enroll(uint256 _courseId) returns (bool)",
         params: [courseId],
+        gas: 500000n,
+        gasPrice: 0n, // SKALE uses 0 gas price
+        value: 0n,
       });
 
       // Add timeout to sendTransaction
