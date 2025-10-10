@@ -97,12 +97,12 @@ services:
         max_attempts: 3
         window: 120s
 
-  # Redis Cache (Optional)
+  # Redis Cache (Optional) - Updated to patched version for CVE-2025-49844
   redis:
-    image: redis:7-alpine
+    image: redis:7.2.11-alpine
     container_name: abya-redis
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"  # Bind to localhost only
     volumes:
       - redis_data:/data
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
@@ -110,19 +110,30 @@ services:
       - abya-network
     restart: unless-stopped
     command: redis-server /usr/local/etc/redis/redis.conf
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-changeme}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
     deploy:
       resources:
         limits:
           cpus: '0.5'
-          memory: 128M
+          memory: 256M
         reservations:
           cpus: '0.25'
-          memory: 64M
+          memory: 128M
 
   # Nginx Reverse Proxy (Optional - for load balancing multiple frontend instances)
   nginx-proxy:

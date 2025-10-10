@@ -23,8 +23,14 @@ services:
       - "traefik.http.routers.abya-secure.tls=true"
 
   redis:
+    image: redis:7.2.11-alpine  # Patched version for CVE-2025-49844
     ports:
       - "127.0.0.1:6379:6379"  # Bind to localhost only for security
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}  # Must be set in production
+    command: >
+      redis-server /usr/local/etc/redis/redis.conf
+      --requirepass "${REDIS_PASSWORD}"
 
   nginx-proxy:
     # Disable nginx-proxy in production if using Traefik or direct SSL
