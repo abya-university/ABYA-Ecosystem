@@ -1,8 +1,13 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { ethers } from "ethers";
-import { useAccount } from "wagmi";
-import Ecosystem3FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem3Facet.sol/Ecosystem3Facet.json";
-import { useEthersSigner } from "../components/useClientSigner";
+import { createContext, useContext, useState, useEffect } from "react";
+import Ecosystem3FacetABI from "../artifacts/contracts/Ecosystem3Facet.sol/Ecosystem3Facet.json";
+import CONTRACT_ADDRESSES from "../constants/addresses";
+import { client } from "../services/client";
+import { defineChain } from "thirdweb/chains";
+import { getContract, readContract } from "thirdweb";
+import { useActiveAccount } from "thirdweb/react";
+
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
+const Ecosystem3Facet_ABI = Ecosystem3FacetABI.abi;
 
 const CertificatesContext = createContext();
 
@@ -12,35 +17,42 @@ export const useCertificates = () => {
 
 export const CertificatesProvider = ({ children }) => {
   const [certificates, setCertificates] = useState([]);
-  const { address } = useAccount();
-  const EcosystemDiamondAddress = import.meta.env
-    .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
-  const signerPromise = useEthersSigner();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
 
   useEffect(() => {
     const fetchCertificates = async () => {
-      if (!address) return;
+      if (!isConnected) {
+        throw new Error("User is not connected");
+      }
 
       try {
-        const signer = await signerPromise;
-        const contract = new ethers.Contract(
-          EcosystemDiamondAddress,
-          Ecosystem3FacetABI.abi,
-          signer
-        );
+        const contract = await getContract({
+          address: DiamondAddress,
+          abi: Ecosystem3Facet_ABI,
+          client,
+          chain: defineChain(11155111), // Sepolia
+        });
 
-        const certificates = await contract.getCertificates(address);
-        setCertificates(
-          certificates.map((cert) => ({
-            certificateId: cert[0].toString(),
-            courseId: cert[1].toString(),
-            learner: cert[2],
-            cert_issuer: cert[3],
-            issue_date: cert[4].toString(),
-            courseName: cert[5],
-            owner: cert[6],
-          }))
-        );
+        const certificates = await readContract({
+          contract,
+          method:
+            "function getCertificates(address _learner) view returns ((uint256 certificateId, uint256 courseId, address learner, address cert_issuer, uint256 issue_date, string courseName, address owner)[])",
+          params: [address],
+        });
+
+        const formattedCertificates = certificates.map((cert) => ({
+          certificateId: cert.certificateId.toString(),
+          courseId: cert.courseId.toString(),
+          learner: cert.learner,
+          cert_issuer: cert.cert_issuer,
+          issue_date: cert.issue_date.toString(),
+          courseName: cert.courseName,
+          owner: cert.owner,
+        }));
+
+        setCertificates(formattedCertificates);
         console.log("Context Certificates:", certificates);
       } catch (error) {
         console.error("Error fetching certificates:", error);
@@ -48,7 +60,7 @@ export const CertificatesProvider = ({ children }) => {
     };
 
     fetchCertificates();
-  }, [address, EcosystemDiamondAddress, signerPromise]);
+  }, [address]);
 
   return (
     <CertificatesContext.Provider value={{ certificates }}>

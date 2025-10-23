@@ -22,8 +22,8 @@ import { useUser } from "../contexts/userContext";
 import { ChapterContext } from "../contexts/chapterContext";
 import { LessonContext } from "../contexts/lessonContext";
 import { QuizContext } from "../contexts/quizContext";
-import Ecosystem1FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem1Facet.sol/Ecosystem1Facet.json";
-import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
+import Ecosystem1FacetABI from "../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
+import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import { toast, ToastContainer } from "react-toastify";
 import { useActiveAccount, useSendTransaction } from "thirdweb/react";
 import { client } from "../services/client";
@@ -35,9 +35,9 @@ import {
 } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
 import { useChainMetadata } from "thirdweb/react";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const EcosystemDiamondAddress = import.meta.env
-  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
@@ -83,11 +83,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
 
   console.log("Courses in courselist:", courses);
 
-  console.log("Latest Review for course", courseId, ":", latestReview);
-  console.log("All Reviews for course", courseId, ":", allReviews);
-  console.log("Feedback for course", courseId, ":", feedback);
-
-  const { data: chainMetadata } = useChainMetadata(defineChain(1020352220));
+  const { data: chainMetadata } = useChainMetadata(defineChain(11155111));
 
   console.log("Name:", chainMetadata?.name);
   console.log("Faucets:", chainMetadata?.faucets);
@@ -118,18 +114,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   //     },
   //   ],
   // });
-
-  const skaleTitanTestnet = defineChain({
-    id: 1020352220,
-    rpc: `https://1020352220.rpc.thirdweb.com/${
-      import.meta.env.VITE_APP_THIRDWEB_CLIENT_ID
-    }`,
-    name: "SKALE Titan Hub Testnet",
-    nativeCurrency: { name: "sFUEL", symbol: "sFUEL", decimals: 18 },
-    blockExplorers: [
-      { name: "SKALE Explorer", url: "https://staging-explorer.skale.network" },
-    ],
-  });
 
   const getDifficultyLabel = (level) => {
     switch (Number(level)) {
@@ -177,10 +161,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       0
     );
 
-    console.log("Course ID:", numericCourseId);
-    console.log("Filtered Chapters:", courseChapters);
-    console.log("Total Duration:", totalDuration);
-
     return totalDuration;
   };
 
@@ -202,10 +182,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       totalQuizzes: courseQuizzes.length,
     });
   };
-
-  console.log("Courses:", courses);
-  console.log("Address:", address);
-  console.log("Role:", role);
 
   // Debug useEffect to log enrollment status for all courses
   useEffect(() => {
@@ -292,10 +268,10 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       setError(null);
 
       const contract = getContract({
-        address: EcosystemDiamondAddress,
+        address: DiamondAddress,
         abi: Ecosystem1Facet_ABI,
         client,
-        chain: defineChain(1020352220),
+        chain: defineChain(11155111),
       });
 
       // First check if the course is ready for eligibility check
@@ -539,10 +515,10 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
 
       // 6. Send to blockchain
       const contract = getContract({
-        address: EcosystemDiamondAddress,
+        address: DiamondAddress,
         abi: Ecosystem1Facet_ABI,
         client,
-        chain: defineChain(1020352220),
+        chain: defineChain(11155111),
       });
 
       const transaction = prepareContractCall({
@@ -655,39 +631,26 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       for (const course of courses) {
         if (!course.approved) {
           try {
-            // const signer = await signerPromise;
-            // const diamondContract = new ethers.Contract(
-            //   EcosystemDiamondAddress,
-            //   Ecosystem1Facet_ABI,
-            //   signer
-            // );
-
             const contract = await getContract({
-              address: EcosystemDiamondAddress,
+              address: DiamondAddress,
               abi: Ecosystem1Facet_ABI,
               client,
-              chain: defineChain(1020352220),
+              chain: defineChain(11155111),
             });
 
             // Check if eligibility check is ready
-            const isReadyForCheck =
-              // await diamondContract.isCourseReadyForEligibilityCheck(
-              //   course.courseId
-              // );
-              await readContract({
-                contract,
-                method:
-                  "function isCourseReadyForEligibilityCheck(uint256 courseId) view returns (bool)",
-                params: [courseId],
-              });
+            const isReadyForCheck = await readContract({
+              contract,
+              method:
+                "function isCourseReadyForEligibilityCheck(uint256 courseId) view returns (bool)",
+              params: [courseId],
+            });
 
             if (isReadyForCheck) {
               console.log(
                 `Course ${course.courseId} is ready for eligibility check`
               );
-              // await diamondContract.checkCourseEligibilityAfterDelay(
-              //   course.courseId
-              // );
+
               await prepareContractCall({
                 contract,
                 method:
@@ -698,10 +661,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
               // Wait a bit for the eligibility check to process
               await new Promise((resolve) => setTimeout(resolve, 15000));
 
-              // If eligibility check passes, submit for AI review
-              // const feedback = await diamondContract.getCourseFeedback(
-              //   course.courseId
-              // );
               const feedback = await readContract({
                 contract,
                 method:
@@ -739,10 +698,10 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       setFeedbackLoading(true);
 
       const contract = getContract({
-        address: EcosystemDiamondAddress,
+        address: DiamondAddress,
         abi: Ecosystem1Facet_ABI,
         client,
-        chain: defineChain(1020352220),
+        chain: defineChain(11155111),
       });
 
       // const feedback = await diamondContract.getCourseFeedback(courseId);
@@ -766,19 +725,16 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     try {
       setLoading(true);
       const contract = getContract({
-        address: EcosystemDiamondAddress,
+        address: DiamondAddress,
         abi: Ecosystem2Facet_ABI,
         client,
-        chain: skaleTitanTestnet,
+        chain: defineChain(11155111),
       });
 
       const transaction = prepareContractCall({
         contract,
         method: "function enroll(uint256 _courseId) returns (bool)",
         params: [courseId],
-        gas: 500000n,
-        gasPrice: 0n, // SKALE uses 0 gas price
-        value: 0n,
       });
 
       // Add timeout to sendTransaction
@@ -845,10 +801,10 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     try {
       setLoading(true);
       const contract = getContract({
-        address: EcosystemDiamondAddress,
+        address: DiamondAddress,
         abi: Ecosystem2Facet_ABI,
         client,
-        chain: defineChain(1020352220),
+        chain: defineChain(11155111),
       });
 
       const transaction = prepareContractCall({

@@ -15,7 +15,7 @@ import {
   Timer,
   Users,
 } from "lucide-react";
-import { useAccount } from "wagmi";
+import { useActiveAccount } from "thirdweb/react";
 
 const PreviewCourse = () => {
   const { courses } = useContext(CourseContext);
@@ -24,7 +24,8 @@ const PreviewCourse = () => {
   const { quizzes } = useContext(QuizContext);
   const [courseId, setCourseId] = useState("");
   const [selectedQuiz, setSelectedQuiz] = useState(null);
-  const { address } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
 
   const renderResourceIcon = (contentType) => {
     switch (contentType) {

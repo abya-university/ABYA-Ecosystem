@@ -1,12 +1,10 @@
 import React, { useState } from "react";
 import { AlertCircle, CheckCircle, Star, X } from "lucide-react";
-import Ecosystem2ABI from "../artifacts/contracts/Ecosystem Contracts/Ecosystem2.sol/Ecosystem2.json";
-import { ethers } from "ethers";
-import { useEthersSigner } from "./useClientSigner";
-import { useAccount } from "wagmi";
+import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const ContractABI = Ecosystem2ABI.abi;
-const ContractAddress = import.meta.env.VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
+const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
 const ReviewModal = ({ isOpen, onClose, onSubmit, courseId }) => {
   const [ratings, setRatings] = useState({

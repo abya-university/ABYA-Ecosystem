@@ -1,12 +1,12 @@
 import { createContext, useEffect, useState } from "react";
-import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
+import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import { defineChain } from "thirdweb/chains";
 import { client } from "../services/client";
 import { useActiveAccount } from "thirdweb/react";
 import { getContract, readContract } from "thirdweb";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const EcosystemDiamondAddress = import.meta.env
-  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
 const LessonContext = createContext();
@@ -18,16 +18,14 @@ const LessonProvider = ({ children }) => {
 
   const fetchLessons = async () => {
     console.log("Starting fetchLessons...");
-    const resolvedSigner = await client;
-    console.log("ResolvedSigner: ", resolvedSigner);
 
-    if (resolvedSigner) {
+    if (client) {
       try {
         const contract = getContract({
-          address: EcosystemDiamondAddress,
+          address: DiamondAddress,
           abi: Ecosystem2Facet_ABI,
           client,
-          chain: defineChain(1020352220),
+          chain: defineChain(11155111), // Sepolia
         });
         console.log("Contract instance created");
 

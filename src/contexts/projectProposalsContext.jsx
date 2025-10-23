@@ -1,14 +1,15 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
-import { useEthersSigner } from "../components/useClientSigner";
+import CommunityGovernanceFacet from "../artifacts/contracts/CommunityGovernanceFacet.sol/CommunityGovernanceFacet.json";
 import { toast } from "react-toastify";
 import { useActiveAccount } from "thirdweb/react";
 import { client } from "../services/client";
-import { defineChain, getContract, readContract } from "thirdweb";
+import { getContract, readContract } from "thirdweb";
+import { defineChain } from "thirdweb/chains";
 import { ethers } from "ethers";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
-const Community_ABI = CommunityABI.abi;
+const DiamondAddress = CONTRACT_ADDRESSES.diamondAddress;
+const CommunityGovernanceFacet_ABI = CommunityGovernanceFacet.abi;
 
 const ProjectProposalsContext = createContext();
 
@@ -53,10 +54,10 @@ export const ProjectProposalsProvider = ({ children }) => {
     setLoading(true);
     try {
       const communityContract = await getContract({
-        address: CommunityAddress,
-        abi: Community_ABI,
+        address: DiamondAddress,
+        abi: CommunityGovernanceFacet_ABI,
         client,
-        chain: defineChain(1020352220),
+        chain: defineChain(11155111), // Sepolia
       });
 
       const proposalsData = await readContract({

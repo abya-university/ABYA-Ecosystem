@@ -20,15 +20,15 @@ import { ChapterContext } from "../contexts/chapterContext";
 import { LessonContext } from "../contexts/lessonContext";
 import { QuizContext } from "../contexts/quizContext";
 import { useCertificates } from "../contexts/certificatesContext";
-import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
+import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import { useActiveAccount } from "thirdweb/react";
 import { client } from "../services/client";
 import { getContract, readContract } from "thirdweb";
 import { useUser } from "../contexts/userContext";
 import { defineChain } from "thirdweb/chains";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const EcosystemDiamondAddress = import.meta.env
-  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
 const Dashboard = ({ onCourseSelect }) => {
@@ -193,12 +193,11 @@ const Dashboard = ({ onCourseSelect }) => {
   // Function to fetch completion data for a specific course
   const fetchCompletionDataForCourse = async (courseId) => {
     try {
-      const signer = await client;
       const contract = await getContract({
-        address: EcosystemDiamondAddress,
+        address: DiamondAddress,
         abi: Ecosystem2Facet_ABI,
-        signer,
-        chain: defineChain(1020352220),
+        client,
+        chain: defineChain(11155111),
       });
 
       // Get lessons and quizzes for this specific course

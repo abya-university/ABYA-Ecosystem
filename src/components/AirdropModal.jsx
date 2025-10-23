@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { X, Gift, Calendar } from "lucide-react";
 import { ethers } from "ethers";
-import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
+import CommunityGovernanceFacetABI from "../artifacts/contracts/CommunityGovernanceFacet.sol/CommunityGovernanceFacet.json";
 import { toast, ToastContainer } from "react-toastify";
 import { client } from "../services/client";
 import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const Community_ABI = CommunityABI.abi;
-const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
+const CommunityGovernanceFacet_ABI = CommunityGovernanceFacetABI.abi;
 
 const AirdropModal = ({ setShowAirdropModal }) => {
   const [airdropData, setAirdropData] = useState({
@@ -23,13 +24,11 @@ const AirdropModal = ({ setShowAirdropModal }) => {
   const handleAirdrop = async () => {
     try {
       setDistributeAirdropsLoading(true);
-
-      const signer = await client;
       const communityContract = await getContract({
-        address: CommunityAddress,
-        abi: Community_ABI,
-        signer,
-        chain: defineChain(1020352220),
+        address: DiamondAddress,
+        abi: CommunityGovernanceFacet_ABI,
+        client,
+        chain: defineChain(11155111), // Sepolia
       });
 
       // Convert datetime strings to Unix timestamps

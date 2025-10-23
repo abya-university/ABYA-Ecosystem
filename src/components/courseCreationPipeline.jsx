@@ -8,9 +8,8 @@ import {
   CheckCircle,
   AlertCircle,
 } from "lucide-react";
-import Ecosystem1FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem1Facet.sol/Ecosystem1Facet.json";
-import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
-import { ethers } from "ethers";
+import Ecosystem1FacetABI from "../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
+import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import { CourseContext } from "../contexts/courseContext";
 import { ChapterContext } from "../contexts/chapterContext";
 import { LessonContext } from "../contexts/lessonContext";
@@ -27,9 +26,9 @@ import {
   sendTransaction,
 } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const EcosystemDiamondAddress = import.meta.env
-  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
@@ -63,17 +62,12 @@ const CourseCreationPipeline = () => {
   const createCourse = async () => {
     setLoading(true);
     try {
-      const signer = await client;
-
       const diamondContract = await getContract({
-        address: EcosystemDiamondAddress,
+        address: DiamondAddress,
         abi: Ecosystem1Facet_ABI,
-        signer: signer,
-        chain: defineChain(1020352220),
+        client,
+        chain: defineChain(11155111), // Sepolia
       });
-
-      console.log("Contract Details:", diamondContract);
-      console.log("Transaction Params:", courseData.basicInfo);
 
       const tx = await prepareContractCall({
         contract: diamondContract,
@@ -98,10 +92,6 @@ const CourseCreationPipeline = () => {
         },
       });
 
-      // Check if the role has been granted
-      // const hasRole = await diamondContract.hasCourseOwnerRole(
-      //   signer.getAddress()
-      // );
       const hasRole = await readContract({
         contract: diamondContract,
         method:
@@ -289,9 +279,8 @@ const CourseCreationPipeline = () => {
       if (isConnected) {
         setLoading(true);
         try {
-          const signer = await client;
-          if (!signer) {
-            throw new Error("Signer is required to access the contract.");
+          if (!client) {
+            throw new Error("Client is required to access the contract.");
           }
 
           const parsedCourseId = Number(courseId);
@@ -306,17 +295,12 @@ const CourseCreationPipeline = () => {
           }
 
           const diamondContract = await getContract({
-            address: EcosystemDiamondAddress,
+            address: DiamondAddress,
             abi: Ecosystem2Facet_ABI,
-            signer: signer,
-            chain: defineChain(1020352220),
+            client,
+            chain: defineChain(11155111),
           });
 
-          // const tx = await diamondContract.addChapters(
-          //   parsedCourseId,
-          //   chapters,
-          //   durations
-          // );
           const tx = await prepareContractCall({
             contract: diamondContract,
             method:
@@ -483,20 +467,16 @@ const CourseCreationPipeline = () => {
       } else {
         setLoading(true);
         try {
-          const signer = await client;
-          if (!signer) {
-            throw new Error("Signer is required to access the contract.");
+          if (!client) {
+            throw new Error("Client is required to access the contract.");
           }
 
           const diamondContract = await getContract({
-            address: EcosystemDiamondAddress,
+            address: DiamondAddress,
             abi: Ecosystem2Facet_ABI,
-            signer: signer,
-            chain: defineChain(1020352220),
+            client,
+            chain: defineChain(11155111),
           });
-          console.log("Chapter ID: ", chapterId);
-          console.log("Lesson Name: ", lessonName);
-          console.log("Lesson Content: ", lessonContent);
 
           const tx = await prepareContractCall({
             contract: diamondContract,
@@ -669,27 +649,18 @@ const CourseCreationPipeline = () => {
     const [questionError, setQuestionError] = useState("");
     const [quizLoading, setQuizLoading] = useState(false);
 
-    console.log("Lessons: ", lessons);
-    console.log("Quizzes: ", quizzes);
-
     const createQuiz = async () => {
       if (!isConnected || !address) {
         throw new Error("Please connect to a blockchain network");
       }
       setQuizLoading(true);
       try {
-        // const lesson = lessons.find((lesson) => lesson.lessonId === lessonId);
-        const signer = await client;
-
         const diamondContract = await getContract({
-          address: EcosystemDiamondAddress,
+          address: DiamondAddress,
           abi: Ecosystem2Facet_ABI,
-          signer: signer,
-          chain: defineChain(1020352220),
+          client,
+          chain: defineChain(11155111),
         });
-
-        console.log("Lesson Id: ", lessonId);
-        console.log("Quiz Title: ", quizTitle);
 
         // const tx = await diamondContract.createQuiz(lessonId, quizTitle);
         const tx = await prepareContractCall({
@@ -738,22 +709,12 @@ const CourseCreationPipeline = () => {
         }
         setLoading(true);
         try {
-          const signer = await client;
-
           const diamondContract = await getContract({
-            address: EcosystemDiamondAddress,
+            address: DiamondAddress,
             abi: Ecosystem2Facet_ABI,
-            signer: signer,
-            chain: defineChain(1020352220),
+            client,
+            chain: defineChain(11155111),
           });
-
-          console.log("Quiz Id: ", quizId);
-          console.log("Question: ", question);
-          console.log(
-            "Options: ",
-            options.map((option) => option.text)
-          );
-          console.log("Correct Option Index: ", correctOptionIndex);
 
           const tx = await prepareContractCall({
             contract: diamondContract,
@@ -1055,13 +1016,11 @@ const CourseCreationPipeline = () => {
           name: resourceName,
         };
 
-        const signer = await client;
-
         const diamondContract = await getContract({
-          address: EcosystemDiamondAddress,
+          address: DiamondAddress,
           abi: Ecosystem2Facet_ABI,
-          signer: signer,
-          chain: defineChain(1020352220),
+          client,
+          chain: defineChain(11155111),
         });
 
         const tx = await prepareContractCall({

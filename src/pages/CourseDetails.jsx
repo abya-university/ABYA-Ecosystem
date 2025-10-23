@@ -25,12 +25,10 @@ import {
 } from "lucide-react";
 import ReviewModal from "../components/ReviewModal";
 import { useUser } from "../contexts/userContext";
-import { useAccount } from "wagmi";
 import PropTypes from "prop-types";
 import ProgressBar from "../components/progressBar";
-import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
-import Ecosystem3FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem3Facet.sol/Ecosystem3Facet.json";
-import { ethers } from "ethers";
+import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
+import Ecosystem3FacetABI from "../artifacts/contracts/Ecosystem3Facet.sol/Ecosystem3Facet.json";
 import { useEthersSigner } from "../components/useClientSigner";
 import Certificate from "../components/Certificate";
 import { useCertificates } from "../contexts/certificatesContext";
@@ -45,9 +43,9 @@ import {
   sendTransaction,
 } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const EcosystemDiamondAddress = import.meta.env
-  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 const Ecosystem3Facet_ABI = Ecosystem3FacetABI.abi;
 
@@ -221,13 +219,11 @@ const Quiz = memo(({ quiz, courseId }) => {
 
   useEffect(() => {
     const fetchCompletedQuizzes = async () => {
-      const signer = await client;
-
       const contract = await getContract({
-        address: EcosystemDiamondAddress,
+        address: DiamondAddress,
         abi: Ecosystem2Facet_ABI,
-        signer,
-        chain: defineChain(1020352220),
+        client,
+        chain: defineChain(11155111),
       });
 
       const completedQuizzes = await readContract({
@@ -266,12 +262,11 @@ const Quiz = memo(({ quiz, courseId }) => {
   useEffect(() => {
     const checkQuizLock = async () => {
       try {
-        const signer = await client;
         const contract = await getContract({
-          address: EcosystemDiamondAddress,
+          address: DiamondAddress,
           abi: Ecosystem2Facet_ABI,
-          signer,
-          chain: defineChain(1020352220),
+          client,
+          chain: defineChain(11155111),
         });
 
         const lockTime = await readContract({
@@ -354,13 +349,11 @@ const Quiz = memo(({ quiz, courseId }) => {
 
       if (attempts + 1 >= 3) {
         try {
-          const signer = await client;
-
           const contract = await getContract({
-            address: EcosystemDiamondAddress,
+            address: DiamondAddress,
             abi: Ecosystem2Facet_ABI,
-            signer,
-            chain: defineChain(1020352220),
+            client,
+            chain: defineChain(11155111),
           });
 
           const courseIdBN = BigInt(courseId);
@@ -387,28 +380,16 @@ const Quiz = memo(({ quiz, courseId }) => {
         }
       }
 
-      const signer = await client;
-
       const contract = await getContract({
-        address: EcosystemDiamondAddress,
+        address: DiamondAddress,
         abi: Ecosystem2Facet_ABI,
-        signer,
-        chain: defineChain(1020352220),
+        client,
+        chain: defineChain(11155111),
       });
 
       // Convert IDs to numbers for validation
       const courseIdNum = Number(courseId);
       const quizIdNum = Number(quiz.quizId);
-
-      // Log the values before validation
-      console.log("Pre-validation values:", {
-        courseId,
-        courseIdNum,
-        quizId: quiz.quizId,
-        quizIdNum,
-        selectedAnswers,
-        calculatedScore,
-      });
 
       // Validate the data
       validateQuizData(
@@ -786,7 +767,6 @@ const CourseDetails = memo(({ courseId }) => {
   const account = useActiveAccount();
   const address = account?.address;
   const [completedLessons, setCompletedLessons] = useState(0);
-  const signerPromise = useEthersSigner();
   const [completedLessonIds, setCompletedLessonIds] = useState(new Set());
   const [completedQuizIds, setCompletedQuizIds] = useState(new Set());
   const [showCongratsPopup, setShowCongratsPopup] = useState(false);
@@ -805,13 +785,11 @@ const CourseDetails = memo(({ courseId }) => {
 
   useEffect(() => {
     const fetchCompletedLessons = async () => {
-      const signer = await client;
-
       const contract = await getContract({
-        address: EcosystemDiamondAddress,
+        address: DiamondAddress,
         abi: Ecosystem2Facet_ABI,
-        signer,
-        chain: defineChain(1020352220),
+        client,
+        chain: defineChain(11155111),
       });
 
       const completedLessons = await readContract({
@@ -851,13 +829,11 @@ const CourseDetails = memo(({ courseId }) => {
 
   useEffect(() => {
     const fetchCompletedQuizzes = async () => {
-      const signer = await client;
-
       const contract = await getContract({
-        address: EcosystemDiamondAddress,
+        address: DiamondAddress,
         abi: Ecosystem2Facet_ABI,
-        signer,
-        chain: defineChain(1020352220),
+        client,
+        chain: defineChain(11155111),
       });
 
       const completedQuizzes = await readContract({
@@ -904,19 +880,11 @@ const CourseDetails = memo(({ courseId }) => {
       const chapterIdBN = BigInt(chapterId);
       const lessonIdBN = BigInt(lessonId);
 
-      console.log("Attempting to mark as read with params:", {
-        courseId: courseIdBN.toString(),
-        chapterId: chapterIdBN.toString(),
-        lessonId: lessonIdBN.toString(),
-      });
-
-      const signer = await client;
-
       const contract = await getContract({
-        address: EcosystemDiamondAddress,
+        address: DiamondAddress,
         abi: Ecosystem2Facet_ABI,
-        signer,
-        chain: defineChain(1020352220),
+        client,
+        chain: defineChain(11155111),
       });
 
       try {
@@ -1285,9 +1253,8 @@ const CourseDetails = memo(({ courseId }) => {
   //Leave it for now
   const handleClaimCertificate = async () => {
     try {
-      const signer = await signerPromise;
-      if (!signer) {
-        throw new Error("No signer available");
+      if (!client) {
+        throw new Error("No client available");
       }
 
       // Check if profile is missing
@@ -1309,11 +1276,12 @@ const CourseDetails = memo(({ courseId }) => {
         return;
       }
 
-      const contract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem3Facet_ABI,
-        signer
-      );
+      const contract = await getContract({
+        address: DiamondAddress,
+        abi: Ecosystem2Facet_ABI,
+        client,
+        chain: defineChain(11155111),
+      });
 
       const cert_issuer = "ABYA UNIVERSITY";
       const issue_date = new Date().toISOString();

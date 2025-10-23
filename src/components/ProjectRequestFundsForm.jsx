@@ -1,14 +1,14 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { X, Coins, FileCode, Layers, Calendar, Code2 } from "lucide-react";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "../index.css";
-import { ethers } from "ethers";
-import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
+import CommunityGovernanceFacetABI from "../artifacts/contracts/CommunityGovernanceFacet.sol/CommunityGovernanceFacet.json";
 import { client } from "../services/client";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const Community_ABI = CommunityABI.abi;
-const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
+const CommunityGovernanceFacet_ABI = CommunityGovernanceFacetABI.abi;
 
 const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
   const [projectData, setProjectData] = useState({
@@ -35,12 +35,11 @@ const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      const signer = await client;
       const communityContract = await getContract({
-        address: CommunityAddress,
-        abi: Community_ABI,
+        address: DiamondAddress,
+        abi: CommunityGovernanceFacet_ABI,
         client,
-        chain: defineChain(1020352220),
+        chain: defineChain(1115511), // Sepolia
       });
 
       // Convert tech stack string to array

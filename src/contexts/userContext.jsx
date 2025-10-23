@@ -1,13 +1,15 @@
 import { createContext, useState, useEffect, useContext } from "react";
-import Ecosystem2ABI from "../artifacts/contracts/Ecosystem Contracts/Ecosystem2.sol/Ecosystem2.json";
+import Ecosystem2ABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import PropTypes from "prop-types";
 import { useActiveAccount } from "thirdweb/react";
 import { client } from "../services/client";
 import { ethers } from "ethers";
-import { defineChain, getContract, readContract } from "thirdweb";
+import { getContract, readContract } from "thirdweb";
+import { defineChain } from "thirdweb/chains";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const ContractABI = Ecosystem2ABI.abi;
-const ContractAddress = import.meta.env.VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
+const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
 const REVIEWER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("REVIEWER_ROLE"));
 const MULTISIG_APPROVER = ethers.keccak256(
@@ -42,13 +44,11 @@ export const UserProvider = ({ children }) => {
       }
 
       try {
-        const signer = await client;
-
         const contract = await getContract({
-          address: ContractAddress,
-          abi: ContractABI,
-          signer,
-          chain: defineChain(1020352220),
+          address: DiamondAddress,
+          abi: Ecosystem2Facet_ABI,
+          client,
+          chain: defineChain(11155111), // Sepolia
         });
 
         const isReviewer = await readContract({

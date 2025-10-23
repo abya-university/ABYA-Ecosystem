@@ -1,14 +1,17 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Award, CircleSlash2, Coins, Sparkles, Zap } from "lucide-react";
 import { Trophy, Medal } from "lucide-react";
 import { useCommunityMembers } from "../contexts/communityMembersContext";
 import { useActiveAccount } from "thirdweb/react";
-import {
-  defineChain,
-  getContract,
-  prepareContractCall,
-  sendTransaction,
-} from "thirdweb";
+import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
+import { defineChain } from "thirdweb/chains";
+import CommunityBadgeFacetABI from "../artifacts/contracts/CommunityBadgeFacet.sol/CommunityBadgeFacet.json";
+import { toast } from "react-toastify";
+import { client } from "../services/client";
+import CONTRACT_ADDRESSES from "../constants/addresses";
+
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
+const CommunityBadgeFacet_ABI = CommunityBadgeFacetABI.abi;
 
 // Mapping of BadgeLevel enum to display properties
 const BADGE_DISPLAY_MAP = {
@@ -69,19 +72,17 @@ const RewardsSection = () => {
     // Handle Claim Badge Rewards
     const handleClaimRewards = async () => {
       if (!isConnected) {
-        openConnectModal();
-        return;
+        throw new Error("Wallet not connected");
       }
 
       setClaimRewardsLoading(true);
 
       try {
-        const signer = await client;
         const contract = await getContract({
-          address: import.meta.env.VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS,
-          abi: Ecosystem2FacetABI.abi,
-          signer,
-          chain: defineChain(1020352220),
+          address: DiamondAddress,
+          abi: CommunityBadgeFacet_ABI,
+          client,
+          chain: defineChain(11155111), // Sepolia
         });
 
         const tx = await prepareContractCall({

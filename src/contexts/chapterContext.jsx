@@ -1,11 +1,11 @@
-import React, { createContext, useEffect, useState } from "react";
-import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
+import { createContext, useEffect, useState } from "react";
+import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import { defineChain } from "thirdweb/chains";
 import { getContract, readContract } from "thirdweb";
 import { client } from "../services/client";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const EcosystemDiamondAddress = import.meta.env
-  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
 const ChapterContext = createContext();
@@ -14,15 +14,13 @@ const ChapterProvider = ({ children }) => {
   const [chapters, setChapters] = useState([]);
 
   const fetchChapters = async () => {
-    const resolvedSigner = await client;
-
-    if (resolvedSigner) {
+    if (client) {
       try {
         const contract = getContract({
-          address: EcosystemDiamondAddress,
+          address: DiamondAddress,
           abi: Ecosystem2Facet_ABI,
           client,
-          chain: defineChain(1020352220),
+          chain: defineChain(11155111), // Sepolia
         });
 
         const chaptersData = await readContract({

@@ -1,19 +1,16 @@
 import { useProjectProposals } from "../contexts/projectProposalsContext";
 import { useEffect, useState } from "react";
 import { useUser } from "../contexts/userContext";
-import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
+import CommunityGovernanceFacet from "../artifacts/contracts/CommunityGovernanceFacet.sol/CommunityGovernanceFacet.json";
 import { toast } from "react-toastify";
 import { useActiveAccount } from "thirdweb/react";
 import { client } from "../services/client";
-import {
-  defineChain,
-  getContract,
-  prepareContractCall,
-  sendTransaction,
-} from "thirdweb";
+import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
+import { defineChain } from "thirdweb/chains";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
-const Community_ABI = CommunityABI.abi;
+const DiamondAddress = CONTRACT_ADDRESSES.diamondAddress;
+const CommunityGovernanceFacet_ABI = CommunityGovernanceFacet.abi;
 
 const ProjectDetails = () => {
   const { proposals, fetchProposals } = useProjectProposals();
@@ -96,13 +93,11 @@ const ProjectDetails = () => {
   const handleApprove = async () => {
     setIsApproveLoading(true);
     try {
-      const signer = await client;
-
       const communityContract = await getContract({
-        address: CommunityAddress,
-        abi: Community_ABI,
-        signer,
-        chain: defineChain(1020352220),
+        address: DiamondAddress,
+        abi: CommunityGovernanceFacet_ABI,
+        client,
+        chain: defineChain(11155111), // Sepolia
       });
 
       const tx = await prepareContractCall({
@@ -128,11 +123,11 @@ const ProjectDetails = () => {
   const handleReject = async () => {
     setIsRejectLoading(true);
     try {
-      const signer = await client;
       const communityContract = await getContract({
-        address: CommunityAddress,
-        abi: Community_ABI,
-        signer,
+        address: DiamondAddress,
+        abi: CommunityGovernanceFacet_ABI,
+        client,
+        chain: defineChain(11155111), // Sepolia
       });
       console.log("Payload: ", selectedProject.id, rejectReason);
 

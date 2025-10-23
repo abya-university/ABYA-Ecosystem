@@ -1,12 +1,12 @@
 import React, { createContext, useEffect, useState } from "react";
-import Ecosystem1FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem1Facet.sol/Ecosystem1Facet.json";
+import Ecosystem1FacetABI from "../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
 import { defineChain } from "thirdweb/chains";
 import { useActiveAccount } from "thirdweb/react";
-import { getContract, readContract } from "thirdweb"; // Import readContract instead
+import { getContract, readContract } from "thirdweb";
 import { client } from "../services/client";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const EcosystemDiamondAddress = import.meta.env
-  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
 
 const CourseContext = createContext();
@@ -27,10 +27,10 @@ const CourseProvider = ({ children }) => {
       if (resolvedSigner) {
         try {
           const contract = getContract({
-            address: EcosystemDiamondAddress,
+            address: DiamondAddress,
             abi: Ecosystem1Facet_ABI,
             client,
-            chain: defineChain(1020352220),
+            chain: defineChain(11155111), // Sepolia
           });
 
           console.log("Contract instance:", contract);
@@ -232,10 +232,10 @@ const CourseProvider = ({ children }) => {
 
     try {
       const contract = getContract({
-        address: EcosystemDiamondAddress,
+        address: DiamondAddress,
         abi: Ecosystem1Facet_ABI,
         client,
-        chain: defineChain(1020352220),
+        chain: defineChain(11155111), // Sepolia
       });
 
       await Promise.all([
