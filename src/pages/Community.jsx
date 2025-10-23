@@ -27,7 +27,10 @@ import { FaMedal, FaGem, FaTrophy } from "react-icons/fa";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "../index.css";
-import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
+import CommunityEngagementFacetABI from "../artifacts/contracts/CommunityEngagementFacet.sol/CommunityEngagementFacet.json";
+import CommunityBadgeFacetABI from "../artifacts/contracts/CommunityBadgeFacet.sol/CommunityBadgeFacet.json";
+import CommunityGovernanceFacetABI from "../artifacts/contracts/CommunityGovernanceFacet.sol/CommunityGovernanceFacet.json";
+import TokenManagementFacet from "../artifacts/contracts/TokenManagementFacet.sol/TokenManagementFacet.json";
 import { useCommunityEvents } from "../contexts/communityEventsContext";
 import { useCommunityMembers } from "../contexts/communityMembersContext";
 import RewardsSection from "../components/RewardsSection";
@@ -45,9 +48,14 @@ import {
   sendTransaction,
 } from "thirdweb";
 import { client } from "../services/client";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const Community_ABI = CommunityABI.abi;
-const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
+const CommunityEngagementFacet_ABI = CommunityEngagementFacetABI.abi;
+const CommunityBadgeFacet_ABI = CommunityBadgeFacetABI.abi;
+const CommunityGovernanceFacet_ABI = CommunityGovernanceFacetABI.abi;
+const TokenManagementFacet_ABI = TokenManagementFacet.abi;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
+
 
 const CommunityPage = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -98,24 +106,34 @@ const CommunityPage = () => {
 
   // Fetch badge data
   const fetchBadgeData = async () => {
-    if (!isConnected) return;
+    if (!isConnected || !address) return;
 
     try {
       const contract = await getContract({
-        address: CommunityAddress,
-        abi: Community_ABI,
+        address: DiamondAddress,
+        abi: CommunityBadgeFacet_ABI,
         client,
-        chain: defineChain(1020352220),
+        chain: defineChain(11155111),
       });
 
-      // const badge = await contract.checkMemberBadge();
-      const badge = await readContract({
+      const raw = await readContract({
         contract,
-        method: "function checkMemberBadge() view returns (uint8)",
-        params: [],
+        method:
+          "function getMemberBadgeDetails(address _member) view returns (uint8 currentBadge, string badgeName, string iconURI, uint256 tokenReward, uint256 totalEventsAttended, uint256 pendingRewards)",
+        params: [address],
       });
 
-      setBadgeData(badge);
+      // normalize returned tuple to a structured object
+      const formatted = {
+        currentBadge: Number(raw[0]),
+        badgeName: raw[1],
+        iconURI: raw[2],
+        tokenReward: raw[3]?.toString?.() ?? "0",
+        totalEventsAttended: Number(raw[4]),
+        pendingRewards: raw[5]?.toString?.() ?? "0",
+      };
+
+      setBadgeData(formatted);
     } catch (error) {
       console.error("Error fetching badge data:", error);
     }
@@ -127,16 +145,16 @@ const CommunityPage = () => {
 
     try {
       const contract = await getContract({
-        address: CommunityAddress,
-        abi: Community_ABI,
+        address: DiamondAddress,
+        abi: TokenManagementFacet_ABI,
         client,
-        chain: defineChain(1020352220),
+        chain: defineChain(11155111),
       });
 
       // const balance = await contract.balanceOf(address);
       const balance = await readContract({
         contract,
-        method: "function balanceOf(address account) view returns (uint256)",
+        method: "function getTokenBalance(address account) view returns (uint256)",
         params: [address],
       });
 
@@ -159,9 +177,8 @@ const CommunityPage = () => {
     }
   }, [isConnected, address]);
 
-  //handle join community
   const handleJoinCommunity = async () => {
-    if (!isConnected) {
+    if (!isConnected || !account) {
       toast.error("Please connect your wallet first");
       return;
     }
@@ -170,10 +187,10 @@ const CommunityPage = () => {
 
     try {
       const contract = getContract({
-        address: CommunityAddress,
-        abi: Community_ABI,
+        address: DiamondAddress,
+        abi: CommunityEngagementFacet_ABI,
         client,
-        chain: defineChain(1020352220),
+        chain: defineChain(11155111),
       });
 
       const transaction = prepareContractCall({
@@ -182,27 +199,83 @@ const CommunityPage = () => {
         params: [],
       });
 
-      const transactionHash = await sendTransaction(transaction);
+      console.log("Sending transaction with EIP-7702 gas sponsorship...");
 
-      console.log("Join community transaction hash:", transactionHash);
+      // Add transaction options for better reliability
+      const transactionHash = await sendTransaction({
+        transaction,
+        account: account,
+        // Add timeout and retry configuration
+        timeoutMs: 120000, // 2 minute timeout instead of default
+        maxRetries: 3, // Retry up to 3 times
+      });
 
-      toast.success("You've successfully joined the community!");
+      console.log("Transaction submitted, hash:", transactionHash);
 
-      // Refresh members list
-      fetchMembers();
+      // Show a pending toast while waiting for confirmation
+      toast.loading("Transaction submitted. Waiting for confirmation...", {
+        id: "tx-pending",
+      });
+
+      // Wait for transaction confirmation
+      const receipt = await waitForReceipt({
+        client,
+        chain: defineChain(11155111),
+        transactionHash,
+        timeoutMs: 120000, // 2 minute wait
+      });
+
+      // Dismiss loading toast and show success
+      toast.dismiss("tx-pending");
+
+      if (receipt.status === "success") {
+        toast.success("You've successfully joined the community!");
+        console.log("Transaction confirmed:", receipt);
+        fetchMembers();
+      } else {
+        toast.error("Transaction failed on chain");
+      }
     } catch (error) {
       console.error("Error joining community:", error);
 
-      // More specific error messages
-      if (error.message.includes("already a member")) {
+      // Dismiss any pending toasts
+      toast.dismiss("tx-pending");
+
+      if (error.message?.includes("Timeout")) {
+        toast.info(
+          "Transaction is taking longer than expected. It may still be processing. Check the explorer later.",
+          { duration: 10000 }
+        );
+        // You might want to check transaction status later
+        checkTransactionStatusLater(transactionHash);
+      } else if (error.message?.includes("already a member")) {
         toast.error("You are already a member of this community");
-      } else if (error.message.includes("paymaster")) {
-        toast.error("Transaction failed. Please try again.");
+      } else if (error.message?.includes("user rejected")) {
+        toast.error("Transaction was rejected");
       } else {
         toast.error("Failed to join community. Please try again!");
       }
     } finally {
       setJoinCommunityLoading(false);
+    }
+  };
+
+  // Helper function to check transaction status later
+  const checkTransactionStatusLater = async (transactionHash) => {
+    try {
+      const receipt = await waitForReceipt({
+        client,
+        chain: defineChain(11155111),
+        transactionHash,
+        timeoutMs: 300000, // 5 minute wait
+      });
+
+      if (receipt.status === "success") {
+        toast.success("Transaction confirmed! You've joined the community.");
+        fetchMembers();
+      }
+    } catch (error) {
+      console.log("Transaction status check:", error);
     }
   };
 
@@ -219,16 +292,16 @@ const CommunityPage = () => {
       const endTimeUnix = new Date(eventData.endTime).getTime() / 1000;
 
       const contract = await getContract({
-        address: CommunityAddress,
-        abi: Community_ABI,
+        address: DiamondAddress,
+        abi: CommunityEngagementFacet_ABI,
         client,
-        chain: defineChain(1020352220),
+        chain: defineChain(11155111),
       });
 
       const tx = await prepareContractCall({
         contract,
         method:
-          "function createEvent(string _name, uint256 _startTime, uint256 _endTime, uint256 _maxParticipants, bool _isOnline, string _location, string _additionalDetails) returns (uint256)",
+          "function createCommunityEvent(string _name, uint256 _startTime, uint256 _endTime, uint256 _maxParticipants, bool _isOnline, string _location, string _additionalDetails) returns (uint256)",
         params: [
           eventData.name,
           BigInt(startTimeUnix),
@@ -263,51 +336,59 @@ const CommunityPage = () => {
   };
 
   // Example for handleAirdrop
-  //this function is just an example, does not exist on the contract
-  const handleAirdrop = async () => {
-    if (!isConnected) {
-      openConnectModal();
-      return;
-    }
+  const handleCreateAirdrop = async () => {
+  if (!isConnected) {
+    openConnectModal();
+    return;
+  }
 
-    setDistributeAirdropsLoading(true);
+  setDistributeAirdropsLoading(true);
 
-    try {
-      const addressList = airdropData.addresses
-        .split("\n")
-        .map((addr) => addr.trim())
-        .filter((addr) => addr);
+  try {
+    // parse start/end time from airdropData (accepts ISO string or timestamp)
+    const startTimeUnix = airdropData.startTime
+      ? Math.floor(new Date(airdropData.startTime).getTime() / 1000)
+      : Math.floor(Date.now() / 1000); // default now
+    const endTimeUnix = airdropData.endTime
+      ? Math.floor(new Date(airdropData.endTime).getTime() / 1000)
+      : startTimeUnix + 24 * 60 * 60; // default +1 day
 
-      const contract = await getContract({
-        address: CommunityAddress,
-        abi: Community_ABI,
-        client,
-        chain: defineChain(1020352220),
-      });
+    const contract = await getContract({
+      address: DiamondAddress,
+      abi: CommunityGovernanceFacetABI,
+      client,
+      chain: defineChain(11155111),
+    });
 
-      const tx = await prepareContractCall({
-        contract,
-        method:
-          "function distributeAirdrops(uint256 _amount, address[] calldata _recipients) returns (bool)",
-        params: [parseEther(airdropData.amount), addressList],
-      });
+    const tx = await prepareContractCall({
+      contract,
+      method:
+        "function createAirdropProposal(uint256 _amount, uint256 _startTime, uint256 _endTime) returns (uint256)",
+      params: [
+        parseEther(airdropData.amount),
+        BigInt(startTimeUnix),
+        BigInt(endTimeUnix),
+      ],
+    });
 
-      await sendTransaction(tx);
+    await sendTransaction(tx);
 
-      toast.success("Airdrop proposal created!");
-      setShowAirdropModal(false);
-      setAirdropData({
-        amount: "",
-        addresses: "",
-      });
-    } catch (error) {
-      console.error("Error distributing airdrops:", error);
-      toast.error("Failed to create airdrop proposal");
-    }
-  };
+    toast.success("Airdrop proposal created!");
+    setShowAirdropModal(false);
+    setAirdropData({
+      amount: "",
+      addresses: "",
+      startTime: "",
+      endTime: "",
+    });
+  } catch (error) {
+    console.error("Error distributing airdrops:", error);
+    toast.error("Failed to create airdrop proposal");
+  } finally {
+    setDistributeAirdropsLoading(false);
+  }
 
   // Handle Fund Project
-  //Also this function can't seem to find it in the contract
   const handleFundProject = async () => {
     if (!isConnected) {
       openConnectModal();
@@ -318,19 +399,18 @@ const CommunityPage = () => {
 
     try {
       const contract = await getContract({
-        address: CommunityAddress,
-        abi: Community_ABI,
+        address: DiamondAddress,
+        abi: CommunityGovernanceFacet_ABI,
         client,
-        chain: defineChain(1020352220),
+        chain: defineChain(11155111),
       });
 
       const tx = await prepareContractCall({
         contract,
         method:
-          "function fundCommunityProjects(address _project, uint256 _amount) returns (bool)",
+          "function approveProjectProposal(uint256 _projectId)",
         params: [
-          projectFundingData.projectAddress,
-          parseEther(projectFundingData.amount),
+          BigInt(projectFundingData.projectId),
         ],
       });
 
@@ -358,12 +438,11 @@ const CommunityPage = () => {
     setParticipateLoading(true);
 
     try {
-      const signer = await client;
       const contract = await getContract({
-        address: CommunityAddress,
-        abi: Community_ABI,
-        signer,
-        chain: defineChain(1020352220),
+        address: DiamondAddress,
+        abi: CommunityEngagementFacet_ABI,
+        client,
+        chain: defineChain(11155111),
       });
 
       // const tx = await contract.participateInEvent(BigInt(eventId));

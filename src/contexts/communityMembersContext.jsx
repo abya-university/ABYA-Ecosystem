@@ -1,19 +1,14 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
-import CommunityBadgeABI from "../artifacts/contracts/Community Contracts/CommunityBadgeSystem.sol/CommunityBadgeSystem.json";
+import CommunityEngagementFacetABI from "../artifacts/contracts/CommunityEngagementFacet.sol/CommunityEngagementFacet.json";
+import CommunityBadgeFacetABI from "../artifacts/contracts/CommunityBadgeFacet.sol/CommunityBadgeFacet.json";
 import { toast } from "react-toastify";
 import { useActiveAccount } from "thirdweb/react";
 import { getContract, readContract, defineChain } from "thirdweb";
 import { client } from "../services/client";
 
-const Community_ABI = CommunityABI.abi;
-const CommunityBadge_ABI = CommunityBadgeABI.abi;
-const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
-const CommunityBadgeAddress = import.meta.env
-  .VITE_APP_COMMUNITYBADGESYSTEM_CONTRACT_ADDRESS;
-
-// Define your chain
-const SKALE_CHAIN = defineChain(1020352220);
+const CommunityEngagementFacet_ABI = CommunityEngagementFacetABI.abi;
+const CommunityBadgeFacet_ABI = CommunityBadgeFacetABI.abi;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 
 const CommunityMembersContext = createContext();
 
@@ -44,10 +39,10 @@ export const CommunityMembersProvider = ({ children }) => {
       // console.log("Fetching members from contract:", CommunityAddress);
 
       const contract = getContract({
-        address: CommunityAddress,
-        abi: Community_ABI,
+        address: DiamondAddress,
+        abi: CommunityEngagementFacet_ABI,
         client,
-        chain: SKALE_CHAIN,
+        chain: defineChain(11155111),
       });
 
       const communityMembers = await readContract({
@@ -92,10 +87,10 @@ export const CommunityMembersProvider = ({ children }) => {
       console.log("Fetching badge details for:", address);
 
       const contract = getContract({
-        address: CommunityBadgeAddress,
-        abi: CommunityBadge_ABI,
+        address: DiamondAddress,
+        abi: CommunityBadgeFacet_ABI,
         client,
-        chain: SKALE_CHAIN,
+        chain: defineChain(11155111),
       });
 
       const memberBadgeDetails = await readContract({

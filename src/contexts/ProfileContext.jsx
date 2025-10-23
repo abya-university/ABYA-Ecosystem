@@ -34,6 +34,19 @@ const EMPTY_PROFILE = {
   updatedAt: null,
 };
 
+// ✅ Use direct SKALE RPC to avoid bundler issues
+const skaleTitanTestnet = defineChain({
+  id: 1020352220,
+  rpc: `https://1020352220.rpc.thirdweb.com/${
+    import.meta.env.VITE_APP_THIRDWEB_CLIENT_ID
+  }`,
+  name: "SKALE Titan Hub Testnet",
+  nativeCurrency: { name: "sFUEL", symbol: "sFUEL", decimals: 18 },
+  blockExplorers: [
+    { name: "SKALE Explorer", url: "https://staging-explorer.skale.network" },
+  ],
+});
+
 export const ProfileProvider = ({ children }) => {
   const [profile, setProfile] = useState(EMPTY_PROFILE);
   const [loading, setLoading] = useState(false);
@@ -44,48 +57,98 @@ export const ProfileProvider = ({ children }) => {
   const createProfile = useCallback(
     async (fname, lname, email) => {
       try {
-        if (!isConnected || !address || !client) {
+        if (!isConnected || !account) {
           throw new Error("Please connect your wallet first");
         }
 
+        if (!PROFILE_CONTRACT_ADDRESS) {
+          throw new Error("Profile contract address not configured");
+        }
+
         setLoading(true);
+
         const contract = getContract({
           address: PROFILE_CONTRACT_ADDRESS,
           abi: profileABI,
           client,
-          chain: defineChain(1020352220),
+          chain: skaleTitanTestnet,
         });
 
-        const tx = prepareContractCall({
+        // ✅ Prepare transaction with explicit gas settings
+        const transaction = prepareContractCall({
           contract,
           method:
             "function createProfile(string _fname, string _lname, string _email) returns (uint256)",
           params: [fname, lname, email],
         });
 
-        const result = await sendTransaction(tx);
+        console.log("Transaction prepared:", transaction);
+
+        if (!transaction) {
+          throw new Error("Failed to prepare transaction");
+        }
+
+        // ✅ Send transaction with explicit account and timeout
+        const transactionPromise = sendTransaction({
+          transaction,
+          account,
+        });
+
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Transaction timeout after 45 seconds")),
+            45000
+          )
+        );
+
+        const result = await Promise.race([transactionPromise, timeoutPromise]);
+
+        console.log("Profile creation result:", result);
         toast.success("Profile created successfully!");
 
-        // Refresh profile after creation
-        await getProfileByAccount();
+        // Wait for transaction to be mined before refreshing
+        setTimeout(() => {
+          getProfileByAccount();
+        }, 3000);
+
         return result;
       } catch (error) {
         console.error("Error creating profile:", error);
-        const errorMessage = error.message.includes("Email already exists")
-          ? "This email is already registered"
-          : "Failed to create profile. Please try again.";
+
+        let errorMessage = "Failed to create profile. Please try again.";
+
+        if (error?.message) {
+          if (error.message.includes("timeout")) {
+            errorMessage = "Transaction timed out. Please try again.";
+          } else if (
+            error.message.includes("bundler") ||
+            error.message.includes("UserOperation")
+          ) {
+            errorMessage =
+              "Account abstraction failed. Try connecting with a different wallet type.";
+          } else if (error.message.includes("Email already exists")) {
+            errorMessage = "This email is already registered";
+          } else if (error.message.includes("revert")) {
+            errorMessage = "Transaction reverted. Please check your inputs.";
+          } else if (error.message.includes("user rejected")) {
+            errorMessage = "Transaction cancelled by user";
+          } else {
+            errorMessage = error.message;
+          }
+        }
+
         toast.error(errorMessage);
         throw error;
       } finally {
         setLoading(false);
       }
     },
-    [isConnected, address]
+    [isConnected, account]
   );
 
   const getProfileByAccount = useCallback(async () => {
     try {
-      if (!isConnected || !address || !client) {
+      if (!isConnected || !address) {
         setProfile(EMPTY_PROFILE);
         return;
       }
@@ -95,7 +158,7 @@ export const ProfileProvider = ({ children }) => {
         address: PROFILE_CONTRACT_ADDRESS,
         abi: profileABI,
         client,
-        chain: defineChain(1020352220),
+        chain: skaleTitanTestnet,
       });
 
       const profiles = await readContract({
@@ -106,7 +169,6 @@ export const ProfileProvider = ({ children }) => {
       });
 
       if (profiles && profiles.length > 0) {
-        // Get the most recent active profile
         const activeProfile = profiles.find((p) => p.active) || profiles[0];
         setProfile(activeProfile);
       } else {
@@ -123,7 +185,7 @@ export const ProfileProvider = ({ children }) => {
   const deactivateProfile = useCallback(
     async (profileId) => {
       try {
-        if (!isConnected || !address || !client) {
+        if (!isConnected || !account) {
           throw new Error("Please connect your wallet first");
         }
 
@@ -132,20 +194,28 @@ export const ProfileProvider = ({ children }) => {
           address: PROFILE_CONTRACT_ADDRESS,
           abi: profileABI,
           client,
-          chain: defineChain(1020352220),
+          chain: skaleTitanTestnet,
         });
 
-        const tx = prepareContractCall({
+        const transaction = prepareContractCall({
           contract,
           method: "function deactivateProfile(uint256 _profileId)",
           params: [profileId],
+          gas: 500000n,
+          gasPrice: 0n,
+          maxFeePerGas: 0n,
+          maxPriorityFeePerGas: 0n,
+          value: 0n,
         });
 
-        await sendTransaction(tx);
-        toast.success("Profile deactivated successfully");
+        const result = await sendTransaction({
+          transaction,
+          account,
+        });
 
-        // Refresh profile after deactivation
+        toast.success("Profile deactivated successfully");
         await getProfileByAccount();
+        return result;
       } catch (error) {
         console.error("Error deactivating profile:", error);
         toast.error("Failed to deactivate profile");
@@ -154,7 +224,7 @@ export const ProfileProvider = ({ children }) => {
         setLoading(false);
       }
     },
-    [isConnected, address, getProfileByAccount]
+    [isConnected, account, getProfileByAccount]
   );
 
   const getAllProfiles = useCallback(async () => {
@@ -165,7 +235,7 @@ export const ProfileProvider = ({ children }) => {
         address: PROFILE_CONTRACT_ADDRESS,
         abi: profileABI,
         client,
-        chain: defineChain(1020352220),
+        chain: skaleTitanTestnet,
       });
 
       const profiles = await readContract({

@@ -15,7 +15,7 @@ import {
   Settings,
 } from "lucide-react";
 import { useProfile } from "../contexts/ProfileContext";
-import { AbyaConnectButton } from "../providers/Providers2";
+import { AbyaConnectButton } from "../providers/Providers";
 import {
   useActiveAccount,
   useDisconnect,

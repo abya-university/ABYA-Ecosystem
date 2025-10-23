@@ -1,13 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
+import CommunityEngagementFacetABI from "../artifacts/contracts/CommunityEngagementFacet.sol/CommunityEngagementFacet.json";
 import { toast } from "react-toastify";
 import { useActiveAccount } from "thirdweb/react";
 import { client } from "../services/client";
 import { getContract, readContract } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
-const Community_ABI = CommunityABI.abi;
+const CommunityEngagementFacet_ABI = CommunityEngagementFacetABI.abi;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 
 const CommunityEventsContext = createContext();
 
@@ -64,10 +65,10 @@ export const CommunityEventsProvider = ({ children }) => {
 
     try {
       const contract = await getContract({
-        address: CommunityAddress,
-        abi: Community_ABI,
+        address: DiamondAddress,
+        abi: CommunityEngagementFacet_ABI,
         client,
-        chain: defineChain(1020352220),
+        chain: defineChain(11155111),
       });
 
       // const allEvents = await contract.getAllCommunityEvents();
