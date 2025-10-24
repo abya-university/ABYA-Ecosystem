@@ -5,7 +5,7 @@ import { useCommunityMembers } from "../contexts/communityMembersContext";
 import { useActiveAccount } from "thirdweb/react";
 import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
-import CommunityBadgeFacetABI from "../artifacts/contracts/CommunityBadgeFacet.sol/CommunityBadgeFacet.json";
+import CommunityBadgeFacetABI from "../artifacts/contracts/CommunityBadgesFacet.sol/CommunityBadgesFacet.json";
 import { toast } from "react-toastify";
 import { client } from "../services/client";
 import CONTRACT_ADDRESSES from "../constants/addresses";

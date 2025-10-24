@@ -34,19 +34,6 @@ const EMPTY_PROFILE = {
   updatedAt: null,
 };
 
-// ✅ Use direct SKALE RPC to avoid bundler issues
-const skaleTitanTestnet = defineChain({
-  id: 1020352220,
-  rpc: `https://1020352220.rpc.thirdweb.com/${
-    import.meta.env.VITE_APP_THIRDWEB_CLIENT_ID
-  }`,
-  name: "SKALE Titan Hub Testnet",
-  nativeCurrency: { name: "sFUEL", symbol: "sFUEL", decimals: 18 },
-  blockExplorers: [
-    { name: "SKALE Explorer", url: "https://staging-explorer.skale.network" },
-  ],
-});
-
 export const ProfileProvider = ({ children }) => {
   const [profile, setProfile] = useState(EMPTY_PROFILE);
   const [loading, setLoading] = useState(false);
@@ -71,7 +58,7 @@ export const ProfileProvider = ({ children }) => {
           address: PROFILE_CONTRACT_ADDRESS,
           abi: profileABI,
           client,
-          chain: skaleTitanTestnet,
+          chain: defineChain(11155111),
         });
 
         // ✅ Prepare transaction with explicit gas settings
@@ -158,13 +145,12 @@ export const ProfileProvider = ({ children }) => {
         address: PROFILE_CONTRACT_ADDRESS,
         abi: profileABI,
         client,
-        chain: skaleTitanTestnet,
+        chain: defineChain(11155111),
       });
 
       const profiles = await readContract({
         contract,
-        method:
-          "function getProfilesByAccount(address _account) view returns (tuple(uint256 id, string fname, string lname, string email, address account, bool active, uint256 createdAt, uint256 updatedAt)[])",
+        method: "getProfilesByAccount",
         params: [address],
       });
 
@@ -194,12 +180,12 @@ export const ProfileProvider = ({ children }) => {
           address: PROFILE_CONTRACT_ADDRESS,
           abi: profileABI,
           client,
-          chain: skaleTitanTestnet,
+          chain: defineChain(11155111),
         });
 
         const transaction = prepareContractCall({
           contract,
-          method: "function deactivateProfile(uint256 _profileId)",
+          method: "deactivateProfile",
           params: [profileId],
           gas: 500000n,
           gasPrice: 0n,
@@ -235,13 +221,13 @@ export const ProfileProvider = ({ children }) => {
         address: PROFILE_CONTRACT_ADDRESS,
         abi: profileABI,
         client,
-        chain: skaleTitanTestnet,
+        chain: defineChain(11155111),
       });
 
       const profiles = await readContract({
         contract,
-        method:
-          "function getAllProfiles() view returns (tuple(uint256 id, string fname, string lname, string email, address account, bool active, uint256 createdAt, uint256 updatedAt)[])",
+        method: "getAllProfiles()",
+        params: [],
       });
 
       return profiles || [];

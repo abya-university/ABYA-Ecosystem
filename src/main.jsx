@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
-import Providers from "./providers/Providers.jsx";
+// import Providers from "./providers/Providers.jsx";
 import CourseProvider from "./contexts/courseContext.jsx";
 import ChapterProvider from "./contexts/chapterContext.jsx";
 import LessonProvider from "./contexts/lessonContext.jsx";
@@ -26,35 +26,35 @@ createRoot(document.getElementById("root")).render(
     <ThirdwebProvider>
       <ProfileProvider>
         <ThemeProvider>
-          <Providers>
-            <BrowserRouter>
-              <CourseProvider>
-                <ChapterProvider>
-                  <LessonProvider>
-                    <QuizProvider>
-                      <UserProvider>
-                        <CertificatesProvider>
-                          <CommunityEventsProvider>
-                            <CommunityMembersProvider>
-                              <ProjectProposalsProvider>
-                                <AirdropProposalProvider>
-                                  <TransactionHistoryProvider>
-                                    <UserPositionProvider>
-                                      <App />
-                                    </UserPositionProvider>
-                                  </TransactionHistoryProvider>
-                                </AirdropProposalProvider>
-                              </ProjectProposalsProvider>
-                            </CommunityMembersProvider>
-                          </CommunityEventsProvider>
-                        </CertificatesProvider>
-                      </UserProvider>
-                    </QuizProvider>
-                  </LessonProvider>
-                </ChapterProvider>
-              </CourseProvider>
-            </BrowserRouter>
-          </Providers>
+          {/* <Providers> */}
+          <BrowserRouter>
+            <CourseProvider>
+              <ChapterProvider>
+                <LessonProvider>
+                  <QuizProvider>
+                    <UserProvider>
+                      <CertificatesProvider>
+                        <CommunityEventsProvider>
+                          <CommunityMembersProvider>
+                            <ProjectProposalsProvider>
+                              <AirdropProposalProvider>
+                                <TransactionHistoryProvider>
+                                  <UserPositionProvider>
+                                    <App />
+                                  </UserPositionProvider>
+                                </TransactionHistoryProvider>
+                              </AirdropProposalProvider>
+                            </ProjectProposalsProvider>
+                          </CommunityMembersProvider>
+                        </CommunityEventsProvider>
+                      </CertificatesProvider>
+                    </UserProvider>
+                  </QuizProvider>
+                </LessonProvider>
+              </ChapterProvider>
+            </CourseProvider>
+          </BrowserRouter>
+          {/* </Providers> */}
         </ThemeProvider>
       </ProfileProvider>
     </ThirdwebProvider>

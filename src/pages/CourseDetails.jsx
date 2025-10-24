@@ -29,7 +29,6 @@ import PropTypes from "prop-types";
 import ProgressBar from "../components/progressBar";
 import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import Ecosystem3FacetABI from "../artifacts/contracts/Ecosystem3Facet.sol/Ecosystem3Facet.json";
-import { useEthersSigner } from "../components/useClientSigner";
 import Certificate from "../components/Certificate";
 import { useCertificates } from "../contexts/certificatesContext";
 import { useProfile } from "../contexts/ProfileContext";

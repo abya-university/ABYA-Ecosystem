@@ -16,11 +16,8 @@ import {
   BadgeCent,
   UserCircle,
 } from "lucide-react";
-
-import { ethers } from "ethers";
-import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
+import CommunityABI from "../artifacts/contracts/CommunityEngagementFacet.sol/CommunityEngagementFacet.json";
 import { toast, ToastContainer } from "react-toastify";
-import SFuelDistributor from "../providers/SFuelDistribution";
 import { useProfile } from "../contexts/ProfileContext";
 import ProfileDashboard from "./ProfileDash";
 import { useActiveAccount } from "thirdweb/react";
@@ -171,6 +168,8 @@ const SettingsPage = () => {
   };
 
   const { profile } = useProfile();
+
+  // console.log("Profile: ", profile);
 
   return (
     <div
@@ -476,7 +475,7 @@ const SettingsPage = () => {
               </div>
             )}
 
-            {activeSection === "sfuelDetails" && <SFuelDistributor />}
+            {/* {activeSection === "sfuelDetails" && <SFuelDistributor />} */}
           </div>
         </div>
       </div>

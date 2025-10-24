@@ -22,6 +22,8 @@ export default function ProfileDashboard() {
     createProfile,
   } = useProfile();
 
+  console.log("Profile Dash: ", profile);
+
   const [profileImage, setProfileImage] = useState(null);
   const [coverImage, setCoverImage] = useState(null);
   const [darkMode, setDarkMode] = useState(false);
@@ -34,6 +36,20 @@ export default function ProfileDashboard() {
   });
   const [creating, setCreating] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
+
+  const safeCreatedAt =
+    profile?.createdAt != null
+      ? typeof profile.createdAt === "bigint"
+        ? Number(profile.createdAt)
+        : Number(profile.createdAt)
+      : null;
+
+  const safeUpdatedAt =
+    profile?.updatedAt != null
+      ? typeof profile.updatedAt === "bigint"
+        ? Number(profile.updatedAt)
+        : Number(profile.updatedAt)
+      : null;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -428,9 +444,9 @@ export default function ProfileDashboard() {
                         <InfoRow
                           label="Member Since"
                           value={
-                            profile.createdAt
+                            safeCreatedAt
                               ? new Date(
-                                  profile.createdAt * 1000
+                                  safeCreatedAt * 1000
                                 ).toLocaleDateString("en-US", {
                                   year: "numeric",
                                   month: "long",
@@ -442,9 +458,9 @@ export default function ProfileDashboard() {
                         <InfoRow
                           label="Last Updated"
                           value={
-                            profile.updatedAt
+                            safeUpdatedAt
                               ? new Date(
-                                  profile.updatedAt * 1000
+                                  safeUpdatedAt * 1000
                                 ).toLocaleDateString("en-US", {
                                   year: "numeric",
                                   month: "long",

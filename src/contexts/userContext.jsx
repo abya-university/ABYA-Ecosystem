@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect, useContext } from "react";
-import Ecosystem2ABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
+import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import PropTypes from "prop-types";
 import { useActiveAccount } from "thirdweb/react";
 import { client } from "../services/client";

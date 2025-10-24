@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import CommunityEngagementFacetABI from "../artifacts/contracts/CommunityEngagementFacet.sol/CommunityEngagementFacet.json";
-import CommunityBadgeFacetABI from "../artifacts/contracts/CommunityBadgeFacet.sol/CommunityBadgeFacet.json";
+import CommunityBadgeFacetABI from "../artifacts/contracts/CommunityBadgesFacet.sol/CommunityBadgesFacet.json";
 import { toast } from "react-toastify";
 import { useActiveAccount } from "thirdweb/react";
 import { getContract, readContract, defineChain } from "thirdweb";
 import { client } from "../services/client";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
 const CommunityEngagementFacet_ABI = CommunityEngagementFacetABI.abi;
 const CommunityBadgeFacet_ABI = CommunityBadgeFacetABI.abi;

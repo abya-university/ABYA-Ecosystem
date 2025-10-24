@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import AbyaLogo from "../assets/abya.svg";
-import { AbyaConnectButton } from "../providers/Providers2";
+import { AbyaConnectButton } from "../providers/Providers";
 
 import BitcoinLogo from "/bitcoin.svg";
 import EthereumLogo from "/ethereum3.svg";
