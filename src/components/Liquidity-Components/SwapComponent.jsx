@@ -233,12 +233,7 @@ const SwapComponent = () => {
           ],
         });
 
-        const approveResult = await sendTransaction(approveTx);
-        console.log("Approval transaction:", approveResult.transactionHash);
-
-        // Wait for approval to be confirmed
-        await approveResult.wait();
-        console.log(`${swapData.inputTokenSymbol} approved successfully`);
+        await sendTransaction({ approveTx, account });
       }
 
       // Initialize swap contract
@@ -249,53 +244,27 @@ const SwapComponent = () => {
         chain: CONTRACT_CONFIG.CHAIN,
       });
 
-      // Perform swap
-      console.log("Executing swap...", {
-        inputToken: inputTokenAddress,
-        outputToken: outputTokenAddress,
-        amountIn: amountToSwap.toString(),
-        inputSymbol: swapData.inputTokenSymbol,
-        outputSymbol: swapData.outputTokenSymbol,
-      });
-
       const swapTx = prepareContractCall({
         contract: swapContract,
         method: "swapExactInputSingle",
         params: [inputTokenAddress, outputTokenAddress, amountToSwap],
       });
 
-      const swapResult = await sendTransaction(swapTx);
+      const swapResult = await sendTransaction({ swapTx, account });
       setTxHash(swapResult.transactionHash);
 
-      console.log("Swap transaction sent:", swapResult.transactionHash);
+      // Reset form
+      setSwapData({
+        inputAmount: "",
+        outputAmount: "",
+        inputTokenSymbol: swapData.inputTokenSymbol,
+        outputTokenSymbol: swapData.outputTokenSymbol,
+        priceImpact: 0,
+        minimumReceived: "0",
+      });
 
-      // Wait for transaction confirmation
-      const receipt = await swapResult.wait();
-      console.log("Swap transaction confirmed:", receipt);
-
-      if (receipt.status === 1) {
-        setSuccess(
-          `Successfully swapped ${swapData.inputAmount} ${swapData.inputTokenSymbol} for ${swapData.outputAmount} ${swapData.outputTokenSymbol}!`
-        );
-
-        // Reset form
-        setSwapData({
-          inputAmount: "",
-          outputAmount: "",
-          inputTokenSymbol: swapData.inputTokenSymbol,
-          outputTokenSymbol: swapData.outputTokenSymbol,
-          priceImpact: 0,
-          minimumReceived: "0",
-        });
-
-        // Refresh data
-        loadBalances();
-        if (typeof refreshHistory === "function") {
-          refreshHistory();
-        }
-      } else {
-        setError("Swap transaction failed");
-      }
+      // Refresh data
+      loadBalances();
     } catch (error) {
       console.error("Swap failed:", error);
       let errorMessage = "Swap failed";
@@ -457,8 +426,8 @@ const SwapComponent = () => {
                 }}
                 className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 py-1 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-yellow-500 text-gray-900 dark:text-gray-100"
               >
-                <option value="TOKEN0">TOKEN0(USDC)</option>
-                <option value="TOKEN1">TOKEN1(ABYTKN)</option>
+                <option value="TOKEN0">TOKEN0(ABYTKN)</option>
+                <option value="TOKEN1">TOKEN1(USDC)</option>
               </select>
             </div>
           </div>
@@ -513,8 +482,8 @@ const SwapComponent = () => {
                 }}
                 className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 py-1 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-yellow-500 text-gray-900 dark:text-gray-100"
               >
-                <option value="TOKEN1">TOKEN1(ABYTKN)</option>
-                <option value="TOKEN0">TOKEN0(USDC)</option>
+                <option value="TOKEN1">TOKEN1(USDC)</option>
+                <option value="TOKEN0">TOKEN0(ABYTKN)</option>
               </select>
             </div>
           </div>

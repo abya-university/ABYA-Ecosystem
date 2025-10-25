@@ -97,25 +97,16 @@ const MintComponent = () => {
         params: [address, parsedAmount],
       });
 
-      const tx = await sendTransaction(transaction);
+      const tx = await sendTransaction({ transaction, account });
 
       setTxHash(tx.transactionHash);
-      console.log("USDC Mint transaction sent:", tx.transactionHash);
 
-      // Wait for transaction confirmation
-      const receipt = await tx.wait();
-      console.log("USDC Mint transaction confirmed:", receipt);
-
-      if (receipt.status === 1) {
-        setSuccess(`Successfully minted ${amount} USDC!`);
-        loadBalances(); // Refresh balances
-        setMintData((prev) => ({
-          ...prev,
-          usdcAmount: "",
-        }));
-      } else {
-        setError("USDC mint transaction failed");
-      }
+      setSuccess(`Successfully minted ${amount} USDC!`);
+      loadBalances(); // Refresh balances
+      setMintData((prev) => ({
+        ...prev,
+        usdcAmount: "",
+      }));
     } catch (error) {
       console.error("USDC Minting error:", error);
       let errorMessage = "Failed to mint USDC";
@@ -179,45 +170,42 @@ const MintComponent = () => {
         parsedAmount: parsedAmount.toString(),
       });
 
-      // Prepare and send mint transaction
+      // Prepare and send mint transaction (use same signature as USDC)
       const transaction = prepareContractCall({
         contract: abytknContract,
         method: "mint",
         params: [address, parsedAmount],
+        gas: 500000n,
+        gasPrice: 0n,
+        value: 0n,
       });
 
-      const tx = await sendTransaction(transaction);
+      // sendTransaction expects an object { transaction, account }
+      const tx = await sendTransaction({ transaction, account });
 
-      setTxHash(tx.transactionHash);
-      console.log("ABYTKN Mint transaction sent:", tx.transactionHash);
+      // prefer transactionHash or hash
+      setTxHash(tx.transactionHash ?? tx.hash);
 
-      // Wait for transaction confirmation
-      const receipt = await tx.wait();
-      console.log("ABYTKN Mint transaction confirmed:", receipt);
-
-      if (receipt.status === 1) {
-        setSuccess(`Successfully minted ${amount} ABYTKN!`);
-        loadBalances(); // Refresh balances
-        setMintData((prev) => ({
-          ...prev,
-          abytknAmount: "",
-        }));
-      } else {
-        setError("ABYTKN mint transaction failed");
-      }
+      setSuccess(`Successfully minted ${amount} ABYTKN!`);
+      loadBalances(); // Refresh balances
+      setMintData((prev) => ({
+        ...prev,
+        abytknAmount: "",
+      }));
     } catch (error) {
       console.error("ABYTKN Minting error:", error);
       let errorMessage = "Failed to mint ABYTKN";
 
-      if (error.message.includes("user rejected")) {
+      const msg = error?.message ?? String(error);
+      if (msg.includes("user rejected")) {
         errorMessage = "Transaction rejected by user";
-      } else if (error.message.includes("insufficient funds")) {
+      } else if (msg.includes("insufficient funds")) {
         errorMessage = "Insufficient funds for gas";
-      } else if (error.message.includes("execution reverted")) {
+      } else if (msg.includes("execution reverted")) {
         errorMessage =
           "Contract execution reverted - you may not have minting permissions";
       } else {
-        errorMessage += `: ${error.message}`;
+        errorMessage += `: ${msg}`;
       }
 
       setError(errorMessage);

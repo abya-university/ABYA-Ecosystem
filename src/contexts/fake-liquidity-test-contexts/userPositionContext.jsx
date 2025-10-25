@@ -80,13 +80,30 @@ export function UserPositionProvider({ children }) {
   // Fetch token decimals
   const fetchTokenDecimals = useCallback(async () => {
     try {
-      // Get token addresses from contract
-      const [token0Address, token1Address] = await Promise.all([
-        readContractManual("token0"),
-        readContractManual("token1"),
-      ]);
+      // Get token addresses from contract (handle different return shapes)
+      const rawToken0 = await readContractManual("token0");
+      const rawToken1 = await readContractManual("token1");
 
-      // Create token contracts for decimals
+      const resolveAddr = (val) => {
+        if (!val) return null;
+        if (typeof val === "string") return val;
+        if (Array.isArray(val) && val.length > 0) return String(val[0]);
+        if (val?.toString && typeof val.toString === "function") {
+          const s = val.toString();
+          if (s && s !== "0x") return s;
+        }
+        if (val?.address) return val.address;
+        return null;
+      };
+
+      const token0Address = resolveAddr(rawToken0);
+      const token1Address = resolveAddr(rawToken1);
+
+      if (!token0Address || !token1Address) {
+        throw new Error("Could not resolve token addresses");
+      }
+
+      // Create token contracts for decimals (use simple ERC20 ABI)
       const token0Contract = getContract({
         client,
         address: token0Address,
@@ -101,15 +118,89 @@ export function UserPositionProvider({ children }) {
         abi: ["function decimals() view returns (uint8)"],
       });
 
-      const [decimals0, decimals1] = await Promise.all([
-        readContract({ contract: token0Contract, method: "decimals" }),
-        readContract({ contract: token1Contract, method: "decimals" }),
-      ]);
+      // Try thirdweb readContract first, fall back to ethers provider call if needed
+      let decimals0, decimals1;
+      try {
+        decimals0 = await readContract({
+          contract: token0Contract,
+          method: "decimals()",
+        });
+      } catch (err) {
+        // try without parentheses (some providers accept both)
+        try {
+          decimals0 = await readContract({
+            contract: token0Contract,
+            method: "decimals",
+          });
+        } catch (e) {
+          decimals0 = null;
+        }
+      }
 
-      setToken0Decimals(decimals0);
-      setToken1Decimals(decimals1);
+      try {
+        decimals1 = await readContract({
+          contract: token1Contract,
+          method: "decimals()",
+        });
+      } catch (err) {
+        try {
+          decimals1 = await readContract({
+            contract: token1Contract,
+            method: "decimals",
+          });
+        } catch (e) {
+          decimals1 = null;
+        }
+      }
 
-      console.log("Token decimals:", { token0: decimals0, token1: decimals1 });
+      // Final fallback: use ethers JsonRpcProvider to call decimals directly
+      if (decimals0 == null || decimals1 == null) {
+        const provider = new ethers.JsonRpcProvider(
+          import.meta.env.VITE_APP_SKALE_RPC_URL ||
+            import.meta.env.VITE_APP_SEPOLIA_RPC_URL
+        );
+        if (decimals0 == null) {
+          const token0Iface = new ethers.Interface([
+            "function decimals() view returns (uint8)",
+          ]);
+          const token0ContractEthers = new ethers.Contract(
+            token0Address,
+            token0Iface,
+            provider
+          );
+          try {
+            decimals0 = await token0ContractEthers.decimals();
+          } catch (err) {
+            // console.warn("ethers fallback decimals0 failed:", err);
+            decimals0 = 18;
+          }
+        }
+        if (decimals1 == null) {
+          const token1Iface = new ethers.Interface([
+            "function decimals() view returns (uint8)",
+          ]);
+          const token1ContractEthers = new ethers.Contract(
+            token1Address,
+            token1Iface,
+            provider
+          );
+          try {
+            decimals1 = await token1ContractEthers.decimals();
+          } catch (err) {
+            console.warn("ethers fallback decimals1 failed:", err);
+            decimals1 = 18;
+          }
+        }
+      }
+
+      // Ensure numbers
+      setToken0Decimals(Number(decimals0 ?? 18));
+      setToken1Decimals(Number(decimals1 ?? 18));
+
+      console.log("Token decimals:", {
+        token0: token0Decimals,
+        token1: token1Decimals,
+      });
     } catch (error) {
       console.error("Failed to fetch token decimals:", error);
       // Fallback to default decimals
