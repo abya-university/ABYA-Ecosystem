@@ -85,35 +85,12 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
 
   const { data: chainMetadata } = useChainMetadata(defineChain(11155111));
 
-  console.log("Name:", chainMetadata?.name);
-  console.log("Faucets:", chainMetadata?.faucets);
-  console.log("Explorers:", chainMetadata?.explorers);
-
   const [activeTab, setActiveTab] = useState("details");
 
   const [filteredChapters, setFilteredChapters] = useState([]);
   const [filteredLessons, setFilteredLessons] = useState([]);
   const [filteredQuizzes, setFilteredQuizzes] = useState([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
-
-  // const customChain = defineChain({
-  //   id: 1020352220,
-  //   name: "Skale Titan Hub Testnet",
-  //   rpc: `https://1020352220.rpc.thirdweb.com/${
-  //     import.meta.env.VITE_APP_THIRDWEB_CLIENT_ID
-  //   }`,
-  //   nativeCurrency: {
-  //     name: "SKALE",
-  //     symbol: "SKL",
-  //     decimals: 18,
-  //   },
-  //   blockExplorers: [
-  //     {
-  //       name: "Blockscout",
-  //       url: import.meta.env.VITE_APP_BROCK_EXPLORER,
-  //     },
-  //   ],
-  // });
 
   const getDifficultyLabel = (level) => {
     switch (Number(level)) {
@@ -523,12 +500,11 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
 
       const transaction = prepareContractCall({
         contract,
-        method:
-          "function approveCourse(uint256 _courseId, uint256 score, (uint256 learnerAgency, uint256 criticalThinking, uint256 collaborativeLearning, uint256 reflectivePractice, uint256 adaptiveLearning, uint256 authenticLearning, uint256 technologyIntegration, uint256 learnerSupport, uint256 assessmentForLearning, uint256 engagementAndMotivation, bool isSubmitted, string category, uint256 score, bool passed) review)",
+        method: "approveCourse",
         params: [course.courseId, finalScore, review],
       });
 
-      await sendTransaction(transaction);
+      await sendTransaction({ transaction, account });
       toast.success("Course approved successfully!");
     } catch (error) {
       console.error("Error in course approval process:", error);

@@ -14,6 +14,7 @@ import { useState, useEffect, useRef } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import { useDarkMode } from "../contexts/themeContext";
 import ErrorBoundary from "./ErrorBoundary";
+import { useNavigate } from "react-router-dom";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -21,6 +22,7 @@ export default function Navbar() {
   const { profile, hasProfile, clearProfile } = useProfile();
   const { darkMode, setDarkMode } = useDarkMode();
   const dropdownRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     document.body.classList.toggle("dark", darkMode);
@@ -41,6 +43,11 @@ export default function Navbar() {
   // Close mobile menu on navigation
   const handleLinkClick = () => {
     if (menuOpen) setMenuOpen(false);
+  };
+
+  const navigateTo = (path) => {
+    navigate(path);
+    setProfileDropdownOpen(false);
   };
 
   const handleProfileClick = () => {
@@ -138,14 +145,13 @@ export default function Navbar() {
                   </div>
 
                   {/* Dropdown Items */}
-                  <Link
-                    to="/profile"
-                    onClick={() => setProfileDropdownOpen(false)}
+                  <button
+                    onClick={() => navigateTo("/mainpage?section=settings")}
                     className="flex items-center px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
                   >
                     <User className="w-4 h-4 mr-3" />
                     View Profile
-                  </Link>
+                  </button>
 
                   <Link
                     to="/certificates"

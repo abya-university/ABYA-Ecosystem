@@ -42,7 +42,7 @@ const WalletConnection = () => {
   const { data: balanceData, isLoading: balanceLoading } = useWalletBalance({
     account,
     client, // Your thirdweb client
-    chain: defineChain(1020352220), // SKALE Titan Hub
+    chain: defineChain(11155111),
   });
 
   // Outside click / ESC
@@ -174,7 +174,7 @@ const WalletConnection = () => {
                   Profile Actions
                 </h4>
                 <button
-                  onClick={() => navigateTo("/profile")}
+                  onClick={() => navigateTo("/mainpage?section=settings")}
                   className="w-full flex items-center space-x-3 p-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200"
                 >
                   <User className="w-4 h-4" />

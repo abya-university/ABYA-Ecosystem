@@ -21,10 +21,7 @@ const CourseProvider = ({ children }) => {
 
   useEffect(() => {
     const fetchCourses = async () => {
-      const resolvedSigner = await client;
-      console.log("Resolved Signer:", resolvedSigner);
-
-      if (resolvedSigner) {
+      if (client) {
         try {
           const contract = getContract({
             address: DiamondAddress,
@@ -39,8 +36,7 @@ const CourseProvider = ({ children }) => {
             // Use readContract directly instead of useReadContract hook
             const coursesData = await readContract({
               contract,
-              method:
-                "function getAllCourses() view returns ((uint256 courseId, string courseName, string description, bool approved, uint256 score, address creator, bool exists, address[] enrolledStudents, uint8 difficultyLevel, uint256 creationTime)[])",
+              method: "getAllCourses",
               params: [],
             });
 

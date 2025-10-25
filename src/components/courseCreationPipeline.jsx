@@ -71,8 +71,7 @@ const CourseCreationPipeline = () => {
 
       const tx = await prepareContractCall({
         contract: diamondContract,
-        method:
-          "function createCourse(string _courseName, string _description, uint8 _difficultyLevel) returns (bool)",
+        method: "createCourse",
         params: [
           courseData.basicInfo.name,
           courseData.basicInfo.description,
@@ -80,7 +79,7 @@ const CourseCreationPipeline = () => {
         ],
       });
       console.log("Transaction sent:", tx.hash);
-      const receipt = await sendTransaction(tx);
+      const receipt = await sendTransaction({ transaction: tx, account });
       console.log("Transaction confirmed:", receipt.transactionHash);
       toast.success("Course created successfully!");
       setCourseData({
@@ -106,24 +105,7 @@ const CourseCreationPipeline = () => {
         console.error("Role not granted");
       }
     } catch (err) {
-      console.error("Full Error Details:", {
-        name: err.name || "Unknown Error",
-        code: err.code || "No Error Code",
-        message: err.message || "No Error Message",
-        stack: err.stack || "No Stack Trace",
-      });
-
-      if (err.code === "INVALID_ARGUMENT") {
-        toast.error("Invalid transaction parameters. Please check your input.");
-      } else if (err.code === "UNSUPPORTED_OPERATION") {
-        toast.error(
-          "Unsupported network operation. Check your network settings."
-        );
-      } else {
-        toast.error(
-          `Failed to create course: ${err.message || "Unknown error"}`
-        );
-      }
+      toast.error(`Failed to create course: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -303,19 +285,15 @@ const CourseCreationPipeline = () => {
 
           const tx = await prepareContractCall({
             contract: diamondContract,
-            method:
-              "function addChapters(uint256 _courseId, string[] _chapters, uint256[] _durations) returns (bool)",
+            method: "addChapters",
             params: [parsedCourseId, chapters, durations],
           });
-          console.log("Transaction sent:", tx.hash);
-          const receipt = await sendTransaction(tx);
-          console.log(receipt);
+          await sendTransaction({ transaction: tx, account });
+          toast.success("Chapters created successfully!");
           setChapters([]);
           setDurations([]);
           setCourseId("");
-          toast.success("Chapters created successfully!");
         } catch (err) {
-          console.error("Full Error:", err);
           toast.error(`Failed to create chapters: ${err.message}`);
         } finally {
           setLoading(false);
@@ -455,109 +433,59 @@ const CourseCreationPipeline = () => {
     const [lessons, setLessons] = useState([]);
     const [chapterId, setChapterId] = useState("");
     const [courseId, setCourseId] = useState("");
-    const { fetchChapters, chapters, setChapters } = useContext(ChapterContext);
-    const { isConnected } = useAccount();
+    const [filteredChapters, setFilteredChapters] = useState([]); // ✅ local filtered list
+    const { chapters } = useContext(ChapterContext);
+    const account = useActiveAccount();
+    const address = account?.address;
+    const isConnected = !!account;
+    const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState("");
     const [error, setError] = useState("");
 
     const createLesson = async () => {
-      if (!isConnected) {
-        setError("Wallet is not connected");
-        return;
-      } else {
-        setLoading(true);
-        try {
-          if (!client) {
-            throw new Error("Client is required to access the contract.");
-          }
+      if (!client)
+        throw new Error("Client is required to access the contract.");
+      setLoading(true);
+      try {
+        const diamondContract = await getContract({
+          address: DiamondAddress,
+          abi: Ecosystem2Facet_ABI,
+          client,
+          chain: defineChain(11155111),
+        });
 
-          const diamondContract = await getContract({
-            address: DiamondAddress,
-            abi: Ecosystem2Facet_ABI,
-            client,
-            chain: defineChain(11155111),
-          });
-
-          const tx = await prepareContractCall({
-            contract: diamondContract,
-            method:
-              "function addLesson(uint256 _chapterId, string _lessonName, string _lessonContent)",
-            params: [chapterId.toString(), lessonName, lessonContent],
-          });
-          console.log("Transaction sent:", tx.hash);
-          const receipt = await sendTransaction(tx);
-          console.log(receipt);
-          toast.success(`${lessonName} lesson created successfully!`);
-          setLessonName("");
-          setLessonContent("");
-        } catch (err) {
-          console.error("Full Error:", err);
-          toast.error(`Failed to create lessons: ${err.message}`);
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-
-    const addLesson = () => {
-      if (lessonName.trim() && lessonContent.trim()) {
-        setLessons([
-          ...lessons,
-          { name: lessonName.trim(), content: lessonContent.trim() },
-        ]);
-
+        const tx = await prepareContractCall({
+          contract: diamondContract,
+          method: "addLesson",
+          params: [chapterId.toString(), lessonName, lessonContent],
+        });
+        await sendTransaction({ transaction: tx, account });
+        toast.success(`${lessonName} lesson created successfully!`);
         setLessonName("");
         setLessonContent("");
+      } catch (err) {
+        toast.error(`Failed to create lesson: ${err.message}`);
+      } finally {
+        setLoading(false);
       }
     };
 
     useEffect(() => {
       if (courseId) {
-        console.log("Fetching chapters for courseId:", courseId);
-        fetchChapters().then((fetchedChapters) => {
-          if (fetchedChapters) {
-            // Add debug logs
-            console.log("Raw fetched chapters:", fetchedChapters);
-
-            const formattedChapters = fetchedChapters
-              .filter((chapter) => {
-                // Convert both to strings or numbers for comparison
-                const chapterCourseId = Number(chapter.courseId);
-                const targetCourseId = Number(courseId);
-                console.log("Comparing:", chapterCourseId, targetCourseId);
-                return chapterCourseId === targetCourseId;
-              })
-              .map((chapter) => ({
-                chapterId: Number(chapter.chapterId),
-                chapterName: chapter.chapterName,
-              }));
-
-            console.log("Formatted chapters:", formattedChapters);
-            setChapters(formattedChapters);
-          } else {
-            setChapters([]);
-          }
-        });
+        const filtered = chapters.filter(
+          (chapter) => Number(chapter.courseId) === Number(courseId)
+        );
+        setFilteredChapters(filtered); // ✅ only update local state
+      } else {
+        setFilteredChapters([]); // clear when no course selected
       }
-    }, [courseId, fetchChapters, chapters]);
+    }, [courseId, chapters]);
 
     return (
       <div className="space-y-6">
         <h2 className="text-2xl font-bold text-yellow-500">Create Lessons</h2>
-        {(success || error) && (
-          <div
-            className={`mb-4 p-4 rounded-lg flex items-center ${
-              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
-            }`}
-          >
-            {success ? (
-              <CheckCircle className="h-5 w-5 mr-2" />
-            ) : (
-              <AlertCircle className="h-5 w-5 mr-2" />
-            )}
-            <span>{success || error}</span>
-          </div>
-        )}
+
+        {/* Lesson Inputs */}
         <div className="grid gap-4">
           <input
             type="text"
@@ -594,7 +522,6 @@ const CourseCreationPipeline = () => {
                 )
             )}
           </select>
-          {/* <p>{courseId}</p> */}
         </div>
 
         {/* Chapter Selection */}
@@ -608,7 +535,7 @@ const CourseCreationPipeline = () => {
             className="w-full p-3 border rounded-lg"
           >
             <option value="">Choose a chapter</option>
-            {chapters?.map((chapter) => (
+            {filteredChapters.map((chapter) => (
               <option key={chapter.chapterId} value={chapter.chapterId}>
                 {chapter.chapterName}
               </option>
@@ -616,7 +543,9 @@ const CourseCreationPipeline = () => {
           </select>
         </div>
 
+        {/* Submit */}
         <button
+          type="button"
           onClick={createLesson}
           disabled={loading}
           className={`rounded-lg bg-yellow-500 mt-4 py-2 px-6 hover:bg-yellow-600 transition-colors ${
@@ -665,16 +594,13 @@ const CourseCreationPipeline = () => {
         // const tx = await diamondContract.createQuiz(lessonId, quizTitle);
         const tx = await prepareContractCall({
           contract: diamondContract,
-          method:
-            "function createQuiz(uint256 _lessonId, string _title) returns (uint256)",
+          method: "createQuiz",
           params: [lessonId, quizTitle],
         });
-        console.log("Transaction sent:", tx.hash);
-        const receipt = await sendTransaction(tx);
-        console.log("Quiz created: ", receipt);
+        await sendTransaction({ transaction: tx, account });
+        toast.success(`${quizTitle} created successfully!!`);
         setLessonId("");
         setQuizTitle("");
-        toast.success(`${quizTitle} created successfully!!`);
       } catch (error) {
         console.error("Error creating quiz: ", error);
         toast.error("Error creating quiz");
@@ -718,8 +644,7 @@ const CourseCreationPipeline = () => {
 
           const tx = await prepareContractCall({
             contract: diamondContract,
-            method:
-              "function createQuestionWithChoices(uint256 _quizId, string _questionText, string[] _options, uint8 _correctChoiceIndex)",
+            method: "createQuestionWithChoices",
             params: [
               quizId,
               question,
@@ -727,9 +652,7 @@ const CourseCreationPipeline = () => {
               correctOptionIndex,
             ],
           });
-          console.log("Transaction sent:", tx.hash);
-
-          const receipt = await sendTransaction(tx);
+          await sendTransaction({ transaction: tx, account });
           toast.success("Question created successfully!!");
 
           // Reset inputs after adding
@@ -741,7 +664,6 @@ const CourseCreationPipeline = () => {
             { text: "", isCorrect: false },
           ]);
         } catch (err) {
-          console.error("Error creating question: ", err);
           toast.error("Error creating question");
         } finally {
           setLoading(false);
@@ -1025,15 +947,10 @@ const CourseCreationPipeline = () => {
 
         const tx = await prepareContractCall({
           contract: diamondContract,
-          method:
-            "function addResourcesToLesson(uint256 _lessonId, uint8 contentType, (uint8 contentType, string url, string name)[] _resources)",
+          method: "addResourcesToLesson",
           params: [lessonId, ContentTypeEnum[contentType], [newResource]],
         });
-        console.log("Transaction sent:", tx.hash);
-
-        const receipt = await sendTransaction(tx);
-        console.log("Resources added to lesson:", receipt);
-
+        await sendTransaction({ transaction: tx, account });
         // Update local state
         setResources([
           ...resources,
@@ -1044,12 +961,13 @@ const CourseCreationPipeline = () => {
           },
         ]);
 
+        toast.success("Resource added successfully!");
+
         // Reset form
         setResourceName("");
         setResourceLink("");
         setFile(null);
         setContentType("");
-        toast.success("Resource added successfully!");
       } catch (error) {
         console.error("Error adding resource:", error);
         toast.error("Error adding resource. Please try again.");
@@ -1261,7 +1179,7 @@ const CourseCreationPipeline = () => {
   return (
     <div className="w-[95%] md:w-[85%] lg:w-[80%] xl:w-[75%] mx-auto p-8 bg-white dark:bg-gray-900 rounded-lg shadow-lg mt-[100px]">
       <ProgressBar />
-      <ToastContainer position="bottom-right" theme="colored" />
+      <ToastContainer position="bottom-right z-60" theme="colored" />
 
       {showPreview ? (
         <PreviewCourse />
