@@ -51,7 +51,7 @@ const VantaNetBG = ({ darkMode, children }) => {
         scaleMobile: 1.0,
         size: 1.0,
         // Updated to use your blue theme
-        color: darkMode ? 0x1e40af : 0x1d4ed8, // blue-700 to blue-600
+        color: darkMode ? 0x1e40af : 0x064b6d, // blue-700 to blue-600
         color2: darkMode ? 0x3b82f6 : 0x60a5fa, // blue-500 to blue-400
         backgroundColor: darkMode ? 0x0f172a : 0xf8fafc, // gray-900 to gray-50
         points: 12.0,

@@ -93,12 +93,24 @@ const CommunityPage = () => {
   const { role } = useUser();
 
   useEffect(() => {
-    fetchEvents();
+    (async () => {
+      try {
+        await fetchEvents();
+      } catch (err) {
+        console.error("fetchEvents failed:", err);
+      }
+    })();
   }, []);
 
   useEffect(() => {
-    fetchMembers();
-  }, [members]);
+    (async () => {
+      try {
+        await fetchMembers();
+      } catch (err) {
+        console.error("fetchMembers failed:", err);
+      }
+    })();
+  }, [isConnected]);
 
   // console.log("Events: ", events);
   // console.log("Members: ", members);

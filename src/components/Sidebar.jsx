@@ -166,7 +166,10 @@ const Sidebar = ({
                   className={`flex items-center py-3 px-4 rounded-lg transition-all duration-300 
                     hover:bg-yellow-500/10 dark:hover:bg-yellow-500/20 group
                     ${isExpanded ? "justify-start" : "justify-center"}`}
-                  onClick={() => setActiveSection(item.section)}
+                  onClick={() => {
+                    console.log("Clicked section:", item.section); // Add this line
+                    setActiveSection(item.section);
+                  }}
                 >
                   <div
                     className={` dark:text-white

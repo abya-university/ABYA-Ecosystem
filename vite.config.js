@@ -22,4 +22,11 @@ export default defineConfig({
   build: {
     target: 'es2020',
   },
+  server: {
+    allowedHosts: ['14616d900f29.ngrok-free.app'],
+    // You might also want to add these for better ngrok compatibility:
+    host: true, // Listen on all addresses
+    port: 5173, // Your Vite port
+    strictPort: true, // Don't try other ports if 5173 is taken
+  },
 });

@@ -1,25 +1,24 @@
 import { Github, Linkedin, Send, Twitter } from "lucide-react";
 import AbyaLogo from "../../assets/abya.svg";
+import { FaDiscord } from "react-icons/fa6";
 
-const Footer = () => {
+const Footer = ({ darkMode }) => {
   const socialLinks = [
     {
-      icon: (
-        <Twitter className="text-white hover:text-yellow-500 transition-colors" />
-      ),
+      icon: <Twitter className="w-5 h-5" />,
       href: "https://twitter.com/abya_ecosystem",
     },
     {
-      icon: (
-        <Linkedin className="text-white hover:text-yellow-500 transition-colors" />
-      ),
+      icon: <Linkedin className="w-5 h-5" />,
       href: "https://linkedin.com/company/abya",
     },
     {
-      icon: (
-        <Github className="text-white hover:text-yellow-500 transition-colors" />
-      ),
+      icon: <Github className="w-5 h-5" />,
       href: "https://github.com/abya-ecosystem",
+    },
+    {
+      icon: <FaDiscord className="w-5 h-5" />,
+      href: "https://discord.gg/p5EG7nB6",
     },
   ];
 
@@ -51,20 +50,30 @@ const Footer = () => {
   ];
 
   return (
-    <footer className="bg-black/40 py-12">
+    <footer
+      className={`py-16 lg:py-20 ${
+        darkMode ? "bg-black/30" : "bg-white/10"
+      } backdrop-blur-sm`}
+    >
       <div className="container mx-auto px-4">
-        <div className="grid md:grid-cols-4 gap-8">
+        <div className="grid lg:grid-cols-4 gap-8 lg:gap-12">
           {/* Brand Section */}
-          <div>
-            <div className="flex items-center space-x-2 mb-4">
-              <div className="flex items-center space-x-2">
-                <img src={AbyaLogo} alt="ABYA Logo" className="w-30 h-10" />
-                <span className="text-2xl font-bold text-yellow-500">ABYA</span>
-              </div>
+          <div className="lg:col-span-1">
+            <div className="flex items-center space-x-3 mb-6">
+              <img
+                src="/abya_logo.jpg"
+                alt="ABYA Logo"
+                className="w-24 h-12 rounded-lg"
+              />
+              {/* <span className="text-2xl font-bold text-yellow-500">ABYA</span> */}
             </div>
-            <p className="text-gray-400 mb-4">
+            <p
+              className={`mb-6 leading-relaxed ${
+                darkMode ? "text-gray-400" : "text-gray-600"
+              }`}
+            >
               Revolutionizing education through blockchain and decentralized
-              technologies.
+              technologies for a better learning future.
             </p>
             <div className="flex space-x-4">
               {socialLinks.map((social, index) => (
@@ -73,6 +82,11 @@ const Footer = () => {
                   href={social.href}
                   target="_blank"
                   rel="noopener noreferrer"
+                  className={`p-3 rounded-xl transition-all duration-300 transform hover:scale-110 ${
+                    darkMode
+                      ? "bg-gray-800 text-white hover:bg-yellow-500 hover:text-black"
+                      : "bg-white/20 text-gray-700 hover:bg-yellow-500 hover:text-black"
+                  }`}
                 >
                   {social.icon}
                 </a>
@@ -83,15 +97,21 @@ const Footer = () => {
           {/* Footer Links */}
           {footerLinks.map((section, index) => (
             <div key={index}>
-              <h4 className="text-lg font-bold text-white mb-4">
+              <h4
+                className={`text-lg font-bold mb-6 ${
+                  darkMode ? "text-white" : "text-cyan-900"
+                }`}
+              >
                 {section.title}
               </h4>
-              <ul className="space-y-2">
+              <ul className="space-y-3">
                 {section.links.map((link, linkIndex) => (
                   <li key={linkIndex}>
                     <a
                       href={link.href}
-                      className="text-gray-400 hover:text-yellow-500 transition-colors"
+                      className={`transition-all duration-300 hover:text-yellow-500 ${
+                        darkMode ? "text-gray-400" : "text-gray-600"
+                      }`}
                     >
                       {link.name}
                     </a>
@@ -103,27 +123,47 @@ const Footer = () => {
 
           {/* Newsletter Signup */}
           <div>
-            <h4 className="text-lg font-bold text-white mb-4">Stay Updated</h4>
-            <div className="flex">
+            <h4
+              className={`text-lg font-bold mb-6 ${
+                darkMode ? "text-white" : "text-cyan-900"
+              }`}
+            >
+              Stay Updated
+            </h4>
+            <div className="flex mb-3">
               <input
                 type="email"
                 placeholder="Enter your email"
-                className="w-full p-2 bg-gray-800 text-white rounded-l-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                className={`flex-1 p-4 rounded-l-2xl focus:outline-none focus:ring-2 focus:ring-yellow-500 ${
+                  darkMode
+                    ? "bg-gray-800 text-white placeholder-gray-400"
+                    : "bg-white/20 text-gray-900 placeholder-gray-600"
+                }`}
               />
-              <button className="bg-yellow-500 text-black px-4 rounded-r-lg hover:bg-yellow-600 transition-colors">
+              <button className="bg-yellow-500 text-black px-6 rounded-r-2xl hover:bg-yellow-400 transition-all duration-300 transform hover:scale-105">
                 <Send size={20} />
               </button>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
+            <p
+              className={`text-sm ${
+                darkMode ? "text-gray-500" : "text-gray-600"
+              }`}
+            >
               Subscribe for the latest ABYA updates and insights
             </p>
           </div>
         </div>
 
         {/* Copyright */}
-        <div className="border-t border-gray-800 mt-8 pt-6 text-center">
-          <p className="text-gray-400">
-            © 2024 ABYA Ecosystem. All rights reserved.
+        <div
+          className={`border-t mt-12 pt-8 text-center ${
+            darkMode
+              ? "border-gray-800 text-gray-400"
+              : "border-gray-300 text-gray-600"
+          }`}
+        >
+          <p>
+            © 2025 ABYA Ecosystem. All rights reserved.
             <br />
             Built with ❤️ for a decentralized future.
           </p>

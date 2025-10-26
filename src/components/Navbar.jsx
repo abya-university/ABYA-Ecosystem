@@ -68,8 +68,8 @@ export default function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-gray-100/80 dark:bg-gray-900 backdrop-blur-lg dark:shadow-sm dark:shadow-white transition-all duration-1000">
       <div className="container mx-auto flex justify-between items-center p-4">
         {/* Logo */}
-        <div className="flex items-center space-x-2">
-          <img src="/abya_logo.jpg" alt="ABYA Logo" className="w-30 h-10" />
+        <div className="flex items-center">
+          <img src="/abya_logo.jpg" alt="ABYA Logo" className="w-24" />
         </div>
 
         {/* Desktop Links */}
@@ -207,7 +207,17 @@ export default function Navbar() {
               className="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200"
               aria-label={menuOpen ? "Close menu" : "Open menu"}
             >
-              {menuOpen ? <X size={24} /> : <Menu size={24} />}
+              {menuOpen ? (
+                <X
+                  size={24}
+                  className={darkMode ? "text-yellow-500" : "text-gray-800"}
+                />
+              ) : (
+                <Menu
+                  size={24}
+                  className={darkMode ? "text-yellow-500" : "text-gray-800"}
+                />
+              )}
             </button>
           </div>
         </div>

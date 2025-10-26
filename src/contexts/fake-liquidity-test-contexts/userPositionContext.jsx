@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useCallback,
+  useMemo,
 } from "react";
 import { ethers } from "ethers";
 import contractAbi from "../../artifacts/fakeLiquidityArtifacts/Add_Swap_Contract.sol/Add_Swap_Contract.json";
@@ -39,12 +40,21 @@ export function UserPositionProvider({ children }) {
   const isConnected = !!account;
 
   // Initialize contracts with thirdweb
-  const swapContract = getContract({
-    client,
-    address: CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
-    chain: CONTRACT_CONFIG.CHAIN,
-    abi: contract_abi,
-  });
+  const swapContract = useMemo(
+    () =>
+      getContract({
+        client,
+        address: CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
+        chain: CONTRACT_CONFIG.CHAIN,
+        abi: contract_abi,
+      }),
+    [
+      client,
+      CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
+      CONTRACT_CONFIG.CHAIN,
+      contract_abi,
+    ]
+  );
 
   // Reactive data with thirdweb hooks
   const { data: userPositionsData, isLoading: positionsLoading } =
@@ -141,12 +151,14 @@ export function UserPositionProvider({ children }) {
         decimals1 = await readContract({
           contract: token1Contract,
           method: "decimals()",
+          params: [],
         });
       } catch (err) {
         try {
           decimals1 = await readContract({
             contract: token1Contract,
             method: "decimals",
+            params: [],
           });
         } catch (e) {
           decimals1 = null;
@@ -154,44 +166,44 @@ export function UserPositionProvider({ children }) {
       }
 
       // Final fallback: use ethers JsonRpcProvider to call decimals directly
-      if (decimals0 == null || decimals1 == null) {
-        const provider = new ethers.JsonRpcProvider(
-          import.meta.env.VITE_APP_SKALE_RPC_URL ||
-            import.meta.env.VITE_APP_SEPOLIA_RPC_URL
-        );
-        if (decimals0 == null) {
-          const token0Iface = new ethers.Interface([
-            "function decimals() view returns (uint8)",
-          ]);
-          const token0ContractEthers = new ethers.Contract(
-            token0Address,
-            token0Iface,
-            provider
-          );
-          try {
-            decimals0 = await token0ContractEthers.decimals();
-          } catch (err) {
-            // console.warn("ethers fallback decimals0 failed:", err);
-            decimals0 = 18;
-          }
-        }
-        if (decimals1 == null) {
-          const token1Iface = new ethers.Interface([
-            "function decimals() view returns (uint8)",
-          ]);
-          const token1ContractEthers = new ethers.Contract(
-            token1Address,
-            token1Iface,
-            provider
-          );
-          try {
-            decimals1 = await token1ContractEthers.decimals();
-          } catch (err) {
-            console.warn("ethers fallback decimals1 failed:", err);
-            decimals1 = 18;
-          }
-        }
-      }
+      // if (decimals0 == null || decimals1 == null) {
+      //   const provider = new ethers.JsonRpcProvider(
+      //     import.meta.env.VITE_APP_SKALE_RPC_URL ||
+      //       import.meta.env.VITE_APP_SEPOLIA_RPC_URL
+      //   );
+      //   if (decimals0 == null) {
+      //     const token0Iface = new ethers.Interface([
+      //       "function decimals() view returns (uint8)",
+      //     ]);
+      //     const token0ContractEthers = new ethers.Contract(
+      //       token0Address,
+      //       token0Iface,
+      //       provider
+      //     );
+      //     try {
+      //       decimals0 = await token0ContractEthers.decimals();
+      //     } catch (err) {
+      //       // console.warn("ethers fallback decimals0 failed:", err);
+      //       decimals0 = 18;
+      //     }
+      //   }
+      //   if (decimals1 == null) {
+      //     const token1Iface = new ethers.Interface([
+      //       "function decimals() view returns (uint8)",
+      //     ]);
+      //     const token1ContractEthers = new ethers.Contract(
+      //       token1Address,
+      //       token1Iface,
+      //       provider
+      //     );
+      //     try {
+      //       decimals1 = await token1ContractEthers.decimals();
+      //     } catch (err) {
+      //       console.warn("ethers fallback decimals1 failed:", err);
+      //       decimals1 = 18;
+      //     }
+      //   }
+      // }
 
       // Ensure numbers
       setToken0Decimals(Number(decimals0 ?? 18));

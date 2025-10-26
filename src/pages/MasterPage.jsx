@@ -29,7 +29,7 @@ const MasterPage = () => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
-      setSidebarExpanded(!mobile); // Expanded on desktop, collapsed on mobile
+      setSidebarExpanded(!mobile);
     };
 
     handleResize();
@@ -41,9 +41,15 @@ const MasterPage = () => {
   useEffect(() => {
     const sectionFromUrl = searchParams.get("section");
     if (sectionFromUrl) {
+      console.log("Section from URL:", sectionFromUrl); // Debug
       setActiveSection(sectionFromUrl);
     }
   }, [searchParams]);
+
+  // Add useEffect to debug activeSection changes
+  useEffect(() => {
+    console.log("Current active section:", activeSection);
+  }, [activeSection]);
 
   // 3D Illuminated Element Component
   const IlluminatedObject = ({ position, size, color, blur }) => (
@@ -70,6 +76,8 @@ const MasterPage = () => {
   };
 
   const renderContent = () => {
+    console.log("Rendering content for section:", activeSection); // Debug
+
     if (activeSection === "course-details" && selectedCourseId) {
       return <CourseDetails courseId={selectedCourseId} />;
     }
@@ -82,6 +90,7 @@ const MasterPage = () => {
       case "achievements":
         return <AchievementsPage />;
       case "community":
+        console.log("Rendering CommunityPage"); // Debug
         return <CommunityPage />;
       case "settings":
         return <SettingsPage />;
@@ -102,20 +111,14 @@ const MasterPage = () => {
         return <PortfolioPage />;
       case "learning-path":
         return <LearningPath />;
-      // case "course-details":
-      //   return <CourseDetails courseId={selectedCourseId} />;
-      // case "courses":
-      //   return <CoursesPage onCourseSelect={onCourseSelect} />;
       default:
-        return <HomePage />;
+        console.log("Default case - rendering Dashboard"); // Debug
+        return <Dashboard onCourseSelect={onCourseSelect} />;
     }
   };
 
   return (
-    <div
-      className="
-        min-h-screen flex relative overflow-hidden bg-gradient-to-br from-[#ffffff] via-[#f0f4f8] to-[#ffffff] dark:bg-gradient-to-br dark:from-[#0a192f] dark:via-[#112240] dark:to-[#0a192f] transition-all duration-1000"
-    >
+    <div className="min-h-screen flex relative overflow-hidden bg-gradient-to-br from-[#ffffff] via-[#f0f4f8] to-[#ffffff] dark:bg-gradient-to-br dark:from-[#0a192f] dark:via-[#112240] dark:to-[#0a192f] transition-all duration-1000">
       {/* Illuminated Background Elements */}
       {theme === "dark" ? (
         <>
@@ -178,11 +181,7 @@ const MasterPage = () => {
       {/* Main Content - Adjusts margin based on sidebar state */}
       <main
         className={`flex-grow p-6 z-10 relative transition-all duration-300 ${
-          isMobile
-            ? "ml-0" // No margin on mobile (sidebar slides over content)
-            : sidebarExpanded
-            ? "ml-64" // Full sidebar width on desktop when expanded
-            : "ml-20" // Collapsed sidebar width on desktop
+          isMobile ? "ml-0" : sidebarExpanded ? "ml-64" : "ml-20"
         }`}
       >
         {renderContent()}
