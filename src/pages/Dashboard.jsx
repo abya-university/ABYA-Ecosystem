@@ -204,50 +204,52 @@ const Dashboard = ({ onCourseSelect }) => {
       const courseLessons = getLessonsForCourse(courseId);
       const courseQuizzes = getQuizzesForCourse(courseId);
 
+      console.log(`Fetching completion data for course ${courseId}:`, {
+        courseLessonsCount: courseLessons.length,
+        courseQuizzesCount: courseQuizzes.length,
+        connectedAddress: address,
+      });
+
+      // Fetch completed lessons
       const completedLessons = await readContract({
         contract,
-        method:
-          "function getUserCompletedLessonsByCourse(uint256 _courseId) view returns (uint256[])",
+        method: "getUserCompletedLessonsByCourse",
         params: [courseId],
       });
 
-      let completedLessonIds = new Set();
-      if (
-        !(
-          completedLessons.length === 1 &&
-          completedLessons[0].toString() === "0" &&
-          !courseLessons.some((lesson) => lesson.lessonId.toString() === "0")
-        )
-      ) {
-        const lessonIds = completedLessons
-          .flatMap((lesson) => lesson.toString().split(","))
-          .filter((id) =>
-            courseLessons.some((lesson) => lesson.lessonId.toString() === id)
-          );
+      console.log("Raw completed lessons from contract:", completedLessons);
 
-        completedLessonIds = new Set(lessonIds);
+      // Fetch completed quizzes
+      const completedQuizzes = await readContract({
+        contract,
+        method: "getUserCompletedQuizzesByCourse",
+        params: [courseId],
+      });
+
+      console.log("Raw completed quizzes from contract:", completedQuizzes);
+
+      // Process completed lessons - convert uint256[] to string IDs
+      let completedLessonIds = new Set();
+      if (completedLessons && completedLessons.length > 0) {
+        // Direct mapping since contract returns uint256[]
+        const lessonIds = completedLessons.map((id) => id.toString());
+        // Filter to only include lessons that exist in this course
+        const validLessonIds = lessonIds.filter((id) =>
+          courseLessons.some((lesson) => lesson.lessonId.toString() === id)
+        );
+        completedLessonIds = new Set(validLessonIds);
       }
 
-      // Fetch completed quizzes for this course
-      const completedQuizzes = await contract.getUserCompletedQuizzesByCourse(
-        courseId
-      );
-
+      // Process completed quizzes - convert uint256[] to string IDs
       let completedQuizIds = new Set();
-      if (
-        !(
-          completedQuizzes.length === 1 &&
-          completedQuizzes[0].toString() === "0" &&
-          !courseQuizzes.some((quiz) => quiz.quizId.toString() === "0")
-        )
-      ) {
-        const quizIds = completedQuizzes
-          .flatMap((quiz) => quiz.toString().split(","))
-          .filter((id) =>
-            courseQuizzes.some((quiz) => quiz.quizId.toString() === id)
-          );
-
-        completedQuizIds = new Set(quizIds);
+      if (completedQuizzes && completedQuizzes.length > 0) {
+        // Direct mapping since contract returns uint256[]
+        const quizIds = completedQuizzes.map((id) => id.toString());
+        // Filter to only include quizzes that exist in this course
+        const validQuizIds = quizIds.filter((id) =>
+          courseQuizzes.some((quiz) => quiz.quizId.toString() === id)
+        );
+        completedQuizIds = new Set(validQuizIds);
       }
 
       const result = {
@@ -255,15 +257,11 @@ const Dashboard = ({ onCourseSelect }) => {
         completedQuizzes: completedQuizIds.size,
         totalLessons: courseLessons.length,
         totalQuizzes: courseQuizzes.length,
+        completedLessonIds: Array.from(completedLessonIds), // For debugging
+        completedQuizIds: Array.from(completedQuizIds), // For debugging
       };
 
-      console.log(`=== COMPLETION DATA FETCH - Course ID: ${courseId} ===`, {
-        courseLessons: courseLessons.length,
-        courseQuizzes: courseQuizzes.length,
-        completedLessonIds: Array.from(completedLessonIds),
-        completedQuizIds: Array.from(completedQuizIds),
-        result,
-      });
+      console.log(`=== COMPLETION DATA FOR COURSE ${courseId} ===`, result);
 
       return result;
     } catch (error) {
@@ -276,6 +274,8 @@ const Dashboard = ({ onCourseSelect }) => {
         completedQuizzes: 0,
         totalLessons: 0,
         totalQuizzes: 0,
+        completedLessonIds: [],
+        completedQuizIds: [],
       };
     }
   };
@@ -344,7 +344,7 @@ const Dashboard = ({ onCourseSelect }) => {
               Your blockchain education journey
             </p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="lg:flex lg:items-center lg:gap-4 hidden md:flex">
             <button
               // onClick={() => setShowSurveyModal(true)}
               onClick={() =>

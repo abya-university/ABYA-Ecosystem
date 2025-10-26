@@ -438,17 +438,22 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       const evaluationResult = await response.json();
       console.log("AI Evaluation result:", evaluationResult);
 
-      const finalScore = Math.floor(
-        (evaluationResult.finalScore || evaluationResult.score || 0) * 100
-      );
+      // DEBUG: Check the raw score value
+      console.log("Raw score from backend:", evaluationResult.score);
+      console.log("Type of score:", typeof evaluationResult.score);
+
+      // Fixed-point arithmetic for blockchain (multiply by 100 to handle decimals)
+      const finalScore = Math.floor(Number(evaluationResult.score) * 100);
       const category = evaluationResult.category || "General";
       const passed =
         evaluationResult.passed === "Yes" || evaluationResult.passed === true;
 
+      console.log("Final score for blockchain:", finalScore);
+
       // 5. Prepare review object for blockchain
       const ensureValidNumber = (value) => {
         const num = Number(value);
-        return isNaN(num) ? 0 : Math.min(Math.max(num, 0), 100); // Clamp between 0-100
+        return isNaN(num) ? 0 : Math.min(Math.max(num, 0), 100);
       };
 
       const review = {
@@ -484,13 +489,29 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         ),
         isSubmitted: true,
         category: category,
-        score: finalScore,
+        score: finalScore, // This will be 5525 for 55.25%
         passed: passed,
       };
 
       console.log("Review object for blockchain:", review);
 
-      // 6. Send to blockchain
+      // 6. Debug the account issue
+      console.log("Account object:", account);
+      console.log("Account ID:", account?.id);
+      console.log("Account address:", account?.address);
+
+      // Check if we have a valid account
+      if (!account) {
+        throw new Error("Account is undefined - please connect your wallet");
+      }
+
+      if (!account.address) {
+        throw new Error(
+          "Account address is missing - wallet may not be properly connected"
+        );
+      }
+
+      // 7. Send to blockchain
       const contract = getContract({
         address: DiamondAddress,
         abi: Ecosystem1Facet_ABI,
@@ -504,7 +525,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         params: [course.courseId, finalScore, review],
       });
 
-      await sendTransaction({ transaction, account });
+      await sendTransaction(transaction);
       toast.success("Course approved successfully!");
     } catch (error) {
       console.error("Error in course approval process:", error);
@@ -709,65 +730,17 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
 
       const transaction = prepareContractCall({
         contract,
-        method: "function enroll(uint256 _courseId) returns (bool)",
+        method: "enroll",
         params: [courseId],
       });
 
-      // Add timeout to sendTransaction
-      const transactionPromise = sendTransaction(transaction);
-      const timeoutPromise = new Promise(
-        (_, reject) =>
-          setTimeout(() => reject(new Error("Transaction timeout")), 30000) // 30 second timeout
-      );
+      await sendTransaction(transaction);
 
-      const transactionHash = await Promise.race([
-        transactionPromise,
-        timeoutPromise,
-      ]);
-
-      console.log("Enrollment transaction hash:", transactionHash);
-
-      if (transactionHash) {
-        setEnrolled(true);
-        toast.success(
-          `Enrolled into course ${courseId} successfully! Transaction: ${transactionHash.slice(
-            0,
-            8
-          )}...`
-        );
-
-        // Optional: Wait for confirmation with shorter timeout
-        try {
-          const receiptPromise = waitForReceipt(client, transactionHash);
-          const receiptTimeout = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Receipt timeout")), 15000)
-          );
-
-          const receipt = await Promise.race([receiptPromise, receiptTimeout]);
-          console.log("Transaction confirmed:", receipt);
-        } catch (receiptError) {
-          console.warn(
-            "Transaction sent but confirmation failed:",
-            receiptError
-          );
-          // Transaction was still sent, just confirmation failed
-        }
-      } else {
-        throw new Error("Transaction failed - no transaction hash returned");
-      }
+      setEnrolled(true);
+      toast.success(`Enrolled into course ${courseId} successfully!`);
     } catch (error) {
       console.error("Error enrolling in course:", error);
-
-      // More specific error messages
-      if (error.message.includes("timeout")) {
-        toast.error(
-          "Transaction timed out. Please try again with a faster connection."
-        );
-      } else if (error.message.includes("gas")) {
-        toast.error("Gas estimation failed. Please try again.");
-      } else {
-        toast.error("Error enrolling in course. Please try again!");
-      }
+      toast.error("Error enrolling in course. Please try again!");
     } finally {
       setLoading(false);
     }
@@ -785,7 +758,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
 
       const transaction = prepareContractCall({
         contract,
-        method: "function unEnroll(uint256 _courseId)",
+        method: "unEnroll",
         params: [courseId],
       });
 
@@ -885,14 +858,14 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   };
 
   return (
-    <div className="dark:bg-gray-900 dark:text-gray-100 bg-white text-gray-900 min-h-screen p-6 transition-colors duration-300 pt-[100px]">
+    <div className="dark:bg-gray-900 dark:text-gray-100 bg-white text-gray-900 min-h-screen p-4 md:p-6 transition-colors duration-300 pt-20 md:pt-[100px]">
       <ToastContainer position="bottom-right" theme="colored" />
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center space-x-4">
-            <Book className="w-8 h-8 text-yellow-500" />
-            <h1 className="text-3xl font-bold dark:text-yellow-400 text-yellow-500">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8">
+          <div className="flex items-center space-x-3 md:space-x-4">
+            <Book className="w-6 h-6 md:w-8 md:h-8 text-yellow-500" />
+            <h1 className="text-2xl md:text-3xl font-bold dark:text-yellow-400 text-yellow-500">
               Available Courses
             </h1>
           </div>
@@ -900,40 +873,42 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
             onClick={() =>
               onNavigateToCreateCourse && onNavigateToCreateCourse()
             }
-            className="bg-yellow-500 text-black px-6 py-2 rounded-lg hover:bg-yellow-600 transition-colors"
+            className="w-full sm:w-auto bg-yellow-500 text-black px-4 md:px-6 py-2 rounded-lg hover:bg-yellow-600 transition-colors text-sm md:text-base"
           >
             Create New Course
           </button>
         </div>
+
+        {/* Status Messages */}
         {(success || error) && (
           <div
-            className={`mb-4 p-4 rounded-lg flex items-center ${
+            className={`mb-4 p-3 md:p-4 rounded-lg flex items-center ${
               success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
             }`}
           >
             {success ? (
-              <CheckCircle className="h-5 w-5 mr-2" />
+              <CheckCircle className="h-4 w-4 md:h-5 md:w-5 mr-2" />
             ) : (
-              <AlertCircle className="h-5 w-5 mr-2" />
+              <AlertCircle className="h-4 w-4 md:h-5 md:w-5 mr-2" />
             )}
-            <span>{success || error}</span>
+            <span className="text-sm md:text-base">{success || error}</span>
           </div>
         )}
 
         {/* Courses Grid */}
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {courses?.length > 0 ? (
             courses.map((course) => (
               <div
                 key={course.courseId}
-                className="relative p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200 transform hover:scale-105 transition-transform duration-1000 mb-5"
+                className="relative p-4 md:p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200 transform hover:scale-105 transition-transform duration-1000 mb-4 md:mb-5"
               >
                 {/* Info Icon */}
                 <button
                   onClick={(e) => openCourseDetails(course, e)}
-                  className="absolute bottom-4 right-4 z-10 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-yellow-500 hover:bg-gray-400 mt-3 dark:hover:bg-gray-600 transition-colors"
+                  className="absolute bottom-3 right-3 md:bottom-4 md:right-4 z-10 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-yellow-500 hover:bg-gray-400 mt-2 md:mt-3 dark:hover:bg-gray-600 transition-colors"
                 >
-                  <Info className="w-5 h-5" />
+                  <Info className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
 
                 {/* Course Image */}
@@ -941,14 +916,14 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                   <img
                     src="/Vision.jpg"
                     alt={course.courseName}
-                    className="w-full h-48 object-cover rounded-xl"
+                    className="w-full h-40 md:h-48 object-cover rounded-xl"
                     style={{ opacity: 0.75 }}
                   />
 
-                  <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
+                  <div className="absolute top-3 left-3 right-3 md:top-4 md:left-4 md:right-4 flex justify-between items-start">
                     {/* Difficulty Level Tag */}
                     <div
-                      className={`px-3 py-1 rounded-full text-sm font-medium shadow-sm ${getDifficultyColor(
+                      className={`px-2 py-1 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium shadow-sm ${getDifficultyColor(
                         course.difficulty_level
                       )}`}
                     >
@@ -957,18 +932,18 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
 
                     {/* Approval Status Badge */}
                     <div
-                      className={`px-3 py-1 rounded-full text-sm font-medium shadow-sm flex items-center ${getApprovalStatusStyle(
+                      className={`px-2 py-1 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium shadow-sm flex items-center ${getApprovalStatusStyle(
                         course.approved
                       )}`}
                     >
                       {!course.approved ? (
                         <>
-                          <Clock className="w-4 h-4 mr-1" />
+                          <Clock className="w-3 h-3 md:w-4 md:h-4 mr-1" />
                           <span>Pending</span>
                         </>
                       ) : (
                         <>
-                          <Check className="w-4 h-4 mr-1" />
+                          <Check className="w-3 h-3 md:w-4 md:h-4 mr-1" />
                           <span>Approved</span>
                         </>
                       )}
@@ -977,68 +952,58 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                 </div>
 
                 {/* Course Details */}
-                <div className="p-5">
-                  <h2 className="text-xl font-bold mb-2 text-yellow-500 truncate w-[300px]">
+                <div className="p-3 md:p-5">
+                  <h2 className="text-lg md:text-xl font-bold mb-2 text-yellow-500 truncate max-w-[200px] md:max-w-[300px]">
                     {course.courseName}
                   </h2>
-                  <p className="text-gray-400 mb-4 line-clamp-2">
+                  <p className="text-gray-400 mb-3 md:mb-4 line-clamp-2 text-sm md:text-base">
                     {course.description}
                   </p>
 
                   {/* Course Meta Information */}
-                  <div className="flex justify-between items-center mb-4">
-                    <div className="text-sm text-gray-500">
-                      <span className="mr-2 flex items-center">
-                        <Book className="inline-block w-4 h-4 mr-1 -mt-1" />
-                        <span className="truncate w-[100px] overflow-hidden text-ellipsis whitespace-nowrap">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3 md:mb-4">
+                    <div className="text-xs md:text-sm text-gray-500 space-y-1">
+                      <div className="flex items-center">
+                        <Book className="inline-block w-3 h-3 md:w-4 md:h-4 mr-1" />
+                        <span className="truncate max-w-[120px] md:max-w-[100px] overflow-hidden text-ellipsis whitespace-nowrap">
                           {course.creator}
                         </span>
-                      </span>
-                      <span>
-                        <Clock className="inline-block w-4 h-4 mr-1 -mt-1" />
+                      </div>
+                      <div className="flex items-center">
+                        <Clock className="inline-block w-3 h-3 md:w-4 md:h-4 mr-1" />
                         {calculateTotalDuration(course.courseId)} Weeks
-                      </span>
+                      </div>
                     </div>
-                    <div className="text-yellow-500 font-semibold">10 ETH</div>
+                    <div className="text-yellow-500 font-semibold text-sm md:text-base">
+                      10 ETH
+                    </div>
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex space-x-3">
-                    {/* {(role === "ADMIN" ||
-                      role === "Course Owner" ||
-                      role === "Reviewer") && (
-                      <button
-                        onClick={() => viewCourse(course.courseId)}
-                        className="flex-1 bg-yellow-500 text-sm text-black py-2 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center"
-                      >
-                        <Eye className="w-5 h-5 mr-2" />
-                        View Course
-                      </button>
-                    )} */}
+                  <div className="flex flex-col sm:flex-row sm:space-x-3 space-y-2 sm:space-y-0">
                     {!course.approved && course.creator === address && (
                       <button
                         onClick={async () => approveCourse(course)}
-                        className={`flex-1 bg-gray-800 text-white px-1 dark:bg-gray-300 text-sm dark:text-black py-2 rounded-lg 
-        ${
-          isLoading || course.approved
-            ? "opacity-70 cursor-not-allowed"
-            : "hover:bg-gray-600"
-        } 
-        transition-colors flex items-center justify-center`}
+                        className={`w-full bg-gray-800 text-white dark:bg-gray-300 dark:text-black py-2 px-2 rounded-lg 
+                        ${
+                          isLoading || course.approved
+                            ? "opacity-70 cursor-not-allowed"
+                            : "hover:bg-gray-600"
+                        } 
+                        transition-colors flex items-center justify-center text-sm`}
                         disabled={isLoading || course.approved}
                       >
                         {isLoading ? (
-                          <Loader className="w-5 h-5 mr-2 animate-spin" />
+                          <Loader className="w-4 h-4 md:w-5 md:h-5 mr-2 animate-spin" />
                         ) : (
-                          <AlertCircle className="w-5 h-5 mr-2" />
+                          <AlertCircle className="w-4 h-4 md:w-5 md:h-5 mr-2" />
                         )}
                         {course.approved
                           ? "Already Approved"
                           : "Request Review"}
                       </button>
                     )}
-                    {/* Enroll/Unenroll Buttons */}
-                    {/* role === "USER" && */}
+
                     {course.approved && address && (
                       <>
                         {(() => {
@@ -1046,77 +1011,47 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                             course.enrolledStudents,
                             address
                           );
-                          console.log(
-                            `RENDER: Course ${course.courseId} - User ${address} enrolled:`,
-                            userEnrolled
-                          );
                           return userEnrolled;
                         })() ? (
-                          <>
+                          <div className="flex flex-col sm:flex-row gap-2 w-full">
                             <button
                               onClick={() => viewCourse(course.courseId)}
-                              className="flex-1 bg-yellow-500 mt-3 text-gray-800 text-sm py-2 px-1 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center"
+                              className="flex-1 bg-yellow-500 text-gray-800 py-2 px-2 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center text-sm"
                             >
-                              <Eye className="w-5 h-5 mr-2" />
+                              <Eye className="w-4 h-4 md:w-5 md:h-5 mr-2" />
                               View Course
                             </button>
-
                             <button
                               onClick={() => unEnroll(course.courseId)}
                               disabled={loading}
-                              className={`flex-1 bg-red-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center ${
+                              className={`flex-1 bg-red-700 text-white py-2 px-2 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center text-sm ${
                                 loading ? "opacity-50 cursor-not-allowed" : ""
                               }`}
                             >
-                              <WifiOffIcon className="w-5 h-5 mr-2" />
+                              <WifiOffIcon className="w-4 h-4 md:w-5 md:h-5 mr-2" />
                               {loading ? "Unenrolling..." : "Unenroll"}
                             </button>
-                          </>
+                          </div>
                         ) : (
-                          <>
-                            <button
-                              onClick={() => enroll(course.courseId)}
-                              disabled={loading}
-                              className={`flex-1 bg-gray-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center ${
-                                loading ? "opacity-50 cursor-not-allowed" : ""
-                              }`}
-                            >
-                              <Wifi className="w-5 h-5 mr-2" />
-                              {loading ? "Enrolling..." : "Enroll"}
-                            </button>
-                            {/* <div className="text-xs text-gray-500 mt-1">
-                              Debug: Not enrolled - showing enroll button
-                            </div> */}
-                          </>
+                          <button
+                            onClick={() => enroll(course.courseId)}
+                            disabled={loading}
+                            className={`w-full bg-gray-700 text-white py-2 px-2 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center text-sm ${
+                              loading ? "opacity-50 cursor-not-allowed" : ""
+                            }`}
+                          >
+                            <Wifi className="w-4 h-4 md:w-5 md:h-5 mr-2" />
+                            {loading ? "Enrolling..." : "Enroll"}
+                          </button>
                         )}
                       </>
                     )}
-                    {/* Debug info - remove this later */}
-                    {/* {role === "USER" && (
-                      <div className="text-xs text-gray-400 mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded">
-                        Debug Info:
-                        <br />
-                        Role: {role}
-                        <br />
-                        Approved: {course.approved ? "Yes" : "No"}
-                        <br />
-                        Address: {address ? "Connected" : "Not connected"}
-                        <br />
-                        Enrolled:{" "}
-                        {isUserEnrolled(course.enrolledStudents, address)
-                          ? "Yes"
-                          : "No"}
-                        <br />
-                        EnrolledStudents:{" "}
-                        {JSON.stringify(course.enrolledStudents)}
-                      </div>
-                    )} */}
                   </div>
                 </div>
               </div>
             ))
           ) : (
-            <div className="text-gray-900 dark:text-gray-300 text-normal">
+            <div className="col-span-full text-center text-gray-900 dark:text-gray-300 text-base md:text-normal py-8">
               No courses available!
             </div>
           )}
@@ -1130,14 +1065,14 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
               top: `${detailsPosition.top}px`,
               left: `${detailsPosition.left}px`,
             }}
-            className="fixed w-80 dark:bg-gray-900 bg-gray-100 dark:text-gray-100 text-gray-800 rounded-lg overflow-x-hidden shadow-xl p-4 z-50 dark:border dark:border-gray-700 border-none"
+            className="fixed w-11/12 sm:w-80 max-w-sm dark:bg-gray-900 bg-gray-100 dark:text-gray-100 text-gray-800 rounded-lg overflow-x-hidden shadow-xl p-4 z-50 dark:border dark:border-gray-700 border-none mx-4 sm:mx-0"
           >
             {/* Panel Tabs */}
             <div className="flex justify-between items-center mb-2">
-              <div className="flex gap-2">
+              <div className="flex gap-1 md:gap-2">
                 <button
                   onClick={() => setActiveTab("details")}
-                  className={`px-3 py-1 text-sm font-medium rounded-t-lg ${
+                  className={`px-2 py-1 md:px-3 md:py-1 text-xs md:text-sm font-medium rounded-t-lg ${
                     activeTab === "details"
                       ? "bg-yellow-500 text-white"
                       : "text-yellow-500 hover:bg-yellow-100 dark:hover:bg-gray-800"
@@ -1149,12 +1084,11 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                   <button
                     onClick={() => {
                       setActiveTab("metrics");
-                      // Fetch metrics data if not already loaded
                       if (!latestReviews[selectedCourse.courseId]) {
                         getCourseData(selectedCourse.courseId);
                       }
                     }}
-                    className={`px-3 py-1 text-sm font-medium rounded-t-lg ${
+                    className={`px-2 py-1 md:px-3 md:py-1 text-xs md:text-sm font-medium rounded-t-lg ${
                       activeTab === "metrics"
                         ? "bg-yellow-500 text-white"
                         : "text-yellow-500 hover:bg-yellow-100 dark:hover:bg-gray-800"
@@ -1168,33 +1102,35 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                 onClick={() => setSelectedCourse(null)}
                 className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-200"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 md:w-5 md:h-5" />
               </button>
             </div>
 
             {isLoading ? (
-              <div className="flex items-center justify-center h-64">
-                <Loader className="w-8 h-8 text-yellow-500 animate-spin" />
+              <div className="flex items-center justify-center h-48 md:h-64">
+                <Loader className="w-6 h-6 md:w-8 md:h-8 text-yellow-500 animate-spin" />
               </div>
             ) : (
               <>
                 {/* DETAILS TAB */}
                 {activeTab === "details" && (
-                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                  <div className="space-y-3 md:space-y-4 max-h-80 md:max-h-96 overflow-y-auto">
                     <div>
-                      <h4 className="font-semibold text-yellow-500">
+                      <h4 className="font-semibold text-yellow-500 text-sm md:text-base">
                         Course Name
                       </h4>
-                      <p className="dark:text-gray-300 text-gray-700">
+                      <p className="dark:text-gray-300 text-gray-700 text-sm">
                         {selectedCourse.courseName || ""}
                       </p>
                     </div>
+
+                    {/* Rest of details content with responsive text sizes */}
                     <div>
-                      <h4 className="font-semibold text-yellow-500">
+                      <h4 className="font-semibold text-yellow-500 text-sm md:text-base">
                         Difficulty Level
                       </h4>
                       <div
-                        className={`inline-block px-3 py-1 rounded-full text-sm font-medium mt-1 ${getDifficultyColor(
+                        className={`inline-block px-2 py-1 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium mt-1 ${getDifficultyColor(
                           selectedCourse.difficulty_level
                         )}`}
                       >
@@ -1203,11 +1139,13 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                       </div>
                     </div>
 
-                    {/* Approval Status Section */}
+                    {/* Approval Status */}
                     <div>
-                      <h4 className="font-semibold text-yellow-500">Status</h4>
+                      <h4 className="font-semibold text-yellow-500 text-sm md:text-base">
+                        Status
+                      </h4>
                       <div
-                        className={`inline-block px-3 py-1 rounded-full text-sm font-medium mt-1 ${
+                        className={`inline-block px-2 py-1 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium mt-1 ${
                           selectedCourse.approved
                             ? "bg-green-100 text-green-700"
                             : "bg-yellow-100 text-yellow-700"
@@ -1217,14 +1155,14 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                       </div>
                     </div>
 
-                    {/* Score Section - Only show if course has been reviewed */}
+                    {/* Score Section */}
                     {selectedCourse.approvalCount > 0 && (
                       <div>
-                        <h4 className="font-semibold text-yellow-500">
+                        <h4 className="font-semibold text-yellow-500 text-sm md:text-base">
                           Review Score
                         </h4>
                         <div
-                          className={`inline-block px-3 py-1 rounded-full text-sm font-medium mt-1 ${
+                          className={`inline-block px-2 py-1 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium mt-1 ${
                             selectedCourse.approvalCount >= 80
                               ? "bg-green-100 text-green-700"
                               : "bg-red-100 text-red-700"
@@ -1235,11 +1173,11 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                       </div>
                     )}
 
-                    {/* Feedback Section - Only visible to course owner or admin */}
+                    {/* Feedback Section */}
                     {(selectedCourse.creator === address || role === "ADMIN") &&
                       !selectedCourse.approved && (
                         <div>
-                          <h4 className="font-semibold text-yellow-500">
+                          <h4 className="font-semibold text-yellow-500 text-sm md:text-base">
                             Feedback
                           </h4>
                           <div className="mt-1 p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
@@ -1248,13 +1186,13 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                                 <Loader className="w-4 h-4 text-yellow-500 animate-spin" />
                               </div>
                             ) : courseFeedback ? (
-                              <p className="text-sm dark:text-gray-300 text-gray-700">
+                              <p className="text-xs md:text-sm dark:text-gray-300 text-gray-700">
                                 {typeof courseFeedback === "string"
                                   ? courseFeedback
                                   : JSON.stringify(courseFeedback)}
                               </p>
                             ) : (
-                              <p className="text-sm text-gray-500 italic">
+                              <p className="text-xs md:text-sm text-gray-500 italic">
                                 No feedback available yet
                               </p>
                             )}
@@ -1263,43 +1201,44 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                       )}
 
                     <div>
-                      <h4 className="font-semibold text-yellow-500">
+                      <h4 className="font-semibold text-yellow-500 text-sm md:text-base">
                         Description
                       </h4>
-                      <p className="dark:text-gray-300 text-gray-700">
+                      <p className="dark:text-gray-300 text-gray-700 text-sm">
                         {selectedCourse.description || ""}
                       </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+
+                    <div className="grid grid-cols-2 gap-3 md:gap-4">
                       <div>
-                        <h4 className="font-semibold text-yellow-500">
+                        <h4 className="font-semibold text-yellow-500 text-xs md:text-sm">
                           Chapters
                         </h4>
-                        <p className="dark:text-gray-300 text-gray-700">
+                        <p className="dark:text-gray-300 text-gray-700 text-sm">
                           {chapters?.length || 0}
                         </p>
                       </div>
                       <div>
-                        <h4 className="font-semibold text-yellow-500">
+                        <h4 className="font-semibold text-yellow-500 text-xs md:text-sm">
                           Lessons
                         </h4>
-                        <p className="dark:text-gray-300 text-gray-700">
+                        <p className="dark:text-gray-300 text-gray-700 text-sm">
                           {lessons?.length || 0}
                         </p>
                       </div>
                       <div>
-                        <h4 className="font-semibold text-yellow-500">
+                        <h4 className="font-semibold text-yellow-500 text-xs md:text-sm">
                           Quizzes
                         </h4>
-                        <p className="dark:text-gray-300 text-gray-700">
+                        <p className="dark:text-gray-300 text-gray-700 text-sm">
                           {quizzes?.length || 0}
                         </p>
                       </div>
                       <div>
-                        <h4 className="font-semibold text-yellow-500">
+                        <h4 className="font-semibold text-yellow-500 text-xs md:text-sm">
                           Duration
                         </h4>
-                        <p className="dark:text-gray-300 text-gray-700">
+                        <p className="dark:text-gray-300 text-gray-700 text-sm">
                           {typeof calculateTotalDuration(
                             selectedCourse.courseId
                           ) === "object"
@@ -1311,16 +1250,18 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                         </p>
                       </div>
                       <div>
-                        <h4 className="font-semibold text-yellow-500">
+                        <h4 className="font-semibold text-yellow-500 text-xs md:text-sm">
                           Prerequisites
                         </h4>
-                        <p className="dark:text-gray-300 text-gray-700">None</p>
+                        <p className="dark:text-gray-300 text-gray-700 text-sm">
+                          None
+                        </p>
                       </div>
-                      <div className="flex gap-2 flex-col">
-                        <h4 className="font-semibold text-yellow-500">
+                      <div>
+                        <h4 className="font-semibold text-yellow-500 text-xs md:text-sm">
                           Enrolled
                         </h4>
-                        <span className="dark:text-gray-300 text-gray-700">
+                        <span className="dark:text-gray-300 text-gray-700 text-sm">
                           {typeof getEnrolledStudentsCount(
                             selectedCourse?.enrolledStudents
                           ) === "object"
@@ -1334,56 +1275,57 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                     </div>
 
                     <div>
-                      <h4 className="font-semibold text-yellow-500">Creator</h4>
-                      <p className="dark:text-gray-300 text-gray-700 truncate w-64">
+                      <h4 className="font-semibold text-yellow-500 text-sm md:text-base">
+                        Creator
+                      </h4>
+                      <p className="dark:text-gray-300 text-gray-700 text-sm truncate max-w-[200px] md:max-w-64">
                         {selectedCourse.creator || ""}
                       </p>
                     </div>
 
-                    {/* View Metrics Button - Shows only for approved courses */}
+                    {/* View Metrics Button */}
                     <div className="pt-2">
                       <button
                         onClick={() => setActiveTab("metrics")}
-                        className="w-full py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+                        className="w-full py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors text-sm"
                       >
-                        <ChartBar className="w-5 h-5" />
+                        <ChartBar className="w-4 h-4 md:w-5 md:h-5" />
                         <span>View Course Metrics</span>
                       </button>
                     </div>
                   </div>
                 )}
 
-                {/* METRICS TAB */}
+                {/* METRICS TAB - Similar responsive adjustments */}
                 {activeTab === "metrics" && (
-                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                  <div className="space-y-3 md:space-y-4 max-h-80 md:max-h-96 overflow-y-auto">
                     <div className="flex justify-between items-center">
-                      <h3 className="text-xl font-bold text-yellow-500">
+                      <h3 className="text-lg md:text-xl font-bold text-yellow-500">
                         Course Metrics
                       </h3>
                       <button
                         onClick={() => setActiveTab("details")}
-                        className="text-yellow-500 hover:text-yellow-600 flex items-center gap-1"
+                        className="text-yellow-500 hover:text-yellow-600 flex items-center gap-1 text-sm"
                       >
-                        <ArrowLeft className="w-4 h-4" />
-                        <span className="text-sm">Back</span>
+                        <ArrowLeft className="w-3 h-3 md:w-4 md:h-4" />
+                        <span>Back</span>
                       </button>
                     </div>
 
                     {!latestReviews[selectedCourse.courseId] ? (
-                      <div className="flex justify-center items-center h-64">
-                        <Loader className="w-8 h-8 text-yellow-500 animate-spin" />
+                      <div className="flex justify-center items-center h-40 md:h-64">
+                        <Loader className="w-6 h-6 md:w-8 md:h-8 text-yellow-500 animate-spin" />
                       </div>
                     ) : (
                       <>
                         {/* Evaluation Summary */}
-                        <div className="dark:bg-gray-800 bg-gray-200 rounded-lg p-4">
-                          <h4 className="text-yellow-500 font-medium mb-3">
+                        <div className="dark:bg-gray-800 bg-gray-200 rounded-lg p-3 md:p-4">
+                          <h4 className="text-yellow-500 font-medium mb-2 md:mb-3 text-sm md:text-base">
                             Evaluation Summary
                           </h4>
-                          {/* Circular Progress for Evaluation Summary */}
-                          <div className="flex justify-center py-4">
-                            <div className="relative w-32 h-32">
-                              {/* Circular Progress */}
+                          <div className="flex justify-center py-2 md:py-4">
+                            <div className="relative w-24 h-24 md:w-32 md:h-32">
+                              {/* Circular Progress - same logic but smaller on mobile */}
                               {(() => {
                                 const latestReview =
                                   latestReviews[selectedCourse.courseId];
@@ -1398,7 +1340,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                                       className="w-full h-full"
                                       viewBox="0 0 100 100"
                                     >
-                                      {/* Background circle */}
                                       <circle
                                         cx="50"
                                         cy="50"
@@ -1407,8 +1348,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                                         stroke="#f3f4f6"
                                         strokeWidth="10"
                                       />
-
-                                      {/* Progress arc */}
                                       <circle
                                         cx="50"
                                         cy="50"
@@ -1425,9 +1364,8 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                                         transform="rotate(-90 50 50)"
                                       />
                                     </svg>
-
                                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                      <span className="text-2xl font-bold text-yellow-500 dark:text-yellow-500">
+                                      <span className="text-lg md:text-2xl font-bold text-yellow-500 dark:text-yellow-500">
                                         {approvalPercentage.toFixed(2)}%
                                       </span>
                                       <span className="text-xs uppercase text-gray-400">
@@ -1439,10 +1377,10 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                               })()}
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
+                          <div className="grid grid-cols-2 gap-2 mt-2 text-xs md:text-sm">
                             <div>
                               <span className="text-gray-400">Category:</span>
-                              <p className="text-yellow-500 truncate w-full">
+                              <p className="text-yellow-500 truncate">
                                 {latestReviews[selectedCourse.courseId]
                                   ?.category || "General"}
                               </p>
@@ -1457,16 +1395,14 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                         </div>
 
                         {/* Performance Breakdown */}
-                        <div className="bg-gray-200 dark:bg-gray-800 rounded-lg p-4">
-                          <h4 className="text-yellow-500 font-medium mb-4">
+                        <div className="bg-gray-200 dark:bg-gray-800 rounded-lg p-3 md:p-4">
+                          <h4 className="text-yellow-500 font-medium mb-3 text-sm md:text-base">
                             Performance Breakdown
                           </h4>
-
-                          {/* Safely handle latestReviews data */}
                           {latestReviews[selectedCourse.courseId] &&
                           Object.keys(latestReviews[selectedCourse.courseId])
                             .length > 0 ? (
-                            <div className="grid grid-cols-1 gap-3">
+                            <div className="grid grid-cols-1 gap-2 md:gap-3">
                               {Object.entries({
                                 "Learner Agency":
                                   latestReviews[selectedCourse.courseId]
@@ -1501,7 +1437,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                               }).map(([key, value]) => (
                                 <div key={key} className="mb-1">
                                   <div className="flex justify-between mb-1">
-                                    <span className="text-xs dark:text-gray-300 text-gray-700">
+                                    <span className="text-xs dark:text-gray-300 text-gray-700 truncate max-w-[100px] md:max-w-none">
                                       {key}
                                     </span>
                                     <span
@@ -1516,9 +1452,9 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                                       {value}%
                                     </span>
                                   </div>
-                                  <div className="w-full bg-gray-700 rounded-full h-2.5">
+                                  <div className="w-full bg-gray-700 rounded-full h-2">
                                     <div
-                                      className={`h-2.5 rounded-full ${
+                                      className={`h-2 rounded-full ${
                                         value >= 70
                                           ? "bg-green-500"
                                           : value >= 50
@@ -1532,7 +1468,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                               ))}
                             </div>
                           ) : (
-                            <div className="text-center py-4 text-gray-400">
+                            <div className="text-center py-3 md:py-4 text-gray-400 text-sm">
                               No detailed metrics available for this course
                             </div>
                           )}

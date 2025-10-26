@@ -31,8 +31,7 @@ const LessonProvider = ({ children }) => {
 
         const lessonsData = await readContract({
           contract,
-          method:
-            "function getAllLessons() view returns ((uint256 chapterId, uint256 lessonId, string lessonName, string lessonContent, (uint8 contentType, string url, string name)[10] additionalResources, uint256 resourceCount, bool exists)[])",
+          method: "getAllLessons",
           params: [],
         });
 

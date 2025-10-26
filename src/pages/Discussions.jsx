@@ -56,66 +56,66 @@ const DiscussionsPage = () => {
   return (
     <div
       className="dark:bg-gray-900 dark:text-gray-100 bg-white text-gray-900
-      min-h-screen p-6 transition-colors duration-300 pt-[100px]"
+    min-h-screen p-4 md:p-6 transition-colors duration-300 pt-16 md:pt-[100px]"
     >
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex items-center mb-8 space-x-4">
+        <div className="flex items-center mb-6 md:mb-8 space-x-3 md:space-x-4">
           <div>
             <h1
-              className="text-3xl font-bold 
-              dark:text-yellow-400 text-yellow-500"
+              className="text-2xl md:text-3xl font-bold 
+            dark:text-yellow-400 text-yellow-500"
             >
               Discussions
             </h1>
-            <p
-              className="
-              text-sm 
-              dark:text-gray-400 text-gray-600"
-            >
+            <p className="text-sm dark:text-gray-400 text-gray-600 mt-1">
               Your discussions page.
             </p>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
+
+        {/* New Discussion Card */}
+        <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4 md:p-6">
           <textarea
             value={newDiscussion}
             onChange={(e) => setNewDiscussion(e.target.value)}
             placeholder="Start a new discussion..."
-            className="w-full p-3 border dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 dark:bg-gray-800 dark:text-white"
+            className="w-full p-3 border dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 dark:bg-gray-800 dark:text-white text-sm md:text-base"
             rows={4}
           />
-          <div className="flex justify-end mt-4">
+          <div className="flex justify-end mt-3 md:mt-4">
             <button
               onClick={handlePostDiscussion}
-              className="bg-yellow-500 text-gray-900 px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors"
+              className="bg-yellow-500 text-gray-900 px-3 py-2 md:px-4 md:py-2 rounded-lg hover:bg-yellow-600 transition-colors text-sm md:text-base w-full sm:w-auto"
             >
               Post Discussion
             </button>
           </div>
         </div>
 
-        <div className="space-y-4">
+        {/* Discussions List */}
+        <div className="space-y-3 md:space-y-4">
           {discussions.map((discussion) => (
             <div
               key={discussion.id}
-              className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6"
+              className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 md:p-6"
             >
-              <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-cyan-950 dark:bg-yellow-500 text-white rounded-full flex items-center justify-center">
+              {/* Discussion Header */}
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 md:gap-4 mb-3 md:mb-4">
+                <div className="flex items-center space-x-2 md:space-x-3">
+                  <div className="w-8 h-8 md:w-10 md:h-10 bg-cyan-950 dark:bg-yellow-500 text-white rounded-full flex items-center justify-center text-sm md:text-base flex-shrink-0">
                     {discussion.author[0]}
                   </div>
-                  <div>
-                    <p className="font-semibold text-gray-900 dark:text-white">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 dark:text-white text-sm md:text-base truncate">
                       {discussion.author}
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
                       {discussion.timestamp}
                     </p>
                   </div>
                 </div>
-                <div className="flex space-x-3">
+                <div className="flex flex-wrap gap-1 md:gap-2">
                   {discussion.tags.map((tag) => (
                     <span
                       key={tag}
@@ -127,26 +127,31 @@ const DiscussionsPage = () => {
                 </div>
               </div>
 
-              <p className="text-gray-800 dark:text-gray-200 mb-4">
+              {/* Discussion Content */}
+              <p className="text-gray-800 dark:text-gray-200 mb-3 md:mb-4 text-sm md:text-base">
                 {discussion.content}
               </p>
 
-              <div className="flex justify-between items-center border-t dark:border-gray-700 pt-4">
-                <div className="flex space-x-4">
-                  <button className="flex items-center space-x-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
-                    <ThumbsUp size={18} />
+              {/* Discussion Actions */}
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-t dark:border-gray-700 pt-3 md:pt-4">
+                <div className="flex space-x-3 md:space-x-4 justify-center sm:justify-start">
+                  <button className="flex items-center space-x-1 md:space-x-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm">
+                    <ThumbsUp size={16} className="md:w-[18px] md:h-[18px]" />
                     <span>{discussion.likes}</span>
                   </button>
-                  <button className="flex items-center space-x-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
-                    <MessageSquare size={18} />
+                  <button className="flex items-center space-x-1 md:space-x-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm">
+                    <MessageSquare
+                      size={16}
+                      className="md:w-[18px] md:h-[18px]"
+                    />
                     <span>{discussion.comments}</span>
                   </button>
-                  <button className="flex items-center space-x-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
-                    <Share2 size={18} />
+                  <button className="flex items-center space-x-1 md:space-x-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm">
+                    <Share2 size={16} className="md:w-[18px] md:h-[18px]" />
                   </button>
                 </div>
-                <button className="text-yellow-500 hover:text-yellow-600 flex items-center">
-                  <ArrowUp size={18} />
+                <button className="text-yellow-500 hover:text-yellow-600 flex items-center justify-center sm:justify-start text-sm">
+                  <ArrowUp size={16} className="md:w-[18px] md:h-[18px]" />
                   <span className="ml-1">Upvote</span>
                 </button>
               </div>

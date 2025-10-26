@@ -43,6 +43,7 @@ import {
 } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
 import CONTRACT_ADDRESSES from "../constants/addresses";
+import { toast } from "react-toastify";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
@@ -408,12 +409,12 @@ const Quiz = memo(({ quiz, courseId }) => {
       // Proceed with contract call...
       const tx = await prepareContractCall({
         contract,
-        method:
-          "function submitQuiz(uint256 _courseId, uint256 _quizId, uint256[] _answers, uint256 _score) returns (bool)",
-        params: [ourseIdBN, quizIdBN, answersArray, BigInt(calculatedScore)],
+        method: "submitQuiz",
+        params: [courseIdBN, quizIdBN, answersArray, BigInt(calculatedScore)],
       });
 
-      await sendTransaction(tx);
+      await sendTransaction({ transaction: tx, account });
+      toast.success(`Successfully completed quiz id ${quizIdBN}`);
     } catch (error) {
       console.error("Quiz submission error:", {
         error,
@@ -784,89 +785,96 @@ const CourseDetails = memo(({ courseId }) => {
 
   useEffect(() => {
     const fetchCompletedLessons = async () => {
-      const contract = await getContract({
-        address: DiamondAddress,
-        abi: Ecosystem2Facet_ABI,
-        client,
-        chain: defineChain(11155111),
-      });
+      try {
+        const contract = await getContract({
+          address: DiamondAddress,
+          abi: Ecosystem2Facet_ABI,
+          client,
+          chain: defineChain(11155111),
+        });
 
-      const completedLessons = await readContract({
-        contract,
-        method:
-          "function getUserCompletedLessonsByCourse(uint256 _courseId) view returns (uint256[])",
-        params: [courseId],
-      });
+        // The contract uses msg.sender, so we need to call it from the connected account
+        let completedLessons = null;
+        try {
+          completedLessons = await readContract({
+            contract,
+            method: "getUserCompletedLessonsByCourse",
+            params: [courseId],
+          });
+        } catch (e) {
+          console.error("Error fetching completed lessons:", e);
+          setCompletedLessonIds(new Set());
+          return;
+        }
 
-      // Special case handling: if the only value is "0" and there's no lesson with ID 0
-      if (
-        completedLessons.length === 1 &&
-        completedLessons[0].toString() === "0" &&
-        !lessons.some((lesson) => lesson.lessonId.toString() === "0")
-      ) {
+        console.log("Raw completedLessons from contract:", completedLessons);
+
+        if (!completedLessons || completedLessons.length === 0) {
+          setCompletedLessonIds(new Set());
+          return;
+        }
+
+        // Convert uint256[] to string array
+        const lessonIds = completedLessons.map((id) => id.toString());
+
+        console.log("Processed completed lessons:", lessonIds);
+        setCompletedLessonIds(new Set(lessonIds));
+      } catch (err) {
+        console.error("Error fetching completed lessons:", err);
         setCompletedLessonIds(new Set());
-        console.log(
-          "No completed lessons (found [0] which isn't a valid lesson ID)"
-        );
-        return;
       }
-
-      // Split the lesson IDs and filter only valid ones
-      const lessonIds = completedLessons
-        .flatMap((lesson) => lesson.toString().split(","))
-        .filter((id) =>
-          lessons.some((lesson) => lesson.lessonId.toString() === id)
-        );
-
-      const completedLessonIdsSet = new Set(lessonIds);
-      setCompletedLessonIds(completedLessonIdsSet);
-      console.log("Completed user lessons:", Array.from(completedLessonIdsSet));
     };
 
-    fetchCompletedLessons();
-  }, [courseId, client, lessons]);
+    if (courseId && client) {
+      fetchCompletedLessons();
+    }
+  }, [courseId, client, address]); // Remove 'lessons' from dependencies to avoid infinite loops
 
   useEffect(() => {
     const fetchCompletedQuizzes = async () => {
-      const contract = await getContract({
-        address: DiamondAddress,
-        abi: Ecosystem2Facet_ABI,
-        client,
-        chain: defineChain(11155111),
-      });
+      try {
+        const contract = await getContract({
+          address: DiamondAddress,
+          abi: Ecosystem2Facet_ABI,
+          client,
+          chain: defineChain(11155111),
+        });
 
-      const completedQuizzes = await readContract({
-        contract,
-        method:
-          "function getUserCompletedQuizzesByCourse(uint256 _courseId) view returns (uint256[])",
-        params: [courseId],
-      });
+        let completedQuizzes = null;
+        try {
+          completedQuizzes = await readContract({
+            contract,
+            method: "getUserCompletedQuizzesByCourse",
+            params: [courseId],
+          });
+        } catch (e) {
+          console.error("Error fetching completed quizzes:", e);
+          setCompletedQuizIds(new Set());
+          return;
+        }
 
-      // Special case handling: if the only value is "0" and there's no quiz with ID 0
-      if (
-        completedQuizzes.length === 1 &&
-        completedQuizzes[0].toString() === "0" &&
-        !quizzes.some((quiz) => quiz.quizId.toString() === "0")
-      ) {
+        console.log("Raw completedQuizzes from contract:", completedQuizzes);
+
+        if (!completedQuizzes || completedQuizzes.length === 0) {
+          setCompletedQuizIds(new Set());
+          return;
+        }
+
+        // Convert uint256[] to string array
+        const quizIds = completedQuizzes.map((id) => id.toString());
+
+        console.log("Processed completed quizzes:", quizIds);
+        setCompletedQuizIds(new Set(quizIds));
+      } catch (err) {
+        console.error("Error fetching completed quizzes:", err);
         setCompletedQuizIds(new Set());
-        console.log(
-          "No completed quizzes (found [0] which isn't a valid quiz ID)"
-        );
-        return;
       }
-
-      // Split the quiz IDs and filter only valid ones
-      const quizIds = completedQuizzes
-        .flatMap((quiz) => quiz.toString().split(","))
-        .filter((id) => quizzes.some((quiz) => quiz.quizId.toString() === id));
-
-      const completedQuizIdsSet = new Set(quizIds);
-      setCompletedQuizIds(completedQuizIdsSet);
-      console.log("Completed user quizzes:", Array.from(completedQuizIdsSet));
     };
 
-    fetchCompletedQuizzes();
-  }, [courseId, client, quizzes]);
+    if (courseId && client) {
+      fetchCompletedQuizzes();
+    }
+  }, [courseId, client, address]);
 
   const markAsRead = async (courseId, chapterId, lessonId) => {
     // Add lesson to loading state
@@ -889,17 +897,15 @@ const CourseDetails = memo(({ courseId }) => {
       try {
         const tx = await prepareContractCall({
           contract,
-          method:
-            "function markAsRead(uint256 _courseId, uint256 _chapterId, uint256 _lessonId) returns (bool)",
+          method: "markAsRead",
           params: [courseIdBN, chapterIdBN, lessonIdBN],
         });
 
         console.log("Transaction sent:", tx.hash);
 
         // Wait for transaction confirmation
-        const receipt = await sendTransaction(tx);
-        console.log("Transaction confirmed:", receipt);
-
+        await sendTransaction({ transaction: tx, account });
+        toast.success(`Successfully completed lesson ${lessonIdBN}`);
         // Update local state only after confirmation
         setCompletedLessonIds((prev) => new Set([...prev, lessonIdStr]));
       } catch (contractError) {

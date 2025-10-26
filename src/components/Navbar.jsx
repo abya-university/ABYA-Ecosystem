@@ -8,6 +8,8 @@ import {
   LogOut,
   Settings,
   GraduationCap,
+  LogIn,
+  UserPlus,
 } from "lucide-react";
 import WalletConnection from "./WalletConnection";
 import { useState, useEffect, useRef } from "react";
@@ -57,7 +59,6 @@ export default function Navbar() {
   const handleLogout = () => {
     clearProfile();
     setProfileDropdownOpen(false);
-    // You might want to add wallet disconnect logic here too
   };
 
   const getInitials = (fname, lname) => {
@@ -66,42 +67,42 @@ export default function Navbar() {
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-gray-100/80 dark:bg-gray-900 backdrop-blur-lg dark:shadow-sm dark:shadow-white transition-all duration-1000">
-      <div className="container mx-auto flex justify-between items-center p-4">
+      <div className="container mx-auto flex justify-between items-center p-3 md:p-4">
         {/* Logo */}
         <div className="flex items-center">
-          <img src="/abya_logo.jpg" alt="ABYA Logo" className="w-24" />
+          <img src="/abya_logo.jpg" alt="ABYA Logo" className="w-20 md:w-24" />
         </div>
 
         {/* Desktop Links */}
-        <div className="hidden md:flex space-x-6">
+        <div className="hidden md:flex space-x-4 lg:space-x-6">
           <Link
             to="/"
             onClick={handleLinkClick}
-            className="text-lg font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200"
+            className="text-base lg:text-lg font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200"
           >
             Home
           </Link>
           <Link
             to="/courses"
             onClick={handleLinkClick}
-            className="text-lg font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200"
+            className="text-base lg:text-lg font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200"
           >
             Courses
           </Link>
           <Link
             to="/community"
             onClick={handleLinkClick}
-            className="text-lg font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200"
+            className="text-base lg:text-lg font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200"
           >
             Community
           </Link>
         </div>
 
         {/* Actions: Profile, Wallet, Theme, Mobile Menu */}
-        <div className="flex items-center space-x-4">
-          {/* Profile Dropdown */}
+        <div className="flex items-center space-x-2 md:space-x-4">
+          {/* Profile Dropdown - Desktop only when logged in */}
           {hasProfile && profile && (
-            <div className="relative" ref={dropdownRef}>
+            <div className="hidden md:block relative" ref={dropdownRef}>
               <button
                 onClick={handleProfileClick}
                 className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200"
@@ -109,7 +110,7 @@ export default function Navbar() {
                 <div className="w-8 h-8 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
                   {getInitials(profile.fname, profile.lname)}
                 </div>
-                <span className="hidden sm:block text-sm font-medium text-gray-700 dark:text-gray-200">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
                   {profile.fname}
                 </span>
               </button>
@@ -147,9 +148,9 @@ export default function Navbar() {
                   {/* Dropdown Items */}
                   <button
                     onClick={() => navigateTo("/mainpage?section=settings")}
-                    className="flex items-center px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
+                    className="flex items-center px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 w-full text-left"
                   >
-                    <User className="w-4 h-4 mr-3" />
+                    <User className="w-4 h-4 mr-3 flex-shrink-0" />
                     View Profile
                   </button>
 
@@ -158,7 +159,7 @@ export default function Navbar() {
                     onClick={() => setProfileDropdownOpen(false)}
                     className="flex items-center px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
                   >
-                    <GraduationCap className="w-4 h-4 mr-3" />
+                    <GraduationCap className="w-4 h-4 mr-3 flex-shrink-0" />
                     My Certificates
                   </Link>
 
@@ -167,7 +168,7 @@ export default function Navbar() {
                     onClick={() => setProfileDropdownOpen(false)}
                     className="flex items-center px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
                   >
-                    <Settings className="w-4 h-4 mr-3" />
+                    <Settings className="w-4 h-4 mr-3 flex-shrink-0" />
                     Settings
                   </Link>
 
@@ -177,7 +178,7 @@ export default function Navbar() {
                     onClick={handleLogout}
                     className="flex items-center w-full px-4 py-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-200"
                   >
-                    <LogOut className="w-4 h-4 mr-3" />
+                    <LogOut className="w-4 h-4 mr-3 flex-shrink-0" />
                     Sign Out
                   </button>
                 </div>
@@ -185,36 +186,61 @@ export default function Navbar() {
             </div>
           )}
 
-          <ErrorBoundary>
-            <WalletConnection />
-          </ErrorBoundary>
+          {/* Wallet Connection - Desktop only */}
+          <div className="hidden md:block">
+            <ErrorBoundary>
+              <WalletConnection />
+            </ErrorBoundary>
+          </div>
+
+          {/* Auth Buttons - Desktop only when not logged in */}
+          {!hasProfile && (
+            <div className="hidden md:flex items-center space-x-3">
+              <Link
+                to="/login"
+                className="text-sm font-medium text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200"
+              >
+                Login
+              </Link>
+              <Link
+                to="/signup"
+                className="bg-yellow-500 text-gray-900 px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors text-sm font-medium"
+              >
+                Sign Up
+              </Link>
+            </div>
+          )}
 
           {/* Dark Mode Toggle */}
           <button
             onClick={() => setDarkMode(!darkMode)}
-            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-yellow-500 transition-colors duration-200"
+            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-yellow-500 transition-colors duration-200 flex-shrink-0"
             aria-label={
               darkMode ? "Switch to light mode" : "Switch to dark mode"
             }
           >
-            {darkMode ? <Sun size={24} /> : <Moon size={24} />}
+            {darkMode ? (
+              <Sun size={20} className="md:w-6 md:h-6" />
+            ) : (
+              <Moon size={20} className="md:w-6 md:h-6" />
+            )}
           </button>
 
           {/* Hamburger Button for Mobile */}
           <div className="md:hidden">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200"
+              className="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200 flex-shrink-0"
               aria-label={menuOpen ? "Close menu" : "Open menu"}
             >
               {menuOpen ? (
                 <X
-                  size={24}
+                  size={20}
                   className={darkMode ? "text-yellow-500" : "text-gray-800"}
                 />
               ) : (
                 <Menu
-                  size={24}
+                  size={20}
                   className={darkMode ? "text-yellow-500" : "text-gray-800"}
                 />
               )}
@@ -225,47 +251,94 @@ export default function Navbar() {
 
       {/* Mobile Menu Links */}
       {menuOpen && (
-        <div className="md:hidden absolute top-full left-0 w-full bg-gray-100 dark:bg-gray-900 shadow-lg">
-          <div className="flex flex-col items-center py-4 space-y-4">
+        <div className="md:hidden absolute top-full left-0 w-full bg-gray-100 dark:bg-gray-900 shadow-lg border-t border-gray-200 dark:border-gray-700">
+          <div className="flex flex-col py-4 space-y-1">
+            {/* Navigation Links */}
             <Link
               to="/"
               onClick={handleLinkClick}
-              className="text-lg font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200"
+              className="text-base font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200 py-3 px-6 hover:bg-gray-200 dark:hover:bg-gray-800"
             >
               Home
             </Link>
             <Link
               to="/courses"
               onClick={handleLinkClick}
-              className="text-lg font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200"
+              className="text-base font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200 py-3 px-6 hover:bg-gray-200 dark:hover:bg-gray-800"
             >
               Courses
             </Link>
             <Link
               to="/community"
               onClick={handleLinkClick}
-              className="text-lg font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200"
+              className="text-base font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200 py-3 px-6 hover:bg-gray-200 dark:hover:bg-gray-800"
             >
               Community
             </Link>
-            {hasProfile && (
+
+            {/* Profile Links - Mobile when logged in */}
+            {hasProfile && profile && (
               <>
+                <div className="border-t border-gray-300 dark:border-gray-700 my-2"></div>
+                <div className="px-6 py-3">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center text-white font-semibold">
+                      {getInitials(profile.fname, profile.lname)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {profile.fname} {profile.lname}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {profile.email}
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 <Link
-                  to="/profile"
+                  to="/mainpage?section=settings"
                   onClick={handleLinkClick}
-                  className="text-lg font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200"
+                  className="flex items-center text-base font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200 py-3 px-6 hover:bg-gray-200 dark:hover:bg-gray-800"
                 >
+                  <User className="w-4 h-4 mr-3" />
                   My Profile
                 </Link>
                 <Link
                   to="/certificates"
                   onClick={handleLinkClick}
-                  className="text-lg font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200"
+                  className="flex items-center text-base font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200 py-3 px-6 hover:bg-gray-200 dark:hover:bg-gray-800"
                 >
+                  <GraduationCap className="w-4 h-4 mr-3" />
                   Certificates
                 </Link>
+                <Link
+                  to="/settings"
+                  onClick={handleLinkClick}
+                  className="flex items-center text-base font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200 py-3 px-6 hover:bg-gray-200 dark:hover:bg-gray-800"
+                >
+                  <Settings className="w-4 h-4 mr-3" />
+                  Settings
+                </Link>
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    handleLinkClick();
+                  }}
+                  className="flex items-center text-base font-semibold text-red-600 dark:text-red-400 transition-colors duration-200 py-3 px-6 hover:bg-red-50 dark:hover:bg-red-900/20 text-left"
+                >
+                  <LogOut className="w-4 h-4 mr-3" />
+                  Sign Out
+                </button>
               </>
             )}
+
+            {/* Wallet Connection - Mobile */}
+            <div className="border-t border-gray-300 dark:border-gray-700 my-2"></div>
+            <div className="px-6 py-3">
+              <ErrorBoundary>
+                <WalletConnection />
+              </ErrorBoundary>
+            </div>
           </div>
         </div>
       )}
