@@ -39,7 +39,7 @@ export function AbyaConnectButton() {
     () => [
       inAppWallet({
         auth: {
-          options: ["discord", "passkey", "google", "github"],
+          options: ["google", "discord", "passkey", "github"],
         },
         metadata: {
           name: "ABYA Ecosystem",

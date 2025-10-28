@@ -12,6 +12,8 @@ import {
   Award,
   ExternalLink,
   CheckCircle,
+  ClipboardListIcon,
+  RefreshCw,
 } from "lucide-react";
 import { CourseContext } from "../contexts/courseContext";
 import { useProfile } from "../contexts/ProfileContext";
@@ -20,16 +22,9 @@ import { ChapterContext } from "../contexts/chapterContext";
 import { LessonContext } from "../contexts/lessonContext";
 import { QuizContext } from "../contexts/quizContext";
 import { useCertificates } from "../contexts/certificatesContext";
-import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
-import { useActiveAccount } from "thirdweb/react";
-import { client } from "../services/client";
-import { getContract, readContract } from "thirdweb";
 import { useUser } from "../contexts/userContext";
-import { defineChain } from "thirdweb/chains";
-import CONTRACT_ADDRESSES from "../constants/addresses";
-
-const DiamondAddress = CONTRACT_ADDRESSES.diamond;
-const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
+import { useProgress } from "../contexts/progressContext";
+import { useActiveAccount } from "thirdweb/react";
 
 const Dashboard = ({ onCourseSelect }) => {
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -38,41 +33,49 @@ const Dashboard = ({ onCourseSelect }) => {
   const { profile } = useProfile();
   const account = useActiveAccount();
   const address = account?.address;
-  const { chapters, fetchChapters, setChapters } = useContext(ChapterContext);
+  const { chapters, fetchChapters } = useContext(ChapterContext);
   const { lessons } = useContext(LessonContext);
   const { quizzes } = useContext(QuizContext);
   const { certificates } = useCertificates();
 
-  // Store completion data for each course
-  const [courseCompletionData, setCourseCompletionData] = useState({});
+  // Use the progress context instead of local state
+  const {
+    completedLessonIds,
+    completedQuizIds,
+    loading: progressLoading,
+    refreshProgress,
+    fetchCompletedLessons,
+    fetchCompletedQuizzes,
+  } = useProgress();
 
   console.log("Profile", profile);
 
-  // Sample stats data (keep as is or modify based on your needs)
+  // Sample stats data - you can now make these dynamic with real data
   const stats = [
     {
       icon: <Wallet className="w-6 h-6" />,
       title: "Total Courses",
-      value: "24",
-      change: "+5.2%",
+      // value: enrolledCourses?.length.toString(),
+      value: 24,
+      change: "+0%", // You can calculate this based on previous data
     },
     {
       icon: <LineChart className="w-6 h-6" />,
       title: "Completed Quizzes",
-      value: "42",
-      change: "+12.5%",
+      value: Array.from(completedQuizIds).length.toString(),
+      change: "+0%",
     },
     {
       icon: <Trophy className="w-6 h-6" />,
-      title: "Achievement Points",
-      value: "1,256",
-      change: "+8.7%",
+      title: "Completed Lessons",
+      value: Array.from(completedLessonIds).length.toString(),
+      change: "+0%",
     },
     {
       icon: <Layers className="w-6 h-6" />,
-      title: "Learning Streaks",
-      value: "14 days",
-      change: "+3 days",
+      title: "Certificates",
+      value: certificates.length.toString(),
+      change: "+0%",
     },
   ];
 
@@ -97,10 +100,7 @@ const Dashboard = ({ onCourseSelect }) => {
   console.log("Dashboard Courses:", courses);
 
   const getEnrolledStudentsCount = (enrolledStudents) => {
-    // If the array is empty or undefined, return 0
     if (!enrolledStudents || enrolledStudents.length === 0) return 0;
-
-    // Return the length of the array
     return enrolledStudents.length;
   };
 
@@ -108,28 +108,24 @@ const Dashboard = ({ onCourseSelect }) => {
     setIsDarkMode(!isDarkMode);
   };
 
-  // Helper function to check if current user is enrolled (handles both array and string formats)
+  // Helper function to check if current user is enrolled
   const isUserEnrolled = (enrolledStudents, userAddress) => {
     if (!enrolledStudents || !userAddress) {
       return false;
     }
 
-    // If it's an array, check if it includes the address
     if (Array.isArray(enrolledStudents)) {
       return enrolledStudents.some(
         (addr) => addr.toLowerCase() === userAddress.toLowerCase()
       );
     }
 
-    // Convert to string and check
     const studentsStr = String(enrolledStudents);
 
-    // If it's a single address, check if it matches
     if (studentsStr.startsWith("0x") && !studentsStr.includes(",")) {
       return studentsStr.toLowerCase() === userAddress.toLowerCase();
     }
 
-    // If multiple addresses, split and check
     const addressList = studentsStr
       .split(",")
       .map((addr) => addr.trim().toLowerCase());
@@ -148,7 +144,6 @@ const Dashboard = ({ onCourseSelect }) => {
     if (onCourseSelect) {
       onCourseSelect(courseId);
     } else {
-      // Fallback for direct URL navigation if onCourseSelect is not provided
       window.location.href = `/course/${courseId}`;
     }
   };
@@ -159,12 +154,10 @@ const Dashboard = ({ onCourseSelect }) => {
 
   // Helper function to get lessons for a specific course (via chapters)
   const getLessonsForCourse = (courseId) => {
-    // First, get all chapters for this course
     const courseChapters = chapters.filter(
       (chapter) => chapter.courseId.toString() === courseId.toString()
     );
 
-    // Then get all lessons for these chapters
     const courseLessons = lessons.filter((lesson) =>
       courseChapters.some(
         (chapter) =>
@@ -177,10 +170,8 @@ const Dashboard = ({ onCourseSelect }) => {
 
   // Helper function to get quizzes for a specific course (via lessons)
   const getQuizzesForCourse = (courseId) => {
-    // Get lessons for this course first
     const courseLessons = getLessonsForCourse(courseId);
 
-    // Then get quizzes associated with these lessons
     const courseQuizzes = quizzes.filter((quiz) =>
       courseLessons.some(
         (lesson) => lesson.lessonId.toString() === quiz.lessonId.toString()
@@ -190,94 +181,39 @@ const Dashboard = ({ onCourseSelect }) => {
     return courseQuizzes;
   };
 
-  // Function to fetch completion data for a specific course
-  const fetchCompletionDataForCourse = async (courseId) => {
-    try {
-      const contract = await getContract({
-        address: DiamondAddress,
-        abi: Ecosystem2Facet_ABI,
-        client,
-        chain: defineChain(11155111),
-      });
+  // Calculate completion data for a course using the progress context
+  const getCourseCompletionData = (courseId) => {
+    const courseLessons = getLessonsForCourse(courseId);
+    const courseQuizzes = getQuizzesForCourse(courseId);
 
-      // Get lessons and quizzes for this specific course
-      const courseLessons = getLessonsForCourse(courseId);
-      const courseQuizzes = getQuizzesForCourse(courseId);
+    // Filter completed items that belong to this specific course
+    const completedCourseLessons = Array.from(completedLessonIds).filter(
+      (lessonId) =>
+        courseLessons.some((lesson) => lesson.lessonId.toString() === lessonId)
+    );
 
-      console.log(`Fetching completion data for course ${courseId}:`, {
-        courseLessonsCount: courseLessons.length,
-        courseQuizzesCount: courseQuizzes.length,
-        connectedAddress: address,
-      });
+    const completedCourseQuizzes = Array.from(completedQuizIds).filter(
+      (quizId) =>
+        courseQuizzes.some((quiz) => quiz.quizId.toString() === quizId)
+    );
 
-      // Fetch completed lessons
-      const completedLessons = await readContract({
-        contract,
-        method: "getUserCompletedLessonsByCourse",
-        params: [courseId],
-      });
+    const totalLessons = courseLessons.length;
+    const totalQuizzes = courseQuizzes.length;
+    const completedLessons = completedCourseLessons.length;
+    const completedQuizzes = completedCourseQuizzes.length;
 
-      console.log("Raw completed lessons from contract:", completedLessons);
+    const result = {
+      completedLessons,
+      completedQuizzes,
+      totalLessons,
+      totalQuizzes,
+      completedLessonIds: completedCourseLessons,
+      completedQuizIds: completedCourseQuizzes,
+    };
 
-      // Fetch completed quizzes
-      const completedQuizzes = await readContract({
-        contract,
-        method: "getUserCompletedQuizzesByCourse",
-        params: [courseId],
-      });
+    console.log(`Course ${courseId} completion data:`, result);
 
-      console.log("Raw completed quizzes from contract:", completedQuizzes);
-
-      // Process completed lessons - convert uint256[] to string IDs
-      let completedLessonIds = new Set();
-      if (completedLessons && completedLessons.length > 0) {
-        // Direct mapping since contract returns uint256[]
-        const lessonIds = completedLessons.map((id) => id.toString());
-        // Filter to only include lessons that exist in this course
-        const validLessonIds = lessonIds.filter((id) =>
-          courseLessons.some((lesson) => lesson.lessonId.toString() === id)
-        );
-        completedLessonIds = new Set(validLessonIds);
-      }
-
-      // Process completed quizzes - convert uint256[] to string IDs
-      let completedQuizIds = new Set();
-      if (completedQuizzes && completedQuizzes.length > 0) {
-        // Direct mapping since contract returns uint256[]
-        const quizIds = completedQuizzes.map((id) => id.toString());
-        // Filter to only include quizzes that exist in this course
-        const validQuizIds = quizIds.filter((id) =>
-          courseQuizzes.some((quiz) => quiz.quizId.toString() === id)
-        );
-        completedQuizIds = new Set(validQuizIds);
-      }
-
-      const result = {
-        completedLessons: completedLessonIds.size,
-        completedQuizzes: completedQuizIds.size,
-        totalLessons: courseLessons.length,
-        totalQuizzes: courseQuizzes.length,
-        completedLessonIds: Array.from(completedLessonIds), // For debugging
-        completedQuizIds: Array.from(completedQuizIds), // For debugging
-      };
-
-      console.log(`=== COMPLETION DATA FOR COURSE ${courseId} ===`, result);
-
-      return result;
-    } catch (error) {
-      console.error(
-        `Error fetching completion data for course ${courseId}:`,
-        error
-      );
-      return {
-        completedLessons: 0,
-        completedQuizzes: 0,
-        totalLessons: 0,
-        totalQuizzes: 0,
-        completedLessonIds: [],
-        completedQuizIds: [],
-      };
-    }
+    return result;
   };
 
   // Effect to fetch chapters for all enrolled courses
@@ -285,7 +221,6 @@ const Dashboard = ({ onCourseSelect }) => {
     const fetchChaptersForEnrolledCourses = async () => {
       if (enrolledCourses.length === 0) return;
 
-      // Fetch chapters for each enrolled course
       for (const course of enrolledCourses) {
         await fetchChapters(course.courseId);
       }
@@ -294,39 +229,19 @@ const Dashboard = ({ onCourseSelect }) => {
     fetchChaptersForEnrolledCourses();
   }, [enrolledCourses, fetchChapters]);
 
-  // Effect to fetch completion data for all enrolled courses
+  // Effect to refresh progress data when enrolled courses change
   useEffect(() => {
-    const fetchAllCompletionData = async () => {
-      if (enrolledCourses.length === 0 || chapters.length === 0) return;
+    const fetchInitialData = async () => {
+      if (enrolledCourses.length === 0) return;
 
-      const completionPromises = enrolledCourses.map(async (course) => {
-        const completionData = await fetchCompletionDataForCourse(
-          course.courseId
-        );
-        return {
-          courseId: course.courseId,
-          ...completionData,
-        };
-      });
-
-      try {
-        const completionResults = await Promise.all(completionPromises);
-
-        // Convert array to object for easy lookup
-        const completionDataMap = {};
-        completionResults.forEach((result) => {
-          completionDataMap[result.courseId] = result;
-        });
-
-        setCourseCompletionData(completionDataMap);
-        console.log("All course completion data:", completionDataMap);
-      } catch (error) {
-        console.error("Error fetching completion data for courses:", error);
+      // Only fetch chapters, let individual components handle progress
+      for (const course of enrolledCourses) {
+        await fetchChapters(course.courseId);
       }
     };
 
-    fetchAllCompletionData();
-  }, [enrolledCourses, client, lessons, quizzes, chapters]);
+    fetchInitialData();
+  }, [enrolledCourses, fetchChapters]);
 
   return (
     <div
@@ -346,7 +261,6 @@ const Dashboard = ({ onCourseSelect }) => {
           </div>
           <div className="lg:flex lg:items-center lg:gap-4 hidden md:flex">
             <button
-              // onClick={() => setShowSurveyModal(true)}
               onClick={() =>
                 alert("This feature is under development. Stay tuned!")
               }
@@ -354,8 +268,27 @@ const Dashboard = ({ onCourseSelect }) => {
                        text-white rounded-lg hover:from-cyan-900 hover:to-yellow-700 
                        transition-all duration-300 transform hover:scale-105 shadow-lg"
             >
-              <ClipboardList className="w-4 h-4" />
+              <ClipboardListIcon className="w-4 h-4" />
               Take Survey
+            </button>
+            <button
+              onClick={async () => {
+                if (enrolledCourses.length === 0) return;
+                console.log("Manually refreshing progress...");
+                for (const course of enrolledCourses) {
+                  await refreshProgress(course.courseId);
+                }
+              }}
+              disabled={progressLoading}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 
+             text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50"
+            >
+              {progressLoading ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              Refresh Progress
             </button>
           </div>
         </div>
@@ -404,34 +337,24 @@ const Dashboard = ({ onCourseSelect }) => {
           {enrolledCourses.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 p-3">
               {enrolledCourses.map((course) => {
-                const completionData = courseCompletionData[
-                  course.courseId
-                ] || {
-                  completedLessons: 0,
-                  completedQuizzes: 0,
-                  totalLessons: 0,
-                  totalQuizzes: 0,
-                };
+                const completionData = getCourseCompletionData(course.courseId);
 
-                // Debug logging for each course
-                console.log(
-                  `=== DASHBOARD PROGRESS DEBUG - Course: ${course.courseName} ===`,
-                  {
-                    courseId: course.courseId,
-                    completionData,
-                    totalItems:
-                      completionData.totalLessons + completionData.totalQuizzes,
-                    completedItems:
-                      completionData.completedLessons +
-                      completionData.completedQuizzes,
-                    progressPercentage:
-                      ((completionData.completedLessons +
-                        completionData.completedQuizzes) /
-                        (completionData.totalLessons +
-                          completionData.totalQuizzes)) *
-                        100 || 0,
-                  }
-                );
+                const totalItems =
+                  completionData.totalLessons + completionData.totalQuizzes;
+                const completedItems =
+                  completionData.completedLessons +
+                  completionData.completedQuizzes;
+                const progressPercentage =
+                  totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+                const isCompleted = progressPercentage >= 100;
+                const hasCertificate = hasCertificateForCourse(course.courseId);
+
+                console.log(`Dashboard Course: ${course.courseName}`, {
+                  progressPercentage,
+                  isCompleted,
+                  hasCertificate,
+                  completionData,
+                });
 
                 return (
                   <div
@@ -473,27 +396,7 @@ const Dashboard = ({ onCourseSelect }) => {
                       </span>
 
                       {(() => {
-                        const totalItems =
-                          completionData.totalLessons +
-                          completionData.totalQuizzes;
-                        const completedItems =
-                          completionData.completedLessons +
-                          completionData.completedQuizzes;
-                        const progressPercentage =
-                          totalItems > 0
-                            ? (completedItems / totalItems) * 100
-                            : 0;
-                        const isCompleted = progressPercentage >= 100;
-                        const hasCertificate = hasCertificateForCourse(
-                          course.courseId
-                        );
-
-                        console.log(
-                          `Course ${course.courseId} - Progress: ${progressPercentage}%, HasCertificate: ${hasCertificate}`
-                        );
-
                         if (isCompleted && hasCertificate) {
-                          // Course completed and certificate claimed
                           return (
                             <div className="space-y-2">
                               <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg p-3 text-center">
@@ -523,7 +426,6 @@ const Dashboard = ({ onCourseSelect }) => {
                             </div>
                           );
                         } else if (isCompleted && !hasCertificate) {
-                          // Course completed but certificate not claimed
                           return (
                             <div className="bg-gradient-to-r from-yellow-500 to-amber-600 text-white rounded-lg p-3 text-center">
                               <div className="flex items-center justify-center mb-2">
@@ -545,7 +447,6 @@ const Dashboard = ({ onCourseSelect }) => {
                             </div>
                           );
                         } else {
-                          // Course in progress - show progress bar and continue button
                           return (
                             <div className="space-y-2 flex flex-col">
                               <ProgressBar
@@ -624,6 +525,13 @@ const Dashboard = ({ onCourseSelect }) => {
             ))}
           </div>
         </div>
+
+        {progressLoading && (
+          <div className="text-center py-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500 mx-auto"></div>
+            <p className="text-sm text-gray-500 mt-2">Updating progress...</p>
+          </div>
+        )}
       </div>
     </div>
   );

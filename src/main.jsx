@@ -19,6 +19,7 @@ import { UserPositionProvider } from "./contexts/fake-liquidity-test-contexts/us
 import { TransactionHistoryProvider } from "./contexts/fake-liquidity-test-contexts/historyContext.jsx";
 import { ThirdwebProvider } from "thirdweb/react";
 import { ThemeProvider } from "./contexts/themeContext.jsx";
+import { ProgressProvider } from "./contexts/progressContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -40,7 +41,9 @@ createRoot(document.getElementById("root")).render(
                               <AirdropProposalProvider>
                                 <TransactionHistoryProvider>
                                   <UserPositionProvider>
-                                    <App />
+                                    <ProgressProvider>
+                                      <App />
+                                    </ProgressProvider>
                                   </UserPositionProvider>
                                 </TransactionHistoryProvider>
                               </AirdropProposalProvider>

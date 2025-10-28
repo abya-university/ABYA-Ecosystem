@@ -4,6 +4,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import { ethers } from "ethers";
 import CONTRACT_ABI from "../../artifacts/fakeLiquidityArtifacts/Add_Swap_Contract.sol/Add_Swap_Contract.json";
@@ -170,67 +171,45 @@ export function TransactionHistoryProvider({ children }) {
     ETH: "0.0",
   });
 
-  // Initialize contracts
-  const swapContract = ContractUtils.createContract(
-    CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
-    CONTRACT_CONFIG.ABI.SWAP
+  // Use refs for values that don't need to trigger re-renders
+  const isMountedRef = useRef(true);
+
+  // Initialize contracts - use useMemo to prevent recreation on every render
+  const swapContract = React.useMemo(
+    () =>
+      ContractUtils.createContract(
+        CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
+        CONTRACT_CONFIG.ABI.SWAP
+      ),
+    []
   );
 
-  const abytknContract = ContractUtils.createContract(
-    CONTRACT_CONFIG.ADDRESSES.TOKEN0,
-    CONTRACT_CONFIG.ABI.ABYTKN
+  const abytknContract = React.useMemo(
+    () =>
+      ContractUtils.createContract(
+        CONTRACT_CONFIG.ADDRESSES.TOKEN0,
+        CONTRACT_CONFIG.ABI.ABYTKN
+      ),
+    []
   );
 
-  const usdcContract = ContractUtils.createContract(
-    CONTRACT_CONFIG.ADDRESSES.TOKEN1,
-    CONTRACT_CONFIG.ABI.USDC
+  const usdcContract = React.useMemo(
+    () =>
+      ContractUtils.createContract(
+        CONTRACT_CONFIG.ADDRESSES.TOKEN1,
+        CONTRACT_CONFIG.ABI.USDC
+      ),
+    []
   );
 
-  // Reactive data with thirdweb hooks
-  const { data: txHistoryData, isLoading: historyLoading } = useReadContract({
-    contract: swapContract,
-    method: "getUserTransactionHistory",
-    params: [],
-  });
-
-  const { data: abytknBalance } = useReadContract({
-    contract: abytknContract,
-    method: "balanceOf",
-    params: [address || "0x"],
-  });
-
-  const { data: usdcBalance } = useReadContract({
-    contract: usdcContract,
-    method: "balanceOf",
-    params: [address || "0x"],
-  });
-
-  const { data: tokenPrice } = useReadContract({
-    contract: swapContract,
-    method: "getTokenPrice",
-    params: [],
-  });
-
-  const { data: poolInfoData } = useReadContract({
-    contract: swapContract,
-    method: "getPoolInfo",
-    params: [],
-  });
-
-  const { data: poolBalances } = useReadContract({
-    contract: swapContract,
-    method: "getPoolBalances",
-    params: [],
-  });
-
-  // Common error handler
-  const handleError = (operation, error, fallbackMessage) => {
+  // Common error handler - useCallback to prevent recreation
+  const handleError = useCallback((operation, error, fallbackMessage) => {
     console.error(`Error ${operation}:`, error);
     setError(fallbackMessage || `Failed to ${operation}`);
     return null;
-  };
+  }, []);
 
-  // Function to fetch transaction history from the contract (manual for complex processing)
+  // Function to fetch transaction history from the contract
   const fetchTransactionHistory = useCallback(async () => {
     if (!isConnected || !address) return;
 
@@ -238,7 +217,6 @@ export function TransactionHistoryProvider({ children }) {
     setError(null);
 
     try {
-      // Use manual read for complex data processing
       const txHistoryData = await ContractUtils.readContractManual(
         swapContract,
         "getUserTransactionHistory"
@@ -255,25 +233,13 @@ export function TransactionHistoryProvider({ children }) {
     } catch (err) {
       handleError("fetching transaction history", err);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
-  }, [isConnected, address, swapContract]);
+  }, [isConnected, address, swapContract, handleError]);
 
-  // Fetch transaction history when the user connects their wallet
-  useEffect(() => {
-    if (isConnected) {
-      fetchTransactionHistory();
-    } else {
-      setTransactions([]);
-    }
-  }, [isConnected, fetchTransactionHistory]);
-
-  // Function to refresh transaction history
-  const refreshHistory = () => {
-    fetchTransactionHistory();
-  };
-
-  // Manual balance loading (for when you need precise control)
+  // Manual balance loading
   const loadBalances = useCallback(async () => {
     if (!isConnected || !address) return;
 
@@ -296,7 +262,7 @@ export function TransactionHistoryProvider({ children }) {
     } catch (error) {
       handleError("loading balances manually", error);
     }
-  }, [isConnected, address, abytknContract, usdcContract]);
+  }, [isConnected, address, abytknContract, usdcContract, handleError]);
 
   // Function to calculate output amount
   const calculateOutputAmount = useCallback(
@@ -306,7 +272,6 @@ export function TransactionHistoryProvider({ children }) {
       }
 
       try {
-        // Use manual read for price calculation
         const tokenPrice = await ContractUtils.readContractManual(
           swapContract,
           "getTokenPrice"
@@ -428,10 +393,10 @@ export function TransactionHistoryProvider({ children }) {
         apr: "N/A",
       });
     }
-  }, [isConnected, swapContract]);
+  }, [isConnected, swapContract, handleError]);
 
-  // Advanced pool price calculation (from original)
-  const getCurrentPoolPrice = async () => {
+  // Advanced pool price calculation
+  const getCurrentPoolPrice = useCallback(async () => {
     try {
       const poolAddress = CONTRACT_CONFIG.ADDRESSES.UNISWAP_POOL;
 
@@ -512,9 +477,9 @@ export function TransactionHistoryProvider({ children }) {
       console.error("Error fetching pool price:", error);
       return { price: 1000, isInitialRatio: true };
     }
-  };
+  }, []);
 
-  const fetchPoolPrice = async () => {
+  const fetchPoolPrice = useCallback(async () => {
     if (!isConnected) return;
 
     setIsLoadingPrice(true);
@@ -527,14 +492,13 @@ export function TransactionHistoryProvider({ children }) {
     } finally {
       setIsLoadingPrice(false);
     }
-  };
+  }, [isConnected, getCurrentPoolPrice, handleError]);
 
-  const refreshPoolPrice = async () => {
+  const refreshPoolPrice = useCallback(async () => {
     if (!isConnected) return;
 
     setIsLoadingPrice(true);
     try {
-      // Manual price refresh with complex logic
       const tokenPrice = await ContractUtils.readContractManual(
         swapContract,
         "getTokenPrice"
@@ -576,11 +540,57 @@ export function TransactionHistoryProvider({ children }) {
     } finally {
       setIsLoadingPrice(false);
     }
-  };
+  }, [isConnected, swapContract, handleError]);
 
-  // Update reactive data when hooks change
+  // Use reactive data from thirdweb hooks
+  const { data: txHistoryData, isLoading: historyLoading } = useReadContract({
+    contract: swapContract,
+    method: "getUserTransactionHistory",
+    params: [],
+  });
+
+  const { data: abytknBalance } = useReadContract({
+    contract: abytknContract,
+    method: "balanceOf",
+    params: [address || "0x"],
+  });
+
+  const { data: usdcBalance } = useReadContract({
+    contract: usdcContract,
+    method: "balanceOf",
+    params: [address || "0x"],
+  });
+
+  const { data: tokenPrice } = useReadContract({
+    contract: swapContract,
+    method: "getTokenPrice",
+    params: [],
+  });
+
+  const { data: poolInfoData } = useReadContract({
+    contract: swapContract,
+    method: "getPoolInfo",
+    params: [],
+  });
+
+  const { data: poolBalances } = useReadContract({
+    contract: swapContract,
+    method: "getPoolBalances",
+    params: [],
+  });
+
+  // Fetch transaction history when the user connects their wallet
   useEffect(() => {
-    if (abytknBalance) {
+    if (isConnected) {
+      fetchTransactionHistory();
+    } else {
+      setTransactions([]);
+    }
+  }, [isConnected, fetchTransactionHistory]);
+
+  // Update reactive data when hooks change - use proper dependencies
+  useEffect(() => {
+    if (abytknBalance && isMountedRef.current) {
       setBalances((prev) => ({
         ...prev,
         ABYTKN: ethers.formatUnits(abytknBalance, 18),
@@ -589,7 +599,7 @@ export function TransactionHistoryProvider({ children }) {
   }, [abytknBalance]);
 
   useEffect(() => {
-    if (usdcBalance) {
+    if (usdcBalance && isMountedRef.current) {
       setBalances((prev) => ({
         ...prev,
         USDC: ethers.formatUnits(usdcBalance, 18),
@@ -598,34 +608,67 @@ export function TransactionHistoryProvider({ children }) {
   }, [usdcBalance]);
 
   useEffect(() => {
-    if (tokenPrice) {
+    if (tokenPrice && isMountedRef.current) {
       const formattedPrice = parseFloat(ethers.formatUnits(tokenPrice, 18));
       setPoolPrice(formattedPrice);
       setIsInitialRatio(false);
     }
   }, [tokenPrice]);
 
-  // Value provided by the context
-  const value = {
-    transactions,
-    loading: loading || historyLoading,
-    error,
-    refreshHistory,
-    loadBalances,
-    calculateOutputAmount,
-    loadPoolInfo,
-    balances,
-    poolInfo,
-    fetchPoolPrice,
-    getCurrentPoolPrice,
-    refreshPoolPrice,
-    isLoadingPrice,
-    isInitialRatio,
-    poolPrice,
-    calculateRatioWithPoolPrice: PriceUtils.calculateRatioWithPoolPrice,
-    slippageTolerance,
-    setSlippageTolerance,
-  };
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Function to refresh transaction history
+  const refreshHistory = useCallback(() => {
+    fetchTransactionHistory();
+  }, [fetchTransactionHistory]);
+
+  // Memoize the context value to prevent unnecessary re-renders
+  const value = React.useMemo(
+    () => ({
+      transactions,
+      loading: loading || historyLoading,
+      error,
+      refreshHistory,
+      loadBalances,
+      calculateOutputAmount,
+      loadPoolInfo,
+      balances,
+      poolInfo,
+      fetchPoolPrice,
+      getCurrentPoolPrice,
+      refreshPoolPrice,
+      isLoadingPrice,
+      isInitialRatio,
+      poolPrice,
+      calculateRatioWithPoolPrice: PriceUtils.calculateRatioWithPoolPrice,
+      slippageTolerance,
+      setSlippageTolerance,
+    }),
+    [
+      transactions,
+      loading,
+      historyLoading,
+      error,
+      refreshHistory,
+      loadBalances,
+      calculateOutputAmount,
+      loadPoolInfo,
+      balances,
+      poolInfo,
+      fetchPoolPrice,
+      getCurrentPoolPrice,
+      refreshPoolPrice,
+      isLoadingPrice,
+      isInitialRatio,
+      poolPrice,
+      slippageTolerance,
+    ]
+  );
 
   return (
     <TransactionHistoryContext.Provider value={value}>

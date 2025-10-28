@@ -8,7 +8,7 @@ import { defineChain } from "thirdweb/chains";
 import { ethers } from "ethers";
 import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const DiamondAddress = CONTRACT_ADDRESSES.diamondAddress;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const CommunityGovernanceFacet_ABI = CommunityGovernanceFacet.abi;
 
 const ProjectProposalsContext = createContext();
@@ -62,8 +62,7 @@ export const ProjectProposalsProvider = ({ children }) => {
 
       const proposalsData = await readContract({
         contract: communityContract,
-        method:
-          "function getAllProjectProposals() view returns ((uint256 id, address creator, string name, string description, string[] techStack, string blockchain, uint256 requestedAmount, uint256 timeline, uint8 stage, bool isApproved, bool isRejected, string rejectionReason, uint256 approvalCount)[])",
+        method: "getAllProjectProposals",
         params: [],
       });
 

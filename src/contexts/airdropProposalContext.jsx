@@ -8,7 +8,7 @@ import { defineChain } from "thirdweb/chains";
 import { ethers } from "ethers";
 import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const DiamondAddress = CONTRACT_ADDRESSES.diamondAddress;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const CommunityGovernanceFacet_ABI = CommunityGovernanceFacet.abi;
 
 const AirdropProposalsContext = createContext();
@@ -55,8 +55,7 @@ export const AirdropProposalProvider = ({ children }) => {
       // const proposalsData = await communityContract.getAllAirdropProposals();
       const proposalsData = await readContract({
         contract: communityContract,
-        method:
-          "function getAllAirdropProposals() view returns ((uint256 airdropId, uint256 amount, uint256 startTime, uint256 endTime, bool isActive, uint256 approvalCount)[])",
+        method: "getAllAirdropProposals",
         params: [],
       });
       const formattedProposals = formatProposals(proposalsData);

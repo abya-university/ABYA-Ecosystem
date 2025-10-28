@@ -8,6 +8,19 @@ import { client } from "../services/client";
 import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
 import CONTRACT_ADDRESSES from "../constants/addresses";
+import {
+  X,
+  Clock,
+  User,
+  Code,
+  // Blockchain,
+  Coins,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  ExternalLink,
+  Blocks,
+} from "lucide-react";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamondAddress;
 const CommunityGovernanceFacet_ABI = CommunityGovernanceFacet.abi;
@@ -25,64 +38,73 @@ const ProjectDetails = () => {
   const [showReasonInput, setShowReasonInput] = useState(false);
   const [error, setError] = useState("");
 
-  // console.log("Projects:", proposals);
-
   useEffect(() => {
     fetchProposals();
-  }, []); // Remove proposals from dependency array to avoid infinite loop
+  }, []);
 
-  // Function to handle opening modal with project details
   const handleViewDetails = (project) => {
     setSelectedProject(project);
     setShowModal(true);
+    setShowReasonInput(false);
+    setRejectReason("");
   };
 
-  // Function to close modal
   const closeModal = () => {
     setShowModal(false);
     setSelectedProject(null);
+    setShowReasonInput(false);
+    setRejectReason("");
   };
 
-  // Helper function to get stage name from number
   const getStageLabel = (stageNumber) => {
     const stages = {
-      0: "IDEA",
-      1: "Planning",
-      2: "MVP",
-      3: "Alpha",
-      4: "Beta",
-      5: "Production",
+      0: "💡 IDEA",
+      1: "📋 Planning",
+      2: "🚀 MVP",
+      3: "🔬 Alpha",
+      4: "🧪 Beta",
+      5: "🏆 Production",
     };
     return stages[stageNumber] || "Unknown";
   };
 
-  // Function to truncate long text
   const truncateText = (text, maxLength = 150) => {
+    if (!text) return "No description provided";
     if (text.length <= maxLength) return text;
     return text.substr(0, maxLength) + "...";
   };
 
-  // Get approval status
   const getStatusLabel = (project) => {
     if (project.isApproved) return "Approved";
     if (project.isRejected) return "Rejected";
-    return "Pending";
+    return "Pending Review";
   };
 
-  // Format tech stack array to string
-  const formatTechStack = (techStack) => {
-    if (!techStack) return "N/A";
-    if (typeof techStack === "string") return techStack;
-
-    // Check if it's an array-like object with numeric keys
-    if (techStack[0] && typeof techStack === "object") {
-      return Object.values(techStack).join(", ");
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "Approved":
+        return "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800";
+      case "Rejected":
+        return "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800";
+      default:
+        return "text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800";
     }
-
-    return "N/A";
   };
 
-  // Format address for display
+  const formatTechStack = (techStack) => {
+    if (!techStack) return [];
+    if (typeof techStack === "string") {
+      return techStack
+        .split(",")
+        .map((tech) => tech.trim())
+        .filter((tech) => tech.length > 0);
+    }
+    if (Array.isArray(techStack)) {
+      return techStack;
+    }
+    return [];
+  };
+
   const formatAddress = (address) => {
     if (!address) return "Unknown";
     return `${address.substring(0, 6)}...${address.substring(
@@ -91,28 +113,34 @@ const ProjectDetails = () => {
   };
 
   const handleApprove = async () => {
+    if (!selectedProject) return;
+
     setIsApproveLoading(true);
+    setError("");
     try {
-      const communityContract = await getContract({
+      const communityContract = getContract({
         address: DiamondAddress,
         abi: CommunityGovernanceFacet_ABI,
         client,
-        chain: defineChain(11155111), // Sepolia
+        chain: defineChain(11155111),
       });
 
-      const tx = await prepareContractCall({
+      const transaction = prepareContractCall({
         contract: communityContract,
-        method: "function approveProjectProposal(uint256 _proposalId)",
-        params: [selectedProject.id],
+        method: "approveProjectProposal",
+        params: [BigInt(selectedProject.id)],
       });
 
-      await sendTransaction(tx);
-      toast.success("Project approved successfully");
-      setIsApproveLoading(false);
+      await sendTransaction({ transaction, account });
+      toast.success("🎉 Project approved successfully!");
+      fetchProposals();
       closeModal();
     } catch (err) {
-      setError("Error approving project", err);
-      toast.error("Error approving project");
+      console.error("Error approving project:", err);
+      setError(err.message || "Failed to approve project");
+      toast.error("Failed to approve project");
+    } finally {
+      setIsApproveLoading(false);
     }
   };
 
@@ -121,96 +149,139 @@ const ProjectDetails = () => {
   };
 
   const handleReject = async () => {
+    if (!selectedProject || !rejectReason.trim()) {
+      toast.error("Please provide a rejection reason");
+      return;
+    }
+
     setIsRejectLoading(true);
+    setError("");
     try {
-      const communityContract = await getContract({
+      const communityContract = getContract({
         address: DiamondAddress,
         abi: CommunityGovernanceFacet_ABI,
         client,
-        chain: defineChain(11155111), // Sepolia
+        chain: defineChain(11155111),
       });
-      console.log("Payload: ", selectedProject.id, rejectReason);
 
-      const tx = await prepareContractCall({
+      const transaction = prepareContractCall({
         contract: communityContract,
-        method:
-          "function rejectProjectProposal(uint256 _proposalId, string _reason)",
-        params: [selectedProject.id, rejectReason],
+        method: "rejectProjectProposal",
+        params: [BigInt(selectedProject.id), rejectReason.trim()],
       });
-      await sendTransaction(tx);
+
+      await sendTransaction({ transaction, account });
       toast.success("Project rejected successfully");
-      setIsRejectLoading(false);
-      setRejectReason("");
+      fetchProposals();
       closeModal();
     } catch (err) {
-      setError("Error rejecting project", err);
-      toast.error("Error rejecting project", err);
+      console.error("Error rejecting project:", err);
+      setError(err.message || "Failed to reject project");
+      toast.error("Failed to reject project");
+    } finally {
+      setIsRejectLoading(false);
     }
   };
 
+  const canApproveReject =
+    role === "Reviewer" ||
+    role === "Multisig Approver" ||
+    role === "Community Manager" ||
+    role === "ADMIN";
+
   return (
     <>
-      <div className="grid md:grid-cols-2 gap-6">
+      {/* Projects Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {proposals.length === 0 ? (
-          <div className="col-span-2 text-center text-gray-500 dark:text-gray-400 py-10">
-            No project proposals found!
+          <div className="col-span-full text-center py-16 bg-white/50 dark:bg-gray-800/50 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600">
+            <div className="max-w-md mx-auto">
+              <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                <Code className="w-8 h-8 text-gray-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-300 mb-2">
+                No Project Proposals Yet
+              </h3>
+              <p className="text-gray-500 dark:text-gray-400 text-sm">
+                Be the first to submit an innovative project proposal to the
+                community!
+              </p>
+            </div>
           </div>
         ) : (
           proposals.map((project) => (
             <div
               key={project.id}
-              className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 transform hover:scale-105 transition-transform duration-500"
+              className="group bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl border border-gray-200 dark:border-gray-700 p-6 transition-all duration-300 hover:scale-105 hover:border-yellow-300 dark:hover:border-yellow-600"
             >
+              {/* Header */}
               <div className="flex justify-between items-start mb-4">
-                <h3 className="text-xl font-bold">{project.name}</h3>
-                <span className="px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-white line-clamp-2 flex-1 pr-2">
+                  {project.name}
+                </h3>
+                <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 whitespace-nowrap">
                   {getStageLabel(project.stage)}
                 </span>
               </div>
 
-              <p className="text-gray-600 dark:text-gray-300 mb-4 h-24 overflow-hidden">
+              {/* Description */}
+              <p className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-3 text-sm leading-relaxed">
                 {truncateText(project.description)}
               </p>
 
-              <div className="flex flex-col gap-3 mb-4">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500 dark:text-gray-400">
-                    Requested:
-                  </span>
-                  <span className="font-medium">
+              {/* Project Stats */}
+              <div className="space-y-3 mb-4">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                    <Coins className="w-4 h-4" />
+                    <span>Requested</span>
+                  </div>
+                  <span className="font-semibold text-gray-800 dark:text-white">
                     {project.requestedAmount} ETH
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500 dark:text-gray-400">
-                    Status:
-                  </span>
-                  <span
-                    className={`font-medium ${
-                      getStatusLabel(project) === "Approved"
-                        ? "text-green-500"
-                        : getStatusLabel(project) === "Rejected"
-                        ? "text-red-500"
-                        : "text-blue-500"
-                    }`}
-                  >
-                    {getStatusLabel(project)}
+
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                    <Clock className="w-4 h-4" />
+                    <span>Timeline</span>
+                  </div>
+                  <span className="font-semibold text-gray-800 dark:text-white">
+                    {project.timeline} days
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500 dark:text-gray-400">
-                    Creator:
-                  </span>
-                  <span className="font-medium">
+
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                    <User className="w-4 h-4" />
+                    <span>Creator</span>
+                  </div>
+                  <span className="font-medium text-gray-700 dark:text-gray-300">
                     {formatAddress(project.creator)}
                   </span>
                 </div>
               </div>
 
+              {/* Status Badge */}
+              <div className="flex items-center justify-between mb-4">
+                <span
+                  className={`px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(
+                    getStatusLabel(project)
+                  )}`}
+                >
+                  {getStatusLabel(project)}
+                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  ID: {project.id}
+                </span>
+              </div>
+
+              {/* View Details Button */}
               <button
                 onClick={() => handleViewDetails(project)}
-                className="mt-2 w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-cyan-950 font-medium rounded-lg transition-colors duration-300"
+                className="w-full py-2.5 px-4 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-cyan-950 font-semibold rounded-xl transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center gap-2 group-hover:scale-105"
               >
+                <ExternalLink className="w-4 h-4" />
                 View Details
               </button>
             </div>
@@ -218,292 +289,255 @@ const ProjectDetails = () => {
         )}
       </div>
 
-      {/* Modal for project details */}
+      {/* Project Details Modal */}
       {showModal && selectedProject && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
-              {error && (
-                <div className="text-red-500 text-normal p-2">{error}</div>
-              )}
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold">{selectedProject.name}</h2>
-                <button
-                  onClick={closeModal}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="space-y-5">
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <span className="px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-700">
+            {/* Modal Header */}
+            <div className="flex justify-between items-start p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900">
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2 pr-8">
+                  {selectedProject.name}
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  <span className="px-3 py-1 text-sm font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
                     {getStageLabel(selectedProject.stage)}
                   </span>
-                  <span className="px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                    {selectedProject.blockchain}
+                  <span
+                    className={`px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(
+                      getStatusLabel(selectedProject)
+                    )}`}
+                  >
+                    {getStatusLabel(selectedProject)}
                   </span>
+                  {selectedProject.blockchain && (
+                    <span className="px-3 py-1 text-sm font-medium rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                      <Blocks className="w-3 h-3 inline mr-1" />
+                      {selectedProject.blockchain}
+                    </span>
+                  )}
                 </div>
+              </div>
+              <button
+                onClick={closeModal}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors duration-200 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
 
-                <div className="mb-4">
-                  <h3 className="text-lg font-medium mb-2">Description</h3>
-                  <div className="text-gray-600 dark:text-gray-300 whitespace-pre-line bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
-                    {selectedProject.description}
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+              {error && (
+                <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                  <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
+                    <AlertCircle className="w-5 h-5" />
+                    <span className="font-medium">{error}</span>
                   </div>
                 </div>
+              )}
 
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* Project Details Section */}
-                  <div className="bg-gray-50 dark:bg-gray-700/30 p-4 rounded-lg">
-                    <h3 className="text-lg font-medium mb-3 border-b border-gray-200 dark:border-gray-600 pb-2">
-                      Project Details
+              <div className="grid lg:grid-cols-3 gap-6">
+                {/* Main Content */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Description */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-3 flex items-center gap-2">
+                      <Code className="w-5 h-5 text-blue-500" />
+                      Project Description
                     </h3>
-                    <ul className="space-y-3">
-                      <li>
-                        <div className="flex items-center mb-1">
-                          <span className="text-gray-500 dark:text-gray-400 text-sm">
-                            Requested Amount
-                          </span>
-                        </div>
-                        <span className="font-medium text-lg">
-                          {selectedProject.requestedAmount} ETH
-                        </span>
-                      </li>
-                      <li>
-                        <div className="flex items-center mb-1">
-                          <span className="text-gray-500 dark:text-gray-400 text-sm">
-                            Timeline
-                          </span>
-                        </div>
-                        <span className="font-medium text-lg">
-                          {selectedProject.timeline} days
-                        </span>
-                      </li>
-                      <li>
-                        <div className="flex items-center mb-1">
-                          <span className="text-gray-500 dark:text-gray-400 text-sm">
-                            Status
-                          </span>
-                        </div>
-                        <span
-                          className={`font-medium text-lg ${
-                            getStatusLabel(selectedProject) === "Approved"
-                              ? "text-green-500"
-                              : getStatusLabel(selectedProject) === "Rejected"
-                              ? "text-red-500"
-                              : "text-yellow-500"
-                          }`}
-                        >
-                          {getStatusLabel(selectedProject)}
-                        </span>
-                      </li>
-                      <li>
-                        <div className="flex items-center mb-1">
-                          <span className="text-gray-500 dark:text-gray-400 text-sm">
-                            Approvals
-                          </span>
-                        </div>
-                        <span className="font-medium text-lg">
-                          {selectedProject.approvalCount}
-                        </span>
-                      </li>
-                    </ul>
-                  </div>
-
-                  {/* Technical Info Section */}
-                  <div className="bg-gray-50 dark:bg-gray-700/30 p-4 rounded-lg">
-                    <h3 className="text-lg font-medium mb-3 border-b border-gray-200 dark:border-gray-600 pb-2">
-                      Technical Info
-                    </h3>
-                    <ul className="space-y-3">
-                      <li>
-                        <div className="flex items-center mb-1">
-                          <span className="text-gray-500 dark:text-gray-400 text-sm">
-                            Tech Stack
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {selectedProject.techStack &&
-                          typeof selectedProject.techStack === "string" ? (
-                            selectedProject.techStack
-                              .split(",")
-                              .map((tech, index) => (
-                                <span
-                                  key={index}
-                                  className="px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs rounded-md"
-                                >
-                                  {tech.trim()}
-                                </span>
-                              ))
-                          ) : Array.isArray(selectedProject.techStack) ? (
-                            selectedProject.techStack.map((tech, index) => (
-                              <span
-                                key={index}
-                                className="px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs rounded-md"
-                              >
-                                {tech.trim ? tech.trim() : tech}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="font-medium">
-                              {formatTechStack
-                                ? formatTechStack(selectedProject.techStack)
-                                : selectedProject.techStack?.toString() ||
-                                  "Not specified"}
-                            </span>
-                          )}
-                        </div>
-                      </li>
-                      <li>
-                        <div className="flex items-center mb-1">
-                          <span className="text-gray-500 dark:text-gray-400 text-sm">
-                            Blockchain
-                          </span>
-                        </div>
-                        <span className="font-medium">
-                          {selectedProject.blockchain}
-                        </span>
-                      </li>
-                      <li>
-                        <div className="flex items-center mb-1">
-                          <span className="text-gray-500 dark:text-gray-400 text-sm">
-                            Creator
-                          </span>
-                        </div>
-                        <span className="font-medium text-sm break-all bg-gray-100 dark:bg-gray-600 p-1 rounded block">
-                          {selectedProject.creator}
-                        </span>
-                      </li>
-                      <li>
-                        <div className="flex items-center mb-1">
-                          <span className="text-gray-500 dark:text-gray-400 text-sm">
-                            Project ID
-                          </span>
-                        </div>
-                        <span className="font-medium">
-                          {selectedProject.id}
-                        </span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-
-                {selectedProject.isRejected &&
-                  selectedProject.rejectionReason && (
-                    <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                      <h3 className="text-lg font-medium text-red-800 dark:text-red-400 mb-2">
-                        Rejection Reason
-                      </h3>
-                      <p className="text-red-700 dark:text-red-300">
-                        {selectedProject.rejectionReason}
+                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+                      <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line leading-relaxed">
+                        {selectedProject.description ||
+                          "No description provided."}
                       </p>
                     </div>
-                  )}
+                  </div>
 
-                <div className="flex flex-col pt-4 mt-2 border-t border-gray-200 dark:border-gray-700">
-                  <div className="flex justify-between mb-4">
-                    {(role === "Reviewer" ||
-                      role === "Multisig Approver" ||
-                      role === "Community Manager" ||
-                      role === "ADMIN") && (
-                      <div className="flex space-x-3">
-                        {!selectedProject.isApproved &&
-                        !selectedProject.isRejected ? (
+                  {/* Tech Stack */}
+                  {formatTechStack(selectedProject.techStack).length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-3 flex items-center gap-2">
+                        <Code className="w-5 h-5 text-green-500" />
+                        Technology Stack
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {formatTechStack(selectedProject.techStack).map(
+                          (tech, index) => (
+                            <span
+                              key={index}
+                              className="px-3 py-2 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 rounded-lg text-sm font-medium"
+                            >
+                              {tech}
+                            </span>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sidebar - Project Details */}
+                <div className="space-y-6">
+                  {/* Funding & Timeline */}
+                  <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                      <Coins className="w-5 h-5 text-blue-500" />
+                      Funding Details
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Requested Amount
+                        </span>
+                        <span className="text-lg font-bold text-gray-800 dark:text-white">
+                          {selectedProject.requestedAmount} ETH
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Timeline
+                        </span>
+                        <span className="text-lg font-bold text-gray-800 dark:text-white">
+                          {selectedProject.timeline} days
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Approvals
+                        </span>
+                        <span className="text-lg font-bold text-gray-800 dark:text-white">
+                          {selectedProject.approvalCount || 0}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Project Info */}
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                      <User className="w-5 h-5 text-purple-500" />
+                      Project Info
+                    </h3>
+                    <div className="space-y-3">
+                      <div>
+                        <span className="text-gray-600 dark:text-gray-400 text-sm">
+                          Creator
+                        </span>
+                        <p className="font-mono text-sm bg-gray-100 dark:bg-gray-600 p-2 rounded-lg break-all mt-1">
+                          {selectedProject.creator}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600 dark:text-gray-400 text-sm">
+                          Project ID
+                        </span>
+                        <p className="font-medium text-gray-800 dark:text-white">
+                          {selectedProject.id}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rejection Reason (if rejected) */}
+              {selectedProject.isRejected &&
+                selectedProject.rejectionReason && (
+                  <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                    <h3 className="text-lg font-semibold text-red-800 dark:text-red-400 mb-2 flex items-center gap-2">
+                      <XCircle className="w-5 h-5" />
+                      Rejection Reason
+                    </h3>
+                    <p className="text-red-700 dark:text-red-300">
+                      {selectedProject.rejectionReason}
+                    </p>
+                  </div>
+                )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <Clock className="w-4 h-4" />
+                  Project ID: {selectedProject.id}
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                  {canApproveReject &&
+                    !selectedProject.isApproved &&
+                    !selectedProject.isRejected && (
+                      <>
+                        {!showReasonInput ? (
                           <>
                             <button
                               onClick={handleApprove}
                               disabled={isApproveLoading}
-                              className="py-2 px-6 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg transition-colors duration-300 relative"
+                              className="flex-1 sm:flex-none py-3 px-6 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
                             >
                               {isApproveLoading ? (
-                                <>
-                                  <span className="opacity-0">Approve</span>
-                                  <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                  </div>
-                                </>
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                               ) : (
-                                "Approve"
+                                <>
+                                  <CheckCircle className="w-5 h-5" />
+                                  Approve Project
+                                </>
                               )}
                             </button>
                             <button
                               onClick={handleRejectClick}
-                              className="py-2 px-6 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-colors duration-300"
+                              className="flex-1 sm:flex-none py-3 px-6 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 flex items-center justify-center gap-2"
                             >
-                              Reject
+                              <XCircle className="w-5 h-5" />
+                              Reject Project
                             </button>
                           </>
                         ) : (
-                          <div className="py-2 px-6 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-                            Status:{" "}
-                            {selectedProject.isApproved ? (
-                              <span className="font-medium text-lg text-green-500 p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
-                                Approved
-                              </span>
-                            ) : (
-                              <span className="font-medium text-lg text-red-500 p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
-                                Rejected
-                              </span>
-                            )}
+                          <div className="w-full bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4">
+                            <h4 className="font-semibold text-yellow-800 dark:text-yellow-400 mb-3">
+                              Provide Rejection Reason
+                            </h4>
+                            <textarea
+                              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-colors resize-none"
+                              placeholder="Please provide a detailed reason for rejecting this project..."
+                              value={rejectReason}
+                              onChange={(e) => setRejectReason(e.target.value)}
+                              rows={3}
+                            />
+                            <div className="flex flex-col sm:flex-row gap-2 mt-3">
+                              <button
+                                onClick={() => setShowReasonInput(false)}
+                                className="py-2 px-4 bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 font-medium rounded-lg transition-colors duration-300"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={handleReject}
+                                disabled={
+                                  isRejectLoading || !rejectReason.trim()
+                                }
+                                className="flex-1 py-2 px-4 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                              >
+                                {isRejectLoading ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                ) : null}
+                                {isRejectLoading
+                                  ? "Rejecting..."
+                                  : "Confirm Rejection"}
+                              </button>
+                            </div>
                           </div>
                         )}
-                      </div>
+                      </>
                     )}
-                    <button
-                      onClick={closeModal}
-                      className="py-2 px-6 bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 font-medium rounded-lg transition-colors duration-300"
-                    >
-                      Close
-                    </button>
-                  </div>
 
-                  {/* Rejection reason panel - appears when showReasonInput is true */}
-                  {showReasonInput && (
-                    <div className="mt-2 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 transition-all duration-300">
-                      <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">
-                        Rejection Reason
-                      </h4>
-                      <textarea
-                        className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-colors"
-                        placeholder="Please provide a reason for rejection..."
-                        value={rejectReason}
-                        onChange={(e) => setRejectReason(e.target.value)}
-                        rows={3}
-                      />
-                      <div className="flex justify-end mt-3">
-                        <button
-                          onClick={() => setShowReasonInput(false)}
-                          className="py-2 px-4 mr-2 bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 font-medium rounded-lg transition-colors duration-300"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleReject}
-                          className="py-2 px-4 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors duration-300 flex items-center"
-                          disabled={isRejectLoading}
-                        >
-                          {isRejectLoading && (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          )}
-                          {isRejectLoading ? "Rejecting..." : "Confirm Reject"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <button
+                    onClick={closeModal}
+                    className="flex-1 sm:flex-none py-3 px-6 bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"
+                  >
+                    Close
+                  </button>
                 </div>
               </div>
             </div>

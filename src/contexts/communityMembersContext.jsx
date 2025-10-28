@@ -48,7 +48,7 @@ export const CommunityMembersProvider = ({ children }) => {
 
       const communityMembers = await readContract({
         contract,
-        method: "function getAllCommunityMembers() view returns (address[])",
+        method: "getAllCommunityMembers",
         params: [],
       });
 
@@ -61,7 +61,8 @@ export const CommunityMembersProvider = ({ children }) => {
           )
         : [];
 
-      // console.log("Formatted members:", formattedMembers);
+      // toast.success("Community members loaded successfully");
+      console.log("Formatted members:", formattedMembers);
       setMembers(formattedMembers);
     } catch (error) {
       console.error("Error fetching members:", error);
@@ -96,8 +97,7 @@ export const CommunityMembersProvider = ({ children }) => {
 
       const memberBadgeDetails = await readContract({
         contract,
-        method:
-          "function getMemberBadgeDetails(address _member) view returns (uint8 currentBadge, string badgeName, string iconURI, uint256 tokenReward, uint256 totalEventsAttended)",
+        method: "getMemberBadgeDetails",
         params: [address],
       });
 
@@ -112,6 +112,7 @@ export const CommunityMembersProvider = ({ children }) => {
       };
 
       console.log("Formatted badge details:", formattedMemberBadgeDetails);
+      // toast.success("Member badge details loaded successfully");
       setMemberBadgeDetails(formattedMemberBadgeDetails);
     } catch (error) {
       console.error("Error fetching member badge details:", error);

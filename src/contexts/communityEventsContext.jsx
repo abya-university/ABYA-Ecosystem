@@ -74,12 +74,12 @@ export const CommunityEventsProvider = ({ children }) => {
       // const allEvents = await contract.getAllCommunityEvents();
       const allEvents = await readContract({
         contract,
-        method:
-          "function getAllCommunityEvents() view returns ((uint256 id, string name, address creator, uint256 startTime, uint256 endTime, uint256 maxParticipants, uint256 currentParticipants, bool isActive, bool isOnline, string location, string additionalDetails)[])",
+        method: "getAllCommunityEvents",
         params: [],
       });
       // console.log("All Events b4 formatting: ", allEvents);
       const formattedEvents = formatEvents(allEvents);
+      // toast.success("Community events loaded successfully");
       setEvents(formattedEvents);
       // console.log("All Events after formatting: ", formattedEvents);
     } catch (err) {

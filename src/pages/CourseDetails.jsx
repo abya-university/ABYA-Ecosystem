@@ -44,6 +44,7 @@ import {
 import { defineChain } from "thirdweb/chains";
 import CONTRACT_ADDRESSES from "../constants/addresses";
 import { toast } from "react-toastify";
+import { useProgress } from "../contexts/progressContext";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
@@ -214,50 +215,9 @@ const Quiz = memo(({ quiz, courseId }) => {
   const [lockEndTime, setLockEndTime] = useState(null);
   const account = useActiveAccount();
   const address = account?.address;
-  const [completedQuizIds, setCompletedQuizIds] = useState(new Set());
   const { quizzes } = useContext(QuizContext);
-
-  useEffect(() => {
-    const fetchCompletedQuizzes = async () => {
-      const contract = await getContract({
-        address: DiamondAddress,
-        abi: Ecosystem2Facet_ABI,
-        client,
-        chain: defineChain(11155111),
-      });
-
-      const completedQuizzes = await readContract({
-        contract,
-        method:
-          "function getUserCompletedQuizzesByCourse(uint256 _courseId) view returns (uint256[])",
-        params: [courseId],
-      });
-
-      // Special case handling: if the only value is "0" and there's no quiz with ID 0
-      if (
-        completedQuizzes.length === 1 &&
-        completedQuizzes[0].toString() === "0" &&
-        !quizzes.some((quiz) => quiz.quizId.toString() === "0")
-      ) {
-        setCompletedQuizIds(new Set());
-        console.log(
-          "No completed quizzes (found [0] which isn't a valid quiz ID)"
-        );
-        return;
-      }
-
-      // Split the quiz IDs and filter only valid ones
-      const quizIds = completedQuizzes
-        .flatMap((quiz) => quiz.toString().split(","))
-        .filter((id) => quizzes.some((quiz) => quiz.quizId.toString() === id));
-
-      const completedQuizIdsSet = new Set(quizIds);
-      setCompletedQuizIds(completedQuizIdsSet);
-      console.log("Completed user quizzes:", Array.from(completedQuizIdsSet));
-    };
-
-    fetchCompletedQuizzes();
-  }, [courseId, client, quizzes]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { completedQuizIds, addCompletedQuiz } = useProgress();
 
   useEffect(() => {
     const checkQuizLock = async () => {
@@ -271,8 +231,7 @@ const Quiz = memo(({ quiz, courseId }) => {
 
         const lockTime = await readContract({
           contract,
-          method:
-            "function getQuizLockTime(uint256 _quizId, address _user) view returns (uint256)",
+          method: "getQuizLockTime",
           params: [quiz.quizId, address],
         });
 
@@ -338,8 +297,34 @@ const Quiz = memo(({ quiz, courseId }) => {
     if (score < 0 || score > 100) throw new Error("Invalid score");
   };
 
+  const validateQuizSubmission = () => {
+    // Check if all questions are answered
+    const unansweredQuestions = quiz.questions.filter(
+      (q) => selectedAnswers[q.questionId] === undefined
+    );
+
+    if (unansweredQuestions.length > 0) {
+      toast.error(
+        `Please answer all ${unansweredQuestions.length} remaining questions`
+      );
+      return false;
+    }
+
+    return true;
+  };
+
   // Then update the relevant part of handleSubmit
   const handleSubmit = useCallback(async () => {
+    if (!account) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+
+    if (!validateQuizSubmission()) {
+      return;
+    }
+    setIsSubmitting(true);
+
     try {
       const calculatedScore = calculateScore();
       setScore(calculatedScore);
@@ -347,89 +332,152 @@ const Quiz = memo(({ quiz, courseId }) => {
 
       setAttempts((prevAttempts) => prevAttempts + 1);
 
-      if (attempts + 1 >= 3) {
-        try {
-          const contract = await getContract({
-            address: DiamondAddress,
-            abi: Ecosystem2Facet_ABI,
-            client,
-            chain: defineChain(11155111),
-          });
+      // Only proceed with contract call if score is >= 75%
+      if (calculatedScore >= 75) {
+        const contract = getContract({
+          address: DiamondAddress,
+          abi: Ecosystem2Facet_ABI,
+          client,
+          chain: defineChain(11155111),
+        });
 
-          const courseIdBN = BigInt(courseId);
-          const quizIdBN = BigInt(quiz.quizId);
+        // Convert IDs to BigInt
+        const courseIdBN = BigInt(courseId);
+        const quizIdBN = BigInt(quiz.quizId);
 
-          console.log("Locking quiz:", {
-            courseId: courseIdBN.toString(),
-            quizId: quizIdBN.toString(),
-          });
+        // Prepare answers array - ensure all answers are provided and converted to BigInt
+        const answersArray = quiz.questions.map((q) => {
+          const answer = selectedAnswers[q.questionId];
+          // If no answer selected, default to 0 (or handle as needed)
+          return BigInt(answer !== undefined ? answer : 0);
+        });
 
-          const tx = await prepareContractCall({
-            contract,
-            method: "function lockQuiz(uint256 _courseId, uint256 _quizId)",
-            params: [courseIdBN, quizIdBN],
-          });
+        console.log("Submitting quiz with data:", {
+          courseId: courseIdBN.toString(),
+          quizId: quizIdBN.toString(),
+          answers: answersArray,
+          score: calculatedScore,
+          answersLength: answersArray.length,
+          questionsLength: quiz.questions.length,
+        });
 
-          await sendTransaction(tx);
-          console.log("Quiz locked successfully");
+        // Validate that we have answers for all questions
+        if (answersArray.length !== quiz.questions.length) {
+          throw new Error("Not all questions have been answered");
+        }
 
-          // Update UI to reflect locked state
-          setIsLocked(true);
-        } catch (lockError) {
-          console.error("Failed to lock quiz:", lockError);
+        const transaction = prepareContractCall({
+          contract,
+          method: "submitQuiz", // Just the method name, not the full signature
+          params: [
+            courseIdBN,
+            quizIdBN,
+            answersArray,
+            // BigInt(Math.floor(calculatedScore)), // Ensure score is integer
+          ],
+        });
+
+        // Send transaction with account
+        const result = await sendTransaction({
+          transaction,
+          account,
+        });
+
+        console.log("Quiz submitted successfully:", result);
+        toast.success(
+          `Quiz submitted successfully! Score: ${calculatedScore.toFixed(1)}%`
+        );
+
+        // Add to completed quizzes if score is passing
+        if (calculatedScore >= 75) {
+          addCompletedQuiz(quiz.quizId);
+        }
+
+        // Lock quiz if max attempts reached (even if failed)
+        if (attempts + 1 >= 3) {
+          try {
+            const lockTransaction = prepareContractCall({
+              contract,
+              method: "lockQuiz",
+              params: [courseIdBN, quizIdBN],
+            });
+
+            await sendTransaction({
+              transaction: lockTransaction,
+              account,
+            });
+            console.log("Quiz locked due to max attempts");
+            setIsLocked(true);
+          } catch (lockError) {
+            console.error("Failed to lock quiz:", lockError);
+          }
+        }
+      } else {
+        // Score below 75% - just show message, no contract call
+        toast.warning(
+          `Score ${calculatedScore.toFixed(
+            1
+          )}% is below passing grade (75%). Please try again.`
+        );
+
+        // Still lock if max attempts reached
+        if (attempts + 1 >= 3) {
+          try {
+            const contract = getContract({
+              address: DiamondAddress,
+              abi: Ecosystem2Facet_ABI,
+              client,
+              chain: defineChain(11155111),
+            });
+
+            const lockTransaction = prepareContractCall({
+              contract,
+              method: "lockQuiz",
+              params: [BigInt(courseId), BigInt(quiz.quizId)],
+            });
+
+            await sendTransaction({
+              transaction: lockTransaction,
+              account,
+            });
+            setIsLocked(true);
+            toast.info("Maximum attempts reached. Quiz locked for 6 hours.");
+          } catch (lockError) {
+            console.error("Failed to lock quiz:", lockError);
+          }
         }
       }
-
-      const contract = await getContract({
-        address: DiamondAddress,
-        abi: Ecosystem2Facet_ABI,
-        client,
-        chain: defineChain(11155111),
-      });
-
-      // Convert IDs to numbers for validation
-      const courseIdNum = Number(courseId);
-      const quizIdNum = Number(quiz.quizId);
-
-      // Validate the data
-      validateQuizData(
-        courseIdNum,
-        quizIdNum,
-        Object.values(selectedAnswers),
-        calculatedScore
-      );
-
-      // After validation passes, convert to BigInt for contract call
-      const courseIdBN = BigInt(courseId);
-      const quizIdBN = BigInt(quiz.quizId);
-      const answersArray = quiz.questions.map((q) =>
-        BigInt(selectedAnswers[q.questionId] ?? 0)
-      );
-
-      // Proceed with contract call...
-      const tx = await prepareContractCall({
-        contract,
-        method: "submitQuiz",
-        params: [courseIdBN, quizIdBN, answersArray, BigInt(calculatedScore)],
-      });
-
-      await sendTransaction({ transaction: tx, account });
-      toast.success(`Successfully completed quiz id ${quizIdBN}`);
     } catch (error) {
-      console.error("Quiz submission error:", {
-        error,
-        errorCode: error.code,
-        errorData: error.data,
-        values: {
-          courseId,
-          quizId: quiz?.quizId,
-          selectedAnswers,
-          score: calculateScore(),
-        },
-      });
-      throw error;
+      console.error("Quiz submission error:", error);
+
+      // More specific error messages
+      if (error.message?.includes("user rejected")) {
+        toast.error("Transaction was rejected");
+      } else if (error.message?.includes("insufficient funds")) {
+        toast.error("Insufficient funds for transaction");
+      } else if (error.message?.includes("execution reverted")) {
+        // Try to extract the revert reason
+        const revertReason =
+          error.data?.message || error.reason || "Contract execution reverted";
+        toast.error(`Quiz submission failed: ${revertReason}`);
+      } else if (error.message?.includes("Already completed")) {
+        toast.error("You have already completed this quiz");
+      } else {
+        toast.error("Failed to submit quiz. Please try again.");
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [calculateScore, attempts, quiz, selectedAnswers, client, courseId]);
+  }, [
+    calculateScore,
+    attempts,
+    quiz,
+    selectedAnswers,
+    client,
+    courseId,
+    account,
+    addCompletedQuiz,
+  ]);
 
   // Helper function to parse errors
   function parseSubmissionError(error) {
@@ -635,13 +683,20 @@ const Quiz = memo(({ quiz, courseId }) => {
               disabled={
                 Object.keys(selectedAnswers).length !== quiz.questions.length
               }
-              className={`p-2 px-4 rounded-lg ${
+              className={`p-2 px-4 rounded-lg flex items-center gap-2 ${
                 Object.keys(selectedAnswers).length === quiz.questions.length
                   ? "bg-green-500 hover:bg-green-600 text-white"
                   : "bg-gray-100 text-gray-400 cursor-not-allowed"
               }`}
             >
-              Submit Quiz
+              {isSubmitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Submitting...
+                </>
+              ) : (
+                "Submit Quiz"
+              )}
             </button>
           ) : (
             <button
@@ -767,8 +822,6 @@ const CourseDetails = memo(({ courseId }) => {
   const account = useActiveAccount();
   const address = account?.address;
   const [completedLessons, setCompletedLessons] = useState(0);
-  const [completedLessonIds, setCompletedLessonIds] = useState(new Set());
-  const [completedQuizIds, setCompletedQuizIds] = useState(new Set());
   const [showCongratsPopup, setShowCongratsPopup] = useState(false);
   const [learnerName, setLearnerName] = useState("");
   const [showCertificate, setShowCertificate] = useState(false);
@@ -780,101 +833,20 @@ const CourseDetails = memo(({ courseId }) => {
   const [loading, setLoading] = useState(false);
   const [selectedCertificate, setSelectedCertificate] = useState(null);
   const [markingAsReadIds, setMarkingAsReadIds] = useState(new Set());
-
-  // Update both fetch functions to filter out invalid IDs
-
-  useEffect(() => {
-    const fetchCompletedLessons = async () => {
-      try {
-        const contract = await getContract({
-          address: DiamondAddress,
-          abi: Ecosystem2Facet_ABI,
-          client,
-          chain: defineChain(11155111),
-        });
-
-        // The contract uses msg.sender, so we need to call it from the connected account
-        let completedLessons = null;
-        try {
-          completedLessons = await readContract({
-            contract,
-            method: "getUserCompletedLessonsByCourse",
-            params: [courseId],
-          });
-        } catch (e) {
-          console.error("Error fetching completed lessons:", e);
-          setCompletedLessonIds(new Set());
-          return;
-        }
-
-        console.log("Raw completedLessons from contract:", completedLessons);
-
-        if (!completedLessons || completedLessons.length === 0) {
-          setCompletedLessonIds(new Set());
-          return;
-        }
-
-        // Convert uint256[] to string array
-        const lessonIds = completedLessons.map((id) => id.toString());
-
-        console.log("Processed completed lessons:", lessonIds);
-        setCompletedLessonIds(new Set(lessonIds));
-      } catch (err) {
-        console.error("Error fetching completed lessons:", err);
-        setCompletedLessonIds(new Set());
-      }
-    };
-
-    if (courseId && client) {
-      fetchCompletedLessons();
-    }
-  }, [courseId, client, address]); // Remove 'lessons' from dependencies to avoid infinite loops
+  const {
+    completedLessonIds,
+    completedQuizIds,
+    loading: progressLoading,
+    refreshProgress,
+    addCompletedLesson,
+    addCompletedQuiz,
+  } = useProgress();
 
   useEffect(() => {
-    const fetchCompletedQuizzes = async () => {
-      try {
-        const contract = await getContract({
-          address: DiamondAddress,
-          abi: Ecosystem2Facet_ABI,
-          client,
-          chain: defineChain(11155111),
-        });
-
-        let completedQuizzes = null;
-        try {
-          completedQuizzes = await readContract({
-            contract,
-            method: "getUserCompletedQuizzesByCourse",
-            params: [courseId],
-          });
-        } catch (e) {
-          console.error("Error fetching completed quizzes:", e);
-          setCompletedQuizIds(new Set());
-          return;
-        }
-
-        console.log("Raw completedQuizzes from contract:", completedQuizzes);
-
-        if (!completedQuizzes || completedQuizzes.length === 0) {
-          setCompletedQuizIds(new Set());
-          return;
-        }
-
-        // Convert uint256[] to string array
-        const quizIds = completedQuizzes.map((id) => id.toString());
-
-        console.log("Processed completed quizzes:", quizIds);
-        setCompletedQuizIds(new Set(quizIds));
-      } catch (err) {
-        console.error("Error fetching completed quizzes:", err);
-        setCompletedQuizIds(new Set());
-      }
-    };
-
-    if (courseId && client) {
-      fetchCompletedQuizzes();
+    if (courseId) {
+      refreshProgress(courseId);
     }
-  }, [courseId, client, address]);
+  }, [courseId, refreshProgress]);
 
   const markAsRead = async (courseId, chapterId, lessonId) => {
     // Add lesson to loading state
@@ -907,7 +879,7 @@ const CourseDetails = memo(({ courseId }) => {
         await sendTransaction({ transaction: tx, account });
         toast.success(`Successfully completed lesson ${lessonIdBN}`);
         // Update local state only after confirmation
-        setCompletedLessonIds((prev) => new Set([...prev, lessonIdStr]));
+        addCompletedLesson(lessonId);
       } catch (contractError) {
         console.error("Contract interaction failed:", {
           error: contractError,
@@ -1338,20 +1310,16 @@ const CourseDetails = memo(({ courseId }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 pt-[100px]">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-4 sm:py-8 lg:py-12 px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 lg:pt-[100px]">
       <div className="max-w-7xl mx-auto">
-        {/* <ProgressBar
-          completedLessons={completedLessons}
-          totalLessons={totalLessons}
-        /> */}
-        <div className="flex gap-8">
-          {/* Main Content Area (80%) */}
-          <div className="w-[80%] mt-4">
+        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8">
+          {/* Main Content Area - Full width on mobile, 80% on lg+ */}
+          <div className="w-full lg:w-[80%] mt-2 sm:mt-4">
             {/* Simple Course Header */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 mb-8 border border-gray-200 dark:border-gray-700 shadow-sm">
-              <div className="flex items-start gap-3 mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 mb-6 sm:mb-8 border border-gray-200 dark:border-gray-700 shadow-sm">
+              <div className="flex flex-wrap items-start gap-2 sm:gap-3 mb-3 sm:mb-4">
                 {/* Simple status badges */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 sm:gap-2">
                   <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
                     Course
                   </span>
@@ -1368,29 +1336,29 @@ const CourseDetails = memo(({ courseId }) => {
               </div>
 
               {/* Course Title */}
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-3 leading-tight">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-3 leading-tight">
                 {currentCourse?.courseName}
               </h1>
 
               {/* Course Description */}
-              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 leading-relaxed">
                 {currentCourse?.description}
               </p>
             </div>
 
-            <div className="space-y-8">
+            <div className="space-y-6 sm:space-y-8">
               {filteredChapters.map((chapter, chapterIndex) => {
                 if (
                   chapter.chapterId?.toString() === activeChapterId?.toString()
                 ) {
                   return (
-                    <div key={chapter.chapterId} className="p-6">
-                      <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                        <BookOpen className="w-6 h-6 text-yellow-500" />
+                    <div key={chapter.chapterId} className="p-4 sm:p-6">
+                      <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-900 dark:text-white mb-4 sm:mb-6 flex items-center gap-2">
+                        <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-500" />
                         Module {chapterIndex + 1}: {chapter.chapterName}
                       </h2>
 
-                      <div className="space-y-6">
+                      <div className="space-y-4 sm:space-y-6">
                         {lessons
                           .filter(
                             (lesson) =>
@@ -1407,41 +1375,35 @@ const CourseDetails = memo(({ courseId }) => {
                             return (
                               <div
                                 key={lesson.lessonId}
-                                className="border-t border-gray-200 dark:border-gray-700 pt-6 first:border-0 first:pt-0"
+                                className="border-t border-gray-200 dark:border-gray-700 pt-4 sm:pt-6 first:border-0 first:pt-0"
                               >
-                                <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-3">
-                                  {/* <span className="text-lg font-semibold pr-1">
-                                    Lesson: {lesson.lessonId}
-                                  </span> */}
+                                <h3 className="text-lg sm:text-xl font-medium text-gray-900 dark:text-white mb-2 sm:mb-3">
                                   {lesson.lessonName}
                                 </h3>
-                                <p className="text-gray-700 dark:text-gray-300 mb-4">
+                                <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 mb-3 sm:mb-4">
                                   {lesson.lessonContent}
                                 </p>
 
                                 {lesson?.additionalResources?.some(
                                   (r) => r.url
                                 ) && (
-                                  <div className="mt-4 space-y-4">
-                                    <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                                  <div className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
+                                    <h4 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-1 sm:mb-2">
                                       Additional Resources
                                     </h4>
-                                    <div className="grid gap-4">
+                                    <div className="grid gap-3 sm:gap-4">
                                       {lesson?.additionalResources
                                         ?.filter((r) => r.url)
                                         .map((resource, index) => (
                                           <div key={index}>
                                             <Resource resource={resource} />
-                                            {/* <span className="italic text-gray-700 text-sm dark:text-gray-300">
-                                            {resource.name}
-                                          </span> */}
                                           </div>
                                         ))}
                                     </div>
                                   </div>
                                 )}
 
-                                {/* add a mark as read btn */}
+                                {/* Mark as read button */}
                                 {currentCourse.approved && address && (
                                   <>
                                     {(() => {
@@ -1451,15 +1413,15 @@ const CourseDetails = memo(({ courseId }) => {
                                       );
                                       return userEnrolled;
                                     })() ? (
-                                      <div className="flex justify-between items-center">
+                                      <div className="flex justify-between items-center mt-3 sm:mt-4">
                                         <button
-                                          className={`bg-yellow-500 text-gray-900 p-2 my-3 rounded-lg font-normal flex items-center gap-2 ${
+                                          className={`bg-yellow-500 text-gray-900 p-2 sm:p-3 my-2 sm:my-3 rounded-lg font-normal flex items-center gap-2 text-sm sm:text-base ${
                                             completedLessonIds.has(
                                               lesson.lessonId.toString()
                                             ) ||
                                             markingAsReadIds.has(
                                               lesson.lessonId.toString()
-                                            ) // Ensure lessonId is a string
+                                            )
                                               ? "opacity-50 cursor-not-allowed"
                                               : "hover:bg-yellow-600"
                                           }`}
@@ -1478,9 +1440,7 @@ const CourseDetails = memo(({ courseId }) => {
                                                   chapter.chapterId,
                                                   lesson.lessonId
                                                 );
-                                                // Show success message
                                               } catch (error) {
-                                                // Show error message to user
                                                 console.error(
                                                   "Failed to mark lesson as read:",
                                                   error
@@ -1502,7 +1462,9 @@ const CourseDetails = memo(({ courseId }) => {
                                           ) ? (
                                             <>
                                               <Loader2 className="w-4 h-4 animate-spin" />
-                                              Marking...
+                                              <span className="hidden sm:inline">
+                                                Marking...
+                                              </span>
                                             </>
                                           ) : completedLessonIds.has(
                                               lesson.lessonId.toString()
@@ -1518,14 +1480,14 @@ const CourseDetails = memo(({ courseId }) => {
                                 )}
 
                                 {lessonQuiz && (
-                                  <div className="mt-6 p-6 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg dark:text-gray-300">
+                                  <div className="mt-4 sm:mt-6 p-4 sm:p-6 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg dark:text-gray-300">
                                     <div
-                                      className="w-full justify-between cursor-pointer"
+                                      className="w-full flex justify-between items-center cursor-pointer"
                                       onClick={() =>
                                         toggleQuiz(lesson.lessonId)
                                       }
                                     >
-                                      <span className="dark:text-gray-300">
+                                      <span className="dark:text-gray-300 text-sm sm:text-base">
                                         {lessonQuiz.quizTitle}
                                       </span>
                                       <ChevronRight
@@ -1558,8 +1520,8 @@ const CourseDetails = memo(({ courseId }) => {
             </div>
           </div>
 
-          {/* Right Sidebar Navigation (20%) */}
-          <div className="w-[20%] bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-fit sticky top-[100px] overflow-hidden">
+          {/* Right Sidebar Navigation - Hidden on mobile, shown on lg+ */}
+          <div className="hidden lg:block w-full lg:w-[20%] bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-fit sticky top-24 lg:top-[100px] overflow-hidden">
             {/* Certificate Status Section */}
             {certificates.some(
               (cert) =>
@@ -1567,7 +1529,6 @@ const CourseDetails = memo(({ courseId }) => {
                 cert.owner.toLowerCase() === address.toLowerCase()
             ) && (
               <div className="relative bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 dark:from-emerald-900/30 dark:via-green-900/20 dark:to-teal-900/20 border-b border-emerald-200 dark:border-emerald-700/50">
-                {/* Decorative background pattern */}
                 <div className="absolute inset-0 opacity-10 dark:opacity-5">
                   <svg
                     className="w-full h-full"
@@ -1602,7 +1563,6 @@ const CourseDetails = memo(({ courseId }) => {
 
                 <div className="relative p-4">
                   <div className="flex items-start gap-3">
-                    {/* Certificate Icon */}
                     <div className="flex-shrink-0 bg-gradient-to-br from-emerald-500 to-green-600 p-2 rounded-lg shadow-md">
                       <svg
                         className="w-5 h-5 text-white"
@@ -1613,7 +1573,6 @@ const CourseDetails = memo(({ courseId }) => {
                       </svg>
                     </div>
 
-                    {/* Certificate Status Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
@@ -1628,21 +1587,18 @@ const CourseDetails = memo(({ courseId }) => {
                       </div>
                       <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">
                         Congratulations! You've successfully completed this
-                        course and earned your certificate.
+                        course.
                       </p>
 
-                      {/* View Certificate Button */}
                       <button
                         className="mt-3 w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-emerald-700 dark:text-emerald-300 text-xs font-medium py-2 px-3 rounded-lg border border-emerald-200 dark:border-emerald-600 transition-all duration-200 hover:shadow-sm flex items-center justify-center gap-2"
                         onClick={() => {
-                          // Find the certificate for this course and user
                           const userCertificate = certificates.find(
                             (cert) =>
                               cert.courseId ===
                                 currentCourse.courseId.toString() &&
                               cert.owner.toLowerCase() === address.toLowerCase()
                           );
-
                           if (userCertificate) {
                             handleCertificateClick(userCertificate);
                           }
@@ -1675,54 +1631,32 @@ const CourseDetails = memo(({ courseId }) => {
               </div>
             )}
 
-            {/* Certificate Popup */}
-            <CSSTransition
-              in={showPopup}
-              timeout={300}
-              classNames="popup"
-              unmountOnExit
-            >
-              <div
-                className="fixed inset-0 z-50 flex items-center justify-center overflow-auto"
-                style={{ backgroundColor: "rgba(0, 0, 0, 0.1)" }}
-              >
-                <div className="relative bg-transparent rounded-lg max-w-6xl w-full max-h-[87vh] shadow-lg">
-                  <button
-                    onClick={handleCloseCertPopup}
-                    className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10 bg-white rounded-full p-1"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-6 w-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-
-                  {loading ? (
-                    <div className="flex justify-center items-center h-full">
-                      <div className="loader"></div>
-                    </div>
-                  ) : (
-                    <Certificate certificateData={selectedCertificate} />
+            {/* Mobile Navigation Drawer - Show on small screens */}
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 z-40">
+              <div className="flex justify-between items-center">
+                <button
+                  onClick={() => setShowMobileNav(!showMobileNav)}
+                  className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  Course Navigation
+                </button>
+                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
+                  {Math.round(
+                    ((completedLessonIds.size + completedQuizIds.size) /
+                      (totalLessons + totalQuizzes)) *
+                      100
                   )}
-                </div>
+                  %
+                </span>
               </div>
-            </CSSTransition>
+            </div>
 
             {/* Main Content Area */}
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {/* Progress Section */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-3">
+              <div className="mb-4 sm:mb-6">
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
                     Course Progress
                   </h3>
@@ -1745,7 +1679,7 @@ const CourseDetails = memo(({ courseId }) => {
 
               {/* Navigation Section */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4 flex items-center gap-2">
                   <svg
                     className="w-4 h-4 text-gray-500 dark:text-gray-400"
                     fill="none"
@@ -1777,16 +1711,15 @@ const CourseDetails = memo(({ courseId }) => {
                         onClick={() =>
                           setActiveChapterId(chapter.chapterId?.toString())
                         }
-                        className={`group relative p-3 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-sm ${
+                        className={`group relative p-2 sm:p-3 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-sm ${
                           isActive
                             ? "bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border border-yellow-200 dark:border-yellow-700/50 shadow-sm"
                             : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
                         }`}
                       >
-                        <div className="flex items-center gap-3">
-                          {/* Module Icon */}
+                        <div className="flex items-center gap-2 sm:gap-3">
                           <div
-                            className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-semibold transition-colors ${
+                            className={`flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-xs font-semibold transition-colors ${
                               isActive
                                 ? "bg-gradient-to-br from-yellow-400 to-amber-500 text-white shadow-sm"
                                 : isCompleted
@@ -1796,7 +1729,7 @@ const CourseDetails = memo(({ courseId }) => {
                           >
                             {isCompleted ? (
                               <svg
-                                className="w-4 h-4"
+                                className="w-3 h-3 sm:w-4 sm:h-4"
                                 fill="currentColor"
                                 viewBox="0 0 20 20"
                               >
@@ -1811,9 +1744,8 @@ const CourseDetails = memo(({ courseId }) => {
                             )}
                           </div>
 
-                          {/* Module Content */}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 sm:gap-2">
                               <span
                                 className={`text-xs font-medium truncate ${
                                   isActive
@@ -1824,7 +1756,7 @@ const CourseDetails = memo(({ courseId }) => {
                                 {chapter.chapterName}
                               </span>
                               {isActive && (
-                                <div className="flex-shrink-0 w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                                <div className="flex-shrink-0 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-yellow-500 rounded-full animate-pulse"></div>
                               )}
                             </div>
                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
@@ -1832,15 +1764,13 @@ const CourseDetails = memo(({ courseId }) => {
                             </p>
                           </div>
 
-                          {/* Status Indicator */}
                           {isCompleted && !isActive && (
-                            <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                            <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4 text-green-500 flex-shrink-0" />
                           )}
                         </div>
 
-                        {/* Active indicator line */}
                         {isActive && (
-                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-yellow-400 to-amber-500 rounded-r-full"></div>
+                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-4 sm:h-6 bg-gradient-to-b from-yellow-400 to-amber-500 rounded-r-full"></div>
                         )}
                       </div>
                     );
@@ -1852,16 +1782,15 @@ const CourseDetails = memo(({ courseId }) => {
         </div>
       </div>
 
-      {/* i want a show congratulation popup when user complete all the lessons */}
+      {/* Congratulations Popup - Responsive */}
       {!hasCertificate && showCongratsPopup && (
         <div
           id="popup"
           className="fixed z-50 inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn"
         >
-          <div className="relative bg-white dark:bg-gray-800 max-w-lg w-full rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden transform animate-scaleIn">
-            {/* Decorative Header Background */}
+          <div className="relative bg-white dark:bg-gray-800 w-full max-w-sm sm:max-w-md lg:max-w-lg rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden transform animate-scaleIn">
             <div
-              className="relative h-32 bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600"
+              className="relative h-24 sm:h-28 lg:h-32 bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600"
               style={{
                 background: `linear-gradient(135deg, rgba(251, 191, 36, 0.95), rgba(245, 158, 11, 0.95)), url('/congratulations.jpg')`,
                 backgroundSize: "cover",
@@ -1870,35 +1799,20 @@ const CourseDetails = memo(({ courseId }) => {
             >
               <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/20 to-yellow-600/40"></div>
 
-              {/* Celebration Elements */}
-              <div className="absolute top-4 left-4 text-yellow-200 animate-bounce">
+              <div className="absolute top-2 sm:top-3 left-2 sm:left-3 text-yellow-200 animate-bounce">
                 <svg
-                  className="w-6 h-6"
+                  className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
                   <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                 </svg>
               </div>
-              <div className="absolute top-6 right-6 text-yellow-200 animate-pulse">
-                <svg
-                  className="w-8 h-8"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
 
-              {/* Trophy Icon */}
               <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2">
-                <div className="bg-white dark:bg-gray-800 p-4 rounded-full shadow-lg border-4 border-yellow-400">
+                <div className="bg-white dark:bg-gray-800 p-2 sm:p-3 lg:p-4 rounded-full shadow-lg border-2 sm:border-3 lg:border-4 border-yellow-400">
                   <svg
-                    className="w-8 h-8 text-yellow-500"
+                    className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-yellow-500"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
@@ -1908,33 +1822,29 @@ const CourseDetails = memo(({ courseId }) => {
               </div>
             </div>
 
-            {/* Content */}
-            <div className="pt-12 pb-8 px-8">
-              <div className="text-center space-y-6">
-                {/* Main Heading */}
+            <div className="pt-10 sm:pt-12 lg:pt-14 pb-6 sm:pb-8 px-4 sm:px-6 lg:px-8">
+              <div className="text-center space-y-4 sm:space-y-6">
                 <div>
-                  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                     🎉 Congratulations!
                   </h2>
-                  <div className="w-16 h-1 bg-gradient-to-r from-yellow-400 to-yellow-600 mx-auto rounded-full"></div>
+                  <div className="w-12 sm:w-14 lg:w-16 h-0.5 sm:h-1 bg-gradient-to-r from-yellow-400 to-yellow-600 mx-auto rounded-full"></div>
                 </div>
 
-                {/* Success Message */}
-                <div className="space-y-4">
-                  <p className="text-lg text-gray-700 dark:text-gray-300 leading-relaxed">
+                <div className="space-y-3 sm:space-y-4">
+                  <p className="text-sm sm:text-base lg:text-lg text-gray-700 dark:text-gray-300 leading-relaxed">
                     You have successfully completed the{" "}
-                    <span className="font-semibold text-yellow-600 dark:text-yellow-400 px-2 py-1 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg">
+                    <span className="font-semibold text-yellow-600 dark:text-yellow-400 px-2 py-1 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg text-xs sm:text-sm">
                       {currentCourse?.courseName}
                     </span>{" "}
                     course.
                   </p>
 
-                  {/* Certificate Info */}
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
-                    <div className="flex items-start space-x-3">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-3 sm:p-4 rounded-xl border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-start space-x-2 sm:space-x-3">
                       <div className="bg-blue-500 p-1 rounded-full flex-shrink-0 mt-0.5">
                         <svg
-                          className="w-4 h-4 text-white"
+                          className="w-3 h-3 sm:w-4 sm:h-4 text-white"
                           fill="currentColor"
                           viewBox="0 0 20 20"
                         >
@@ -1946,39 +1856,32 @@ const CourseDetails = memo(({ courseId }) => {
                         </svg>
                       </div>
                       <div className="text-left">
-                        <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                        <p className="text-xs sm:text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
                           Certificate Information
                         </p>
-                        <p className="text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
+                        <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
                           Certificate will be issued to:
                           <span className="font-semibold text-blue-900 dark:text-blue-100 ml-1">
                             {profile?.firstName} {profile?.secondName}
                           </span>
                         </p>
-                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
-                          If this name is incorrect, please update your profile
-                          in Settings before claiming your certificate.
-                        </p>
                       </div>
                     </div>
                   </div>
 
-                  <p className="text-gray-600 dark:text-gray-400">
-                    Click the "Claim Certificate" button to generate and
-                    download your certificate.
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                    Click the button below to claim your certificate.
                   </p>
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 mt-8">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-6 sm:mt-8">
                 <button
                   onClick={handleClaimCertificate}
-                  id="generateCertificate"
-                  className="flex-1 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center justify-center space-x-2"
+                  className="flex-1 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-semibold py-2 sm:py-3 px-4 sm:px-6 rounded-xl transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center justify-center space-x-2 text-sm sm:text-base"
                 >
                   <svg
-                    className="w-5 h-5"
+                    className="w-4 h-4 sm:w-5 sm:h-5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1995,8 +1898,7 @@ const CourseDetails = memo(({ courseId }) => {
 
                 <button
                   onClick={handleClosePopup}
-                  id="closePopup"
-                  className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium py-3 px-6 rounded-xl transition-all duration-200 border border-gray-300 dark:border-gray-600"
+                  className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium py-2 sm:py-3 px-4 sm:px-6 rounded-xl transition-all duration-200 border border-gray-300 dark:border-gray-600 text-sm sm:text-base"
                 >
                   Close
                 </button>
@@ -2006,49 +1908,19 @@ const CourseDetails = memo(({ courseId }) => {
         </div>
       )}
 
-      <style jsx>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-
-        @keyframes scaleIn {
-          from {
-            opacity: 0;
-            transform: scale(0.9) translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-          }
-        }
-
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out;
-        }
-
-        .animate-scaleIn {
-          animation: scaleIn 0.4s ease-out;
-        }
-      `}</style>
-
+      {/* Certificate Modal - Responsive */}
       {showCertificate && certificateData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 overflow-auto">
-          <div className="relative bg-white rounded-lg max-w-7xl w-full max-h-[80vh] overflow-auto p-8 shadow-lg">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 overflow-auto p-4">
+          <div className="relative bg-white rounded-lg w-full max-w-4xl lg:max-w-7xl max-h-[90vh] overflow-auto p-4 sm:p-6 lg:p-8 shadow-lg">
             <button
               onClick={() => setShowCertificate(false)}
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10"
+              className="absolute top-2 right-2 sm:top-4 sm:right-4 text-gray-500 hover:text-gray-700 z-10"
             >
               <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6"
+                className="w-5 h-5 sm:w-6 sm:h-6"
                 fill="none"
-                viewBox="0 0 24 24"
                 stroke="currentColor"
+                viewBox="0 0 24 24"
               >
                 <path
                   strokeLinecap="round"
@@ -2058,7 +1930,6 @@ const CourseDetails = memo(({ courseId }) => {
                 />
               </svg>
             </button>
-
             <Certificate certificateData={certificateData} />
           </div>
         </div>

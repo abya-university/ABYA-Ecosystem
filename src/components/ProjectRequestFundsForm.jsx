@@ -6,11 +6,17 @@ import "../index.css";
 import CommunityGovernanceFacetABI from "../artifacts/contracts/CommunityGovernanceFacet.sol/CommunityGovernanceFacet.json";
 import { client } from "../services/client";
 import CONTRACT_ADDRESSES from "../constants/addresses";
+import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
+import { useActiveAccount } from "thirdweb/react";
+import { defineChain } from "thirdweb/chains";
+import { ethers } from "ethers";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const CommunityGovernanceFacet_ABI = CommunityGovernanceFacetABI.abi;
 
-const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
+const ProjectFundingRequestModal = ({
+  setShowProjectRequestFundsForm = () => {}, // Fixed: This should match the prop name from CommunityPage
+}) => {
   const [projectData, setProjectData] = useState({
     name: "",
     description: "",
@@ -18,10 +24,11 @@ const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
     blockchain: "",
     requestedAmount: "",
     timeline: "",
-    stage: "MVP", // Default value
+    stage: "MVP",
   });
 
   const [isLoading, setIsLoading] = useState(false);
+  const account = useActiveAccount();
 
   const projectStageMapping = {
     IDEA: 0,
@@ -32,39 +39,49 @@ const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
     PRODUCTION: 5,
   };
 
+  const handleClose = () => {
+    if (typeof setShowProjectRequestFundsForm === "function") {
+      setShowProjectRequestFundsForm(false);
+    }
+  };
+
   const handleSubmit = async () => {
+    if (!account) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const communityContract = await getContract({
+      const communityContract = getContract({
         address: DiamondAddress,
         abi: CommunityGovernanceFacet_ABI,
         client,
-        chain: defineChain(1115511), // Sepolia
+        chain: defineChain(11155111),
       });
 
       // Convert tech stack string to array
       const techStackArray = projectData.techStack
         .split(",")
-        .map((tech) => tech.trim());
+        .map((tech) => tech.trim())
+        .filter((tech) => tech.length > 0);
 
-      // Convert timeline to days (assuming input is in days)
-      const timelineDays = parseInt(projectData.timeline);
+      // Convert timeline to days
+      const timelineDays = parseInt(projectData.timeline) || 0;
 
-      console.log(
-        "Project Data: ",
-        projectData.name,
-        projectData.description,
-        techStackArray,
-        projectData.blockchain,
-        projectData.requestedAmount,
-        timelineDays,
-        projectData.stage
-      );
+      console.log("Project Data:", {
+        name: projectData.name,
+        description: projectData.description,
+        techStack: techStackArray,
+        blockchain: projectData.blockchain,
+        requestedAmount: projectData.requestedAmount,
+        timeline: timelineDays,
+        stage: projectData.stage,
+      });
 
-      const tx = await prepareContractCall({
+      const transaction = prepareContractCall({
         contract: communityContract,
-        method:
-          "function createProjectFundingProposal(string _name, string _description, string[] _techStack, string _blockchain, uint256 _requestedAmount, uint256 _timeline, uint8 _stage) returns (uint256)",
+        method: "createProjectFundingProposal",
         params: [
           projectData.name,
           projectData.description,
@@ -76,25 +93,32 @@ const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
         ],
       });
 
-      await tx.wait();
+      await sendTransaction({
+        transaction,
+        account,
+      });
+
       toast.success("Project proposal submitted successfully!");
 
-      setTimeout(() => {
-        setProjectData({
-          name: "",
-          description: "",
-          techStack: "",
-          blockchain: "",
-          requestedAmount: "",
-          timeline: "",
-          stage: "MVP",
-        });
-        setShowProjectFundingModal(false);
-      }, 2000);
+      // Reset form and close modal immediately
+      setProjectData({
+        name: "",
+        description: "",
+        techStack: "",
+        blockchain: "",
+        requestedAmount: "",
+        timeline: "",
+        stage: "MVP",
+      });
+
+      // Close the modal
+      handleClose();
     } catch (error) {
+      console.error("Error submitting project proposal:", error);
       toast.error(
-        "Error submitting project proposal. Please try again.",
-        error
+        error.message?.includes("user rejected")
+          ? "Transaction was rejected"
+          : "Error submitting project proposal. Please try again."
       );
     } finally {
       setIsLoading(false);
@@ -111,8 +135,8 @@ const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
             Request Project Funding
           </h3>
           <button
-            onClick={() => setShowProjectFundingModal(false)}
-            className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            onClick={handleClose}
+            className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200"
           >
             <X className="w-6 h-6" />
           </button>
@@ -133,7 +157,7 @@ const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
                   name: e.target.value,
                 })
               }
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-200"
               placeholder="e.g., DeFi Yield Aggregator"
             />
           </div>
@@ -152,7 +176,7 @@ const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
                 })
               }
               rows={3}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-200"
               placeholder="Describe your project and its goals..."
             />
           </div>
@@ -174,7 +198,7 @@ const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
                   techStack: e.target.value,
                 })
               }
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-200"
               placeholder="e.g., React, Solidity, Hardhat (comma separated)"
             />
           </div>
@@ -196,7 +220,7 @@ const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
                   blockchain: e.target.value,
                 })
               }
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-200"
               placeholder="e.g., Ethereum, Polygon, Arbitrum"
             />
           </div>
@@ -220,7 +244,7 @@ const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
                     requestedAmount: e.target.value,
                   })
                 }
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-200"
                 placeholder="e.g., 1000"
               />
             </div>
@@ -242,7 +266,7 @@ const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
                     timeline: e.target.value,
                   })
                 }
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-200"
                 placeholder="e.g., 90"
                 min="1"
               />
@@ -265,7 +289,7 @@ const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
                   stage: e.target.value,
                 })
               }
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-200"
             >
               <option value="IDEA">Idea</option>
               <option value="PLANNING">Planning</option>
@@ -278,15 +302,15 @@ const ProjectFundingRequestModal = ({ setShowProjectFundingModal }) => {
 
           <button
             onClick={handleSubmit}
-            disabled={isLoading}
-            className="w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-cyan-950 font-medium rounded-lg transition-colors duration-300 flex items-center justify-center mt-4"
+            disabled={isLoading || !account}
+            className="w-full py-3 px-4 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 disabled:from-gray-400 disabled:to-gray-500 text-cyan-950 font-semibold rounded-xl transition-all duration-300 flex items-center justify-center mt-4 shadow-lg hover:shadow-xl disabled:hover:shadow-lg hover:scale-105 disabled:hover:scale-100"
           >
             {isLoading ? (
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
             ) : (
               <>
                 <Coins className="w-5 h-5 mr-2" />
-                Submit Funding Request
+                {account ? "Submit Funding Request" : "Connect Wallet First"}
               </>
             )}
           </button>

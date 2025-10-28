@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { parseEther, formatEther } from "viem";
+import { parseEther } from "viem";
 import {
   Users,
   MessageCircle,
@@ -8,22 +8,14 @@ import {
   Star,
   Plus,
   Calendar,
-  Award,
-  Gift,
-  Zap,
-  ArrowRight,
   Coins,
-  Sparkles,
-  Activity,
   X,
   PlusCircle,
   MapPin,
   Merge,
-  Check,
   GiftIcon,
   Badge,
 } from "lucide-react";
-import { FaMedal, FaGem, FaTrophy } from "react-icons/fa";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "../index.css";
@@ -41,12 +33,12 @@ import AirdropModal from "../components/AirdropModal";
 import AirdropDetails from "../components/AirdropDetails";
 import { useActiveAccount } from "thirdweb/react";
 import {
-  defineChain,
   getContract,
   prepareContractCall,
   readContract,
   sendTransaction,
 } from "thirdweb";
+import { defineChain } from "thirdweb/chains";
 import { client } from "../services/client";
 import CONTRACT_ADDRESSES from "../constants/addresses";
 
@@ -112,9 +104,6 @@ const CommunityPage = () => {
     })();
   }, [isConnected]);
 
-  // console.log("Events: ", events);
-  // console.log("Members: ", members);
-
   // Fetch badge data
   const fetchBadgeData = async () => {
     if (!isConnected || !address) return;
@@ -129,8 +118,7 @@ const CommunityPage = () => {
 
       const raw = await readContract({
         contract,
-        method:
-          "function getMemberBadgeDetails(address _member) view returns (uint8 currentBadge, string badgeName, string iconURI, uint256 tokenReward, uint256 totalEventsAttended, uint256 pendingRewards)",
+        method: "getMemberBadgeDetails",
         params: [address],
       });
 
@@ -165,8 +153,7 @@ const CommunityPage = () => {
       // const balance = await contract.balanceOf(address);
       const balance = await readContract({
         contract,
-        method:
-          "function getTokenBalance(address account) view returns (uint256)",
+        method: "getTokenBalance",
         params: [address],
       });
 
@@ -207,46 +194,18 @@ const CommunityPage = () => {
 
       const transaction = prepareContractCall({
         contract,
-        method: "function joinCommunity() returns (bool)",
+        method: "joinCommunity",
         params: [],
       });
 
       console.log("Sending transaction with EIP-7702 gas sponsorship...");
 
       // Add transaction options for better reliability
-      const transactionHash = await sendTransaction({
+      await sendTransaction({
         transaction,
         account: account,
-        // Add timeout and retry configuration
-        timeoutMs: 120000, // 2 minute timeout instead of default
-        maxRetries: 3, // Retry up to 3 times
       });
-
-      console.log("Transaction submitted, hash:", transactionHash);
-
-      // Show a pending toast while waiting for confirmation
-      toast.loading("Transaction submitted. Waiting for confirmation...", {
-        id: "tx-pending",
-      });
-
-      // Wait for transaction confirmation
-      const receipt = await waitForReceipt({
-        client,
-        chain: defineChain(11155111),
-        transactionHash,
-        timeoutMs: 120000, // 2 minute wait
-      });
-
-      // Dismiss loading toast and show success
-      toast.dismiss("tx-pending");
-
-      if (receipt.status === "success") {
-        toast.success("You've successfully joined the community!");
-        console.log("Transaction confirmed:", receipt);
-        fetchMembers();
-      } else {
-        toast.error("Transaction failed on chain");
-      }
+      toast.success("Successfully joined the community!");
     } catch (error) {
       console.error("Error joining community:", error);
 
@@ -259,7 +218,7 @@ const CommunityPage = () => {
           { duration: 10000 }
         );
         // You might want to check transaction status later
-        checkTransactionStatusLater(transactionHash);
+        // checkTransactionStatusLater(transactionHash);
       } else if (error.message?.includes("already a member")) {
         toast.error("You are already a member of this community");
       } else if (error.message?.includes("user rejected")) {
@@ -273,23 +232,23 @@ const CommunityPage = () => {
   };
 
   // Helper function to check transaction status later
-  const checkTransactionStatusLater = async (transactionHash) => {
-    try {
-      const receipt = await waitForReceipt({
-        client,
-        chain: defineChain(11155111),
-        transactionHash,
-        timeoutMs: 300000, // 5 minute wait
-      });
+  // const checkTransactionStatusLater = async (transactionHash) => {
+  //   try {
+  //     const receipt = await waitForReceipt({
+  //       client,
+  //       chain: defineChain(11155111),
+  //       transactionHash,
+  //       timeoutMs: 300000, // 5 minute wait
+  //     });
 
-      if (receipt.status === "success") {
-        toast.success("Transaction confirmed! You've joined the community.");
-        fetchMembers();
-      }
-    } catch (error) {
-      console.log("Transaction status check:", error);
-    }
-  };
+  //     if (receipt.status === "success") {
+  //       toast.success("Transaction confirmed! You've joined the community.");
+  //       fetchMembers();
+  //     }
+  //   } catch (error) {
+  //     console.log("Transaction status check:", error);
+  //   }
+  // };
 
   const handleCreateEvent = async () => {
     if (!isConnected) {
@@ -312,8 +271,7 @@ const CommunityPage = () => {
 
       const tx = await prepareContractCall({
         contract,
-        method:
-          "function createCommunityEvent(string _name, uint256 _startTime, uint256 _endTime, uint256 _maxParticipants, bool _isOnline, string _location, string _additionalDetails) returns (uint256)",
+        method: "createCommunityEvent",
         params: [
           eventData.name,
           BigInt(startTimeUnix),
@@ -325,7 +283,7 @@ const CommunityPage = () => {
         ],
       });
 
-      await sendTransaction(tx);
+      await sendTransaction({ transaction: tx, account });
 
       toast.success("Event created successfully!");
       setShowCreateEventModal(false);
@@ -374,8 +332,7 @@ const CommunityPage = () => {
 
       const tx = await prepareContractCall({
         contract,
-        method:
-          "function createAirdropProposal(uint256 _amount, uint256 _startTime, uint256 _endTime) returns (uint256)",
+        method: "createAirdropProposal",
         params: [
           parseEther(airdropData.amount),
           BigInt(startTimeUnix),
@@ -399,615 +356,677 @@ const CommunityPage = () => {
     } finally {
       setDistributeAirdropsLoading(false);
     }
+  };
 
-    // Handle Fund Project
-    const handleFundProject = async () => {
-      if (!isConnected) {
-        openConnectModal();
-        return;
-      }
+  // Handle Fund Project
+  const handleFundProject = async () => {
+    if (!isConnected) {
+      openConnectModal();
+      return;
+    }
 
-      setFundProjectLoading(true);
+    setFundProjectLoading(true);
 
-      try {
-        const contract = await getContract({
-          address: DiamondAddress,
-          abi: CommunityGovernanceFacet_ABI,
-          client,
-          chain: defineChain(11155111),
-        });
+    try {
+      const contract = await getContract({
+        address: DiamondAddress,
+        abi: CommunityGovernanceFacet_ABI,
+        client,
+        chain: defineChain(11155111),
+      });
 
-        const tx = await prepareContractCall({
-          contract,
-          method: "function approveProjectProposal(uint256 _projectId)",
-          params: [BigInt(projectFundingData.projectId)],
-        });
+      const tx = await prepareContractCall({
+        contract,
+        method: "approveProjectProposal",
+        params: [BigInt(projectFundingData.projectId)],
+      });
 
-        await sendTransaction(tx);
+      await sendTransaction(tx);
 
-        toast.success("Project funding proposal created!");
-        setShowProjectFundingModal(false);
-        setProjectFundingData({
-          projectAddress: "",
-          amount: "",
-        });
-      } catch (error) {
-        console.error("Error funding project:", error);
-        toast.error("Failed to create funding proposal");
-      }
-    };
+      toast.success("Project funding proposal created!");
+      setShowProjectFundingModal(false);
+      setProjectFundingData({
+        projectAddress: "",
+        amount: "",
+      });
+    } catch (error) {
+      console.error("Error funding project:", error);
+      toast.error("Failed to create funding proposal");
+    }
+  };
 
-    // Handle Participate in Event
-    const handleParticipateInEvent = async (eventId) => {
-      if (!isConnected) {
-        openConnectModal();
-        return;
-      }
+  // Handle Participate in Event
+  const handleParticipateInEvent = async (eventId) => {
+    if (!isConnected) {
+      openConnectModal();
+      return;
+    }
 
-      setParticipateLoading(true);
+    setParticipateLoading(true);
 
-      try {
-        const contract = await getContract({
-          address: DiamondAddress,
-          abi: CommunityEngagementFacet_ABI,
-          client,
-          chain: defineChain(11155111),
-        });
+    try {
+      const contract = await getContract({
+        address: DiamondAddress,
+        abi: CommunityEngagementFacet_ABI,
+        client,
+        chain: defineChain(11155111),
+      });
 
-        // const tx = await contract.participateInEvent(BigInt(eventId));
-        const tx = await prepareContractCall({
-          contract,
-          method: "function participateInEvent(uint256 _eventId)",
-          params: [eventId],
-        });
-        await sendTransaction(tx);
+      // const tx = await contract.participateInEvent(BigInt(eventId));
+      const tx = await prepareContractCall({
+        contract,
+        method: "participateInEvent",
+        params: [eventId],
+      });
+      await sendTransaction({ transaction: tx, account });
 
-        toast.success("You're now participating in this event!");
-        fetchEvents();
-      } catch (error) {
-        console.error("Error participating in event:", error);
-        toast.error("Failed to join event");
-      }
-    };
+      toast.success("You're now participating in this event!");
+      fetchEvents();
+    } catch (error) {
+      console.error("Error participating in event:", error);
+      toast.error("Failed to join event");
+    }
+  };
 
-    const getEventStatus = (startTime, endTime) => {
-      const now = Date.now();
-      if (now < startTime) return "upcoming";
-      if (now > endTime) return "past";
-      return "ongoing";
-    };
+  const getEventStatus = (startTime, endTime) => {
+    const now = Date.now();
+    if (now < startTime) return "upcoming";
+    if (now > endTime) return "past";
+    return "ongoing";
+  };
 
-    const fadeIn = "animate-fadeIn";
-    const slideIn = "animate-slideIn";
+  const fadeIn = "animate-fadeIn";
+  const slideIn = "animate-slideIn";
 
-    const featuredMembers = [
-      {
-        name: "Alice Ethereum",
-        role: "Core Developer",
-        avatar: "/api/placeholder/80/80",
-      },
-      {
-        name: "Bob Blockchain",
-        role: "Community Lead",
-        avatar: "/api/placeholder/80/80",
-      },
-      {
-        name: "Charlie Web3",
-        role: "UX Architect",
-        avatar: "/api/placeholder/80/80",
-      },
-    ];
+  const featuredMembers = [
+    {
+      name: "Alice Ethereum",
+      role: "Core Developer",
+      avatar: "/api/placeholder/80/80",
+    },
+    {
+      name: "Bob Blockchain",
+      role: "Community Lead",
+      avatar: "/api/placeholder/80/80",
+    },
+    {
+      name: "Charlie Web3",
+      role: "UX Architect",
+      avatar: "/api/placeholder/80/80",
+    },
+  ];
 
-    const recentActivities = [
-      {
-        icon: <Heart className="w-5 h-5 text-red-500" />,
-        description: "New project proposal submitted",
-        timestamp: "2h ago",
-      },
-      {
-        icon: <Star className="w-5 h-5 text-yellow-500" />,
-        description: "Governance vote initiated",
-        timestamp: "5h ago",
-      },
-      {
-        icon: <Globe className="w-5 h-5 text-blue-500" />,
-        description: "New community chapter launched",
-        timestamp: "1d ago",
-      },
-    ];
+  const recentActivities = [
+    {
+      icon: <Heart className="w-5 h-5 text-red-500" />,
+      description: "New project proposal submitted",
+      timestamp: "2h ago",
+    },
+    {
+      icon: <Star className="w-5 h-5 text-yellow-500" />,
+      description: "Governance vote initiated",
+      timestamp: "5h ago",
+    },
+    {
+      icon: <Globe className="w-5 h-5 text-blue-500" />,
+      description: "New community chapter launched",
+      timestamp: "1d ago",
+    },
+  ];
 
-    const handleInputChange = (e) => {
-      const { name, value } = e.target;
-      setEventData((prevData) => ({
-        ...prevData,
-        [name]: value,
-      }));
-    };
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setEventData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }));
+  };
 
-    const CreateEventModal = () => (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm transition-opacity">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6 transform transition-all duration-300 ease-in-out scale-100 max-h-[90vh] overflow-y-auto">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-              Create Community Event
-            </h3>
-            <button
-              onClick={() => setShowCreateEventModal(false)}
-              className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Event Name *
-              </label>
-              <input
-                type="text"
-                name="name"
-                value={eventData.name}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="Workshop, Hackathon, etc."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Start Time *
-              </label>
-              <input
-                type="datetime-local"
-                name="startTime"
-                value={eventData.startTime}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                End Time *
-              </label>
-              <input
-                type="datetime-local"
-                name="endTime"
-                value={eventData.endTime}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Max Participants *
-              </label>
-              <input
-                type="number"
-                name="maxParticipants"
-                value={eventData.maxParticipants}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                min="1"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Event Type *
-              </label>
-              <div className="flex gap-4">
-                <label className="inline-flex items-center">
-                  <input
-                    type="radio"
-                    name="isOnline"
-                    className="form-radio text-yellow-500"
-                    checked={eventData.isOnline}
-                    onChange={() =>
-                      setEventData({ ...eventData, isOnline: true })
-                    }
-                  />
-                  <span className="ml-2 text-gray-700 dark:text-gray-300">
-                    Online
-                  </span>
-                </label>
-                <label className="inline-flex items-center">
-                  <input
-                    type="radio"
-                    name="isOnline"
-                    className="form-radio text-yellow-500"
-                    checked={!eventData.isOnline}
-                    onChange={() =>
-                      setEventData({ ...eventData, isOnline: false })
-                    }
-                  />
-                  <span className="ml-2 text-gray-700 dark:text-gray-300">
-                    Physical
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                {eventData.isOnline ? "Meeting Link *" : "Location Address *"}
-              </label>
-              <input
-                type="text"
-                name="location"
-                value={eventData.location}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder={
-                  eventData.isOnline
-                    ? "https://meet.google.com/..."
-                    : "123 Main St, City, Country"
-                }
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Additional Details
-              </label>
-              <textarea
-                name="additionalDetails"
-                value={eventData.additionalDetails}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white h-24"
-                placeholder="Dress code, items to bring, agenda, etc."
-              />
-            </div>
-
-            <button
-              onClick={handleCreateEvent}
-              disabled={createEventLoading}
-              className="w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-cyan-950 font-medium rounded-lg transition-colors duration-300 flex items-center justify-center"
-            >
-              {createEventLoading ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
-              ) : (
-                <>
-                  <Calendar className="w-5 h-5 mr-2" />
-                  Create Event
-                </>
-              )}
-            </button>
-          </div>
+  const CreateEventModal = () => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm transition-opacity">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6 transform transition-all duration-300 ease-in-out scale-100 max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            Create Community Event
+          </h3>
+          <button
+            onClick={() => setShowCreateEventModal(false)}
+            className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+          >
+            <X className="w-6 h-6" />
+          </button>
         </div>
-      </div>
-    );
 
-    // Modal Component for Project Funding
-    const ProjectFundingModal = () => (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm transition-opacity">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6 transform transition-all duration-300 ease-in-out scale-100">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-              Fund Community Project
-            </h3>
-            <button
-              onClick={() => setShowProjectFundingModal(false)}
-              className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-            >
-              <X className="w-6 h-6" />
-            </button>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Event Name *
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={eventData.name}
+              onChange={handleInputChange}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              placeholder="Workshop, Hackathon, etc."
+            />
           </div>
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Project Address
-              </label>
-              <input
-                type="text"
-                value={projectFundingData.projectAddress}
-                onChange={(e) =>
-                  setProjectFundingData({
-                    ...projectFundingData,
-                    projectAddress: e.target.value,
-                  })
-                }
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="0x..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Amount (ABYATKN)
-              </label>
-              <input
-                type="text"
-                value={projectFundingData.amount}
-                onChange={(e) =>
-                  setProjectFundingData({
-                    ...projectFundingData,
-                    amount: e.target.value,
-                  })
-                }
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="e.g., 100"
-              />
-            </div>
-
-            <button
-              onClick={handleFundProject}
-              disabled={fundProjectLoading}
-              className="w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-cyan-950 font-medium rounded-lg transition-colors duration-300 flex items-center justify-center"
-            >
-              {fundProjectLoading ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
-              ) : (
-                <>
-                  <Coins className="w-5 h-5 mr-2" />
-                  Submit Funding Proposal
-                </>
-              )}
-            </button>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Start Time *
+            </label>
+            <input
+              type="datetime-local"
+              name="startTime"
+              value={eventData.startTime}
+              onChange={handleInputChange}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
           </div>
-        </div>
-      </div>
-    );
 
-    return (
-      <div className="dark:bg-gray-900 dark:text-gray-100 bg-white text-gray-900 min-h-screen p-6 transition-colors duration-300 pt-[100px]">
-        <ToastContainer position="bottom-right" theme="colored" />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              End Time *
+            </label>
+            <input
+              type="datetime-local"
+              name="endTime"
+              value={eventData.endTime}
+              onChange={handleInputChange}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+          </div>
 
-        {showCreateEventModal && <CreateEventModal />}
-        {showAirdropModal && (
-          <AirdropModal setShowAirdropModal={setShowAirdropModal} />
-        )}
-        {showProjectFundingModal && <ProjectFundingModal />}
-        {showProjectRequestFundsForm && (
-          <ProjectFundingRequestModal
-            setShowProjectRequestFundsForm={setShowProjectRequestFundsForm}
-          />
-        )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Max Participants *
+            </label>
+            <input
+              type="number"
+              name="maxParticipants"
+              value={eventData.maxParticipants}
+              onChange={handleInputChange}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              min="1"
+            />
+          </div>
 
-        <div className="max-w-6xl mx-auto">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold dark:text-yellow-400 text-yellow-500 flex items-center">
-                ABYA Community Hub
-                <span className="ml-3 text-sm font-normal px-2 py-1 bg-blue-500 text-white rounded-full animate-pulse">
-                  Live
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Event Type *
+            </label>
+            <div className="flex gap-4">
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="isOnline"
+                  className="form-radio text-yellow-500"
+                  checked={eventData.isOnline}
+                  onChange={() =>
+                    setEventData({ ...eventData, isOnline: true })
+                  }
+                />
+                <span className="ml-2 text-gray-700 dark:text-gray-300">
+                  Online
                 </span>
-              </h1>
-              <p className="text-gray-400">Connect, Collaborate, Innovate</p>
+              </label>
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="isOnline"
+                  className="form-radio text-yellow-500"
+                  checked={!eventData.isOnline}
+                  onChange={() =>
+                    setEventData({ ...eventData, isOnline: false })
+                  }
+                />
+                <span className="ml-2 text-gray-700 dark:text-gray-300">
+                  Physical
+                </span>
+              </label>
             </div>
           </div>
 
-          {/* Navigation Tabs */}
-          <div className="flex overflow-x-auto space-x-4 mb-8 border-b border-gray-800 pb-2">
-            {["Overview", "Events", "Rewards", "Projects", "Airdrops"].map(
-              (tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab.toLowerCase())}
-                  className={`pb-3 whitespace-nowrap transition-all duration-300 ${
-                    activeTab === tab.toLowerCase()
-                      ? "dark:text-white text-gray-800 border-b-2 border-yellow-500 transform translate-y-[2px]"
-                      : "text-gray-500 dark:hover:text-white hover:text-gray-900"
-                  }`}
-                >
-                  {tab}
-                </button>
-              )
-            )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {eventData.isOnline ? "Meeting Link *" : "Location Address *"}
+            </label>
+            <input
+              type="text"
+              name="location"
+              value={eventData.location}
+              onChange={handleInputChange}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              placeholder={
+                eventData.isOnline
+                  ? "https://meet.google.com/..."
+                  : "123 Main St, City, Country"
+              }
+            />
           </div>
 
-          {/* Action Buttons */}
-          <div className="relative flex flex-wrap items-center justify-between mb-8">
-            {isConnected && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Additional Details
+            </label>
+            <textarea
+              name="additionalDetails"
+              value={eventData.additionalDetails}
+              onChange={handleInputChange}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white h-24"
+              placeholder="Dress code, items to bring, agenda, etc."
+            />
+          </div>
+
+          <button
+            onClick={handleCreateEvent}
+            disabled={createEventLoading}
+            className="w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-cyan-950 font-medium rounded-lg transition-colors duration-300 flex items-center justify-center"
+          >
+            {createEventLoading ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
+            ) : (
               <>
-                <div className="flex flex-wrap gap-3">
-                  {role === "ADMIN" ||
-                  role === "Community Manager" ||
-                  role === "Reviewer" ? (
-                    <>
-                      <button
-                        onClick={() => setShowCreateEventModal(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-300 shadow-sm hover:shadow-md font-medium"
-                      >
-                        <Calendar className="w-5 h-5" />
-                        Create Event
-                      </button>
-
-                      <button
-                        onClick={() => setShowAirdropModal(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-all duration-300 shadow-sm hover:shadow-md font-medium"
-                      >
-                        <GiftIcon className="w-5 h-5" />
-                        Distribute Airdrops
-                      </button>
-
-                      <button
-                        onClick={() => setShowProjectFundingModal(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all duration-300 shadow-sm hover:shadow-md font-medium"
-                      >
-                        <Coins className="w-5 h-5" />
-                        Fund Project
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => setShowProjectRequestFundsForm(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all duration-300 shadow-sm hover:shadow-md font-medium"
-                      >
-                        <Coins className="w-5 h-5" />
-                        Request Project Funding
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                {/* Join community button */}
-                <div className="mt-3 sm:mt-0">
-                  {members.includes(address) ? (
-                    <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 rounded-lg shadow-md">
-                      <div className="relative">
-                        <Badge className="w-5 h-5" />
-                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></div>
-                      </div>
-                      <span className="font-medium">ABYA Member</span>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={handleJoinCommunity}
-                      disabled={joinCommunityLoading}
-                      className="flex items-center gap-2 px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-gray-900 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md font-medium"
-                    >
-                      {joinCommunityLoading ? (
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
-                      ) : (
-                        <>
-                          <Merge className="w-5 h-5" />
-                          Join Community
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
+                <Calendar className="w-5 h-5 mr-2" />
+                Create Event
               </>
             )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Modal Component for Project Funding
+  const ProjectFundingModal = () => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm transition-opacity">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6 transform transition-all duration-300 ease-in-out scale-100">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            Fund Community Project
+          </h3>
+          <button
+            onClick={() => setShowProjectFundingModal(false)}
+            className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Project Address
+            </label>
+            <input
+              type="text"
+              value={projectFundingData.projectAddress}
+              onChange={(e) =>
+                setProjectFundingData({
+                  ...projectFundingData,
+                  projectAddress: e.target.value,
+                })
+              }
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              placeholder="0x..."
+            />
           </div>
 
-          {/* Content based on active tab */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Amount (ABYATKN)
+            </label>
+            <input
+              type="text"
+              value={projectFundingData.amount}
+              onChange={(e) =>
+                setProjectFundingData({
+                  ...projectFundingData,
+                  amount: e.target.value,
+                })
+              }
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              placeholder="e.g., 100"
+            />
+          </div>
+
+          <button
+            onClick={handleFundProject}
+            disabled={fundProjectLoading}
+            className="w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-cyan-950 font-medium rounded-lg transition-colors duration-300 flex items-center justify-center"
+          >
+            {fundProjectLoading ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
+            ) : (
+              <>
+                <Coins className="w-5 h-5 mr-2" />
+                Submit Funding Proposal
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="dark:bg-gradient-to-br dark:from-gray-900 dark:to-gray-800 bg-gradient-to-br from-blue-50 to-cyan-100 min-h-screen p-4 md:p-6 transition-colors duration-300 pt-24 md:pt-28">
+      <ToastContainer
+        position="bottom-right"
+        theme="colored"
+        className="text-sm"
+        toastClassName="rounded-lg shadow-lg"
+      />
+
+      {showCreateEventModal && <CreateEventModal />}
+      {showAirdropModal && (
+        <AirdropModal setShowAirdropModal={setShowAirdropModal} />
+      )}
+      {showProjectFundingModal && <ProjectFundingModal />}
+      {showProjectRequestFundsForm && (
+        <ProjectFundingRequestModal
+          setShowProjectRequestFundsForm={setShowProjectRequestFundsForm}
+        />
+      )}
+
+      <div className="max-w-7xl mx-auto">
+        {/* Header Section */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
+          <div className="flex-1 text-center lg:text-left">
+            <div className="inline-flex items-center gap-3 mb-3">
+              <div className="p-3 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-2xl shadow-lg">
+                <Users className="w-8 h-8 text-cyan-950" />
+              </div>
+              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-yellow-500 to-yellow-600 bg-clip-text text-transparent">
+                ABYA Community
+              </h1>
+            </div>
+            <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl">
+              Connect, Collaborate, and Innovate with Web3 Enthusiasts Worldwide
+            </p>
+            <div className="flex flex-wrap gap-2 mt-4 justify-center lg:justify-start">
+              <span className="px-3 py-1 bg-green-500 text-white text-sm rounded-full animate-pulse">
+                🌟 Live Community
+              </span>
+              <span className="px-3 py-1 bg-blue-500 text-white text-sm rounded-full">
+                🚀 {members?.length || 0} Members
+              </span>
+              <span className="px-3 py-1 bg-purple-500 text-white text-sm rounded-full">
+                ⚡ Active
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Tabs - Improved */}
+        <div className="flex overflow-x-auto space-x-1 mb-8 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-2 border border-gray-200 dark:border-gray-700 shadow-lg">
+          {[
+            { key: "overview", label: "Overview", icon: "📊" },
+            { key: "events", label: "Events", icon: "🎪" },
+            { key: "rewards", label: "Rewards", icon: "🏆" },
+            { key: "projects", label: "Projects", icon: "💼" },
+            { key: "airdrops", label: "Airdrops", icon: "🎁" },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-2 px-4 py-3 rounded-xl whitespace-nowrap transition-all duration-300 font-medium ${
+                activeTab === tab.key
+                  ? "bg-gradient-to-r from-yellow-500 to-yellow-600 text-cyan-950 shadow-lg transform scale-105"
+                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white"
+              }`}
+            >
+              <span className="text-lg">{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Action Buttons Section */}
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-8 p-6 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg">
+          {isConnected && (
+            <>
+              <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
+                {role === "ADMIN" ||
+                role === "Community Manager" ||
+                role === "Reviewer" ? (
+                  <>
+                    <button
+                      onClick={() => setShowCreateEventModal(true)}
+                      className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 font-semibold"
+                    >
+                      <Calendar className="w-5 h-5" />
+                      Create Event
+                    </button>
+
+                    <button
+                      onClick={() => setShowAirdropModal(true)}
+                      className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 font-semibold"
+                    >
+                      <GiftIcon className="w-5 h-5" />
+                      Distribute Airdrops
+                    </button>
+
+                    <button
+                      onClick={() => setShowProjectFundingModal(true)}
+                      className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 font-semibold"
+                    >
+                      <Coins className="w-5 h-5" />
+                      Fund Project
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setShowProjectRequestFundsForm(true)}
+                    className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 font-semibold"
+                  >
+                    <Coins className="w-5 h-5" />
+                    Request Project Funding
+                  </button>
+                )}
+              </div>
+
+              {/* Join Community Button */}
+              <div className="flex justify-center lg:justify-end w-full lg:w-auto">
+                {Array.isArray(members) && members.includes(address) ? (
+                  <div className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-cyan-950 rounded-xl shadow-lg font-semibold">
+                    <div className="relative">
+                      <Badge className="w-6 h-6" />
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                    </div>
+                    <span>ABYA Member</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleJoinCommunity}
+                    disabled={joinCommunityLoading}
+                    className="flex items-center gap-3 px-8 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-cyan-950 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {joinCommunityLoading ? (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-950"></div>
+                    ) : (
+                      <>
+                        <Merge className="w-6 h-6" />
+                        Join Community
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Tab Content */}
+        <div className={`${fadeIn}`}>
           {activeTab === "overview" && (
-            <div className={`grid md:grid-cols-3 gap-6 ${fadeIn}`}>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Community Stats */}
-              <div
-                className="p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200
-                transform hover:scale-105 transition-transform duration-1000"
-              >
-                <h2 className="text-xl font-semibold mb-4">Community Stats</h2>
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-4">
-                    <Users className="w-6 h-6 text-blue-500" />
-                    <div>
-                      <p className="text-gray-400">Total Members</p>
-                      <p className="text-2xl font-bold">{members?.length}</p>
-                    </div>
+              <div className="p-6 rounded-2xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                    <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <div className="flex items-center space-x-4">
-                    <Globe className="w-6 h-6 text-green-500" />
-                    <div>
-                      <p className="text-gray-400">Countries</p>
-                      <p className="text-2xl font-bold">87</p>
+                  Community Stats
+                </h2>
+                <div className="space-y-5">
+                  {[
+                    {
+                      icon: Users,
+                      color: "blue",
+                      label: "Total Members",
+                      value: members?.length || 0,
+                    },
+                    {
+                      icon: Globe,
+                      color: "green",
+                      label: "Countries",
+                      value: "87",
+                    },
+                    {
+                      icon: MessageCircle,
+                      color: "purple",
+                      label: "Active Discussions",
+                      value: "1,234",
+                    },
+                  ].map((stat, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div
+                          className={`p-2 bg-${stat.color}-100 dark:bg-${stat.color}-900 rounded-lg`}
+                        >
+                          <stat.icon
+                            className={`w-5 h-5 text-${stat.color}-600 dark:text-${stat.color}-400`}
+                          />
+                        </div>
+                        <span className="text-gray-600 dark:text-gray-300">
+                          {stat.label}
+                        </span>
+                      </div>
+                      <span className="text-2xl font-bold text-gray-800 dark:text-white">
+                        {stat.value}
+                      </span>
                     </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <MessageCircle className="w-6 h-6 text-purple-500" />
-                    <div>
-                      <p className="text-gray-400">Active Discussions</p>
-                      <p className="text-2xl font-bold">1,234</p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
 
               {/* Featured Members */}
-              <div
-                className="p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200
-                transform hover:scale-105 transition-transform duration-1000"
-              >
-                <h2 className="text-xl font-semibold mb-4">Featured Members</h2>
-                {featuredMembers.map((member, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center space-x-4 mb-4 last:mb-0"
-                  >
-                    <img
-                      src={`https://api.dicebear.com/6.x/personas/svg?seed=${Math.random()
-                        .toString(36)
-                        .substring(7)}`}
-                      alt={member.name}
-                      className="w-12 h-12 rounded-full border-2 border-blue-500"
-                    />
-                    <div>
-                      <p className="font-medium">{member.name}</p>
-                      <p className="text-sm text-gray-400">{member.role}</p>
-                    </div>
+              <div className="p-6 rounded-2xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white flex items-center gap-3">
+                  <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                    <Star className="w-6 h-6 text-green-600 dark:text-green-400" />
                   </div>
-                ))}
+                  Featured Members
+                </h2>
+                <div className="space-y-4">
+                  {featuredMembers.map((member, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600/50 transition-colors"
+                    >
+                      <img
+                        src={`https://api.dicebear.com/6.x/avataaars/svg?seed=${member.name}`}
+                        alt={member.name}
+                        className="w-14 h-14 rounded-full border-4 border-yellow-400 shadow-md"
+                      />
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-800 dark:text-white">
+                          {member.name}
+                        </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {member.role}
+                        </p>
+                      </div>
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Recent Activities */}
-              <div
-                className="p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200
-                transform hover:scale-105 transition-transform duration-1000"
-              >
-                <h2 className="text-xl font-semibold mb-4">
+              <div className="p-6 rounded-2xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white flex items-center gap-3">
+                  <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
+                    <Heart className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                  </div>
                   Recent Activities
                 </h2>
-                {recentActivities.map((activity, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center space-x-4 mb-4 last:mb-0"
-                  >
-                    {activity.icon}
-                    <div>
-                      <p>{activity.description}</p>
-                      <p className="text-sm text-gray-500">
-                        {activity.timestamp}
-                      </p>
+                <div className="space-y-4">
+                  {recentActivities.map((activity, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600/50 transition-colors"
+                    >
+                      {activity.icon}
+                      <div className="flex-1">
+                        <p className="text-gray-800 dark:text-white">
+                          {activity.description}
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {activity.timestamp}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
           )}
 
           {activeTab === "events" && (
             <div className={`space-y-6 ${fadeIn}`}>
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Community Events</h2>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg">
+                <h2 className="text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-3">
+                  <Calendar className="w-8 h-8 text-yellow-500" />
+                  Community Events
+                </h2>
                 {(role === "ADMIN" ||
                   role === "Community Manager" ||
                   role === "Reviewer") && (
                   <button
                     onClick={() => setShowCreateEventModal(true)}
-                    className="flex items-center gap-2 px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-300 text-sm"
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl font-semibold"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-5 h-5" />
                     New Event
                   </button>
                 )}
               </div>
 
               {loading ? (
-                <div className="flex justify-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500"></div>
+                <div className="flex justify-center py-20">
+                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-500"></div>
                 </div>
               ) : events.length === 0 ? (
-                <div className="text-center py-12 bg-gray-100 dark:bg-gray-800 rounded-xl">
-                  <Calendar className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                  <p className="text-xl font-medium">No events available</p>
-                  <p className="text-gray-500 dark:text-gray-400 mb-4">
-                    Be the first to create a community event!
+                <div className="text-center py-16 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg">
+                  <Calendar className="w-20 h-20 mx-auto text-gray-400 mb-6" />
+                  <p className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+                    No events available
+                  </p>
+                  <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                    Be the first to create an amazing community event and bring
+                    everyone together!
                   </p>
                   <button
                     onClick={() => setShowCreateEventModal(true)}
-                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-cyan-950 rounded-lg transition-colors duration-300"
+                    className="px-8 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-cyan-950 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl font-semibold"
                   >
-                    Create Event
+                    Create First Event
                   </button>
                 </div>
               ) : (
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   {events.map((event) => {
-                    // Calculate countdown
                     const now = Date.now();
                     const isUpcoming = event.startTime > now;
                     const isPast = event.endTime < now;
                     const isOngoing = !isUpcoming && !isPast;
 
-                    // Calculate countdown values
                     const secondsToStart = Math.max(
                       0,
                       Math.floor((event.startTime - now) / 1000)
@@ -1024,79 +1043,72 @@ const CommunityPage = () => {
                     return (
                       <div
                         key={event.id}
-                        className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 transform hover:scale-105 transition-transform duration-1000 relative"
+                        className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300 hover:scale-105"
                       >
-                        <div className="absolute top-4 right-4">
-                          <span
-                            className={`text-xs px-2 py-1 rounded-full ${
-                              isUpcoming
-                                ? "bg-blue-100 text-blue-800"
-                                : isOngoing
-                                ? "bg-green-100 text-green-800"
-                                : "bg-gray-100 text-gray-800"
-                            }`}
-                          >
-                            {isUpcoming
-                              ? "Upcoming"
-                              : isOngoing
-                              ? "Ongoing"
-                              : "Past"}
-                          </span>
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-3">
+                              <h3 className="text-xl font-bold text-gray-800 dark:text-white pr-2">
+                                {event.name}
+                              </h3>
+                              <span
+                                className={`text-xs px-3 py-1 rounded-full font-semibold ${
+                                  isUpcoming
+                                    ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                                    : isOngoing
+                                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                                    : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+                                }`}
+                              >
+                                {isUpcoming
+                                  ? "Upcoming"
+                                  : isOngoing
+                                  ? "Ongoing"
+                                  : "Past"}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2 mb-4">
+                              <span
+                                className={`text-xs px-3 py-1 rounded-full ${
+                                  event.isOnline
+                                    ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                                    : "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
+                                }`}
+                              >
+                                {event.isOnline ? "🌐 Online" : "📍 Physical"}
+                              </span>
+                              <span className="text-xs px-3 py-1 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-full">
+                                👥 {event.currentParticipants}/
+                                {event.maxParticipants}
+                              </span>
+                            </div>
+                          </div>
                         </div>
 
-                        <h2 className="text-lg font-bold mb-2 pr-16">
-                          {event.name}
-                        </h2>
-
-                        {/* Event Type Badge */}
-                        <div className="inline-block mb-3">
-                          <span
-                            className={`text-xs px-2 py-1 rounded-full ${
-                              event.isOnline
-                                ? "bg-purple-100 text-purple-800"
-                                : "bg-orange-100 text-orange-800"
-                            }`}
-                          >
-                            {event.isOnline ? "Online" : "Physical"}
-                          </span>
-                        </div>
-
-                        {/* Additional Details */}
-                        <p className="text-gray-500 dark:text-gray-400 mb-4">
-                          {event.additionalDetails
-                            ? event.additionalDetails
-                                .substring(0, 100)
-                                .trim()
-                                .concat(
-                                  event.additionalDetails.length > 100
-                                    ? "..."
-                                    : ""
-                                )
-                            : "Join this exciting community event!"}
+                        <p className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-2">
+                          {event.additionalDetails ||
+                            "Join this exciting community event!"}
                         </p>
 
-                        {/* Location - Modified to hide actual link */}
-                        <div className="flex items-start gap-2 mb-3">
-                          <div className="mt-0.5">
-                            {event.isOnline ? (
-                              <Globe className="w-5 h-5 text-blue-500" />
-                            ) : (
-                              <MapPin className="w-5 h-5 text-red-500" />
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-600 dark:text-gray-300 overflow-hidden text-ellipsis">
+                        <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                          {event.isOnline ? (
+                            <Globe className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                          ) : (
+                            <MapPin className="w-5 h-5 text-red-500 flex-shrink-0" />
+                          )}
+                          <p className="text-sm text-gray-600 dark:text-gray-300">
                             {event.isOnline
                               ? "Click 'Join Event' when the event starts"
                               : event.location || "Location TBD"}
                           </p>
                         </div>
 
-                        {/* Date and Participants */}
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                          <div className="flex items-center gap-3">
                             <Calendar className="w-5 h-5 text-gray-500" />
                             <div className="flex flex-col">
-                              <span className="text-sm">
+                              <span className="text-sm font-medium text-gray-800 dark:text-white">
                                 {new Date(event.startTime).toLocaleDateString()}
                               </span>
                               <span className="text-xs text-gray-500">
@@ -1105,89 +1117,67 @@ const CommunityPage = () => {
                                   {
                                     hour: "2-digit",
                                     minute: "2-digit",
-                                    second: "2-digit",
                                   }
                                 )}
                               </span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Users className="w-5 h-5 text-gray-500" />
-                            <span className="text-sm">
-                              {event.currentParticipants} /{" "}
-                              {event.maxParticipants}
-                            </span>
-                          </div>
                         </div>
 
-                        {/* Countdown Timer - New Addition */}
                         {isUpcoming && (
-                          <div className="mb-4 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                            <p className="text-xs text-gray-600 dark:text-gray-300 mb-1">
+                          <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/50 dark:to-blue-800/50 rounded-xl border border-blue-200 dark:border-blue-700">
+                            <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2 text-center">
                               Starting in:
                             </p>
-                            <div className="flex justify-center space-x-2">
-                              <div className="text-center">
-                                <span className="text-sm font-bold">
-                                  {days}
-                                </span>
-                                <p className="text-xs">days</p>
-                              </div>
-                              <div className="text-center">
-                                <span className="text-sm font-bold">
-                                  {hours}
-                                </span>
-                                <p className="text-xs">hours</p>
-                              </div>
-                              <div className="text-center">
-                                <span className="text-sm font-bold">
-                                  {minutes}
-                                </span>
-                                <p className="text-xs">min</p>
-                              </div>
-                              <div className="text-center">
-                                <span className="text-sm font-bold">
-                                  {seconds}
-                                </span>
-                                <p className="text-xs">sec</p>
-                              </div>
+                            <div className="flex justify-center space-x-4">
+                              {[
+                                { value: days, label: "Days" },
+                                { value: hours, label: "Hours" },
+                                { value: minutes, label: "Minutes" },
+                                { value: seconds, label: "Seconds" },
+                              ].map((time, index) => (
+                                <div key={index} className="text-center">
+                                  <div className="bg-white dark:bg-blue-800 rounded-lg p-2 min-w-12 shadow-sm">
+                                    <span className="text-lg font-bold text-blue-600 dark:text-blue-200">
+                                      {time.value.toString().padStart(2, "0")}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
+                                    {time.label}
+                                  </p>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         )}
 
-                        {/* Modified Join Button with contract function call */}
                         <button
                           onClick={async () => {
                             if (!event.isOnline) {
-                              // For physical events, just call the contract function
                               await handleParticipateInEvent(event.id);
                               return;
                             }
-
                             try {
-                              // For online events, call contract first then open meeting
                               await handleParticipateInEvent(event.id);
-                              // Only open the link if contract call was successful
                               window.open(event.location, "_blank");
                             } catch (error) {
-                              console.error("Failed to join event:", error);
                               toast.error("Failed to join event");
                             }
                           }}
                           disabled={
                             participateLoading ||
                             isPast ||
-                            isUpcoming || // Disable if event hasn't started yet
+                            isUpcoming ||
                             event.currentParticipants >= event.maxParticipants
                           }
-                          className={`mt-2 w-full py-2 px-4 font-medium rounded-lg transition-colors duration-300 flex items-center justify-center
-            ${
-              isPast ||
-              isUpcoming ||
-              event.currentParticipants >= event.maxParticipants
-                ? "bg-gray-300 text-gray-700 dark:bg-gray-700 dark:text-gray-300 cursor-not-allowed"
-                : "bg-yellow-500 hover:bg-yellow-600 text-cyan-950"
-            }`}
+                          className={`w-full py-3 px-4 font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2
+                          ${
+                            isPast ||
+                            isUpcoming ||
+                            event.currentParticipants >= event.maxParticipants
+                              ? "bg-gray-300 text-gray-700 dark:bg-gray-700 dark:text-gray-300 cursor-not-allowed"
+                              : "bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-cyan-950 shadow-lg hover:shadow-xl hover:scale-105"
+                          }`}
                         >
                           {participateLoading ? (
                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
@@ -1199,7 +1189,7 @@ const CommunityPage = () => {
                             event.maxParticipants ? (
                             <>Event Full</>
                           ) : (
-                            <>Join Event</>
+                            <>🎉 Join Event</>
                           )}
                         </button>
                       </div>
@@ -1214,35 +1204,41 @@ const CommunityPage = () => {
 
           {activeTab === "projects" && (
             <div className={`space-y-6 ${fadeIn}`}>
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Community Projects</h2>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg">
+                <h2 className="text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-3">
+                  <Coins className="w-8 h-8 text-green-500" />
+                  Community Projects
+                </h2>
                 <button
                   onClick={() => setShowProjectFundingModal(true)}
-                  className="flex items-center gap-2 px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors duration-300 text-sm"
+                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl font-semibold"
                 >
-                  <PlusCircle className="w-4 h-4" />
+                  <PlusCircle className="w-5 h-5" />
                   Fund Project
                 </button>
               </div>
-
               <ProjectDetails />
             </div>
           )}
 
-          {/* //activetab for airdrops */}
           {activeTab === "airdrops" && (
             <div className={`space-y-6 ${fadeIn}`}>
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Airdrop Distributions</h2>
+              <div className="p-6 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg">
+                <h2 className="text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-3 mb-2">
+                  <GiftIcon className="w-8 h-8 text-purple-500" />
+                  Airdrop Distributions
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Manage and track airdrop distributions for community members
+                </p>
               </div>
-
               <AirdropDetails />
             </div>
           )}
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 };
 
 export default CommunityPage;

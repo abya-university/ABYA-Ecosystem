@@ -37,8 +37,7 @@ export const CertificatesProvider = ({ children }) => {
 
         const certificates = await readContract({
           contract,
-          method:
-            "function getCertificates(address _learner) view returns ((uint256 certificateId, uint256 courseId, address learner, address cert_issuer, uint256 issue_date, string courseName, address owner)[])",
+          method: "getCertificates",
           params: [address],
         });
 
