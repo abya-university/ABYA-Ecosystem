@@ -6,10 +6,12 @@ import ProfileDash from "./pages/ProfileDash";
 import NotFoundPage from "./pages/404Page";
 import CourseMetricsPage from "./pages/CourseMetricsPage";
 import SettingsPage from "./pages/Settings";
+import { ToastContainer } from "react-toastify";
 
 function App() {
   return (
     <>
+      <ToastContainer position="bottom-right z-60" theme="colored" />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/mainpage" element={<MasterPage />} />

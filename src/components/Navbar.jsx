@@ -193,24 +193,6 @@ export default function Navbar() {
             </ErrorBoundary>
           </div>
 
-          {/* Auth Buttons - Desktop only when not logged in */}
-          {!hasProfile && (
-            <div className="hidden md:flex items-center space-x-3">
-              <Link
-                to="/login"
-                className="text-sm font-medium text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200"
-              >
-                Login
-              </Link>
-              <Link
-                to="/signup"
-                className="bg-yellow-500 text-gray-900 px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors text-sm font-medium"
-              >
-                Sign Up
-              </Link>
-            </div>
-          )}
-
           {/* Dark Mode Toggle */}
           <button
             onClick={() => setDarkMode(!darkMode)}
