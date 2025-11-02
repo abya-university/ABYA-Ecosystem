@@ -7,6 +7,7 @@ import { client } from "../services/client";
 import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
 import CONTRACT_ADDRESSES from "../constants/addresses";
+import { useActiveAccount } from "thirdweb/react";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const CommunityGovernanceFacet_ABI = CommunityGovernanceFacetABI.abi;
@@ -20,6 +21,7 @@ const AirdropModal = ({ setShowAirdropModal }) => {
   const [distributeAirdropsLoading, setDistributeAirdropsLoading] =
     useState(false);
   const [error, setError] = useState("");
+  const account = useActiveAccount();
 
   const handleAirdrop = async () => {
     try {
@@ -41,16 +43,14 @@ const AirdropModal = ({ setShowAirdropModal }) => {
 
       const tx = await prepareContractCall({
         contract: communityContract,
-        method:
-          "function createAirdropProposal(uint256 _amount, uint256 _startTime, uint256 _endTime) returns (bool)",
+        method: "createAirdropProposal",
         params: [
           ethers.parseEther(airdropData.amount),
           startTimestamp,
           endTimestamp,
         ],
       });
-      const response = await sendTransaction(tx);
-      await response.wait();
+      await sendTransaction({ transaction: tx, account });
 
       // Success handling
       toast.success("Airdrop proposal submitted successfully");

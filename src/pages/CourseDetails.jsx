@@ -847,6 +847,7 @@ const CourseDetails = memo(({ courseId }) => {
       refreshProgress(courseId);
     }
   }, [courseId, refreshProgress]);
+  const [showMobileNav, setShowMobileNav] = useState(false);
 
   const markAsRead = async (courseId, chapterId, lessonId) => {
     // Add lesson to loading state
@@ -896,6 +897,12 @@ const CourseDetails = memo(({ courseId }) => {
       }
     } catch (error) {
       console.error("Error in markAsRead:", error);
+      const errMsg =
+        (typeof error === "string" && error) ||
+        error?.message ||
+        (error && JSON.stringify(error)) ||
+        "Failed to mark lesson as read";
+      toast.error(errMsg);
       throw error;
     } finally {
       // Remove lesson from loading state
@@ -1520,6 +1527,103 @@ const CourseDetails = memo(({ courseId }) => {
             </div>
           </div>
 
+          {/* Mobile Navigation Drawer - Show on small screens */}
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40">
+            <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-3">
+              <div className="flex justify-between items-center">
+                <button
+                  onClick={() => setShowMobileNav((s) => !s)}
+                  aria-expanded={showMobileNav}
+                  className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  Course Navigation
+                </button>
+                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
+                  {Math.round(
+                    ((completedLessonIds.size + completedQuizIds.size) /
+                      (totalLessons + totalQuizzes || 1)) *
+                      100
+                  )}
+                  %
+                </span>
+              </div>
+            </div>
+
+            {/* Expandable navigation panel */}
+            <div
+              className={`bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 overflow-hidden transform transition-max-height duration-300 ease-in-out ${
+                showMobileNav ? "max-h-96" : "max-h-0"
+              }`}
+              style={{ transitionProperty: "max-height" }}
+            >
+              <div className="p-3">
+                <div className="flex justify-between items-center mb-2">
+                  <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                    Modules
+                  </h4>
+                  <button
+                    onClick={() => setShowMobileNav(false)}
+                    className="text-xs text-gray-500 dark:text-gray-400"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-64 overflow-auto pr-2">
+                  {filteredChapters.map((chapter, idx) => {
+                    const isActive =
+                      activeChapterId?.toString() ===
+                      chapter.chapterId?.toString();
+                    const isCompleted =
+                      completedLessonIds.has(chapter.chapterId?.toString()) ||
+                      completedQuizIds.has(chapter.chapterId?.toString());
+
+                    return (
+                      <button
+                        key={chapter.chapterId}
+                        onClick={() => {
+                          setActiveChapterId(chapter.chapterId?.toString());
+                          setShowMobileNav(false);
+                        }}
+                        className={`w-full text-left p-2 rounded-lg flex items-center justify-between ${
+                          isActive
+                            ? "bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border border-yellow-200 dark:border-yellow-700/50"
+                            : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-7 h-7 flex items-center justify-center rounded-md text-xs font-semibold ${
+                              isActive
+                                ? "bg-yellow-400 text-white"
+                                : isCompleted
+                                ? "bg-green-100 text-green-700"
+                                : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {isCompleted ? "✔" : idx + 1}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate text-gray-800 dark:text-gray-200">
+                              {chapter.chapterName}
+                            </div>
+                            <div className="text-xs text-gray-500 truncate">
+                              Module {idx + 1}
+                            </div>
+                          </div>
+                        </div>
+                        {isActive && (
+                          <div className="text-yellow-500 text-xs">Active</div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Right Sidebar Navigation - Hidden on mobile, shown on lg+ */}
           <div className="hidden lg:block w-full lg:w-[20%] bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-fit sticky top-24 lg:top-[100px] overflow-hidden">
             {/* Certificate Status Section */}
@@ -1631,29 +1735,8 @@ const CourseDetails = memo(({ courseId }) => {
               </div>
             )}
 
-            {/* Mobile Navigation Drawer - Show on small screens */}
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 z-40">
-              <div className="flex justify-between items-center">
-                <button
-                  onClick={() => setShowMobileNav(!showMobileNav)}
-                  className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  <BookOpen className="w-4 h-4" />
-                  Course Navigation
-                </button>
-                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
-                  {Math.round(
-                    ((completedLessonIds.size + completedQuizIds.size) /
-                      (totalLessons + totalQuizzes)) *
-                      100
-                  )}
-                  %
-                </span>
-              </div>
-            </div>
-
             {/* Main Content Area */}
-            <div className="p-4 sm:p-6">
+            <div className="p-6">
               {/* Progress Section */}
               <div className="mb-4 sm:mb-6">
                 <div className="flex items-center justify-between mb-2 sm:mb-3">

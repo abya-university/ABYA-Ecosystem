@@ -22,7 +22,7 @@ import {
   Blocks,
 } from "lucide-react";
 
-const DiamondAddress = CONTRACT_ADDRESSES.diamondAddress;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const CommunityGovernanceFacet_ABI = CommunityGovernanceFacet.abi;
 
 const ProjectDetails = () => {
@@ -138,7 +138,7 @@ const ProjectDetails = () => {
     } catch (err) {
       console.error("Error approving project:", err);
       setError(err.message || "Failed to approve project");
-      toast.error("Failed to approve project");
+      toast.error("Failed to approve project", err);
     } finally {
       setIsApproveLoading(false);
     }
@@ -291,7 +291,7 @@ const ProjectDetails = () => {
 
       {/* Project Details Modal */}
       {showModal && selectedProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity">
+        <div className="fixed h-auto inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-700">
             {/* Modal Header */}
             <div className="flex justify-between items-start p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900">
@@ -328,15 +328,6 @@ const ProjectDetails = () => {
 
             {/* Modal Content */}
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-              {error && (
-                <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
-                  <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
-                    <AlertCircle className="w-5 h-5" />
-                    <span className="font-medium">{error}</span>
-                  </div>
-                </div>
-              )}
-
               <div className="grid lg:grid-cols-3 gap-6">
                 {/* Main Content */}
                 <div className="lg:col-span-2 space-y-6">
@@ -390,8 +381,8 @@ const ProjectDetails = () => {
                         <span className="text-gray-600 dark:text-gray-400">
                           Requested Amount
                         </span>
-                        <span className="text-lg font-bold text-gray-800 dark:text-white">
-                          {selectedProject.requestedAmount} ETH
+                        <span className="text-md font-bold text-gray-800 dark:text-white">
+                          {selectedProject.requestedAmount} ABYTKN
                         </span>
                       </div>
                       <div className="flex justify-between items-center">

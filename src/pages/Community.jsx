@@ -305,59 +305,6 @@ const CommunityPage = () => {
     }
   };
 
-  // Example for handleAirdrop
-  const handleCreateAirdrop = async () => {
-    if (!isConnected) {
-      openConnectModal();
-      return;
-    }
-
-    setDistributeAirdropsLoading(true);
-
-    try {
-      // parse start/end time from airdropData (accepts ISO string or timestamp)
-      const startTimeUnix = airdropData.startTime
-        ? Math.floor(new Date(airdropData.startTime).getTime() / 1000)
-        : Math.floor(Date.now() / 1000); // default now
-      const endTimeUnix = airdropData.endTime
-        ? Math.floor(new Date(airdropData.endTime).getTime() / 1000)
-        : startTimeUnix + 24 * 60 * 60; // default +1 day
-
-      const contract = await getContract({
-        address: DiamondAddress,
-        abi: CommunityGovernanceFacetABI,
-        client,
-        chain: defineChain(11155111),
-      });
-
-      const tx = await prepareContractCall({
-        contract,
-        method: "createAirdropProposal",
-        params: [
-          parseEther(airdropData.amount),
-          BigInt(startTimeUnix),
-          BigInt(endTimeUnix),
-        ],
-      });
-
-      await sendTransaction(tx);
-
-      toast.success("Airdrop proposal created!");
-      setShowAirdropModal(false);
-      setAirdropData({
-        amount: "",
-        addresses: "",
-        startTime: "",
-        endTime: "",
-      });
-    } catch (error) {
-      console.error("Error distributing airdrops:", error);
-      toast.error("Failed to create airdrop proposal");
-    } finally {
-      setDistributeAirdropsLoading(false);
-    }
-  };
-
   // Handle Fund Project
   const handleFundProject = async () => {
     if (!isConnected) {
@@ -474,169 +421,223 @@ const CommunityPage = () => {
     },
   ];
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setEventData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
-  };
+  const CreateEventModal = () => {
+    // Move the handleInputChange function inside the modal component
+    const handleInputChange = (e) => {
+      const { name, value, type, checked } = e.target;
+      setEventData((prevData) => ({
+        ...prevData,
+        [name]: type === "checkbox" ? checked : value,
+      }));
+    };
 
-  const CreateEventModal = () => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm transition-opacity">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6 transform transition-all duration-300 ease-in-out scale-100 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-            Create Community Event
-          </h3>
-          <button
-            onClick={() => setShowCreateEventModal(false)}
-            className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+    // Handle radio button changes separately
+    const handleRadioChange = (isOnline) => {
+      setEventData((prevData) => ({
+        ...prevData,
+        isOnline,
+        location: "", // Reset location when switching types
+      }));
+    };
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Event Name *
-            </label>
-            <input
-              type="text"
-              name="name"
-              value={eventData.name}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              placeholder="Workshop, Hackathon, etc."
-            />
+    // Handle modal close
+    const handleCloseModal = () => {
+      setShowCreateEventModal(false);
+      // Reset form data when closing
+      setEventData({
+        name: "",
+        startTime: "",
+        endTime: "",
+        maxParticipants: 50,
+        isOnline: true,
+        location: "",
+        additionalDetails: "",
+      });
+    };
+
+    // Handle backdrop click (close when clicking outside modal)
+    const handleBackdropClick = (e) => {
+      if (e.target === e.currentTarget) {
+        handleCloseModal();
+      }
+    };
+
+    // Prevent form submission on enter key
+    const handleFormSubmit = (e) => {
+      e.preventDefault();
+      handleCreateEvent();
+    };
+
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm transition-opacity"
+        onClick={handleBackdropClick}
+      >
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6 transform transition-all duration-300 ease-in-out scale-100 max-h-[90vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+              Create Community Event
+            </h3>
+            <button
+              onClick={handleCloseModal}
+              className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200"
+            >
+              <X className="w-6 h-6" />
+            </button>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Start Time *
-            </label>
-            <input
-              type="datetime-local"
-              name="startTime"
-              value={eventData.startTime}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              End Time *
-            </label>
-            <input
-              type="datetime-local"
-              name="endTime"
-              value={eventData.endTime}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Max Participants *
-            </label>
-            <input
-              type="number"
-              name="maxParticipants"
-              value={eventData.maxParticipants}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              min="1"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Event Type *
-            </label>
-            <div className="flex gap-4">
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  name="isOnline"
-                  className="form-radio text-yellow-500"
-                  checked={eventData.isOnline}
-                  onChange={() =>
-                    setEventData({ ...eventData, isOnline: true })
-                  }
-                />
-                <span className="ml-2 text-gray-700 dark:text-gray-300">
-                  Online
-                </span>
+          {/* Wrap form elements in a form tag for better handling */}
+          <form onSubmit={handleFormSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Event Name *
               </label>
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  name="isOnline"
-                  className="form-radio text-yellow-500"
-                  checked={!eventData.isOnline}
-                  onChange={() =>
-                    setEventData({ ...eventData, isOnline: false })
-                  }
-                />
-                <span className="ml-2 text-gray-700 dark:text-gray-300">
-                  Physical
-                </span>
-              </label>
+              <input
+                type="text"
+                name="name"
+                value={eventData.name}
+                onChange={handleInputChange}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200"
+                placeholder="Workshop, Hackathon, etc."
+                required
+              />
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {eventData.isOnline ? "Meeting Link *" : "Location Address *"}
-            </label>
-            <input
-              type="text"
-              name="location"
-              value={eventData.location}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              placeholder={
-                eventData.isOnline
-                  ? "https://meet.google.com/..."
-                  : "123 Main St, City, Country"
-              }
-            />
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Start Time *
+              </label>
+              <input
+                type="datetime-local"
+                name="startTime"
+                value={eventData.startTime}
+                onChange={handleInputChange}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200"
+                required
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Additional Details
-            </label>
-            <textarea
-              name="additionalDetails"
-              value={eventData.additionalDetails}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white h-24"
-              placeholder="Dress code, items to bring, agenda, etc."
-            />
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                End Time *
+              </label>
+              <input
+                type="datetime-local"
+                name="endTime"
+                value={eventData.endTime}
+                onChange={handleInputChange}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200"
+                required
+              />
+            </div>
 
-          <button
-            onClick={handleCreateEvent}
-            disabled={createEventLoading}
-            className="w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-cyan-950 font-medium rounded-lg transition-colors duration-300 flex items-center justify-center"
-          >
-            {createEventLoading ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
-            ) : (
-              <>
-                <Calendar className="w-5 h-5 mr-2" />
-                Create Event
-              </>
-            )}
-          </button>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Max Participants *
+              </label>
+              <input
+                type="number"
+                name="maxParticipants"
+                value={eventData.maxParticipants}
+                onChange={handleInputChange}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200"
+                min="1"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Event Type *
+              </label>
+              <div className="flex gap-4">
+                <label className="inline-flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="isOnline"
+                    className="form-radio text-yellow-500 focus:ring-yellow-500"
+                    checked={eventData.isOnline}
+                    onChange={() => handleRadioChange(true)}
+                  />
+                  <span className="ml-2 text-gray-700 dark:text-gray-300">
+                    Online
+                  </span>
+                </label>
+                <label className="inline-flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="isOnline"
+                    className="form-radio text-yellow-500 focus:ring-yellow-500"
+                    checked={!eventData.isOnline}
+                    onChange={() => handleRadioChange(false)}
+                  />
+                  <span className="ml-2 text-gray-700 dark:text-gray-300">
+                    Physical
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {eventData.isOnline ? "Meeting Link *" : "Location Address *"}
+              </label>
+              <input
+                type="text"
+                name="location"
+                value={eventData.location}
+                onChange={handleInputChange}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200"
+                placeholder={
+                  eventData.isOnline
+                    ? "https://meet.google.com/..."
+                    : "123 Main St, City, Country"
+                }
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Additional Details
+              </label>
+              <textarea
+                name="additionalDetails"
+                value={eventData.additionalDetails}
+                onChange={handleInputChange}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200 h-24 resize-none"
+                placeholder="Dress code, items to bring, agenda, etc."
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                className="flex-1 py-2 px-4 bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-300 font-medium rounded-lg transition-colors duration-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={createEventLoading}
+                className="flex-1 py-2 px-4 bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-400 text-cyan-950 font-medium rounded-lg transition-colors duration-300 flex items-center justify-center"
+              >
+                {createEventLoading ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
+                ) : (
+                  <>
+                    <Calendar className="w-5 h-5 mr-2" />
+                    Create Event
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Modal Component for Project Funding
   const ProjectFundingModal = () => (
