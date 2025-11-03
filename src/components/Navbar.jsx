@@ -234,26 +234,26 @@ export default function Navbar() {
       {/* Mobile Menu Links */}
       {menuOpen && (
         <div className="md:hidden absolute top-full left-0 w-full bg-gray-100 dark:bg-gray-900 shadow-lg border-t border-gray-200 dark:border-gray-700">
-          <div className="flex flex-col py-4 space-y-1">
+          <div className="flex flex-col py-4 space-y-1 mx-auto items-center justify-around">
             {/* Navigation Links */}
             <Link
               to="/"
               onClick={handleLinkClick}
-              className="text-base font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200 py-3 px-6 hover:bg-gray-200 dark:hover:bg-gray-800"
+              className="text-base font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200 py-3 px-6 hover:bg-gray-200 dark:hover:bg-gray-800 w-full text-center"
             >
               Home
             </Link>
             <Link
               to="/courses"
               onClick={handleLinkClick}
-              className="text-base font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200 py-3 px-6 hover:bg-gray-200 dark:hover:bg-gray-800"
+              className="text-base font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200 py-3 px-6 hover:bg-gray-200 dark:hover:bg-gray-800 w-full text-center"
             >
               Courses
             </Link>
             <Link
               to="/community"
               onClick={handleLinkClick}
-              className="text-base font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200 py-3 px-6 hover:bg-gray-200 dark:hover:bg-gray-800"
+              className="text-base font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200 py-3 px-6 hover:bg-gray-200 dark:hover:bg-gray-800 w-full text-center"
             >
               Community
             </Link>

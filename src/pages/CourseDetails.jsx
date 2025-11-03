@@ -841,13 +841,13 @@ const CourseDetails = memo(({ courseId }) => {
     addCompletedLesson,
     addCompletedQuiz,
   } = useProgress();
+  const [showMobileNav, setShowMobileNav] = useState(false);
 
   useEffect(() => {
     if (courseId) {
       refreshProgress(courseId);
     }
   }, [courseId, refreshProgress]);
-  const [showMobileNav, setShowMobileNav] = useState(false);
 
   const markAsRead = async (courseId, chapterId, lessonId) => {
     // Add lesson to loading state
@@ -1348,7 +1348,7 @@ const CourseDetails = memo(({ courseId }) => {
               </h1>
 
               {/* Course Description */}
-              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 leading-relaxed">
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-sm md:line-clamp-md lg:line-clamp-none">
                 {currentCourse?.description}
               </p>
             </div>

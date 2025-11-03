@@ -6,7 +6,7 @@ import {
   useCallback,
   useRef,
 } from "react";
-import { useActiveAccount, useReadContract } from "thirdweb/react";
+import { useActiveAccount } from "thirdweb/react";
 import { getContract, readContract } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
 import { client } from "../services/client";
@@ -33,7 +33,6 @@ export const ProgressProvider = ({ children }) => {
   const account = useActiveAccount();
   const address = account?.address;
 
-  // Create contract instance
   const contract = getContract({
     address: DiamondAddress,
     abi: Ecosystem2Facet_ABI,
@@ -51,15 +50,12 @@ export const ProgressProvider = ({ children }) => {
 
       try {
         console.log("Fetching completed lessons for course:", courseId);
-        console.log("User address:", address);
 
-        // KEY FIX: Use account in the readContract call
         const completedLessons = await readContract({
           contract,
           method:
             "function getUserCompletedLessonsByCourse(uint256 _courseId) external view returns(uint256[] memory)",
           params: [BigInt(courseId)],
-          account: account, // ← THIS IS MISSING!
         });
 
         console.log("Raw completed lessons:", completedLessons);
@@ -91,7 +87,7 @@ export const ProgressProvider = ({ children }) => {
         return newSet;
       }
     },
-    [address, contract, account] // Add account to dependencies
+    [address, contract]
   );
 
   const fetchCompletedQuizzes = useCallback(
@@ -104,13 +100,11 @@ export const ProgressProvider = ({ children }) => {
       try {
         console.log("Fetching completed quizzes for course:", courseId);
 
-        // KEY FIX: Use account in the readContract call
         const completedQuizzes = await readContract({
           contract,
           method:
             "function getUserCompletedQuizzesByCourse(uint256 _courseId) external view returns(uint256[] memory)",
           params: [BigInt(courseId)],
-          account: account, // ← THIS IS MISSING!
         });
 
         console.log("Raw completed quizzes:", completedQuizzes);
@@ -142,7 +136,7 @@ export const ProgressProvider = ({ children }) => {
         return newSet;
       }
     },
-    [address, contract, account] // Add account to dependencies
+    [address, contract]
   );
 
   const refreshedCoursesRef = useRef(new Set());
