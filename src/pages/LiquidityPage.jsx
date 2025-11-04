@@ -34,81 +34,85 @@ const LiquidityPage = () => {
               <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
                 {/* Tab Navigation */}
                 <div className="border-b border-gray-200 dark:border-gray-700">
-                  <nav className="flex">
-                    <button
-                      onClick={() => setActiveTab("swap")}
-                      className={`flex-1 px-6 py-4 font-semibold transition-all duration-200 flex items-center justify-center gap-2 relative ${
-                        activeTab === "swap"
-                          ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
-                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                      }`}
-                    >
-                      <ArrowDownUp size={20} />
-                      Swap
-                      {activeTab === "swap" && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-500"></div>
-                      )}
-                    </button>
+                  <nav className="flex overflow-x-auto scrollbar-hide">
+                    <div className="flex min-w-max">
+                      <button
+                        onClick={() => setActiveTab("swap")}
+                        className={`flex-shrink-0 px-4 sm:px-6 py-4 font-semibold transition-all duration-200 flex items-center justify-center gap-2 relative min-w-[120px] sm:min-w-0 ${
+                          activeTab === "swap"
+                            ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
+                            : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        <ArrowDownUp size={20} />
+                        <span className="whitespace-nowrap">Swap</span>
+                        {activeTab === "swap" && (
+                          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-500"></div>
+                        )}
+                      </button>
 
-                    <button
-                      onClick={() => setActiveTab("liquidity")}
-                      className={`flex-1 px-6 py-4 font-semibold transition-all duration-200 flex items-center justify-center gap-2 relative ${
-                        activeTab === "liquidity"
-                          ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
-                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                      }`}
-                    >
-                      <Plus size={20} />
-                      Add Liquidity
-                      {activeTab === "liquidity" && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-500"></div>
-                      )}
-                    </button>
+                      <button
+                        onClick={() => setActiveTab("liquidity")}
+                        className={`flex-shrink-0 px-4 sm:px-6 py-4 font-semibold transition-all duration-200 flex items-center justify-center gap-2 relative min-w-[120px] sm:min-w-0 ${
+                          activeTab === "liquidity"
+                            ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
+                            : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        <Plus size={20} />
+                        <span className="whitespace-nowrap">Add Liquidity</span>
+                        {activeTab === "liquidity" && (
+                          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-500"></div>
+                        )}
+                      </button>
 
-                    <button
-                      onClick={() => setActiveTab("removeLiquidity")}
-                      className={`flex-1 px-6 py-4 font-semibold transition-all duration-200 flex items-center justify-center gap-2 relative ${
-                        activeTab === "removeLiquidity"
-                          ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
-                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                      }`}
-                    >
-                      <Minus size={20} />
-                      Remove Liquidity
-                      {activeTab === "removeLiquidity" && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-500"></div>
-                      )}
-                    </button>
+                      <button
+                        onClick={() => setActiveTab("removeLiquidity")}
+                        className={`flex-shrink-0 px-4 sm:px-6 py-4 font-semibold transition-all duration-200 flex items-center justify-center gap-2 relative min-w-[120px] sm:min-w-0 ${
+                          activeTab === "removeLiquidity"
+                            ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
+                            : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        <Minus size={20} />
+                        <span className="whitespace-nowrap">
+                          Remove Liquidity
+                        </span>
+                        {activeTab === "removeLiquidity" && (
+                          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-500"></div>
+                        )}
+                      </button>
 
-                    <button
-                      onClick={() => setActiveTab("history")}
-                      className={`flex-1 px-6 py-4 font-semibold transition-all duration-200 flex items-center justify-center gap-2 relative ${
-                        activeTab === "history"
-                          ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
-                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                      }`}
-                    >
-                      <Clock size={20} />
-                      History
-                      {activeTab === "history" && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-500"></div>
-                      )}
-                    </button>
+                      <button
+                        onClick={() => setActiveTab("history")}
+                        className={`flex-shrink-0 px-4 sm:px-6 py-4 font-semibold transition-all duration-200 flex items-center justify-center gap-2 relative min-w-[120px] sm:min-w-0 ${
+                          activeTab === "history"
+                            ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
+                            : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        <Clock size={20} />
+                        <span className="whitespace-nowrap">History</span>
+                        {activeTab === "history" && (
+                          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-500"></div>
+                        )}
+                      </button>
 
-                    <button
-                      onClick={() => setActiveTab("mint")}
-                      className={`flex-1 px-6 py-4 font-semibold transition-all duration-200 flex items-center justify-center gap-2 relative ${
-                        activeTab === "mint"
-                          ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
-                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                      }`}
-                    >
-                      <Droplet size={20} />
-                      Mint Tokens
-                      {activeTab === "mint" && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-500"></div>
-                      )}
-                    </button>
+                      <button
+                        onClick={() => setActiveTab("mint")}
+                        className={`flex-shrink-0 px-4 sm:px-6 py-4 font-semibold transition-all duration-200 flex items-center justify-center gap-2 relative min-w-[120px] sm:min-w-0 ${
+                          activeTab === "mint"
+                            ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
+                            : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        <Droplet size={20} />
+                        <span className="whitespace-nowrap">Mint Tokens</span>
+                        {activeTab === "mint" && (
+                          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-500"></div>
+                        )}
+                      </button>
+                    </div>
                   </nav>
                 </div>
 

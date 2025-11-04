@@ -1,33 +1,34 @@
-import React, { createContext, useEffect, useState } from "react";
-import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
-import { useEthersSigner } from "../components/useClientSigner";
-import { useAccount } from "wagmi";
-import { ethers } from "ethers";
+import { createContext, useEffect, useState } from "react";
+import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
+import { defineChain } from "thirdweb/chains";
+import { getContract, readContract } from "thirdweb";
+import { client } from "../services/client";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const EcosystemDiamondAddress = import.meta.env
-  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
 const ChapterContext = createContext();
 
 const ChapterProvider = ({ children }) => {
-  const { address } = useAccount();
-  const signer = useEthersSigner();
   const [chapters, setChapters] = useState([]);
 
   const fetchChapters = async () => {
-    const resolvedSigner = await signer;
-
-    if (resolvedSigner) {
+    if (client) {
       try {
-        const contract = new ethers.Contract(
-          EcosystemDiamondAddress,
-          Ecosystem2Facet_ABI,
-          resolvedSigner
-        );
+        const contract = getContract({
+          address: DiamondAddress,
+          abi: Ecosystem2Facet_ABI,
+          client,
+          chain: defineChain(11155111), // Sepolia
+        });
 
-        // Call the function to get chapters from the mapping
-        const chaptersData = await contract.getAllChapters();
+        const chaptersData = await readContract({
+          contract,
+          method:
+            "function getAllChapters() view returns ((uint256 courseId, uint256 chapterId, string chapterName, uint256 duration, bool exists)[])",
+          params: [],
+        });
 
         // Convert the response to a more manageable format
         const formattedChapters = chaptersData.map((chapter) => ({
@@ -40,7 +41,7 @@ const ChapterProvider = ({ children }) => {
 
         console.log("Formatted contract data:", formattedChapters);
         setChapters(formattedChapters);
-        return formattedChapters; // Return the formatted chapters
+        return formattedChapters;
       } catch (fetchError) {
         console.error("Error fetching chapters:", fetchError);
         return null;
@@ -50,6 +51,11 @@ const ChapterProvider = ({ children }) => {
       return null;
     }
   };
+
+  // Optional: Add useEffect to fetch chapters on component mount
+  useEffect(() => {
+    fetchChapters();
+  }, []);
 
   return (
     <ChapterContext.Provider value={{ chapters, fetchChapters, setChapters }}>

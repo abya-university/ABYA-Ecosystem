@@ -1,6 +1,4 @@
 import { ethers } from "ethers";
-import USDC_ABI from "../../artifacts/fake-liquidity-abis/usdc.json";
-import ABYTKN_ABI from "../../artifacts/fake-liquidity-abis/abyatkn.json";
 import {
   Plus,
   Activity,
@@ -10,23 +8,44 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useAccount } from "wagmi";
-import { useEthersSigner } from "../useClientSigner";
-
-import CONTRACT_ABI from "../../artifacts/fake-liquidity-abis/add_swap_contract.json";
+import { useActiveAccount } from "thirdweb/react";
+import CONTRACT_ABI from "../../artifacts/fakeLiquidityArtifacts/Add_Swap_Contract.sol/Add_Swap_Contract.json";
+import USDC_ABI from "../../artifacts/fakeLiquidityArtifacts/UsdCoin.sol/UsdCoin.json";
+import ABYTKN_ABI from "../../artifacts/fakeLiquidityArtifacts/ABYATKN.sol/ABYATKN.json";
 import { useTransactionHistory } from "../../contexts/fake-liquidity-test-contexts/historyContext";
+import { client } from "../../services/client";
+import {
+  getContract,
+  prepareContractCall,
+  readContract,
+  sendTransaction,
+} from "thirdweb";
+import { defineChain } from "thirdweb/chains";
 
 const contractAbi = CONTRACT_ABI.abi;
 const usdcAbi = USDC_ABI.abi;
 const abyatknAbi = ABYTKN_ABI.abi;
 
+// Constants - Aligned with our context configuration
+const CONTRACT_CONFIG = {
+  ADDRESSES: {
+    ADD_SWAP_CONTRACT: import.meta.env.VITE_APP_SEPOLIA_ADD_SWAP_CONTRACT,
+    TOKEN0: import.meta.env.VITE_APP_SEPOLIA_ABYATKN_ADDRESS, // ABYTKN (token0)
+    TOKEN1: import.meta.env.VITE_APP_SEPOLIA_USDC_ADDRESS, // USDC (token1)
+    UNISWAP_POOL: import.meta.env.VITE_APP_SEPOLIA_ABYATKN_USDC_500,
+  },
+  CHAIN: defineChain(11155111), // Sepolia
+};
+
 const AddLiquidity = () => {
   const [error, setError] = useState(false);
   const [txHash, setTxHash] = useState("");
-  const { address, isConnected } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const signerPromise = useEthersSigner();
+
   const {
     refreshHistory,
     loadBalances,
@@ -39,21 +58,11 @@ const AddLiquidity = () => {
     calculateRatioWithPoolPrice,
   } = useTransactionHistory();
 
-  // Liquidity state
+  // Liquidity state - using clear token names
   const [liquidityData, setLiquidityData] = useState({
-    token0Amount: "",
-    token1Amount: "",
-    token0Symbol: "TOKEN0",
-    token1Symbol: "TOKEN1",
+    abytknAmount: "", // ABYTKN amount
+    usdcAmount: "", // USDC amount
   });
-
-  // Contract addresses
-  const CONTRACT_ADDRESSES = {
-    ADD_SWAP_CONTRACT: import.meta.env.VITE_APP_ADD_SWAP_CONTRACT,
-    TOKEN0: import.meta.env.VITE_APP_USDC_ADDRESS, // USDC
-    TOKEN1: import.meta.env.VITE_APP_ABYATKN_ADDRESS, // ABYTKN
-    UNISWAP_POOL: import.meta.env.VITE_APP_ABYATKN_USDC_500, // Uniswap pool address
-  };
 
   // Update useEffect to use stable references
   useEffect(() => {
@@ -67,17 +76,17 @@ const AddLiquidity = () => {
 
       return () => clearInterval(interval);
     }
-  }, [isConnected, address, loadBalances]);
+  }, [isConnected, address, loadBalances, loadPoolInfo]);
 
   // Handle add liquidity
   const handleAddLiquidity = async () => {
     console.log("Liquidity Data:", liquidityData);
 
     if (
-      !liquidityData.token0Amount ||
-      isNaN(parseFloat(liquidityData.token0Amount)) ||
-      !liquidityData.token1Amount ||
-      isNaN(parseFloat(liquidityData.token1Amount))
+      !liquidityData.abytknAmount ||
+      isNaN(parseFloat(liquidityData.abytknAmount)) ||
+      !liquidityData.usdcAmount ||
+      isNaN(parseFloat(liquidityData.usdcAmount))
     ) {
       setError("Please enter valid amounts for both tokens");
       setTimeout(() => setError(""), 3000);
@@ -85,185 +94,185 @@ const AddLiquidity = () => {
     }
 
     setLoading(true);
+    setError("");
+    setSuccess("");
+
     try {
-      const signer = await signerPromise;
-      if (!signer) {
-        setError("No signer available");
+      if (!client || !address) {
+        setError("No client available or wallet not connected");
         setLoading(false);
         return;
       }
 
-      // Initialize the contract
-      const contract = new ethers.Contract(
-        CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
-        contractAbi,
-        signer
-      );
-
-      // Get contract token addresses
-      const contractToken0Address = await contract.token0();
-      const contractToken1Address = await contract.token1();
-
-      console.log("Token addresses:", {
-        contract: {
-          token0: contractToken0Address,
-          token1: contractToken1Address,
-        },
-        config: {
-          token0: CONTRACT_ADDRESSES.TOKEN0,
-          token1: CONTRACT_ADDRESSES.TOKEN1,
-        },
+      // Initialize contracts
+      const contract = getContract({
+        address: CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
+        abi: contractAbi,
+        client,
+        chain: CONTRACT_CONFIG.CHAIN,
       });
 
-      // Get token contracts
-      const token0Contract = new ethers.Contract(
-        contractToken0Address,
-        USDC_ABI.abi, // Using as generic ERC20 ABI
-        signer
-      );
-
-      const token1Contract = new ethers.Contract(
-        contractToken1Address,
-        ABYTKN_ABI.abi, // Using as generic ERC20 ABI
-        signer
-      );
-
-      // Get token details
-      const token0Symbol = await token0Contract.symbol();
-      const token1Symbol = await token1Contract.symbol();
-      const token0Decimals = await token0Contract.decimals();
-      const token1Decimals = await token1Contract.decimals();
-
-      console.log("Token details:", {
-        token0: {
-          address: contractToken0Address,
-          symbol: token0Symbol,
-          decimals: token0Decimals,
-        },
-        token1: {
-          address: contractToken1Address,
-          symbol: token1Symbol,
-          decimals: token1Decimals,
-        },
+      const abytknContract = getContract({
+        address: CONTRACT_CONFIG.ADDRESSES.TOKEN0,
+        abi: abyatknAbi,
+        client,
+        chain: CONTRACT_CONFIG.CHAIN,
       });
 
-      // Determine which token is which in contract vs UI
-      const token0IsUsdc =
-        contractToken0Address.toLowerCase() ===
-        CONTRACT_ADDRESSES.TOKEN0.toLowerCase();
+      const usdcContract = getContract({
+        address: CONTRACT_CONFIG.ADDRESSES.TOKEN1,
+        abi: usdcAbi,
+        client,
+        chain: CONTRACT_CONFIG.CHAIN,
+      });
 
-      // Prepare the amounts based on token order
-      let amount0Desired, amount1Desired;
-      if (token0IsUsdc) {
-        amount0Desired = ethers.parseUnits(
-          liquidityData.token0Amount.toString(),
-          token0Decimals
-        );
-        amount1Desired = ethers.parseUnits(
-          liquidityData.token1Amount.toString(),
-          token1Decimals
-        );
-      } else {
-        amount0Desired = ethers.parseUnits(
-          liquidityData.token1Amount.toString(),
-          token0Decimals
-        );
-        amount1Desired = ethers.parseUnits(
-          liquidityData.token0Amount.toString(),
-          token1Decimals
-        );
-      }
+      // Get token decimals
+      const [abytknDecimals, usdcDecimals] = await Promise.all([
+        readContract({
+          contract: abytknContract,
+          method: "decimals",
+        }),
+        readContract({
+          contract: usdcContract,
+          method: "decimals",
+        }),
+      ]);
+
+      console.log("Token decimals:", {
+        ABYTKN: abytknDecimals,
+        USDC: usdcDecimals,
+      });
+
+      // Prepare amounts based on contract token order
+      // Contract expects: token0 (ABYTKN), token1 (USDC)
+      const amount0Desired = ethers.parseUnits(
+        liquidityData.abytknAmount.toString(),
+        abytknDecimals
+      );
+      const amount1Desired = ethers.parseUnits(
+        liquidityData.usdcAmount.toString(),
+        usdcDecimals
+      );
 
       console.log("Liquidity amounts:", {
-        amount0: {
-          token: token0Symbol,
-          value: ethers.formatUnits(amount0Desired, token0Decimals),
+        ABYTKN: {
+          value: ethers.formatUnits(amount0Desired, abytknDecimals),
+          raw: amount0Desired.toString(),
         },
-        amount1: {
-          token: token1Symbol,
-          value: ethers.formatUnits(amount1Desired, token1Decimals),
+        USDC: {
+          value: ethers.formatUnits(amount1Desired, usdcDecimals),
+          raw: amount1Desired.toString(),
         },
       });
 
       // Check balances
-      const balance0 = await token0Contract.balanceOf(address);
-      const balance1 = await token1Contract.balanceOf(address);
+      const [abytknBalance, usdcBalance] = await Promise.all([
+        readContract({
+          contract: abytknContract,
+          method: "balanceOf",
+          params: [address],
+        }),
+        readContract({
+          contract: usdcContract,
+          method: "balanceOf",
+          params: [address],
+        }),
+      ]);
 
       console.log("Current balances:", {
-        [token0Symbol]: ethers.formatUnits(balance0, token0Decimals),
-        [token1Symbol]: ethers.formatUnits(balance1, token1Decimals),
+        ABYTKN: ethers.formatUnits(abytknBalance, abytknDecimals),
+        USDC: ethers.formatUnits(usdcBalance, usdcDecimals),
       });
 
       // Check if balances are sufficient
-      if (balance0 < amount0Desired) {
-        setError(`Insufficient ${token0Symbol} balance`);
+      if (abytknBalance < amount0Desired) {
+        setError(`Insufficient ABYTKN balance`);
         setLoading(false);
         return;
       }
 
-      if (balance1 < amount1Desired) {
-        setError(`Insufficient ${token1Symbol} balance`);
+      if (usdcBalance < amount1Desired) {
+        setError(`Insufficient USDC balance`);
         setLoading(false);
         return;
       }
 
       // Check and approve allowances
-      const allowance0 = await token0Contract.allowance(
-        address,
-        CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT
-      );
-      const allowance1 = await token1Contract.allowance(
-        address,
-        CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT
-      );
+      const [allowanceABYTKN, allowanceUSDC] = await Promise.all([
+        readContract({
+          contract: abytknContract,
+          method: "allowance",
+          params: [address, CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT],
+        }),
+        readContract({
+          contract: usdcContract,
+          method: "allowance",
+          params: [address, CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT],
+        }),
+      ]);
 
       console.log("Current allowances:", {
-        [token0Symbol]: ethers.formatUnits(allowance0, token0Decimals),
-        [token1Symbol]: ethers.formatUnits(allowance1, token1Decimals),
+        ABYTKN: ethers.formatUnits(allowanceABYTKN, abytknDecimals),
+        USDC: ethers.formatUnits(allowanceUSDC, usdcDecimals),
       });
 
-      // Approve token0 if needed
-      if (allowance0 < amount0Desired) {
-        console.log(`Approving ${token0Symbol}...`);
-        const tx0 = await token0Contract.approve(
-          CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
-          ethers.MaxUint256
-        );
-        await tx0.wait();
-        console.log(`${token0Symbol} approved`);
+      // Approve ABYTKN if needed
+      if (allowanceABYTKN < amount0Desired) {
+        console.log("Approving ABYTKN...");
+        const approveABYTKNTx = prepareContractCall({
+          contract: abytknContract,
+          method: "approve",
+          params: [
+            CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
+            ethers.MaxUint256,
+          ],
+        });
+        await sendTransaction(approveABYTKNTx);
+        console.log("ABYTKN approved");
       }
 
-      // Approve token1 if needed
-      if (allowance1 < amount1Desired) {
-        console.log(`Approving ${token1Symbol}...`);
-        const tx1 = await token1Contract.approve(
-          CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
-          ethers.MaxUint256
-        );
-        await tx1.wait();
-        console.log(`${token1Symbol} approved`);
+      // Approve USDC if needed
+      if (allowanceUSDC < amount1Desired) {
+        console.log("Approving USDC...");
+        const approveUSDCTx = prepareContractCall({
+          contract: usdcContract,
+          method: "approve",
+          params: [
+            CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
+            ethers.MaxUint256,
+          ],
+        });
+        await sendTransaction(approveUSDCTx);
+        console.log("USDC approved");
       }
 
       // Add liquidity
       console.log("Adding liquidity...");
 
-      // Try to estimate gas first
       try {
-        const gasEstimate = await contract.estimateGas.addLiquidity(
-          amount0Desired,
-          amount1Desired
-        );
+        // Estimate gas
+        const gasEstimate = await prepareContractCall({
+          contract,
+          method: "addLiquidity",
+          params: [amount0Desired, amount1Desired],
+        }).then((tx) => tx.gasLimit);
+
         console.log("Gas estimate:", gasEstimate.toString());
 
         // Add 20% buffer to gas estimate
         const gasLimit = (gasEstimate * 120n) / 100n;
 
-        const tx = await contract.addLiquidity(amount0Desired, amount1Desired, {
-          gasLimit: gasLimit,
-        });
+        const tx = await sendTransaction(
+          prepareContractCall({
+            contract,
+            method: "addLiquidity",
+            params: [amount0Desired, amount1Desired],
+            overrides: { gasLimit },
+          })
+        );
 
-        setTxHash(tx.hash);
-        console.log("Transaction sent:", tx.hash);
+        setTxHash(tx.transactionHash);
+        console.log("Transaction sent:", tx.transactionHash);
 
         const receipt = await tx.wait();
         console.log("Transaction receipt:", receipt);
@@ -271,8 +280,8 @@ const AddLiquidity = () => {
         if (receipt.status === 1) {
           setSuccess("Liquidity added successfully!");
           setLiquidityData({
-            token0Amount: "",
-            token1Amount: "",
+            abytknAmount: "",
+            usdcAmount: "",
           });
           loadBalances();
           if (typeof refreshHistory === "function") {
@@ -285,12 +294,20 @@ const AddLiquidity = () => {
         console.warn("Gas estimation failed:", gasError);
 
         // If gas estimation fails, try with fixed gas limit
-        const tx = await contract.addLiquidity(amount0Desired, amount1Desired, {
-          gasLimit: 1500000, // Set high fixed gas limit
-        });
+        const tx = await sendTransaction(
+          prepareContractCall({
+            contract,
+            method: "addLiquidity",
+            params: [amount0Desired, amount1Desired],
+            overrides: { gasLimit: 1500000n },
+          })
+        );
 
-        setTxHash(tx.hash);
-        console.log("Transaction sent with fixed gas limit:", tx.hash);
+        setTxHash(tx.transactionHash);
+        console.log(
+          "Transaction sent with fixed gas limit:",
+          tx.transactionHash
+        );
 
         const receipt = await tx.wait();
         console.log("Transaction receipt:", receipt);
@@ -298,8 +315,8 @@ const AddLiquidity = () => {
         if (receipt.status === 1) {
           setSuccess("Liquidity added successfully!");
           setLiquidityData({
-            token0Amount: "",
-            token1Amount: "",
+            abytknAmount: "",
+            usdcAmount: "",
           });
           loadBalances();
           if (typeof refreshHistory === "function") {
@@ -311,7 +328,6 @@ const AddLiquidity = () => {
       }
     } catch (error) {
       console.error("Add liquidity failed:", error);
-
       let errorMsg = "Failed to add liquidity";
 
       if (error.reason) {
@@ -323,12 +339,8 @@ const AddLiquidity = () => {
           errorMsg = "Insufficient funds for gas";
         } else if (error.message.includes("execution reverted")) {
           errorMsg = "Transaction reverted by contract";
-
-          // Try to extract more information from the error
           if (error.data) {
             errorMsg += ` - ${error.data}`;
-          } else if (error.error && error.error.data) {
-            errorMsg += ` - ${error.error.data}`;
           }
         } else {
           errorMsg += `: ${error.message}`;
@@ -348,46 +360,39 @@ const AddLiquidity = () => {
   // Set max balance
   const setMaxBalance = (tokenSymbol) => {
     const balance = balances[tokenSymbol];
-    if (activeTab === "swap") {
-      setSwapData({ ...swapData, inputAmount: balance });
-    } else if (activeTab === "liquidity") {
-      if (tokenSymbol === "TOKEN0") {
-        const maxAmount = balances.TOKEN0;
-        handleUSDCAmountChangeWithPoolPrice(maxAmount, poolPrice);
-        setLiquidityData({ ...liquidityData, token0Amount: balance });
-      } else {
-        const maxAmount = balances.TOKEN1;
-        handleABYTKNAmountChangeWithPoolPrice(maxAmount, poolPrice);
-        setLiquidityData({ ...liquidityData, token1Amount: balance });
-      }
+    if (tokenSymbol === "ABYTKN") {
+      handleABYTKNAmountChangeWithPoolPrice(balance, poolPrice);
+    } else if (tokenSymbol === "USDC") {
+      handleUSDCAmountChangeWithPoolPrice(balance, poolPrice);
     }
   };
 
-  const handleUSDCAmountChangeWithPoolPrice = async (value, poolPrice) => {
-    // Since your UI shows USDC as token0 but contract has it as token1,
-    // we need to handle this correctly
+  // Handle ABYTKN amount change
+  const handleABYTKNAmountChangeWithPoolPrice = (value, poolPrice) => {
     const newLiquidityData = {
-      ...liquidityData,
-      token0Amount: value, // This is USDC amount in your UI
-      token1Amount:
-        value && poolPrice ? (parseFloat(value) * poolPrice).toFixed(6) : "", // This is ABYTKN amount in your UI
+      abytknAmount: value,
+      usdcAmount:
+        value && poolPrice ? (parseFloat(value) * poolPrice).toFixed(6) : "",
     };
-
     setLiquidityData(newLiquidityData);
   };
 
-  const handleABYTKNAmountChangeWithPoolPrice = async (value, poolPrice) => {
-    // Since your UI shows ABYTKN as token1 but contract has it as token0,
-    // we need to handle this correctly
+  // Handle USDC amount change
+  const handleUSDCAmountChangeWithPoolPrice = (value, poolPrice) => {
     const newLiquidityData = {
-      ...liquidityData,
-      token1Amount: value, // This is ABYTKN amount in your UI
-      token0Amount:
-        value && poolPrice ? (parseFloat(value) / poolPrice).toFixed(6) : "", // This is USDC amount in your UI
+      usdcAmount: value,
+      abytknAmount:
+        value && poolPrice ? (parseFloat(value) / poolPrice).toFixed(6) : "",
     };
-
     setLiquidityData(newLiquidityData);
   };
+
+  // Calculate ratio validation
+  const ratioValidation = calculateRatioWithPoolPrice?.(
+    liquidityData.abytknAmount,
+    liquidityData.usdcAmount,
+    poolPrice
+  );
 
   return (
     <>

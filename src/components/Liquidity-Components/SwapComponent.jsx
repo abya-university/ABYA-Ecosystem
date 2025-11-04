@@ -1,32 +1,49 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { ArrowDownUp, Activity, Settings } from "lucide-react";
-import { useEthersSigner } from "../../components/useClientSigner";
-import { useAccount } from "wagmi";
 import { useTransactionHistory } from "../../contexts/fake-liquidity-test-contexts/historyContext";
-
 import { ethers } from "ethers";
-import USDC_ABI from "../../artifacts/fake-liquidity-abis/usdc.json";
-import ABYTKN_ABI from "../../artifacts/fake-liquidity-abis/abyatkn.json";
-
-import CONTRACT_ABI from "../../artifacts/fake-liquidity-abis/add_swap_contract.json";
+import CONTRACT_ABI from "../../artifacts/fakeLiquidityArtifacts/Add_Swap_Contract.sol/Add_Swap_Contract.json";
+import USDC_ABI from "../../artifacts/fakeLiquidityArtifacts/UsdCoin.sol/UsdCoin.json";
+import ABYTKN_ABI from "../../artifacts/fakeLiquidityArtifacts/ABYATKN.sol/ABYATKN.json";
+import { useActiveAccount } from "thirdweb/react";
+import { client } from "../../services/client";
+import {
+  getContract,
+  prepareContractCall,
+  readContract,
+  sendTransaction,
+} from "thirdweb";
+import { defineChain } from "thirdweb/chains";
 
 const contractAbi = CONTRACT_ABI.abi;
 const usdcAbi = USDC_ABI.abi;
 const abyatknAbi = ABYTKN_ABI.abi;
 
+// Constants - Aligned with our configuration
+const CONTRACT_CONFIG = {
+  ADDRESSES: {
+    ADD_SWAP_CONTRACT: import.meta.env.VITE_APP_SEPOLIA_ADD_SWAP_CONTRACT,
+    TOKEN0: import.meta.env.VITE_APP_SEPOLIA_ABYATKN_ADDRESS, // ABYTKN
+    TOKEN1: import.meta.env.VITE_APP_SEPOLIA_USDC_ADDRESS, // USDC
+    UNISWAP_POOL: import.meta.env.VITE_APP_SEPOLIA_ABYATKN_USDC_500,
+  },
+  CHAIN: defineChain(11155111), // Sepolia
+};
+
 const SwapComponent = () => {
   const [activeTab, setActiveTab] = useState("swap");
-  const [loadingg, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [txHash, setTxHash] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showSettings, setShowSettings] = useState(false);
 
-  const signerPromise = useEthersSigner();
-  const { isConnected, address } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
   const {
     transactions,
-    loading,
+    loading: historyLoading,
     refreshHistory,
     loadBalances,
     calculateOutputAmount,
@@ -45,45 +62,48 @@ const SwapComponent = () => {
   const [slippageTolerance, setSlippageTolerance] = useState(0.5);
   const [customSlippage, setCustomSlippage] = useState("");
 
-  // Swap state
+  // Swap state - using clear token names
   const [swapData, setSwapData] = useState({
-    inputToken: "",
-    outputToken: "",
     inputAmount: "",
     outputAmount: "",
-    inputTokenSymbol: "TOKEN0",
-    outputTokenSymbol: "TOKEN1",
+    inputTokenSymbol: "ABYTKN", // Default to ABYTKN
+    outputTokenSymbol: "USDC", // Default to USDC
     priceImpact: 0,
     minimumReceived: "0",
   });
-
-  // Contract addresses
-  const CONTRACT_ADDRESSES = {
-    ADD_SWAP_CONTRACT: import.meta.env.VITE_APP_ADD_SWAP_CONTRACT,
-    TOKEN0: import.meta.env.VITE_APP_USDC_ADDRESS, // USDC
-    TOKEN1: import.meta.env.VITE_APP_ABYATKN_ADDRESS, // ABYTKN
-    UNISWAP_POOL: import.meta.env.VITE_APP_ABYATKN_USDC_500, // Uniswap pool address
-  };
 
   // Update output amount when input changes
   useEffect(() => {
     const updateOutputAmount = async () => {
       if (
         swapData.inputAmount &&
+        parseFloat(swapData.inputAmount) > 0 &&
         swapData.inputTokenSymbol !== swapData.outputTokenSymbol
       ) {
-        const result = await calculateOutputAmount(
-          swapData.inputAmount,
-          swapData.inputTokenSymbol,
-          swapData.outputTokenSymbol
-        );
+        try {
+          const result = await calculateOutputAmount(
+            swapData.inputAmount,
+            swapData.inputTokenSymbol,
+            swapData.outputTokenSymbol
+          );
 
-        setSwapData((prev) => ({
-          ...prev,
-          outputAmount: result.output,
-          priceImpact: result.impact,
-          minimumReceived: result.minReceived,
-        }));
+          if (result) {
+            setSwapData((prev) => ({
+              ...prev,
+              outputAmount: result.output,
+              priceImpact: result.impact,
+              minimumReceived: result.minReceived,
+            }));
+          }
+        } catch (error) {
+          console.error("Error calculating output amount:", error);
+          setSwapData((prev) => ({
+            ...prev,
+            outputAmount: "0",
+            priceImpact: 0,
+            minimumReceived: "0",
+          }));
+        }
       } else {
         setSwapData((prev) => ({
           ...prev,
@@ -99,9 +119,7 @@ const SwapComponent = () => {
     swapData.inputAmount,
     swapData.inputTokenSymbol,
     swapData.outputTokenSymbol,
-    slippageTolerance,
-    calculateOutputAmount, // Add this dependency
-    loadPoolInfo,
+    calculateOutputAmount,
   ]);
 
   // Update useEffect to use stable references
@@ -113,117 +131,159 @@ const SwapComponent = () => {
       const interval = setInterval(() => {
         loadBalances();
         loadPoolInfo();
+        fetchPoolPrice();
       }, 30000); // Refresh every 30 seconds
 
       return () => clearInterval(interval);
     }
-  }, [isConnected, address, loadBalances]);
+  }, [isConnected, address, loadBalances, loadPoolInfo, fetchPoolPrice]);
 
   // Handle swap
   const handleSwap = async () => {
     console.log("Swap Data:", swapData);
 
-    // Validate required fields using symbols
-    if (
-      !swapData.inputAmount ||
-      !swapData.inputTokenSymbol ||
-      !swapData.outputTokenSymbol
-    ) {
-      setError("Please fill in all swap fields");
+    // Validate required fields
+    if (!swapData.inputAmount || parseFloat(swapData.inputAmount) <= 0) {
+      setError("Please enter a valid input amount");
       setTimeout(() => setError(""), 3000);
       return;
     }
 
-    // Map symbols to token addresses
-    const inputToken =
-      swapData.inputTokenSymbol === "TOKEN0"
-        ? CONTRACT_ADDRESSES.TOKEN0
-        : CONTRACT_ADDRESSES.TOKEN1;
-    const outputToken =
-      swapData.outputTokenSymbol === "TOKEN0"
-        ? CONTRACT_ADDRESSES.TOKEN0
-        : CONTRACT_ADDRESSES.TOKEN1;
+    if (!swapData.outputAmount || parseFloat(swapData.outputAmount) <= 0) {
+      setError("Please wait for output amount calculation");
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
+
+    if (!address) {
+      setError("Wallet not connected");
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
 
     setLoading(true);
+    setError("");
+    setSuccess("");
 
     try {
-      const signer = await signerPromise;
-      if (!signer) return;
+      // Determine token addresses based on symbols
+      const inputTokenAddress =
+        swapData.inputTokenSymbol === "ABYTKN"
+          ? CONTRACT_CONFIG.ADDRESSES.TOKEN0
+          : CONTRACT_CONFIG.ADDRESSES.TOKEN1;
+
+      const outputTokenAddress =
+        swapData.outputTokenSymbol === "ABYTKN"
+          ? CONTRACT_CONFIG.ADDRESSES.TOKEN0
+          : CONTRACT_CONFIG.ADDRESSES.TOKEN1;
 
       const amountToSwap = ethers.parseUnits(swapData.inputAmount, 18);
 
-      // First approve the input token
+      // Initialize input token contract
       const inputTokenAbi =
-        swapData.inputTokenSymbol === "TOKEN0" ? USDC_ABI.abi : ABYTKN_ABI.abi;
-      const inputTokenContract = new ethers.Contract(
-        inputToken,
-        inputTokenAbi,
-        signer
-      );
+        swapData.inputTokenSymbol === "USDC" ? usdcAbi : abyatknAbi;
+      const inputTokenContract = getContract({
+        address: inputTokenAddress,
+        abi: inputTokenAbi,
+        client,
+        chain: CONTRACT_CONFIG.CHAIN,
+      });
 
-      // Check and approve if needed
-      const allowance = await inputTokenContract.allowance(
-        address,
-        CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT
-      );
-      // If allowance is less than amount to swap, approve more
-      if (allowance < amountToSwap) {
-        console.log("Approving tokens for swapping...");
+      // Check balance
+      const balance = await readContract({
+        contract: inputTokenContract,
+        method: "balanceOf",
+        params: [address],
+      });
 
-        // Approve a large amount to avoid future approvals
-        const MAX_UINT256 = ethers.MaxUint256;
-
-        try {
-          const approveTx = await inputTokenContract.approve(
-            CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
-            MAX_UINT256
-          );
-
-          console.log("Approval transaction sent:", approveTx.hash);
-          await approveTx.wait();
-          console.log("Token approved successfully");
-
-          // Check allowance after approval
-          const newAllowance = await inputTokenContract.allowance(
-            address,
-            CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT
-          );
-          console.log("New allowance:", ethers.formatUnits(newAllowance, 18));
-        } catch (approvalError) {
-          console.error("Approval failed:", approvalError);
-          setError("Failed to approve token: " + approvalError.message);
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Then perform the swap
-      const contract = new ethers.Contract(
-        CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
-        contractAbi,
-        signer
-      );
-
-      const balance = await inputTokenContract.balanceOf(address);
       if (balance < amountToSwap) {
         setError(`Insufficient ${swapData.inputTokenSymbol} balance`);
         setLoading(false);
         return;
       }
 
-      const tx = await contract.swapExactInputSingle(
-        inputToken,
-        outputToken,
-        amountToSwap
-      );
+      console.log("Balance check passed:", {
+        token: swapData.inputTokenSymbol,
+        balance: ethers.formatUnits(balance, 18),
+        required: swapData.inputAmount,
+      });
 
-      setTxHash(tx.hash);
-      await tx.wait();
+      // Check and approve allowance
+      const allowance = await readContract({
+        contract: inputTokenContract,
+        method: "allowance",
+        params: [address, CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT],
+      });
 
-      setSwapData({ ...swapData, inputAmount: "", outputAmount: "0" });
+      console.log("Current allowance:", {
+        token: swapData.inputTokenSymbol,
+        allowance: ethers.formatUnits(allowance, 18),
+        required: ethers.formatUnits(amountToSwap, 18),
+      });
+
+      if (allowance < amountToSwap) {
+        console.log(`Approving ${swapData.inputTokenSymbol}...`);
+
+        const approveTx = prepareContractCall({
+          contract: inputTokenContract,
+          method: "approve",
+          params: [
+            CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
+            ethers.MaxUint256,
+          ],
+        });
+
+        await sendTransaction({ approveTx, account });
+      }
+
+      // Initialize swap contract
+      const swapContract = getContract({
+        address: CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
+        abi: contractAbi,
+        client,
+        chain: CONTRACT_CONFIG.CHAIN,
+      });
+
+      const swapTx = prepareContractCall({
+        contract: swapContract,
+        method: "swapExactInputSingle",
+        params: [inputTokenAddress, outputTokenAddress, amountToSwap],
+      });
+
+      const swapResult = await sendTransaction({ swapTx, account });
+      setTxHash(swapResult.transactionHash);
+
+      // Reset form
+      setSwapData({
+        inputAmount: "",
+        outputAmount: "",
+        inputTokenSymbol: swapData.inputTokenSymbol,
+        outputTokenSymbol: swapData.outputTokenSymbol,
+        priceImpact: 0,
+        minimumReceived: "0",
+      });
+
+      // Refresh data
       loadBalances();
     } catch (error) {
-      setError("Swap failed: " + error.message);
+      console.error("Swap failed:", error);
+      let errorMessage = "Swap failed";
+
+      if (error.message.includes("user rejected")) {
+        errorMessage = "Transaction rejected by user";
+      } else if (error.message.includes("insufficient funds")) {
+        errorMessage = "Insufficient funds for gas";
+      } else if (error.message.includes("execution reverted")) {
+        errorMessage = "Contract execution reverted";
+        // Try to extract revert reason
+        if (error.data) {
+          errorMessage += `: ${error.data}`;
+        }
+      } else if (error.message) {
+        errorMessage += `: ${error.message}`;
+      }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
       setTimeout(() => {
@@ -236,32 +296,23 @@ const SwapComponent = () => {
 
   // Swap input/output tokens
   const swapTokens = () => {
-    setSwapData({
-      ...swapData,
-      inputToken: swapData.outputToken,
-      outputToken: swapData.inputToken,
-      inputTokenSymbol: swapData.outputTokenSymbol,
-      outputTokenSymbol: swapData.inputTokenSymbol,
-      inputAmount: swapData.outputAmount,
-      outputAmount: swapData.inputAmount,
-    });
+    setSwapData((prev) => ({
+      ...prev,
+      inputTokenSymbol: prev.outputTokenSymbol,
+      outputTokenSymbol: prev.inputTokenSymbol,
+      inputAmount: prev.outputAmount,
+      outputAmount: prev.inputAmount,
+    }));
   };
 
-  // Set max balance
-  const setMaxBalance = (tokenSymbol) => {
-    const balance = balances[tokenSymbol];
-    if (activeTab === "swap") {
-      setSwapData({ ...swapData, inputAmount: balance });
-    } else if (activeTab === "liquidity") {
-      if (tokenSymbol === "TOKEN0") {
-        const maxAmount = balances.TOKEN0;
-        handleUSDCAmountChangeWithPoolPrice(maxAmount, poolPrice);
-        setLiquidityData({ ...liquidityData, token0Amount: balance });
-      } else {
-        const maxAmount = balances.TOKEN1;
-        handleABYTKNAmountChangeWithPoolPrice(maxAmount, poolPrice);
-        setLiquidityData({ ...liquidityData, token1Amount: balance });
-      }
+  // Set max balance for input token
+  const setMaxBalance = () => {
+    const balance = balances[swapData.inputTokenSymbol];
+    if (balance && parseFloat(balance) > 0) {
+      setSwapData((prev) => ({
+        ...prev,
+        inputAmount: balance,
+      }));
     }
   };
 
@@ -375,8 +426,8 @@ const SwapComponent = () => {
                 }}
                 className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 py-1 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-yellow-500 text-gray-900 dark:text-gray-100"
               >
-                <option value="TOKEN0">TOKEN0(USDC)</option>
-                <option value="TOKEN1">TOKEN1(ABYTKN)</option>
+                <option value="TOKEN0">TOKEN0(ABYTKN)</option>
+                <option value="TOKEN1">TOKEN1(USDC)</option>
               </select>
             </div>
           </div>
@@ -431,8 +482,8 @@ const SwapComponent = () => {
                 }}
                 className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 py-1 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-yellow-500 text-gray-900 dark:text-gray-100"
               >
-                <option value="TOKEN1">TOKEN1(ABYTKN)</option>
-                <option value="TOKEN0">TOKEN0(USDC)</option>
+                <option value="TOKEN1">TOKEN1(USDC)</option>
+                <option value="TOKEN0">TOKEN0(ABYTKN)</option>
               </select>
             </div>
           </div>
@@ -479,10 +530,10 @@ const SwapComponent = () => {
         {/* Swap Button */}
         <button
           onClick={handleSwap}
-          disabled={!isConnected || loadingg || !swapData.inputAmount}
+          disabled={!isConnected || loading || !swapData.inputAmount}
           className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white px-6 py-4 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
         >
-          {loadingg ? (
+          {loading ? (
             <>
               <Activity className="animate-spin" size={20} />
               Swapping...

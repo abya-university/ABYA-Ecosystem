@@ -1,12 +1,15 @@
 import { createContext, useState, useEffect, useContext } from "react";
-import { ethers } from "ethers";
-import { useAccount } from "wagmi";
-import Ecosystem2ABI from "../artifacts/contracts/Ecosystem Contracts/Ecosystem2.sol/Ecosystem2.json";
-import { useEthersSigner } from "../components/useClientSigner";
+import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import PropTypes from "prop-types";
+import { useActiveAccount } from "thirdweb/react";
+import { client } from "../services/client";
+import { ethers } from "ethers";
+import { getContract, readContract } from "thirdweb";
+import { defineChain } from "thirdweb/chains";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const ContractABI = Ecosystem2ABI.abi;
-const ContractAddress = import.meta.env.VITE_APP_ECOSYSTEM2_CONTRACT_ADDRESS;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
+const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
 const REVIEWER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("REVIEWER_ROLE"));
 const MULTISIG_APPROVER = ethers.keccak256(
@@ -25,9 +28,10 @@ const COMMUNITY_MANAGER = ethers.keccak256(
 const UserContext = createContext();
 
 export const UserProvider = ({ children }) => {
-  const { address, isConnected } = useAccount();
   const [role, setRole] = useState(null);
-  const signerPromise = useEthersSigner();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
 
   useEffect(() => {
     const fetchUserRole = async () => {
@@ -40,35 +44,47 @@ export const UserProvider = ({ children }) => {
       }
 
       try {
-        const signer = await signerPromise;
-        console.log("Signer obtained:", !!signer);
+        const contract = await getContract({
+          address: DiamondAddress,
+          abi: Ecosystem2Facet_ABI,
+          client,
+          chain: defineChain(11155111), // Sepolia
+        });
 
-        const contract = new ethers.Contract(
-          ContractAddress,
-          ContractABI,
-          signer
-        );
+        const isReviewer = await readContract({
+          contract,
+          method:
+            "function hasRole(bytes32 role, address account) view returns (bool)",
+          params: [REVIEWER_ROLE, address],
+        });
 
-        console.log("Contract Address:", ContractAddress);
-        console.log("Current Address:", address);
+        const isMultisigApprover = await readContract({
+          contract,
+          method:
+            "function hasRole(bytes32 role, address account) view returns (bool)",
+          params: [MULTISIG_APPROVER, address],
+        });
 
-        const isReviewer = await contract.hasRole(REVIEWER_ROLE, address);
-        const isMultisigApprover = await contract.hasRole(
-          MULTISIG_APPROVER,
-          address
-        );
-        const isCourseOwner = await contract.hasRole(
-          COURSE_OWNER_ROLE,
-          address
-        );
-        const isDefaultAdmin = await contract.hasRole(
-          DEFAULT_ADMIN_ROLE,
-          address
-        );
-        const isCommunityManager = await contract.hasRole(
-          COMMUNITY_MANAGER,
-          address
-        );
+        const isCourseOwner = await readContract({
+          contract,
+          method:
+            "function hasRole(bytes32 role, address account) view returns (bool)",
+          params: [COURSE_OWNER_ROLE, address],
+        });
+
+        const isDefaultAdmin = await readContract({
+          contract,
+          method:
+            "function hasRole(bytes32 role, address account) view returns (bool)",
+          params: [DEFAULT_ADMIN_ROLE, address],
+        });
+
+        const isCommunityManager = await readContract({
+          contract,
+          method:
+            "function hasRole(bytes32 role, address account) view returns (bool)",
+          params: [COMMUNITY_MANAGER, address],
+        });
 
         if (isReviewer) {
           setRole("Reviewer");
@@ -89,7 +105,7 @@ export const UserProvider = ({ children }) => {
     };
 
     fetchUserRole();
-  }, [address, isConnected, signerPromise]);
+  }, [address, isConnected, client]);
 
   return (
     <UserContext.Provider value={{ role }}>{children}</UserContext.Provider>

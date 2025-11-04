@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
-import Providers from "./providers/Providers.jsx";
+// import Providers from "./providers/Providers.jsx";
 import CourseProvider from "./contexts/courseContext.jsx";
 import ChapterProvider from "./contexts/chapterContext.jsx";
 import LessonProvider from "./contexts/lessonContext.jsx";
@@ -14,17 +14,20 @@ import { CommunityEventsProvider } from "./contexts/communityEventsContext.jsx";
 import { CommunityMembersProvider } from "./contexts/communityMembersContext.jsx";
 import { ProjectProposalsProvider } from "./contexts/projectProposalsContext.jsx";
 import { AirdropProposalProvider } from "./contexts/airdropProposalContext.jsx";
-import { DidProvider } from "./contexts/DidContext.jsx";
 import { ProfileProvider } from "./contexts/ProfileContext.jsx";
 import { UserPositionProvider } from "./contexts/fake-liquidity-test-contexts/userPositionContext.jsx";
 import { TransactionHistoryProvider } from "./contexts/fake-liquidity-test-contexts/historyContext.jsx";
+import { ThirdwebProvider } from "thirdweb/react";
+import { ThemeProvider } from "./contexts/themeContext.jsx";
+import { ProgressProvider } from "./contexts/progressContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     {/* Render WalletConnection globally */}
-    <DidProvider>
+    <ThirdwebProvider>
       <ProfileProvider>
-        <Providers>
+        <ThemeProvider>
+          {/* <Providers> */}
           <BrowserRouter>
             <CourseProvider>
               <ChapterProvider>
@@ -38,7 +41,9 @@ createRoot(document.getElementById("root")).render(
                               <AirdropProposalProvider>
                                 <TransactionHistoryProvider>
                                   <UserPositionProvider>
-                                    <App />
+                                    <ProgressProvider>
+                                      <App />
+                                    </ProgressProvider>
                                   </UserPositionProvider>
                                 </TransactionHistoryProvider>
                               </AirdropProposalProvider>
@@ -52,8 +57,9 @@ createRoot(document.getElementById("root")).render(
               </ChapterProvider>
             </CourseProvider>
           </BrowserRouter>
-        </Providers>
+          {/* </Providers> */}
+        </ThemeProvider>
       </ProfileProvider>
-    </DidProvider>
+    </ThirdwebProvider>
   </StrictMode>
 );

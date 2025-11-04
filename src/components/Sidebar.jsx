@@ -148,10 +148,14 @@ const Sidebar = ({
         className={`fixed left-0 top-0 h-full bg-gray-100 dark:bg-gray-900 shadow-lg shadow-white transition-all duration-300 z-40 
         ${isExpanded ? "w-64" : "w-20"} pt-20 ${
           isMobile && !isExpanded ? "-translate-x-full" : "translate-x-0"
+        } ${
+          isMobile && isExpanded
+            ? "h-auto max-h-[100vh] overflow-y-auto"
+            : "h-full overflow-hidden"
         }`}
       >
         {/* Sidebar Content */}
-        <div className="px-4 mt-4">
+        <div className={`px-4 mt-4 ${isMobile && isExpanded ? "pb-4" : ""}`}>
           {sidebarItems.map((section, sectionIndex) => (
             <div key={sectionIndex} className="mb-6">
               {isExpanded && (
@@ -166,11 +170,22 @@ const Sidebar = ({
                   className={`flex items-center py-3 px-4 rounded-lg transition-all duration-300 
                     hover:bg-yellow-500/10 dark:hover:bg-yellow-500/20 group
                     ${isExpanded ? "justify-start" : "justify-center"}`}
-                  onClick={() => setActiveSection(item.section)}
+                  onClick={() => {
+                    console.log("Clicked section:", item.section);
+                    setActiveSection(item.section);
+                    // Auto-close sidebar on mobile after selection
+                    if (isMobile) {
+                      setIsExpanded(false);
+                      if (onSidebarToggle) {
+                        onSidebarToggle(false);
+                      }
+                    }
+                  }}
                 >
                   <div
-                    className={` dark:text-white
-                    ${isExpanded ? "mr-4" : "tooltip tooltip-right"}`}
+                    className={`dark:text-white ${
+                      isExpanded ? "mr-4" : "tooltip tooltip-right"
+                    }`}
                     data-tip={!isExpanded ? item.name : ""}
                   >
                     {item.icon}
@@ -188,7 +203,13 @@ const Sidebar = ({
 
         {/* Bottom Section - Creator Mode */}
         {isExpanded && (
-          <div className="absolute bottom-0 left-0 right-0 p-4">
+          <div
+            className={`p-4 ${
+              isMobile
+                ? "sticky bottom-0 bg-gray-100 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700"
+                : "absolute bottom-0 left-0 right-0"
+            }`}
+          >
             <div className="bg-yellow-500/10 dark:bg-yellow-500/20 rounded-lg p-4 text-center">
               <h4 className="text-lg font-bold text-gray-800 dark:text-white mb-2">
                 Creator Mode
@@ -199,7 +220,16 @@ const Sidebar = ({
               <Link
                 to="/mainpage"
                 className="w-full bg-yellow-500 text-black py-2 rounded-lg hover:bg-yellow-600 transition-colors block"
-                onClick={() => setActiveSection("create-course")}
+                onClick={() => {
+                  setActiveSection("create-course");
+                  // Auto-close sidebar on mobile after selection
+                  if (isMobile) {
+                    setIsExpanded(false);
+                    if (onSidebarToggle) {
+                      onSidebarToggle(false);
+                    }
+                  }
+                }}
               >
                 Create Course
               </Link>
@@ -207,6 +237,19 @@ const Sidebar = ({
           </div>
         )}
       </div>
+
+      {/* Mobile Overlay - Close sidebar when clicking outside */}
+      {isMobile && isExpanded && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-30"
+          onClick={() => {
+            setIsExpanded(false);
+            if (onSidebarToggle) {
+              onSidebarToggle(false);
+            }
+          }}
+        />
+      )}
 
       {/* Toggle Button - Moves with sidebar */}
       <button

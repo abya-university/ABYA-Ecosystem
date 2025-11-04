@@ -1,13 +1,15 @@
 import { AlertCircle, CheckCircle, Info } from "lucide-react";
 import { useTransactionHistory } from "../../contexts/fake-liquidity-test-contexts/historyContext";
 import { useEffect, useState } from "react";
-import { useAccount } from "wagmi";
+import { useActiveAccount } from "thirdweb/react";
 
 const LiquiditySidebar = () => {
   const [showPoolInfo, setShowPoolInfo] = useState(false);
   const { balances, poolInfo, txHash, loadBalances, loadPoolInfo } =
     useTransactionHistory();
-  const { address, isConnected } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
 
   // Update useEffect to use stable references
   useEffect(() => {

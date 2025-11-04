@@ -760,3 +760,17 @@ a {
   transform: scale(0.95);
   transition: opacity 300ms, transform 300ms;
 }
+
+.line-clamp-sm {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3; /* change number to show more/less lines */
+  overflow: hidden;
+}
+
+.sm\:line-clamp-none {
+  -webkit-line-clamp: unset;
+  -webkit-box-orient: initial;
+  display: block;
+  overflow: visible;
+}
