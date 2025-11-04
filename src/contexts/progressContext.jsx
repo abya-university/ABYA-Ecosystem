@@ -54,8 +54,8 @@ export const ProgressProvider = ({ children }) => {
         const completedLessons = await readContract({
           contract,
           method:
-            "function getUserCompletedLessonsByCourse(uint256 _courseId) external view returns(uint256[] memory)",
-          params: [BigInt(courseId)],
+            "function getUserCompletedLessonsByCourse(address _user, uint256 _courseId) external view returns(uint256[] memory)",
+          params: [address, BigInt(courseId)],
         });
 
         console.log("Raw completed lessons:", completedLessons);
@@ -73,7 +73,7 @@ export const ProgressProvider = ({ children }) => {
 
         const lessonIds = completedLessons
           .map((id) => id.toString())
-          .filter((id) => id && id !== "0");
+          .filter((id) => id !== undefined && id !== null);
 
         console.log("Processed lesson IDs:", lessonIds);
 
@@ -103,8 +103,8 @@ export const ProgressProvider = ({ children }) => {
         const completedQuizzes = await readContract({
           contract,
           method:
-            "function getUserCompletedQuizzesByCourse(uint256 _courseId) external view returns(uint256[] memory)",
-          params: [BigInt(courseId)],
+            "function getUserCompletedQuizzesByCourse(address _user, uint256 _courseId) external view returns(uint256[] memory)",
+          params: [address, BigInt(courseId)],
         });
 
         console.log("Raw completed quizzes:", completedQuizzes);
@@ -122,7 +122,7 @@ export const ProgressProvider = ({ children }) => {
 
         const quizIds = completedQuizzes
           .map((id) => id.toString())
-          .filter((id) => id && id !== "0");
+          .filter((id) => id !== undefined && id !== null);
 
         console.log("Processed quiz IDs:", quizIds);
 

@@ -22,6 +22,7 @@ import {
   Book,
   CheckCircle2,
   Loader2,
+  Loader,
 } from "lucide-react";
 import ReviewModal from "../components/ReviewModal";
 import { useUser } from "../contexts/userContext";
@@ -45,6 +46,7 @@ import { defineChain } from "thirdweb/chains";
 import CONTRACT_ADDRESSES from "../constants/addresses";
 import { toast } from "react-toastify";
 import { useProgress } from "../contexts/progressContext";
+import { useNavigate } from "react-router-dom";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
@@ -827,7 +829,7 @@ const CourseDetails = memo(({ courseId }) => {
   const [showCertificate, setShowCertificate] = useState(false);
   const [certificateData, setCertificateData] = useState(null);
   const { certificates } = useCertificates();
-  const { profile } = useProfile();
+  const { profile, hasProfile } = useProfile();
   const [hasCertificate, setHasCertificate] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -842,12 +844,16 @@ const CourseDetails = memo(({ courseId }) => {
     addCompletedQuiz,
   } = useProgress();
   const [showMobileNav, setShowMobileNav] = useState(false);
+  const navigate = useNavigate();
+  const [isIssuingCertificate, setIsIssuingCertificate] = useState(false);
 
   useEffect(() => {
     if (courseId) {
       refreshProgress(courseId);
     }
   }, [courseId, refreshProgress]);
+
+  console.log("Certificate coursedetail: ", certificates);
 
   const markAsRead = async (courseId, chapterId, lessonId) => {
     // Add lesson to loading state
@@ -1236,19 +1242,20 @@ const CourseDetails = memo(({ courseId }) => {
   //handle claim certificate
   //Leave it for now
   const handleClaimCertificate = async () => {
+    setIsIssuingCertificate(true);
     try {
       if (!client) {
         throw new Error("No client available");
       }
 
       // Check if profile is missing
-      if (!profile || profile.firstName === null) {
+      if (!profile || profile.fname === null) {
         alert("Profile not found. Please connect your profile first.");
         return;
       }
 
       // Set learner name from profile
-      const fullName = `${profile.firstName} ${profile.secondName}`;
+      const fullName = `${profile.fname} ${profile.lname}`;
       setLearnerName(fullName);
 
       // Optional: update learnerName local variable directly if needed
@@ -1262,7 +1269,7 @@ const CourseDetails = memo(({ courseId }) => {
 
       const contract = await getContract({
         address: DiamondAddress,
-        abi: Ecosystem2Facet_ABI,
+        abi: Ecosystem3Facet_ABI,
         client,
         chain: defineChain(11155111),
       });
@@ -1279,26 +1286,30 @@ const CourseDetails = memo(({ courseId }) => {
         courseId: currentCourse.courseId,
       };
 
-      const tx = await contract.issueCertificate(
-        currentCourse.courseId,
-        learner,
-        currentCourse.courseName,
-        cert_issuer,
-        Math.floor(Date.now() / 1000),
-        { gasLimit: 500000 }
-      );
+      // const tx = await contract.issueCertificate(
+      //   currentCourse.courseId,
+      //   learner,
+      //   currentCourse.courseName,
+      //   cert_issuer,
+      //   Math.floor(Date.now() / 1000),
+      //   { gasLimit: 500000 }
+      // );
 
-      console.log("Certificate Parameters:", {
-        courseId: BigInt(currentCourse.courseId).toString(),
-        learner,
-        courseName: currentCourse.courseName,
-        issuer: cert_issuer,
-        timestamp: Math.floor(Date.now() / 1000),
+      const transaction = await prepareContractCall({
+        contract,
+        method: "issueCertificate",
+        params: [
+          BigInt(currentCourse.courseId),
+          learner,
+          currentCourse.courseName,
+          cert_issuer,
+          BigInt(Math.floor(Date.now() / 1000)),
+        ],
       });
 
-      console.log("Transaction sent:", tx.hash);
-      const receipt = await tx.wait();
-      console.log("Transaction Receipt: ", receipt);
+      await sendTransaction({ transaction, account });
+
+      toast.success("Certificate issued successfully!");
 
       // Set certificate data, close congrats popup and show certificate popup
       setCertificateData(newCertificateData);
@@ -1307,13 +1318,25 @@ const CourseDetails = memo(({ courseId }) => {
     } catch (err) {
       console.error("Error issuing certificate:", err);
       // Extract more error information if possible
+      toast.error(
+        `Failed to issue certificate: ${
+          err.message || "Please try again later."
+        }`
+      );
       if (err.error && err.error.message) {
         console.error("Contract error message:", err.error.message);
       }
       if (err.receipt) {
         console.error("Transaction receipt:", err.receipt);
       }
+    } finally {
+      setIsIssuingCertificate(false);
     }
+  };
+
+  const navigateTo = (path) => {
+    navigate(path);
+    setShowCongratsPopup(false);
   };
 
   return (
@@ -1697,14 +1720,30 @@ const CourseDetails = memo(({ courseId }) => {
                       <button
                         className="mt-3 w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-emerald-700 dark:text-emerald-300 text-xs font-medium py-2 px-3 rounded-lg border border-emerald-200 dark:border-emerald-600 transition-all duration-200 hover:shadow-sm flex items-center justify-center gap-2"
                         onClick={() => {
-                          const userCertificate = certificates.find(
-                            (cert) =>
-                              cert.courseId ===
-                                currentCourse.courseId.toString() &&
-                              cert.owner.toLowerCase() === address.toLowerCase()
-                          );
+                          // normalize types and compare strings to avoid mismatches
+                          const userCertificate = certificates.find((cert) => {
+                            const certCourseId =
+                              cert?.courseId?.toString?.() ?? "";
+                            const currentCourseId =
+                              currentCourse?.courseId?.toString?.() ?? "";
+                            const certOwner = (cert?.owner ?? "").toLowerCase();
+                            const userAddr = (address ?? "").toLowerCase();
+                            return (
+                              certCourseId === currentCourseId &&
+                              certOwner === userAddr
+                            );
+                          });
+
                           if (userCertificate) {
-                            handleCertificateClick(userCertificate);
+                            // ensure the viewer receives certificateData and opens
+                            setSelectedCertificate(userCertificate);
+                            setCertificateData(userCertificate); // viewer expects certificateData
+                            setShowPopup(true); // keep if other popup UI depends on it
+                            setShowCertificate(true); // open the certificate modal used below
+                          } else {
+                            console.warn(
+                              "No certificate found for current user/course"
+                            );
                           }
                         }}
                       >
@@ -1945,12 +1984,22 @@ const CourseDetails = memo(({ courseId }) => {
                         <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
                           Certificate will be issued to:
                           <span className="font-semibold text-blue-900 dark:text-blue-100 ml-1">
-                            {profile?.firstName} {profile?.secondName}
+                            {profile?.fname} {profile?.lname}
                           </span>
                         </p>
                       </div>
                     </div>
                   </div>
+
+                  {!hasProfile && (
+                    <button
+                      type="button"
+                      onClick={() => navigateTo("/mainpage?section=settings")}
+                      className="text-red-300 dark:text-purple-500 underline items-center justify-center text-md italic sm:text-sm font-medium mt-10"
+                    >
+                      Create Profile now!
+                    </button>
+                  )}
 
                   <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                     Click the button below to claim your certificate.
@@ -1960,8 +2009,20 @@ const CourseDetails = memo(({ courseId }) => {
 
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-6 sm:mt-8">
                 <button
-                  onClick={handleClaimCertificate}
-                  className="flex-1 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-semibold py-2 sm:py-3 px-4 sm:px-6 rounded-xl transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center justify-center space-x-2 text-sm sm:text-base"
+                  onClick={
+                    hasProfile && !isIssuingCertificate
+                      ? handleClaimCertificate
+                      : undefined
+                  }
+                  disabled={!hasProfile || isIssuingCertificate}
+                  aria-disabled={!hasProfile || isIssuingCertificate}
+                  aria-busy={isIssuingCertificate}
+                  tabIndex={!hasProfile || isIssuingCertificate ? -1 : 0}
+                  className={`flex-1 font-semibold py-2 sm:py-3 px-4 sm:px-6 rounded-xl flex items-center justify-center space-x-2 text-sm sm:text-base transition-all duration-200 ${
+                    hasProfile && !isIssuingCertificate
+                      ? "bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
+                      : "bg-gray-200 text-gray-400 opacity-60 cursor-not-allowed"
+                  }`}
                 >
                   <svg
                     className="w-4 h-4 sm:w-5 sm:h-5"
@@ -1976,7 +2037,16 @@ const CourseDetails = memo(({ courseId }) => {
                       d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  <span>Claim Certificate</span>
+                  <span>
+                    {!isIssuingCertificate ? (
+                      "Claim Certificate"
+                    ) : (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="hidden sm:inline">Issuing...</span>
+                      </>
+                    )}
+                  </span>
                 </button>
 
                 <button
@@ -1993,7 +2063,7 @@ const CourseDetails = memo(({ courseId }) => {
 
       {/* Certificate Modal - Responsive */}
       {showCertificate && certificateData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 overflow-auto p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center mt-[70px] bg-black bg-opacity-75 overflow-auto p-4">
           <div className="relative bg-white rounded-lg w-full max-w-4xl lg:max-w-7xl max-h-[90vh] overflow-auto p-4 sm:p-6 lg:p-8 shadow-lg">
             <button
               onClick={() => setShowCertificate(false)}
