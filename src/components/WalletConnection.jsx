@@ -25,6 +25,7 @@ import {
 import { client } from "../services/client"; // Make sure to import your client
 import { defineChain } from "thirdweb/chains";
 import { toast } from "react-toastify";
+import { useDarkMode } from "../contexts/themeContext";
 
 const WalletConnection = () => {
   const account = useActiveAccount();
@@ -38,6 +39,7 @@ const WalletConnection = () => {
   const dropdownRef = useRef(null);
   const toggleRef = useRef(null);
   const { clearProfile, profile, hasProfile } = useProfile();
+  const { darkMode } = useDarkMode();
 
   const { data: balanceData, isLoading: balanceLoading } = useWalletBalance({
     account,
@@ -139,13 +141,25 @@ const WalletConnection = () => {
 
           {/* Profile Section (if profile exists) */}
           {hasProfile && (
-            <div className="p-4 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-750">
+            <div
+              className={
+                darkMode
+                  ? "p-4 border-b border-gray-700 bg-gray-750"
+                  : "p-4 border-b bg-gray-50"
+              }
+            >
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center text-white font-semibold">
                   {getInitials(profile.fname, profile.lname)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                  <p
+                    className={
+                      darkMode
+                        ? "text-sm font-semibold text-gray-100 truncate"
+                        : "text-gray-700 font-semibold"
+                    }
+                  >
                     {profile.fname} {profile.lname}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 truncate">

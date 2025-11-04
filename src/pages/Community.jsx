@@ -470,19 +470,19 @@ const CommunityPage = () => {
 
     return (
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm transition-opacity p-4"
         onClick={handleBackdropClick}
       >
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6 transform transition-all duration-300 ease-in-out scale-100 max-h-[90vh] overflow-y-auto">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-4 sm:p-6 transform transition-all duration-300 ease-in-out scale-100 max-h-[90vh] overflow-y-auto">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
               Create Community Event
             </h3>
             <button
               onClick={handleCloseModal}
               className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200"
             >
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
           </div>
 
@@ -497,7 +497,7 @@ const CommunityPage = () => {
                 name="name"
                 value={eventData.name}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200"
+                className="w-full px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200 text-sm sm:text-base"
                 placeholder="Workshop, Hackathon, etc."
                 required
               />
@@ -512,7 +512,7 @@ const CommunityPage = () => {
                 name="startTime"
                 value={eventData.startTime}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200"
+                className="w-full px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200 text-sm sm:text-base"
                 required
               />
             </div>
@@ -526,7 +526,7 @@ const CommunityPage = () => {
                 name="endTime"
                 value={eventData.endTime}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200"
+                className="w-full px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200 text-sm sm:text-base"
                 required
               />
             </div>
@@ -540,7 +540,7 @@ const CommunityPage = () => {
                 name="maxParticipants"
                 value={eventData.maxParticipants}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200"
+                className="w-full px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200 text-sm sm:text-base"
                 min="1"
                 required
               />
@@ -550,7 +550,7 @@ const CommunityPage = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Event Type *
               </label>
-              <div className="flex gap-4">
+              <div className="flex gap-3 sm:gap-4">
                 <label className="inline-flex items-center cursor-pointer">
                   <input
                     type="radio"
@@ -559,7 +559,7 @@ const CommunityPage = () => {
                     checked={eventData.isOnline}
                     onChange={() => handleRadioChange(true)}
                   />
-                  <span className="ml-2 text-gray-700 dark:text-gray-300">
+                  <span className="ml-2 text-gray-700 dark:text-gray-300 text-sm sm:text-base">
                     Online
                   </span>
                 </label>
@@ -571,7 +571,7 @@ const CommunityPage = () => {
                     checked={!eventData.isOnline}
                     onChange={() => handleRadioChange(false)}
                   />
-                  <span className="ml-2 text-gray-700 dark:text-gray-300">
+                  <span className="ml-2 text-gray-700 dark:text-gray-300 text-sm sm:text-base">
                     Physical
                   </span>
                 </label>
@@ -587,7 +587,7 @@ const CommunityPage = () => {
                 name="location"
                 value={eventData.location}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200"
+                className="w-full px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200 text-sm sm:text-base"
                 placeholder={
                   eventData.isOnline
                     ? "https://meet.google.com/..."
@@ -605,29 +605,29 @@ const CommunityPage = () => {
                 name="additionalDetails"
                 value={eventData.additionalDetails}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200 h-24 resize-none"
+                className="w-full px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-200 h-20 sm:h-24 resize-none text-sm sm:text-base"
                 placeholder="Dress code, items to bring, agenda, etc."
               />
             </div>
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-2 sm:gap-3 pt-2">
               <button
                 type="button"
                 onClick={handleCloseModal}
-                className="flex-1 py-2 px-4 bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-300 font-medium rounded-lg transition-colors duration-300"
+                className="flex-1 py-2 px-3 sm:px-4 bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-300 font-medium rounded-lg transition-colors duration-300 text-sm sm:text-base"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={createEventLoading}
-                className="flex-1 py-2 px-4 bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-400 text-cyan-950 font-medium rounded-lg transition-colors duration-300 flex items-center justify-center"
+                className="flex-1 py-2 px-3 sm:px-4 bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-400 text-cyan-950 font-medium rounded-lg transition-colors duration-300 flex items-center justify-center text-sm sm:text-base"
               >
                 {createEventLoading ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
+                  <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-cyan-950"></div>
                 ) : (
                   <>
-                    <Calendar className="w-5 h-5 mr-2" />
+                    <Calendar className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
                     Create Event
                   </>
                 )}
@@ -641,17 +641,17 @@ const CommunityPage = () => {
 
   // Modal Component for Project Funding
   const ProjectFundingModal = () => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm transition-opacity">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6 transform transition-all duration-300 ease-in-out scale-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm transition-opacity p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-4 sm:p-6 transform transition-all duration-300 ease-in-out scale-100">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+          <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
             Fund Community Project
           </h3>
           <button
             onClick={() => setShowProjectFundingModal(false)}
             className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
 
@@ -669,7 +669,7 @@ const CommunityPage = () => {
                   projectAddress: e.target.value,
                 })
               }
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm sm:text-base"
               placeholder="0x..."
             />
           </div>
@@ -687,7 +687,7 @@ const CommunityPage = () => {
                   amount: e.target.value,
                 })
               }
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm sm:text-base"
               placeholder="e.g., 100"
             />
           </div>
@@ -695,13 +695,13 @@ const CommunityPage = () => {
           <button
             onClick={handleFundProject}
             disabled={fundProjectLoading}
-            className="w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-cyan-950 font-medium rounded-lg transition-colors duration-300 flex items-center justify-center"
+            className="w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-cyan-950 font-medium rounded-lg transition-colors duration-300 flex items-center justify-center text-sm sm:text-base"
           >
             {fundProjectLoading ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
+              <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-cyan-950"></div>
             ) : (
               <>
-                <Coins className="w-5 h-5 mr-2" />
+                <Coins className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
                 Submit Funding Proposal
               </>
             )}
@@ -712,7 +712,7 @@ const CommunityPage = () => {
   );
 
   return (
-    <div className="dark:bg-gradient-to-br dark:from-gray-900 dark:to-gray-800 bg-gradient-to-br from-blue-50 to-cyan-100 min-h-screen p-4 md:p-6 transition-colors duration-300 pt-24 md:pt-28">
+    <div className="dark:bg-gradient-to-br dark:from-gray-900 dark:to-gray-800 bg-gradient-to-br from-blue-50 to-cyan-100 min-h-screen p-3 sm:p-4 md:p-6 transition-colors duration-300 pt-20 sm:pt-24 md:pt-28">
       <ToastContainer
         position="bottom-right"
         theme="colored"
@@ -733,27 +733,27 @@ const CommunityPage = () => {
 
       <div className="max-w-7xl mx-auto">
         {/* Header Section */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 sm:mb-8 gap-4 sm:gap-6">
           <div className="flex-1 text-center lg:text-left">
-            <div className="inline-flex items-center gap-3 mb-3">
-              <div className="p-3 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-2xl shadow-lg">
-                <Users className="w-8 h-8 text-cyan-950" />
+            <div className="inline-flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+              <div className="p-2 sm:p-3 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-xl sm:rounded-2xl shadow-lg">
+                <Users className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-950" />
               </div>
-              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-yellow-500 to-yellow-600 bg-clip-text text-transparent">
+              <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-yellow-500 to-yellow-600 bg-clip-text text-transparent">
                 ABYA Community
               </h1>
             </div>
-            <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl">
+            <p className="text-sm sm:text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto lg:mx-0">
               Connect, Collaborate, and Innovate with Web3 Enthusiasts Worldwide
             </p>
-            <div className="flex flex-wrap gap-2 mt-4 justify-center lg:justify-start">
-              <span className="px-3 py-1 bg-green-500 text-white text-sm rounded-full animate-pulse">
+            <div className="flex flex-wrap gap-1 sm:gap-2 mt-3 sm:mt-4 justify-center lg:justify-start">
+              <span className="px-2 sm:px-3 py-1 bg-green-500 text-white text-xs sm:text-sm rounded-full animate-pulse">
                 🌟 Live Community
               </span>
-              <span className="px-3 py-1 bg-blue-500 text-white text-sm rounded-full">
+              <span className="px-2 sm:px-3 py-1 bg-blue-500 text-white text-xs sm:text-sm rounded-full">
                 🚀 {members?.length || 0} Members
               </span>
-              <span className="px-3 py-1 bg-purple-500 text-white text-sm rounded-full">
+              <span className="px-2 sm:px-3 py-1 bg-purple-500 text-white text-xs sm:text-sm rounded-full">
                 ⚡ Active
               </span>
             </div>
@@ -761,7 +761,7 @@ const CommunityPage = () => {
         </div>
 
         {/* Navigation Tabs - Improved */}
-        <div className="flex overflow-x-auto space-x-1 mb-8 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-2 border border-gray-200 dark:border-gray-700 shadow-lg">
+        <div className="flex overflow-x-auto space-x-1 mb-6 sm:mb-8 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-1 sm:p-2 border border-gray-200 dark:border-gray-700 shadow-lg scrollbar-hide">
           {[
             { key: "overview", label: "Overview", icon: "📊" },
             { key: "events", label: "Events", icon: "🎪" },
@@ -772,57 +772,57 @@ const CommunityPage = () => {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-4 py-3 rounded-xl whitespace-nowrap transition-all duration-300 font-medium ${
+              className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl whitespace-nowrap transition-all duration-300 font-medium text-xs sm:text-sm ${
                 activeTab === tab.key
                   ? "bg-gradient-to-r from-yellow-500 to-yellow-600 text-cyan-950 shadow-lg transform scale-105"
                   : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white"
               }`}
             >
-              <span className="text-lg">{tab.icon}</span>
+              <span className="text-sm sm:text-lg">{tab.icon}</span>
               {tab.label}
             </button>
           ))}
         </div>
 
         {/* Action Buttons Section */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-8 p-6 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 sm:gap-4 mb-6 sm:mb-8 p-4 sm:p-6 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg">
           {isConnected && (
             <>
-              <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
+              <div className="flex flex-wrap gap-2 sm:gap-3 justify-center lg:justify-start w-full lg:w-auto mb-3 lg:mb-0">
                 {role === "ADMIN" ||
                 role === "Community Manager" ||
                 role === "Reviewer" ? (
                   <>
                     <button
                       onClick={() => setShowCreateEventModal(true)}
-                      className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 font-semibold"
+                      className="flex items-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg sm:rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 font-semibold text-xs sm:text-sm"
                     >
-                      <Calendar className="w-5 h-5" />
+                      <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
                       Create Event
                     </button>
 
                     <button
                       onClick={() => setShowAirdropModal(true)}
-                      className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 font-semibold"
+                      className="flex items-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-lg sm:rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 font-semibold text-xs sm:text-sm"
                     >
-                      <GiftIcon className="w-5 h-5" />
+                      <GiftIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                       Distribute Airdrops
                     </button>
 
                     <button
                       onClick={() => setShowProjectFundingModal(true)}
-                      className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 font-semibold"
+                      className="flex items-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg sm:rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 font-semibold text-xs sm:text-sm"
                     >
-                      <Coins className="w-5 h-5" />
+                      <Coins className="w-4 h-4 sm:w-5 sm:h-5" />
                       Fund Project
                     </button>
                   </>
                 ) : (
                   <button
                     onClick={() => setShowProjectRequestFundsForm(true)}
-                    className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 font-semibold"
+                    className="flex items-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg sm:rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 font-semibold text-xs sm:text-sm"
                   >
-                    <Coins className="w-5 h-5" />
+                    <Coins className="w-4 h-4 sm:w-5 sm:h-5" />
                     Request Project Funding
                   </button>
                 )}
@@ -831,10 +831,10 @@ const CommunityPage = () => {
               {/* Join Community Button */}
               <div className="flex justify-center lg:justify-end w-full lg:w-auto">
                 {Array.isArray(members) && members.includes(address) ? (
-                  <div className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-cyan-950 rounded-xl shadow-lg font-semibold">
+                  <div className="flex items-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-cyan-950 rounded-lg sm:rounded-xl shadow-lg font-semibold text-xs sm:text-sm">
                     <div className="relative">
-                      <Badge className="w-6 h-6" />
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                      <Badge className="w-4 h-4 sm:w-6 sm:h-6" />
+                      <div className="absolute -top-0.5 -right-0.5 w-2 h-2 sm:w-3 sm:h-3 bg-green-500 rounded-full border border-white"></div>
                     </div>
                     <span>ABYA Member</span>
                   </div>
@@ -842,13 +842,13 @@ const CommunityPage = () => {
                   <button
                     onClick={handleJoinCommunity}
                     disabled={joinCommunityLoading}
-                    className="flex items-center gap-3 px-8 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-cyan-950 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 sm:gap-3 px-4 sm:px-8 py-2 sm:py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-cyan-950 rounded-lg sm:rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 font-semibold text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {joinCommunityLoading ? (
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-950"></div>
+                      <div className="animate-spin rounded-full h-4 w-4 sm:h-6 sm:w-6 border-b-2 border-cyan-950"></div>
                     ) : (
                       <>
-                        <Merge className="w-6 h-6" />
+                        <Merge className="w-4 h-4 sm:w-6 sm:h-6" />
                         Join Community
                       </>
                     )}
@@ -862,16 +862,16 @@ const CommunityPage = () => {
         {/* Tab Content */}
         <div className={`${fadeIn}`}>
           {activeTab === "overview" && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
               {/* Community Stats */}
-              <div className="p-6 rounded-2xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-                <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                    <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              <div className="p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                <h2 className="text-lg sm:text-2xl font-bold mb-4 sm:mb-6 text-gray-800 dark:text-white flex items-center gap-2 sm:gap-3">
+                  <div className="p-1 sm:p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                    <Users className="w-4 h-4 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400" />
                   </div>
                   Community Stats
                 </h2>
-                <div className="space-y-5">
+                <div className="space-y-3 sm:space-y-5">
                   {[
                     {
                       icon: Users,
@@ -894,21 +894,21 @@ const CommunityPage = () => {
                   ].map((stat, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl"
+                      className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg sm:rounded-xl"
                     >
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 sm:gap-4">
                         <div
-                          className={`p-2 bg-${stat.color}-100 dark:bg-${stat.color}-900 rounded-lg`}
+                          className={`p-1 sm:p-2 bg-${stat.color}-100 dark:bg-${stat.color}-900 rounded-lg`}
                         >
                           <stat.icon
-                            className={`w-5 h-5 text-${stat.color}-600 dark:text-${stat.color}-400`}
+                            className={`w-3 h-3 sm:w-5 sm:h-5 text-${stat.color}-600 dark:text-${stat.color}-400`}
                           />
                         </div>
-                        <span className="text-gray-600 dark:text-gray-300">
+                        <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">
                           {stat.label}
                         </span>
                       </div>
-                      <span className="text-2xl font-bold text-gray-800 dark:text-white">
+                      <span className="text-lg sm:text-2xl font-bold text-gray-800 dark:text-white">
                         {stat.value}
                       </span>
                     </div>
@@ -917,58 +917,58 @@ const CommunityPage = () => {
               </div>
 
               {/* Featured Members */}
-              <div className="p-6 rounded-2xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-                <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white flex items-center gap-3">
-                  <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-                    <Star className="w-6 h-6 text-green-600 dark:text-green-400" />
+              <div className="p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                <h2 className="text-lg sm:text-2xl font-bold mb-4 sm:mb-6 text-gray-800 dark:text-white flex items-center gap-2 sm:gap-3">
+                  <div className="p-1 sm:p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                    <Star className="w-4 h-4 sm:w-6 sm:h-6 text-green-600 dark:text-green-400" />
                   </div>
                   Featured Members
                 </h2>
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {featuredMembers.map((member, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600/50 transition-colors"
+                      className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg sm:rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600/50 transition-colors"
                     >
                       <img
                         src={`https://api.dicebear.com/6.x/avataaars/svg?seed=${member.name}`}
                         alt={member.name}
-                        className="w-14 h-14 rounded-full border-4 border-yellow-400 shadow-md"
+                        className="w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2 sm:border-4 border-yellow-400 shadow-md"
                       />
                       <div className="flex-1">
-                        <p className="font-semibold text-gray-800 dark:text-white">
+                        <p className="font-semibold text-gray-800 dark:text-white text-sm sm:text-base">
                           {member.name}
                         </p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                           {member.role}
                         </p>
                       </div>
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full animate-pulse"></div>
                     </div>
                   ))}
                 </div>
               </div>
 
               {/* Recent Activities */}
-              <div className="p-6 rounded-2xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-                <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white flex items-center gap-3">
-                  <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
-                    <Heart className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              <div className="p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                <h2 className="text-lg sm:text-2xl font-bold mb-4 sm:mb-6 text-gray-800 dark:text-white flex items-center gap-2 sm:gap-3">
+                  <div className="p-1 sm:p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
+                    <Heart className="w-4 h-4 sm:w-6 sm:h-6 text-purple-600 dark:text-purple-400" />
                   </div>
                   Recent Activities
                 </h2>
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {recentActivities.map((activity, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600/50 transition-colors"
+                      className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg sm:rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600/50 transition-colors"
                     >
                       {activity.icon}
                       <div className="flex-1">
-                        <p className="text-gray-800 dark:text-white">
+                        <p className="text-gray-800 dark:text-white text-sm sm:text-base">
                           {activity.description}
                         </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
                           {activity.timestamp}
                         </p>
                       </div>
@@ -980,10 +980,10 @@ const CommunityPage = () => {
           )}
 
           {activeTab === "events" && (
-            <div className={`space-y-6 ${fadeIn}`}>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg">
-                <h2 className="text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-3">
-                  <Calendar className="w-8 h-8 text-yellow-500" />
+            <div className={`space-y-4 sm:space-y-6 ${fadeIn}`}>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 p-4 sm:p-6 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg">
+                <h2 className="text-xl sm:text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-2 sm:gap-3">
+                  <Calendar className="w-5 h-5 sm:w-8 sm:h-8 text-yellow-500" />
                   Community Events
                 </h2>
                 {(role === "ADMIN" ||
@@ -991,37 +991,37 @@ const CommunityPage = () => {
                   role === "Reviewer") && (
                   <button
                     onClick={() => setShowCreateEventModal(true)}
-                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl font-semibold"
+                    className="flex items-center gap-1 sm:gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg sm:rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl font-semibold text-xs sm:text-sm"
                   >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
                     New Event
                   </button>
                 )}
               </div>
 
               {loading ? (
-                <div className="flex justify-center py-20">
-                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-500"></div>
+                <div className="flex justify-center py-12 sm:py-20">
+                  <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-b-2 border-yellow-500"></div>
                 </div>
               ) : events.length === 0 ? (
-                <div className="text-center py-16 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg">
-                  <Calendar className="w-20 h-20 mx-auto text-gray-400 mb-6" />
-                  <p className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+                <div className="text-center py-12 sm:py-16 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg">
+                  <Calendar className="w-12 h-12 sm:w-20 sm:h-20 mx-auto text-gray-400 mb-4 sm:mb-6" />
+                  <p className="text-lg sm:text-2xl font-bold text-gray-800 dark:text-white mb-3 sm:mb-4">
                     No events available
                   </p>
-                  <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                  <p className="text-gray-600 dark:text-gray-400 mb-6 sm:mb-8 max-w-md mx-auto text-sm sm:text-base">
                     Be the first to create an amazing community event and bring
                     everyone together!
                   </p>
                   <button
                     onClick={() => setShowCreateEventModal(true)}
-                    className="px-8 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-cyan-950 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl font-semibold"
+                    className="px-6 sm:px-8 py-2 sm:py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-cyan-950 rounded-lg sm:rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl font-semibold text-sm sm:text-base"
                   >
                     Create First Event
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
                   {events.map((event) => {
                     const now = Date.now();
                     const isUpcoming = event.startTime > now;
@@ -1044,16 +1044,16 @@ const CommunityPage = () => {
                     return (
                       <div
                         key={event.id}
-                        className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300 hover:scale-105"
+                        className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300 hover:scale-105"
                       >
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
                           <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-3">
-                              <h3 className="text-xl font-bold text-gray-800 dark:text-white pr-2">
+                            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                              <h3 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-white pr-1 sm:pr-2">
                                 {event.name}
                               </h3>
                               <span
-                                className={`text-xs px-3 py-1 rounded-full font-semibold ${
+                                className={`text-xs px-2 py-1 sm:px-3 sm:py-1 rounded-full font-semibold ${
                                   isUpcoming
                                     ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
                                     : isOngoing
@@ -1069,9 +1069,9 @@ const CommunityPage = () => {
                               </span>
                             </div>
 
-                            <div className="flex flex-wrap gap-2 mb-4">
+                            <div className="flex flex-wrap gap-1 sm:gap-2 mb-3 sm:mb-4">
                               <span
-                                className={`text-xs px-3 py-1 rounded-full ${
+                                className={`text-xs px-2 py-1 sm:px-3 sm:py-1 rounded-full ${
                                   event.isOnline
                                     ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
                                     : "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
@@ -1079,7 +1079,7 @@ const CommunityPage = () => {
                               >
                                 {event.isOnline ? "🌐 Online" : "📍 Physical"}
                               </span>
-                              <span className="text-xs px-3 py-1 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-full">
+                              <span className="text-xs px-2 py-1 sm:px-3 sm:py-1 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-full">
                                 👥 {event.currentParticipants}/
                                 {event.maxParticipants}
                               </span>
@@ -1087,27 +1087,27 @@ const CommunityPage = () => {
                           </div>
                         </div>
 
-                        <p className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-2">
+                        <p className="text-gray-600 dark:text-gray-300 mb-3 sm:mb-4 line-clamp-2 text-sm sm:text-base">
                           {event.additionalDetails ||
                             "Join this exciting community event!"}
                         </p>
 
-                        <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                        <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 p-2 sm:p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg sm:rounded-xl">
                           {event.isOnline ? (
-                            <Globe className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                            <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0" />
                           ) : (
-                            <MapPin className="w-5 h-5 text-red-500 flex-shrink-0" />
+                            <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0" />
                           )}
-                          <p className="text-sm text-gray-600 dark:text-gray-300">
+                          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">
                             {event.isOnline
                               ? "Click 'Join Event' when the event starts"
                               : event.location || "Location TBD"}
                           </p>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                          <div className="flex items-center gap-3">
-                            <Calendar className="w-5 h-5 text-gray-500" />
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
                             <div className="flex flex-col">
                               <span className="text-sm font-medium text-gray-800 dark:text-white">
                                 {new Date(event.startTime).toLocaleDateString()}
@@ -1126,11 +1126,11 @@ const CommunityPage = () => {
                         </div>
 
                         {isUpcoming && (
-                          <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/50 dark:to-blue-800/50 rounded-xl border border-blue-200 dark:border-blue-700">
-                            <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2 text-center">
+                          <div className="mb-3 sm:mb-4 p-3 sm:p-4 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/50 dark:to-blue-800/50 rounded-lg sm:rounded-xl border border-blue-200 dark:border-blue-700">
+                            <p className="text-xs sm:text-sm font-medium text-blue-800 dark:text-blue-200 mb-1 sm:mb-2 text-center">
                               Starting in:
                             </p>
-                            <div className="flex justify-center space-x-4">
+                            <div className="flex justify-center space-x-2 sm:space-x-4">
                               {[
                                 { value: days, label: "Days" },
                                 { value: hours, label: "Hours" },
@@ -1138,12 +1138,12 @@ const CommunityPage = () => {
                                 { value: seconds, label: "Seconds" },
                               ].map((time, index) => (
                                 <div key={index} className="text-center">
-                                  <div className="bg-white dark:bg-blue-800 rounded-lg p-2 min-w-12 shadow-sm">
-                                    <span className="text-lg font-bold text-blue-600 dark:text-blue-200">
+                                  <div className="bg-white dark:bg-blue-800 rounded-lg p-1 sm:p-2 min-w-8 sm:min-w-12 shadow-sm">
+                                    <span className="text-sm sm:text-lg font-bold text-blue-600 dark:text-blue-200">
                                       {time.value.toString().padStart(2, "0")}
                                     </span>
                                   </div>
-                                  <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
+                                  <p className="text-xs text-blue-600 dark:text-blue-300 mt-0.5 sm:mt-1">
                                     {time.label}
                                   </p>
                                 </div>
@@ -1171,7 +1171,7 @@ const CommunityPage = () => {
                             isUpcoming ||
                             event.currentParticipants >= event.maxParticipants
                           }
-                          className={`w-full py-3 px-4 font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2
+                          className={`w-full py-2 sm:py-3 px-3 sm:px-4 font-semibold rounded-lg sm:rounded-xl transition-all duration-300 flex items-center justify-center gap-1 sm:gap-2 text-sm sm:text-base
                           ${
                             isPast ||
                             isUpcoming ||
@@ -1181,7 +1181,7 @@ const CommunityPage = () => {
                           }`}
                         >
                           {participateLoading ? (
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-cyan-950"></div>
+                            <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-cyan-950"></div>
                           ) : isPast ? (
                             <>Event Ended</>
                           ) : isUpcoming ? (
@@ -1204,17 +1204,17 @@ const CommunityPage = () => {
           {activeTab === "rewards" && <RewardsSection />}
 
           {activeTab === "projects" && (
-            <div className={`space-y-6 ${fadeIn}`}>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg">
-                <h2 className="text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-3">
-                  <Coins className="w-8 h-8 text-green-500" />
+            <div className={`space-y-4 sm:space-y-6 ${fadeIn}`}>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 p-4 sm:p-6 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg">
+                <h2 className="text-xl sm:text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-2 sm:gap-3">
+                  <Coins className="w-5 h-5 sm:w-8 sm:h-8 text-green-500" />
                   Community Projects
                 </h2>
                 <button
                   onClick={() => setShowProjectFundingModal(true)}
-                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl font-semibold"
+                  className="flex items-center gap-1 sm:gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg sm:rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl font-semibold text-xs sm:text-sm"
                 >
-                  <PlusCircle className="w-5 h-5" />
+                  <PlusCircle className="w-4 h-4 sm:w-5 sm:h-5" />
                   Fund Project
                 </button>
               </div>
@@ -1223,13 +1223,13 @@ const CommunityPage = () => {
           )}
 
           {activeTab === "airdrops" && (
-            <div className={`space-y-6 ${fadeIn}`}>
-              <div className="p-6 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg">
-                <h2 className="text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-3 mb-2">
-                  <GiftIcon className="w-8 h-8 text-purple-500" />
+            <div className={`space-y-4 sm:space-y-6 ${fadeIn}`}>
+              <div className="p-4 sm:p-6 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg">
+                <h2 className="text-xl sm:text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                  <GiftIcon className="w-5 h-5 sm:w-8 sm:h-8 text-purple-500" />
                   Airdrop Distributions
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
                   Manage and track airdrop distributions for community members
                 </p>
               </div>
