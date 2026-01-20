@@ -48,7 +48,7 @@ import { toast } from "react-toastify";
 import { useProgress } from "../contexts/progressContext";
 import { useNavigate } from "react-router-dom";
 import { generateCertificateImage } from "../services/certificateGenerator";
-import { uploadFileToPinata } from "../components/pinata";
+import { uploadFileToPinata, uploadMetadataToIPFS } from "../components/pinata";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
@@ -1303,6 +1303,38 @@ const CourseDetails = memo(({ courseId }) => {
         throw new Error("Image upload failed");
       }
 
+      const metadata = {
+        name: `Certificate - ${currentCourse.courseName}`,
+        description: `Certificate of Completion awarded to ${profile.fname} ${profile.lname}`,
+        image: `ipfs://${imageUpload}`, // Your PNG image
+        external_url: `https://yourplatform.com/certificates/${certificateId}`,
+        attributes: [
+          {
+            trait_type: "Course Name",
+            value: currentCourse.courseName,
+          },
+          {
+            trait_type: "Student",
+            value: `${profile.fname} ${profile.lname}`,
+          },
+          {
+            trait_type: "Issue Date",
+            value: new Date().toISOString(),
+          },
+          {
+            trait_type: "Certificate Type",
+            value: "Course Completion",
+          },
+          {
+            trait_type: "Blockchain",
+            value: "Sepolia", // or your chain
+          },
+        ],
+      };
+
+      // Upload metadata to IPFS
+      const metadataHash = await uploadMetadataToIPFS(metadata);
+
       const contract = await getContract({
         address: DiamondAddress,
         abi: Ecosystem3Facet_ABI,
@@ -1320,7 +1352,7 @@ const CourseDetails = memo(({ courseId }) => {
         issuer: cert_issuer,
         issueDate: issue_date,
         courseId: currentCourse.courseId,
-        tokenURI: imageUpload,
+        tokenURI: metadataHash,
       };
 
       // Stage 4: Minting SBT
@@ -1334,7 +1366,7 @@ const CourseDetails = memo(({ courseId }) => {
           currentCourse.courseName,
           cert_issuer,
           BigInt(Math.floor(Date.now() / 1000)),
-          imageUpload,
+          metadataHash,
         ],
       });
 
