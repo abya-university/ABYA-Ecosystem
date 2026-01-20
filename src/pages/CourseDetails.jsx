@@ -47,6 +47,8 @@ import CONTRACT_ADDRESSES from "../constants/addresses";
 import { toast } from "react-toastify";
 import { useProgress } from "../contexts/progressContext";
 import { useNavigate } from "react-router-dom";
+import { generateCertificateImage } from "../services/certificateGenerator";
+import { uploadFileToPinata } from "../components/pinata";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
@@ -138,7 +140,7 @@ const Resource = memo(({ resource }) => {
       setLoading(true);
       try {
         const response = await fetch(
-          `https://gateway.pinata.cloud/ipfs/${resource.url}`
+          `https://gateway.pinata.cloud/ipfs/${resource.url}`,
         );
         if (!response.ok) {
           throw new Error("Failed to fetch resource");
@@ -302,12 +304,12 @@ const Quiz = memo(({ quiz, courseId }) => {
   const validateQuizSubmission = () => {
     // Check if all questions are answered
     const unansweredQuestions = quiz.questions.filter(
-      (q) => selectedAnswers[q.questionId] === undefined
+      (q) => selectedAnswers[q.questionId] === undefined,
     );
 
     if (unansweredQuestions.length > 0) {
       toast.error(
-        `Please answer all ${unansweredQuestions.length} remaining questions`
+        `Please answer all ${unansweredQuestions.length} remaining questions`,
       );
       return false;
     }
@@ -387,7 +389,7 @@ const Quiz = memo(({ quiz, courseId }) => {
 
         console.log("Quiz submitted successfully:", result);
         toast.success(
-          `Quiz submitted successfully! Score: ${calculatedScore.toFixed(1)}%`
+          `Quiz submitted successfully! Score: ${calculatedScore.toFixed(1)}%`,
         );
 
         // Add to completed quizzes if score is passing
@@ -418,8 +420,8 @@ const Quiz = memo(({ quiz, courseId }) => {
         // Score below 75% - just show message, no contract call
         toast.warning(
           `Score ${calculatedScore.toFixed(
-            1
-          )}% is below passing grade (75%). Please try again.`
+            1,
+          )}% is below passing grade (75%). Please try again.`,
         );
 
         // Still lock if max attempts reached
@@ -512,7 +514,7 @@ const Quiz = memo(({ quiz, courseId }) => {
         }));
       }
     },
-    [quizSubmitted]
+    [quizSubmitted],
   );
 
   if (isLocked) {
@@ -589,7 +591,7 @@ const Quiz = memo(({ quiz, courseId }) => {
           {quiz.questions.map((question, index) => {
             const selectedAnswer = selectedAnswers[question.questionId];
             const correctAnswer = question.choices.findIndex(
-              (choice) => choice.isCorrect
+              (choice) => choice.isCorrect,
             );
 
             return (
@@ -776,7 +778,7 @@ const LessonContent = memo(
         )}
       </div>
     );
-  }
+  },
 );
 
 LessonContent.displayName = "LessonContent";
@@ -793,7 +795,7 @@ LessonContent.propTypes = {
         url: PropTypes.string,
         name: PropTypes.string,
         contentType: PropTypes.number,
-      })
+      }),
     ),
   }).isRequired,
   quiz: PropTypes.shape({
@@ -846,6 +848,17 @@ const CourseDetails = memo(({ courseId }) => {
   const [showMobileNav, setShowMobileNav] = useState(false);
   const navigate = useNavigate();
   const [isIssuingCertificate, setIsIssuingCertificate] = useState(false);
+
+  const PROGRESS_STAGES = {
+    INITIAL: 0,
+    GENERATING_CERTIFICATE: 1,
+    CONVERTING_TO_IMAGE: 2,
+    UPLOADING_TO_IPFS: 3,
+    MINTING_SBT: 4,
+    COMPLETED: 5,
+  };
+
+  const [currentStage, setCurrentStage] = useState(PROGRESS_STAGES.INITIAL);
 
   useEffect(() => {
     if (courseId) {
@@ -926,7 +939,7 @@ const CourseDetails = memo(({ courseId }) => {
         "Missing data - enrolledStudents:",
         enrolledStudents,
         "userAddress:",
-        userAddress
+        userAddress,
       );
       return false;
     }
@@ -934,7 +947,7 @@ const CourseDetails = memo(({ courseId }) => {
     // If it's an array, check if it includes the address
     if (Array.isArray(enrolledStudents)) {
       const isEnrolled = enrolledStudents.some(
-        (addr) => addr.toLowerCase() === userAddress.toLowerCase()
+        (addr) => addr.toLowerCase() === userAddress.toLowerCase(),
       );
       console.log(
         "Array check - enrolledStudents:",
@@ -942,7 +955,7 @@ const CourseDetails = memo(({ courseId }) => {
         "userAddress:",
         userAddress,
         "isEnrolled:",
-        isEnrolled
+        isEnrolled,
       );
       return isEnrolled;
     }
@@ -960,7 +973,7 @@ const CourseDetails = memo(({ courseId }) => {
         "userAddress:",
         userAddress,
         "isEnrolled:",
-        isEnrolled
+        isEnrolled,
       );
       return isEnrolled;
     }
@@ -976,7 +989,7 @@ const CourseDetails = memo(({ courseId }) => {
       "userAddress:",
       userAddress,
       "isEnrolled:",
-      isEnrolled
+      isEnrolled,
     );
     return isEnrolled;
   };
@@ -988,13 +1001,13 @@ const CourseDetails = memo(({ courseId }) => {
   // Memoize current course
   const currentCourse = useMemo(
     () => courses.find((course) => course.courseId === courseId),
-    [courses, courseId]
+    [courses, courseId],
   );
 
   // Memoize filtered chapters
   const filteredChapters = useMemo(() => {
     const filtered = chapters.filter(
-      (chapter) => chapter.courseId?.toString() === courseId?.toString()
+      (chapter) => chapter.courseId?.toString() === courseId?.toString(),
     );
 
     console.log("=== CHAPTER FILTERING DEBUG ===", {
@@ -1021,8 +1034,8 @@ const CourseDetails = memo(({ courseId }) => {
     return lessons.filter((lesson) =>
       filteredChapters.some(
         (chapter) =>
-          chapter.chapterId?.toString() === lesson.chapterId?.toString()
-      )
+          chapter.chapterId?.toString() === lesson.chapterId?.toString(),
+      ),
     ).length;
   }, [lessons, filteredChapters]);
 
@@ -1033,14 +1046,14 @@ const CourseDetails = memo(({ courseId }) => {
       .filter((lesson) =>
         filteredChapters.some(
           (chapter) =>
-            chapter.chapterId?.toString() === lesson.chapterId?.toString()
-        )
+            chapter.chapterId?.toString() === lesson.chapterId?.toString(),
+        ),
       )
       .map((lesson) => lesson.lessonId.toString());
 
     // Count quizzes that are linked to these lessons
     return quizzes.filter((quiz) =>
-      lessonIds.includes(quiz.lessonId.toString())
+      lessonIds.includes(quiz.lessonId.toString()),
     ).length;
 
     // console.log("Total quizzes:", totalQuizzes2);
@@ -1050,7 +1063,7 @@ const CourseDetails = memo(({ courseId }) => {
     const hasCertificate = certificates.some(
       (cert) =>
         cert.courseId === currentCourse.courseId.toString() &&
-        cert.owner.toLowerCase() === address.toLowerCase()
+        cert.owner.toLowerCase() === address.toLowerCase(),
     );
 
     console.log("Checking for certificate:", hasCertificate);
@@ -1103,14 +1116,14 @@ const CourseDetails = memo(({ courseId }) => {
   const getLessonsForChapter = useCallback(
     (chapterId) =>
       lessons.filter((lesson) => lesson.chapterId.toString() === chapterId),
-    [lessons]
+    [lessons],
   );
 
   // Memoize quiz finding function
   const getQuizForLesson = useCallback(
     (lessonId) =>
       quizzes.find((quiz) => quiz.lessonId.toString() === lessonId.toString()),
-    [quizzes]
+    [quizzes],
   );
 
   const toggleQuiz = useCallback((lessonId) => {
@@ -1137,7 +1150,7 @@ const CourseDetails = memo(({ courseId }) => {
       ratings.technologyIntegration,
       ratings.learnerSupport,
       ratings.assessmentForLearning,
-      ratings.engagementAndMotivation
+      ratings.engagementAndMotivation,
     );
   }, []);
 
@@ -1203,7 +1216,7 @@ const CourseDetails = memo(({ courseId }) => {
       role,
       currentCourse,
       address,
-    ]
+    ],
   );
 
   //issueCertificate section - only show congratulations popup when course is 100% complete AND user doesn't have certificate
@@ -1243,6 +1256,7 @@ const CourseDetails = memo(({ courseId }) => {
   //Leave it for now
   const handleClaimCertificate = async () => {
     setIsIssuingCertificate(true);
+    setCurrentStage(PROGRESS_STAGES.INITIAL);
     try {
       if (!client) {
         throw new Error("No client available");
@@ -1251,6 +1265,7 @@ const CourseDetails = memo(({ courseId }) => {
       // Check if profile is missing
       if (!profile || profile.fname === null) {
         alert("Profile not found. Please connect your profile first.");
+        setCurrentStage(PROGRESS_STAGES.INITIAL);
         return;
       }
 
@@ -1264,7 +1279,28 @@ const CourseDetails = memo(({ courseId }) => {
       // Ensure learner name is provided
       if (!learner.trim()) {
         alert("Profile not found. Please connect your profile first.");
+        setCurrentStage(PROGRESS_STAGES.INITIAL);
         return;
+      }
+
+      // Stage 1: Generating certificate
+      setCurrentStage(PROGRESS_STAGES.GENERATING_CERTIFICATE);
+      const imageFile = await generateCertificateImage(
+        profile,
+        currentCourse,
+        address,
+      );
+
+      // Stage 2: Converting to image (completed as part of generation)
+      setCurrentStage(PROGRESS_STAGES.CONVERTING_TO_IMAGE);
+      await new Promise((resolve) => setTimeout(resolve, 500)); // Brief delay for UI
+
+      // Stage 3: Uploading to IPFS
+      setCurrentStage(PROGRESS_STAGES.UPLOADING_TO_IPFS);
+      const imageUpload = await uploadFileToPinata(imageFile);
+
+      if (!imageUpload) {
+        throw new Error("Image upload failed");
       }
 
       const contract = await getContract({
@@ -1284,17 +1320,11 @@ const CourseDetails = memo(({ courseId }) => {
         issuer: cert_issuer,
         issueDate: issue_date,
         courseId: currentCourse.courseId,
+        tokenURI: imageUpload,
       };
 
-      // const tx = await contract.issueCertificate(
-      //   currentCourse.courseId,
-      //   learner,
-      //   currentCourse.courseName,
-      //   cert_issuer,
-      //   Math.floor(Date.now() / 1000),
-      //   { gasLimit: 500000 }
-      // );
-
+      // Stage 4: Minting SBT
+      setCurrentStage(PROGRESS_STAGES.MINTING_SBT);
       const transaction = await prepareContractCall({
         contract,
         method: "issueCertificate",
@@ -1304,11 +1334,14 @@ const CourseDetails = memo(({ courseId }) => {
           currentCourse.courseName,
           cert_issuer,
           BigInt(Math.floor(Date.now() / 1000)),
+          imageUpload,
         ],
       });
 
       await sendTransaction({ transaction, account });
 
+      // Stage 5: Completed
+      setCurrentStage(PROGRESS_STAGES.COMPLETED);
       toast.success("Certificate issued successfully!");
 
       // Set certificate data, close congrats popup and show certificate popup
@@ -1317,11 +1350,12 @@ const CourseDetails = memo(({ courseId }) => {
       setShowCertificate(true);
     } catch (err) {
       console.error("Error issuing certificate:", err);
+      setCurrentStage(PROGRESS_STAGES.INITIAL);
       // Extract more error information if possible
       toast.error(
         `Failed to issue certificate: ${
           err.message || "Please try again later."
-        }`
+        }`,
       );
       if (err.error && err.error.message) {
         console.error("Contract error message:", err.error.message);
@@ -1393,13 +1427,13 @@ const CourseDetails = memo(({ courseId }) => {
                           .filter(
                             (lesson) =>
                               lesson.chapterId?.toString() ===
-                              chapter.chapterId?.toString()
+                              chapter.chapterId?.toString(),
                           )
                           .map((lesson) => {
                             const lessonQuiz = quizzes.find(
                               (quiz) =>
                                 quiz.lessonId.toString() ===
-                                lesson.lessonId.toString()
+                                lesson.lessonId.toString(),
                             );
 
                             return (
@@ -1415,7 +1449,7 @@ const CourseDetails = memo(({ courseId }) => {
                                 </p>
 
                                 {lesson?.additionalResources?.some(
-                                  (r) => r.url
+                                  (r) => r.url,
                                 ) && (
                                   <div className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
                                     <h4 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-1 sm:mb-2">
@@ -1439,7 +1473,7 @@ const CourseDetails = memo(({ courseId }) => {
                                     {(() => {
                                       const userEnrolled = isUserEnrolled(
                                         currentCourse.enrolledStudents,
-                                        address
+                                        address,
                                       );
                                       return userEnrolled;
                                     })() ? (
@@ -1447,10 +1481,10 @@ const CourseDetails = memo(({ courseId }) => {
                                         <button
                                           className={`bg-yellow-500 text-gray-900 p-2 sm:p-3 my-2 sm:my-3 rounded-lg font-normal flex items-center gap-2 text-sm sm:text-base ${
                                             completedLessonIds.has(
-                                              lesson.lessonId.toString()
+                                              lesson.lessonId.toString(),
                                             ) ||
                                             markingAsReadIds.has(
-                                              lesson.lessonId.toString()
+                                              lesson.lessonId.toString(),
                                             )
                                               ? "opacity-50 cursor-not-allowed"
                                               : "hover:bg-yellow-600"
@@ -1458,37 +1492,37 @@ const CourseDetails = memo(({ courseId }) => {
                                           onClick={async () => {
                                             if (
                                               !completedLessonIds.has(
-                                                lesson.lessonId.toString()
+                                                lesson.lessonId.toString(),
                                               ) &&
                                               !markingAsReadIds.has(
-                                                lesson.lessonId.toString()
+                                                lesson.lessonId.toString(),
                                               )
                                             ) {
                                               try {
                                                 await markAsRead(
                                                   currentCourse.courseId,
                                                   chapter.chapterId,
-                                                  lesson.lessonId
+                                                  lesson.lessonId,
                                                 );
                                               } catch (error) {
                                                 console.error(
                                                   "Failed to mark lesson as read:",
-                                                  error
+                                                  error,
                                                 );
                                               }
                                             }
                                           }}
                                           disabled={
                                             completedLessonIds.has(
-                                              lesson.lessonId.toString()
+                                              lesson.lessonId.toString(),
                                             ) ||
                                             markingAsReadIds.has(
-                                              lesson.lessonId.toString()
+                                              lesson.lessonId.toString(),
                                             )
                                           }
                                         >
                                           {markingAsReadIds.has(
-                                            lesson.lessonId.toString()
+                                            lesson.lessonId.toString(),
                                           ) ? (
                                             <>
                                               <Loader2 className="w-4 h-4 animate-spin" />
@@ -1497,7 +1531,7 @@ const CourseDetails = memo(({ courseId }) => {
                                               </span>
                                             </>
                                           ) : completedLessonIds.has(
-                                              lesson.lessonId.toString()
+                                              lesson.lessonId.toString(),
                                             ) ? (
                                             "Completed"
                                           ) : (
@@ -1566,7 +1600,7 @@ const CourseDetails = memo(({ courseId }) => {
                   {Math.round(
                     ((completedLessonIds.size + completedQuizIds.size) /
                       (totalLessons + totalQuizzes || 1)) *
-                      100
+                      100,
                   )}
                   %
                 </span>
@@ -1653,7 +1687,7 @@ const CourseDetails = memo(({ courseId }) => {
             {certificates.some(
               (cert) =>
                 cert.courseId === currentCourse.courseId.toString() &&
-                cert.owner.toLowerCase() === address.toLowerCase()
+                cert.owner.toLowerCase() === address.toLowerCase(),
             ) && (
               <div className="relative bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 dark:from-emerald-900/30 dark:via-green-900/20 dark:to-teal-900/20 border-b border-emerald-200 dark:border-emerald-700/50">
                 <div className="absolute inset-0 opacity-10 dark:opacity-5">
@@ -1742,7 +1776,7 @@ const CourseDetails = memo(({ courseId }) => {
                             setShowCertificate(true); // open the certificate modal used below
                           } else {
                             console.warn(
-                              "No certificate found for current user/course"
+                              "No certificate found for current user/course",
                             );
                           }
                         }}
@@ -1786,7 +1820,7 @@ const CourseDetails = memo(({ courseId }) => {
                     {Math.round(
                       ((completedLessonIds.size + completedQuizIds.size) /
                         (totalLessons + totalQuizzes)) *
-                        100
+                        100,
                     )}
                     %
                   </span>
@@ -2005,6 +2039,83 @@ const CourseDetails = memo(({ courseId }) => {
                     Click the button below to claim your certificate.
                   </p>
                 </div>
+
+                {/* Progress Indicator */}
+                {isIssuingCertificate && (
+                  <div className="mt-4 sm:mt-6 space-y-2 sm:space-y-3">
+                    <div className="bg-gray-50 dark:bg-gray-700/50 p-3 sm:p-4 rounded-xl border border-gray-200 dark:border-gray-600">
+                      <div className="space-y-2 sm:space-y-3">
+                        {[
+                          {
+                            stage: PROGRESS_STAGES.GENERATING_CERTIFICATE,
+                            label: "Generating Certificate",
+                            icon: "📝",
+                          },
+                          {
+                            stage: PROGRESS_STAGES.CONVERTING_TO_IMAGE,
+                            label: "Converting to Image",
+                            icon: "🖼️",
+                          },
+                          {
+                            stage: PROGRESS_STAGES.UPLOADING_TO_IPFS,
+                            label: "Uploading to IPFS",
+                            icon: "☁️",
+                          },
+                          {
+                            stage: PROGRESS_STAGES.MINTING_SBT,
+                            label: "Minting Certificate NFT",
+                            icon: "⛓️",
+                          },
+                          {
+                            stage: PROGRESS_STAGES.COMPLETED,
+                            label: "Completed",
+                            icon: "✅",
+                          },
+                        ].map(({ stage, label, icon }) => (
+                          <div
+                            key={stage}
+                            className={`flex items-center gap-2 sm:gap-3 p-2 rounded-lg transition-all duration-300 ${
+                              currentStage === stage
+                                ? "bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700"
+                                : currentStage > stage
+                                ? "bg-green-50 dark:bg-green-900/20"
+                                : "bg-gray-100 dark:bg-gray-700"
+                            }`}
+                          >
+                            <span className="text-lg sm:text-xl">{icon}</span>
+                            <span
+                              className={`text-xs sm:text-sm font-medium flex-1 ${
+                                currentStage === stage
+                                  ? "text-yellow-800 dark:text-yellow-200"
+                                  : currentStage > stage
+                                  ? "text-green-700 dark:text-green-300"
+                                  : "text-gray-500 dark:text-gray-400"
+                              }`}
+                            >
+                              {label}
+                            </span>
+                            {currentStage === stage && (
+                              <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-yellow-600"></div>
+                            )}
+                            {currentStage > stage && (
+                              <svg
+                                className="w-3 h-3 sm:w-4 sm:h-4 text-green-600"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-6 sm:mt-8">

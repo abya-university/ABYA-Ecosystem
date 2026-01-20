@@ -215,6 +215,12 @@ library LibDiamond {
         mapping(uint256 => Certificate) certificates;
 
         Certificate[] listOfCertificates;
+
+        // ERC721-like SBT storage
+        mapping(uint256 => address) owners;
+        mapping(address => uint256) balances;
+        mapping(uint256 => string) tokenURIs;
+        uint256 totalSupply;
     }
 
     struct Certificate {

@@ -2,13 +2,9 @@
 pragma solidity ^0.8.24;
 
 import { LibDiamond } from "./DiamondLibrary/LibDiamond.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+ 
 
-contract Ecosystem3Facet is ReentrancyGuard {
-    using LibDiamond for LibDiamond.DiamondStorage;
-
-    uint256 public constant COURSE_COMPLETION_REWARD = 2 * 10 ** 18;
-    uint256 public constant QUIZ_COMPLETION_REWARD = 1 * 10 ** 18;
+contract Ecosystem3Facet {
 
     // events
     event CourseDeleteSuccess(uint256 indexed _courseId, address owner);
@@ -24,7 +20,7 @@ contract Ecosystem3Facet is ReentrancyGuard {
     event LessonEdited(uint256 indexed _lessonId, string _lessonName);
     event QuizEdited(uint256 indexed _lessonId, uint256 indexed _quizId, string _quizTitle);
     event EcosystemPoolUpdate(address indexed _to, uint256 indexed _amount);
-
+    event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
 
     //Ecosystem3Facet Storage Pointer
     function ecosystem3Storage() internal pure returns (LibDiamond.Ecosystem3Storage storage es) {
@@ -47,7 +43,7 @@ contract Ecosystem3Facet is ReentrancyGuard {
     }
 
     //function to award/issue certificate
-    function issueCertificate(uint256 _courseId, string memory learner, string memory courseName, string memory cert_issuer, uint issue_date) public returns (uint256, LibDiamond.Certificate memory) {
+    function issueCertificate(uint256 _courseId, string memory learner, string memory courseName, string memory cert_issuer, uint issue_date, string memory _tokenURI) public returns (uint256, LibDiamond.Certificate memory) {
         LibDiamond.Ecosystem3Storage storage es = ecosystem3Storage();
 
         // require(es.isEnrolled[_courseId][msg.sender], "You must be enrolled in the course to complete it");
@@ -74,7 +70,8 @@ contract Ecosystem3Facet is ReentrancyGuard {
         es.listOfCertificates.push(newCert);
 
         // Award tokens for course completion
-        // mintToken(msg.sender, LibDiamond.COURSE_COMPLETION_REWARD);
+        mintToken(msg.sender, LibDiamond.COURSE_COMPLETION_REWARD);
+        _mintCertificate(msg.sender, certificateId, _tokenURI);
 
         emit CertificateIssued(certificateId, courseName, cert_issuer, learner);
 
@@ -82,32 +79,106 @@ contract Ecosystem3Facet is ReentrancyGuard {
         return (certificateId, newCert);
     }
 
+    // SBT metadata helpers
+    function name() external pure returns (string memory) {
+        return "CertificateSBT";
+    }
+
+    function symbol() external pure returns (string memory) {
+        return "CERT";
+    }
+
+    // Minimal ERC721-style views
+    function balanceOf(address owner) public view returns (uint256) {
+        require(owner != address(0), "SBT: zero address");
+        return ecosystem3Storage().balances[owner];
+    }
+
+    function ownerOf(uint256 tokenId) public view returns (address) {
+        address owner = ecosystem3Storage().owners[tokenId];
+        require(owner != address(0), "SBT: nonexistent token");
+        return owner;
+    }
+
+    function tokenURI(uint256 tokenId) public view returns (string memory) {
+        require(_exists(tokenId), "SBT: nonexistent token");
+        return ecosystem3Storage().tokenURIs[tokenId];
+    }
+
+    function totalSupply() external view returns (uint256) {
+        return ecosystem3Storage().totalSupply;
+    }
+
+    // Non-transferable / approvals disabled
+    function approve(address, uint256) external pure {
+        revert("SBT: approvals disabled");
+    }
+
+    function setApprovalForAll(address, bool) external pure {
+        revert("SBT: approvals disabled");
+    }
+
+    function getApproved(uint256) external pure returns (address) {
+        revert("SBT: approvals disabled");
+    }
+
+    function isApprovedForAll(address, address) external pure returns (bool) {
+        return false;
+    }
+
+    function transferFrom(address, address, uint256) external pure {
+        revert("SBT: non-transferable");
+    }
+
+    function safeTransferFrom(address, address, uint256) external pure {
+        revert("SBT: non-transferable");
+    }
+
+    function safeTransferFrom(address, address, uint256, bytes calldata) external pure {
+        revert("SBT: non-transferable");
+    }
+
     // Function to get all certificates of a user
-function getCertificates(address _owner) public view returns (LibDiamond.Certificate[] memory) {
-    LibDiamond.Ecosystem3Storage storage es = ecosystem3Storage();
-    
-    // First, count the number of certificates owned by this user
-    uint256 count = 0;
-    for (uint256 i = 0; i < es.listOfCertificates.length; i++) {
-        if (es.listOfCertificates[i].owner == _owner) {
-            count++;
+    function getCertificates(address _owner) public view returns (LibDiamond.Certificate[] memory) {
+        LibDiamond.Ecosystem3Storage storage es = ecosystem3Storage();
+        
+        // First, count the number of certificates owned by this user
+        uint256 count = 0;
+        for (uint256 i = 0; i < es.listOfCertificates.length; i++) {
+            if (es.listOfCertificates[i].owner == _owner) {
+                count++;
+            }
         }
+
+        // Create an array to hold the certificates
+        LibDiamond.Certificate[] memory result = new LibDiamond.Certificate[](count);
+        
+        // Fill the array with certificates owned by the user
+        uint256 index = 0;
+        for (uint256 i = 0; i < es.listOfCertificates.length; i++) {
+            if (es.listOfCertificates[i].owner == _owner) {
+                result[index] = es.listOfCertificates[i];
+                index++;
+            }
+        }
+
+        return result;
     }
 
-    // Create an array to hold the certificates
-    LibDiamond.Certificate[] memory result = new LibDiamond.Certificate[](count);
-    
-    // Fill the array with certificates owned by the user
-    uint256 index = 0;
-    for (uint256 i = 0; i < es.listOfCertificates.length; i++) {
-        if (es.listOfCertificates[i].owner == _owner) {
-            result[index] = es.listOfCertificates[i];
-            index++;
-        }
+    function _mintCertificate(address to, uint256 tokenId, string memory uri) internal {
+        require(to != address(0), "SBT: mint to zero address");
+        LibDiamond.Ecosystem3Storage storage es = ecosystem3Storage();
+        require(es.owners[tokenId] == address(0), "SBT: token already minted");
+
+        es.owners[tokenId] = to;
+        es.balances[to] += 1;
+        es.tokenURIs[tokenId] = uri;
+        es.totalSupply += 1;
+
+        emit Transfer(address(0), to, tokenId);
     }
 
-    return result;
-}
-
-
+    function _exists(uint256 tokenId) internal view returns (bool) {
+        return ecosystem3Storage().owners[tokenId] != address(0);
+    }
 }
