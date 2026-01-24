@@ -13,7 +13,7 @@ import { LessonContext } from "../../contexts/lessonContext";
 import {
   uploadFileToPinata,
   uploadMetadataToIPFS,
-} from "../../components/pinata";
+} from "../../services/pinata";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;

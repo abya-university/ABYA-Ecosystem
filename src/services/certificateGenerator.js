@@ -17,6 +17,13 @@ const waitForFonts = () => {
 export const generateCertificateImage = async (profile, course, account) => {
     return new Promise(async (resolve, reject) => {
         try {
+            // Handle both string address and account object
+            const accountAddress = typeof account === 'string' ? account : account?.address;
+
+            if (!accountAddress) {
+                throw new Error('Account address is required');
+            }
+
             // Generate the HTML content
             const htmlContent = `
 <!DOCTYPE html>
@@ -245,7 +252,7 @@ export const generateCertificateImage = async (profile, course, account) => {
             })}
                     </div>
                     <div class="detail-item">
-                        <strong>Student ID:</strong> ${account.address.substring(0, 10)}...${account.address.substring(36)}
+                        <strong>Student ID:</strong> ${accountAddress.substring(0, 10)}...${accountAddress.substring(accountAddress.length - 6)}
                     </div>
                     <div class="detail-item">
                         <strong>Instructor:</strong> Platform Director
@@ -337,6 +344,9 @@ export const generateCertificateImage = async (profile, course, account) => {
 };
 
 export const generateCertificateHTML = (profile, course, account) => {
+    // Handle both string address and account object
+    const accountAddress = typeof account === 'string' ? account : account?.address;
+
     return `
 <!DOCTYPE html>
 <html>
@@ -367,7 +377,7 @@ export const generateCertificateHTML = (profile, course, account) => {
                 <div class="detail-item"><strong>Level:</strong> ${course.difficulty_level}</div>
             </div>
             <div>
-                <div class="detail-item"><strong>Student Address:</strong> ${account.address.substring(0, 8)}...</div>
+                <div class="detail-item"><strong>Student Address:</strong> ${accountAddress ? accountAddress.substring(0, 8) + '...' : 'N/A'}</div>
                 <div class="detail-item"><strong>Issued On:</strong> ${new Date().toLocaleDateString()}</div>
                 <div class="detail-item"><strong>Status:</strong> Verified</div>
             </div>

@@ -48,7 +48,7 @@ import { toast } from "react-toastify";
 import { useProgress } from "../contexts/progressContext";
 import { useNavigate } from "react-router-dom";
 import { generateCertificateImage } from "../services/certificateGenerator";
-import { uploadFileToPinata, uploadMetadataToIPFS } from "../services/ipfs";
+import { uploadFileToPinata, uploadMetadataToIPFS } from "../services/pinata";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
@@ -1307,7 +1307,6 @@ const CourseDetails = memo(({ courseId }) => {
         name: `Certificate - ${currentCourse.courseName}`,
         description: `Certificate of Completion awarded to ${profile.fname} ${profile.lname}`,
         image: `ipfs://${imageUpload}`, // Your PNG image
-        external_url: `https://yourplatform.com/certificates/${certificateId}`,
         attributes: [
           {
             trait_type: "Course Name",
