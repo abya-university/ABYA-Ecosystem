@@ -1,11 +1,10 @@
 import { createContext, useState, useEffect, useContext } from "react";
 import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import PropTypes from "prop-types";
-import { useActiveAccount } from "thirdweb/react";
+import { useActiveAccount, useActiveWalletChain } from "thirdweb/react";
 import { client } from "../services/client";
 import { ethers } from "ethers";
 import { getContract, readContract } from "thirdweb";
-import { defineChain } from "thirdweb/chains";
 import CONTRACT_ADDRESSES from "../constants/addresses";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
@@ -13,16 +12,16 @@ const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
 const REVIEWER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("REVIEWER_ROLE"));
 const MULTISIG_APPROVER = ethers.keccak256(
-  ethers.toUtf8Bytes("MULTISIG_APPROVER")
+  ethers.toUtf8Bytes("MULTISIG_APPROVER"),
 );
 const COURSE_OWNER_ROLE = ethers.keccak256(
-  ethers.toUtf8Bytes("COURSE_OWNER_ROLE")
+  ethers.toUtf8Bytes("COURSE_OWNER_ROLE"),
 );
 const DEFAULT_ADMIN_ROLE = ethers.keccak256(
-  ethers.toUtf8Bytes("DEFAULT_ADMIN_ROLE")
+  ethers.toUtf8Bytes("DEFAULT_ADMIN_ROLE"),
 );
 const COMMUNITY_MANAGER = ethers.keccak256(
-  ethers.toUtf8Bytes("COMMUNITY_MANAGER")
+  ethers.toUtf8Bytes("COMMUNITY_MANAGER"),
 );
 
 const UserContext = createContext();
@@ -32,13 +31,15 @@ export const UserProvider = ({ children }) => {
   const account = useActiveAccount();
   const address = account?.address;
   const isConnected = !!account;
+  const chain = useActiveWalletChain();
+  const [did, setDid] = useState(null);
 
   useEffect(() => {
     const fetchUserRole = async () => {
       console.log("Connection Status:", isConnected);
       console.log("Address:", address);
 
-      if (!isConnected || !address) {
+      if (!isConnected || !address || !chain) {
         console.log("Early return - not connected or no address");
         return;
       }
@@ -48,7 +49,7 @@ export const UserProvider = ({ children }) => {
           address: DiamondAddress,
           abi: Ecosystem2Facet_ABI,
           client,
-          chain: defineChain(11155111), // Sepolia
+          chain, // use the currently connected chain
         });
 
         const isReviewer = await readContract({
@@ -105,10 +106,61 @@ export const UserProvider = ({ children }) => {
     };
 
     fetchUserRole();
-  }, [address, isConnected, client]);
+  }, [address, isConnected, chain, client]);
+
+  // make an api call to veramo service(running on localhost:3000) to create a did:ethr
+  useEffect(() => {
+    const createDID = async () => {
+      if (!isConnected || !address || !chain) return;
+
+      try {
+        const response = await fetch("http://localhost:3000/did/create", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            provider: "did:ethr",
+            walletAddress: address,
+            network: chain?.name?.toLowerCase(), // lowercased network name (e.g., "sepolia")
+            // chainId: chain.id, // include explicit chainId for backend flexibility
+          }),
+        });
+
+        const data = await response.json();
+        console.log("DID Creation Response:", data);
+        setDid(data.identifier?.did);
+      } catch (error) {
+        console.error("Error creating DID:", error);
+      }
+    };
+
+    createDID();
+  }, [address, isConnected, chain]);
+
+  // did resolve
+  useEffect(() => {
+    const resolveDID = async () => {
+      if (!did) return;
+
+      try {
+        const response = await fetch(
+          `http://localhost:3000/did/${did}/resolve`,
+        );
+        const data = await response.json();
+        console.log("DID Resolution Response:", data);
+      } catch (error) {
+        console.error("Error resolving DID:", error);
+      }
+    };
+
+    resolveDID();
+  }, [did]);
 
   return (
-    <UserContext.Provider value={{ role }}>{children}</UserContext.Provider>
+    <UserContext.Provider value={{ role, did }}>
+      {children}
+    </UserContext.Provider>
   );
 };
 

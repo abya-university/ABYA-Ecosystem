@@ -48,7 +48,7 @@ import { toast } from "react-toastify";
 import { useProgress } from "../contexts/progressContext";
 import { useNavigate } from "react-router-dom";
 import { generateCertificateImage } from "../services/certificateGenerator";
-import { uploadFileToPinata, uploadMetadataToIPFS } from "../components/pinata";
+import { uploadFileToPinata, uploadMetadataToIPFS } from "../services/ipfs";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;

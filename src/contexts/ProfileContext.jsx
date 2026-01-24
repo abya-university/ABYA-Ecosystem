@@ -5,7 +5,7 @@ import {
   useEffect,
   useCallback,
 } from "react";
-import Profile_ABI from "../artifacts/contracts/Profile.sol/Nemezis.json";
+import Profile_ABI from "../artifacts/contracts/ProfileFacet.sol/ProfileFacet.json";
 import { useActiveAccount } from "thirdweb/react";
 import { client } from "../services/client";
 import {
@@ -16,10 +16,10 @@ import {
 } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
 import { toast } from "react-toastify";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
 const profileABI = Profile_ABI.abi;
-export const PROFILE_CONTRACT_ADDRESS = import.meta.env
-  .VITE_APP_PROFILE_CONTRACT_ADDRESS;
+export const PROFILE_CONTRACT_ADDRESS = CONTRACT_ADDRESSES.facets.ProfileFacet;
 
 const ProfileContext = createContext();
 
@@ -84,8 +84,8 @@ export const ProfileProvider = ({ children }) => {
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(
             () => reject(new Error("Transaction timeout after 45 seconds")),
-            45000
-          )
+            45000,
+          ),
         );
 
         const result = await Promise.race([transactionPromise, timeoutPromise]);
@@ -130,7 +130,7 @@ export const ProfileProvider = ({ children }) => {
         setLoading(false);
       }
     },
-    [isConnected, account]
+    [isConnected, account],
   );
 
   const getProfileByAccount = useCallback(async () => {
@@ -210,7 +210,7 @@ export const ProfileProvider = ({ children }) => {
         setLoading(false);
       }
     },
-    [isConnected, account, getProfileByAccount]
+    [isConnected, account, getProfileByAccount],
   );
 
   const getAllProfiles = useCallback(async () => {

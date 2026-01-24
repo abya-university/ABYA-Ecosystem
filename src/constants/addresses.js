@@ -1,19 +1,20 @@
 const CONTRACT_ADDRESSES = {
-    diamond: "0x444b1073c5Ee679245EcCFE0E9cc481c4fC6C17a",
+    diamond: "0xd0b444D291f979A91aEDc4406126d6896Ccd43a1",
     facets: {
-        DiamondCutFacet: "0x39dde033dff03e9a743a5c89E5b49263e6135c5D",
-        DiamondLoupeFacet: "0xaAe3a6cBe8D46d94f141a56743B3725F0E102d29",
-        OwnershipFacet: "0x2dB66322344D3981b7Aca9EbC3e08A4CFebBD146",
-        TokenManagementFacet: "0x17E1066e84F83F135A454Dd2AaBf4d42ABb48ac8",
-        Ecosystem1Facet: "0xABDcaa5903c1f7438d8A059520fA716f06Cf44f9",
-        Ecosystem2Facet: "0x5b48ae9790E441450ff6B25dA0C872e721e4FeCF",
-        Ecosystem3Facet: "0x06b8E08f78917e4e34ce866fB5b57f40c857B536",
-        CommunityEngagementFacet: "0x1579A3684456A32Bd8cCafbAA0C240E21b96Bd6F",
-        CommunityGovernanceFacet: "0xf67bcb315902f027c510AE822840AdECD93eA9d6",
-        CommunityBadgesFacet: "0x280ADE357306Ccf6f0324CAB47e7272Dd7DA0837"
+        DiamondCutFacet: "0x3F408d3b2BB10daabc66f84b96093314D22C98fF",
+        DiamondLoupeFacet: "0x0A9d49285db713cc9aeaa9a5cF3A089c2bf92830",
+        OwnershipFacet: "0xC08aEE41751a258dBE71Df8f9eBD1c527d24AB35",
+        TokenManagementFacet: "0xF3Dd1E07298861FA33570542e317c381e8498630",
+        Ecosystem1Facet: "0xd00B1060F3f681B9E87E43295A0E960380fe271e",
+        Ecosystem2Facet: "0xfE6868f5790e5DeeD12A6090B8100e1172945292",
+        Ecosystem3Facet: "0x8696891CD15F0FA9AfD8f03E60cb60CD88d0146f",
+        CommunityEngagementFacet: "0xA98dC21c8F9835089eeDfC7a4a406D50f5d3AF74",
+        CommunityGovernanceFacet: "0x134527fDb572EcE377940f622A7e538885b135F2",
+        CommunityBadgesFacet: "0xe7B2e77D448eA59eB29B6F320c81A9F05687aD18",
+        ProfileFacet: "0xbEa20409b1FFa4a56635E6d44757F99911005AaF"
     },
     init: {
-        DiamondInit: "0x5D7e037a8E89020614892c21f3fADD28C073378d"
+        DiamondInit: "0x0acCd49E6326c95E964b0C009eA031f238818aB4"
     }
 };
 
