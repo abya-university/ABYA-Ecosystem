@@ -9,9 +9,17 @@ export default defineConfig({
       process: 'process/browser',
       buffer: 'buffer',
       util: 'util',
+      hardhat: false,
+      "@nomicfoundation/hardhat-toolbox": false,
+      "@nomicfoundation/edr": false,
     },
   },
   optimizeDeps: {
+    exclude: [
+      "hardhat",
+      "@nomicfoundation/hardhat-toolbox",
+      "@nomicfoundation/edr",
+    ],
     esbuildOptions: {
       target: 'es2020',
       define: {

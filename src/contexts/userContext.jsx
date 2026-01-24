@@ -33,6 +33,7 @@ export const UserProvider = ({ children }) => {
   const isConnected = !!account;
   const chain = useActiveWalletChain();
   const [did, setDid] = useState(null);
+  const [didDocument, setDidDocument] = useState(null);
 
   useEffect(() => {
     const fetchUserRole = async () => {
@@ -157,8 +158,57 @@ export const UserProvider = ({ children }) => {
     resolveDID();
   }, [did]);
 
+  useEffect(() => {
+    const createDID = async () => {
+      if (!isConnected || !address || !chain) return;
+
+      try {
+        const response = await fetch("http://localhost:3000/did/create", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            provider: "did:ethr",
+            walletAddress: address,
+            //network: "skale-titan", // SKALE Titan network
+            network: chain?.name?.toLowerCase(), // lowercased network name (e.g., "sepolia")
+          }),
+        });
+
+        const data = await response.json();
+        console.log("DID Creation Response:", data);
+        setDid(data?.identifier?.did);
+      } catch (error) {
+        console.error("Error creating DID:", error);
+      }
+    };
+
+    createDID();
+  }, [address, isConnected, chain]);
+
+  // did resolve
+  useEffect(() => {
+    const resolveDID = async () => {
+      if (!did) return;
+
+      try {
+        const response = await fetch(
+          `http://localhost:3000/did/${did}/resolve`,
+        );
+        const data = await response.json();
+        console.log("DID Resolution Response:", data);
+        setDidDocument(data?.resolution?.didDocument);
+      } catch (error) {
+        console.error("Error resolving DID:", error);
+      }
+    };
+
+    resolveDID();
+  }, [did]);
+
   return (
-    <UserContext.Provider value={{ role, did }}>
+    <UserContext.Provider value={{ role, did, didDocument }}>
       {children}
     </UserContext.Provider>
   );
