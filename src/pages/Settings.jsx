@@ -28,6 +28,7 @@ import {
   prepareContractCall,
   sendTransaction,
 } from "thirdweb";
+import {useUser} from "../contexts/userContext";
 
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
 const Community_ABI = CommunityABI.abi;
@@ -45,6 +46,7 @@ const SettingsPage = () => {
   const [activeRoleTab, setActiveRoleTab] = useState("Admin");
   const [showAddRoleModal, setShowAddRoleModal] = useState(false);
   const [newRoleAddress, setNewRoleAddress] = useState("");
+  const { did, didDocument } = useUser();
 
   const formatAddress = (addr) => {
     if (!addr) return "Not Connected";
@@ -148,8 +150,8 @@ const SettingsPage = () => {
     },
     {
       icon: <BadgeCent className="w-5 h-5" />,
-      label: "SFuel Details",
-      key: "sfuelDetails",
+      label: "DID Details",
+      key: "didDetails",
     },
   ];
 
@@ -189,6 +191,7 @@ const SettingsPage = () => {
 
         {/* Settings Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6">
+          
           {/* Sidebar Navigation */}
           <div
             className="lg:col-span-1 p-4 md:p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200
@@ -481,6 +484,31 @@ const SettingsPage = () => {
                 )}
               </div>
             )}
+
+            {/* DID Details */}
+            {activeSection === "didDetails" && (
+              <div>
+                <h2 className="text-xl md:text-2xl font-semibold mb-4 md:mb-6 text-yellow-500">
+                  Decentralized Identifier (DID) Details
+                </h2>
+                <div className="dark:bg-gray-900 bg-white dark:text-white text-gray-500 p-4 md:p-6 border dark:border-gray-800 rounded-lg shadow-sm">
+                  <h3 className="text-lg md:text-xl font-medium mb-4">
+                    Your DID Information
+                  </h3>
+                  <p className="mb-2">
+                    <span className="font-medium">DID:</span>{" "}
+                    {did}
+                  </p>
+                  <p>
+                    <span className="font-medium">DID Document:</span>{" "}
+                    <pre className="bg-gray-100 dark:bg-gray-800 p-2 rounded-lg overflow-x-auto text-xs md:text-sm">
+                      {JSON.stringify(didDocument, null, 2)}
+                    </pre>
+                  </p>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       </div>

@@ -201,6 +201,7 @@ export function TransactionHistoryProvider({ children }) {
       ),
     []
   );
+  console.log("contract configurations:", CONTRACT_CONFIG);
 
   // Common error handler - useCallback to prevent recreation
   const handleError = useCallback((operation, error, fallbackMessage) => {

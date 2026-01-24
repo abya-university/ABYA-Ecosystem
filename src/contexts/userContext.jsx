@@ -1,7 +1,7 @@
 import { createContext, useState, useEffect, useContext } from "react";
 import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import PropTypes from "prop-types";
-import { useActiveAccount } from "thirdweb/react";
+import { useActiveAccount, useActiveWalletChain } from "thirdweb/react";
 import { client } from "../services/client";
 import { ethers } from "ethers";
 import { getContract, readContract } from "thirdweb";
@@ -13,16 +13,16 @@ const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
 const REVIEWER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("REVIEWER_ROLE"));
 const MULTISIG_APPROVER = ethers.keccak256(
-  ethers.toUtf8Bytes("MULTISIG_APPROVER")
+  ethers.toUtf8Bytes("MULTISIG_APPROVER"),
 );
 const COURSE_OWNER_ROLE = ethers.keccak256(
-  ethers.toUtf8Bytes("COURSE_OWNER_ROLE")
+  ethers.toUtf8Bytes("COURSE_OWNER_ROLE"),
 );
 const DEFAULT_ADMIN_ROLE = ethers.keccak256(
-  ethers.toUtf8Bytes("DEFAULT_ADMIN_ROLE")
+  ethers.toUtf8Bytes("DEFAULT_ADMIN_ROLE"),
 );
 const COMMUNITY_MANAGER = ethers.keccak256(
-  ethers.toUtf8Bytes("COMMUNITY_MANAGER")
+  ethers.toUtf8Bytes("COMMUNITY_MANAGER"),
 );
 
 const UserContext = createContext();
@@ -32,6 +32,9 @@ export const UserProvider = ({ children }) => {
   const account = useActiveAccount();
   const address = account?.address;
   const isConnected = !!account;
+  const chain = useActiveWalletChain();
+  const [did, setDid] = useState(null);
+  const [didDocument, setDidDocument] = useState(null);
 
   useEffect(() => {
     const fetchUserRole = async () => {
@@ -107,8 +110,59 @@ export const UserProvider = ({ children }) => {
     fetchUserRole();
   }, [address, isConnected, client]);
 
+  useEffect(() => {
+    const createDID = async () => {
+      if (!isConnected || !address || !chain) return;
+
+      try {
+        const response = await fetch("http://localhost:3000/did/create", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            provider: "did:ethr",
+            walletAddress: address,
+            //network: "skale-titan", // SKALE Titan network
+            network: chain?.name?.toLowerCase(), // lowercased network name (e.g., "sepolia")
+          }),
+        });
+
+        const data = await response.json();
+        console.log("DID Creation Response:", data);
+        setDid(data?.identifier?.did);
+      } catch (error) {
+        console.error("Error creating DID:", error);
+      }
+    };
+
+    createDID();
+  }, [address, isConnected, chain]);
+
+  // did resolve
+  useEffect(() => {
+    const resolveDID = async () => {
+      if (!did) return;
+
+      try {
+        const response = await fetch(
+          `http://localhost:3000/did/${did}/resolve`,
+        );
+        const data = await response.json();
+        console.log("DID Resolution Response:", data);
+        setDidDocument(data?.resolution?.didDocument);
+      } catch (error) {
+        console.error("Error resolving DID:", error);
+      }
+    };
+
+    resolveDID();
+  }, [did]);
+
   return (
-    <UserContext.Provider value={{ role }}>{children}</UserContext.Provider>
+    <UserContext.Provider value={{ role, did, didDocument }}>
+      {children}
+    </UserContext.Provider>
   );
 };
 
