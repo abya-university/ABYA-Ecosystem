@@ -96,9 +96,24 @@ export const CertificatesProvider = ({ children }) => {
     fetchCertificates();
   }, [address, contract]);
 
+  const getTokenURI = async (tokenId) => {
+    try {
+      const uri = await readContract({
+        contract,
+        method: "tokenURI",
+        params: [tokenId],
+      });
+      return uri;
+    } catch (error) {
+      console.error("Error fetching tokenURI:", error);
+      return null;
+    }
+  };
+
   const value = {
     certificates,
     loading,
+    getTokenURI,
   };
 
   return (
