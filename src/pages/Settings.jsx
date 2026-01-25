@@ -64,7 +64,9 @@ const SettingsPage = () => {
     sessionTimeout: "30",
     requirePassword: true,
   });
-  const { did, didDocument } = useUser();
+  const { did, didDocument, enrolledCourses } = useUser();
+
+  console.log("Dashboard enrolled courses: ", enrolledCourses);
 
   const formatAddress = (addr) => {
     if (!addr) return "Not Connected";

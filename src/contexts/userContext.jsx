@@ -1,14 +1,17 @@
 import { createContext, useState, useEffect, useContext } from "react";
 import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
+import Ecosystem1FacetABI from "../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
 import PropTypes from "prop-types";
 import { useActiveAccount, useActiveWalletChain } from "thirdweb/react";
 import { client } from "../services/client";
 import { ethers } from "ethers";
 import { getContract, readContract } from "thirdweb";
 import CONTRACT_ADDRESSES from "../constants/addresses";
+import { defineChain } from "thirdweb/chains";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
+const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
 
 const REVIEWER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("REVIEWER_ROLE"));
 const MULTISIG_APPROVER = ethers.keccak256(
@@ -32,6 +35,7 @@ export const UserProvider = ({ children }) => {
   const address = account?.address;
   const isConnected = !!account;
   const chain = useActiveWalletChain();
+  const [enrolledCourses, setEnrolledCourses] = useState([]);
   const [did, setDid] = useState(null);
   const [didDocument, setDidDocument] = useState(null);
 
@@ -107,6 +111,54 @@ export const UserProvider = ({ children }) => {
     };
 
     fetchUserRole();
+  }, [address, isConnected, chain, client]);
+
+  //function to get all user enrolled courses
+  useEffect(() => {
+    const fetchEnrolledCourses = async () => {
+      if (!isConnected || !address || !chain) return;
+
+      try {
+        const contract = await getContract({
+          address: DiamondAddress,
+          abi: Ecosystem1Facet_ABI,
+          client,
+          chain: defineChain(11155111), // Sepolia chain
+        });
+
+        const contract2 = await getContract({
+          address: DiamondAddress,
+          abi: Ecosystem2Facet_ABI,
+          client,
+          chain: defineChain(11155111), // Sepolia chain
+        });
+
+        const courseIds = await readContract({
+          contract: contract2,
+          method: "getUserEnrolledCourses",
+          params: [address],
+        });
+
+        // Fetch details for each enrolled course
+        const coursesDetails = await Promise.all(
+          courseIds.map((courseId) =>
+            readContract({
+              contract,
+              method: "getCourse",
+              params: [courseId],
+            }),
+          ),
+        );
+
+        setEnrolledCourses(coursesDetails);
+
+        console.log("Enrolled Courses:", coursesDetails);
+      } catch (error) {
+        console.error("Error fetching enrolled courses:", error);
+      }
+    };
+
+    fetchEnrolledCourses();
   }, [address, isConnected, chain, client]);
 
   // make an api call to veramo service(running on localhost:3000) to create a did:ethr
@@ -208,7 +260,7 @@ export const UserProvider = ({ children }) => {
   }, [did]);
 
   return (
-    <UserContext.Provider value={{ role, did, didDocument }}>
+    <UserContext.Provider value={{ role, enrolledCourses, did, didDocument }}>
       {children}
     </UserContext.Provider>
   );
