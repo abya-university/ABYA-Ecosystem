@@ -15,7 +15,7 @@ import {
   Settings,
 } from "lucide-react";
 import { useProfile } from "../contexts/ProfileContext";
-import {useUser} from "../contexts/userContext";
+import { useUser } from "../contexts/userContext";
 import { AbyaConnectButton } from "../providers/Providers";
 import {
   useActiveAccount,
@@ -258,7 +258,7 @@ const WalletConnection = () => {
                   <span>Address</span>
                 </button>
                 <span className="font-mono text-sm text-gray-900 dark:text-white">
-                  {address.slice(0, 6)}...{address.slice(-4)}
+                  {address?.slice(0, 6)}...{address?.slice(-4)}
                 </span>
               </div>
 
@@ -276,7 +276,7 @@ const WalletConnection = () => {
                   <span>DID</span>
                 </button>
                 <span className="font-mono text-sm text-gray-900 dark:text-white truncate max-w-[110px]">
-                  {did.slice(0, 5)}...{did.slice(-5)}
+                  {did?.slice(0, 5)}...{did?.slice(-5)}
                 </span>
               </div>
 
