@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useProfile } from "../contexts/ProfileContext";
 import {useUser} from "../contexts/userContext";
+import {useDid} from "../contexts/DidContext";
 import { AbyaConnectButton } from "../providers/Providers";
 import {
   useActiveAccount,
@@ -41,8 +42,8 @@ const WalletConnection = () => {
   const toggleRef = useRef(null);
   const { clearProfile, profile, hasProfile } = useProfile();
   const { darkMode } = useDarkMode();
-  const { did } = useUser();
-  console.log("User DID:", did);
+  const { did } = useDid();
+  //console.log("User DID:", did);
 
   const { data: balanceData, isLoading: balanceLoading } = useWalletBalance({
     account,

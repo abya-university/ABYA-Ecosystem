@@ -20,6 +20,7 @@ import { TransactionHistoryProvider } from "./contexts/fake-liquidity-test-conte
 import { ThirdwebProvider } from "thirdweb/react";
 import { ThemeProvider } from "./contexts/themeContext.jsx";
 import { ProgressProvider } from "./contexts/progressContext.jsx";
+import { DidProvider } from "./contexts/DidContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -42,7 +43,9 @@ createRoot(document.getElementById("root")).render(
                                 <TransactionHistoryProvider>
                                   <UserPositionProvider>
                                     <ProgressProvider>
-                                      <App />
+                                      <DidProvider>
+                                        <App />
+                                      </DidProvider>
                                     </ProgressProvider>
                                   </UserPositionProvider>
                                 </TransactionHistoryProvider>
