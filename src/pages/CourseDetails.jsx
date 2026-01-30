@@ -606,7 +606,7 @@ const Quiz = memo(({ quiz, courseId }) => {
                 <div className="mt-2 space-y-2">
                   {question.choices.map((choice, choiceIndex) => (
                     <div
-                      key={choiceIndex}
+                      key={`result-${question.questionId}-choice-${choiceIndex}`}
                       className={`p-2 rounded ${
                         choiceIndex === correctAnswer
                           ? "bg-green-100 dark:bg-green-900/20"
@@ -644,7 +644,7 @@ const Quiz = memo(({ quiz, courseId }) => {
         <div className="space-y-3">
           {currentQuestion.choices.map((choice, index) => (
             <div
-              key={index}
+              key={`question-${currentQuestion.questionId}-choice-${index}`}
               className={`flex items-center space-x-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer ${
                 selectedAnswers[currentQuestion.questionId] === index
                   ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-500"
@@ -751,7 +751,9 @@ const LessonContent = memo(
               {lesson.additionalResources
                 .filter((r) => r.url)
                 .map((resource, index) => (
-                  <div key={index}>
+                  <div
+                    key={`resource-${lesson.lessonId}-${index}-${resource.url}`}
+                  >
                     <Resource resource={resource} />
                   </div>
                 ))}
@@ -818,8 +820,19 @@ LessonContent.propTypes = {
 const CourseDetails = memo(({ courseId }) => {
   const { courses } = useContext(CourseContext);
   const { chapters, fetchChapters, setChapters } = useContext(ChapterContext);
-  const { lessons } = useContext(LessonContext);
-  const { quizzes } = useContext(QuizContext);
+  const { lessons, fetchLessons } = useContext(LessonContext);
+  const { quizzes, fetchQuizzes } = useContext(QuizContext);
+
+  // Debug: Log lessons and quizzes whenever they change
+  useEffect(() => {
+    console.log("=== DATA STATUS DEBUG ===", {
+      lessonsCount: lessons.length,
+      quizzesCount: quizzes.length,
+      chaptersCount: chapters.length,
+      coursesCount: courses.length,
+      lessons: lessons.slice(0, 3), // Show first 3 lessons
+    });
+  }, [lessons, quizzes, chapters, courses]);
   const [openQuizIds, setOpenQuizIds] = useState(new Set());
   const [activeChapterId, setActiveChapterId] = useState(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
@@ -1079,6 +1092,34 @@ const CourseDetails = memo(({ courseId }) => {
       // Don't automatically show popup here - only show when course is completed
     }
   }, [certificates, currentCourse.courseId, address]);
+
+  // Fetch lessons when component mounts - force fetch
+  useEffect(() => {
+    console.log("=== LESSON FETCH CHECK ===", {
+      hasFetchLessons: !!fetchLessons,
+      lessonsCount: lessons.length,
+      willFetch: fetchLessons && lessons.length === 0,
+    });
+
+    if (fetchLessons) {
+      console.log("Triggering fetchLessons()...");
+      fetchLessons();
+    }
+  }, [fetchLessons]);
+
+  // Fetch quizzes when component mounts - force fetch
+  useEffect(() => {
+    console.log("=== QUIZ FETCH CHECK ===", {
+      hasFetchQuizzes: !!fetchQuizzes,
+      quizzesCount: quizzes.length,
+      willFetch: fetchQuizzes && quizzes.length === 0,
+    });
+
+    if (fetchQuizzes) {
+      console.log("Triggering fetchQuizzes()...");
+      fetchQuizzes();
+    }
+  }, [fetchQuizzes]);
 
   // Fetch chapters only when courseId changes or when chapters are empty
   useEffect(() => {
@@ -1535,6 +1576,25 @@ const CourseDetails = memo(({ courseId }) => {
     setShowCongratsPopup(false);
   };
 
+  // Early return if course not found
+  if (!currentCourse) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-4 sm:py-8 lg:py-12 px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 lg:pt-[100px]">
+        <div className="max-w-7xl mx-auto text-center">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-8 border border-gray-200 dark:border-gray-700">
+            <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-yellow-500" />
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+              Loading Course Details...
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              Please wait while we fetch the course information.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-4 sm:py-8 lg:py-12 px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 lg:pt-[100px]">
       <div className="max-w-7xl mx-auto">
@@ -1577,6 +1637,27 @@ const CourseDetails = memo(({ courseId }) => {
                 if (
                   chapter.chapterId?.toString() === activeChapterId?.toString()
                 ) {
+                  const chapterLessons = lessons.filter(
+                    (lesson) =>
+                      lesson.chapterId?.toString() ===
+                      chapter.chapterId?.toString(),
+                  );
+
+                  console.log("=== LESSON FILTERING DEBUG ===", {
+                    chapterId: chapter.chapterId,
+                    totalLessons: lessons.length,
+                    filteredLessons: chapterLessons.length,
+                    lessons: lessons.map((l) => ({
+                      lessonId: l.lessonId,
+                      chapterId: l.chapterId,
+                      lessonName: l.lessonName,
+                    })),
+                    chapterLessons: chapterLessons.map((l) => ({
+                      lessonId: l.lessonId,
+                      lessonName: l.lessonName,
+                    })),
+                  });
+
                   return (
                     <div key={chapter.chapterId} className="p-4 sm:p-6">
                       <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-900 dark:text-white mb-4 sm:mb-6 flex items-center gap-2">
@@ -1585,158 +1666,175 @@ const CourseDetails = memo(({ courseId }) => {
                       </h2>
 
                       <div className="space-y-4 sm:space-y-6">
-                        {lessons
-                          .filter(
-                            (lesson) =>
-                              lesson.chapterId?.toString() ===
-                              chapter.chapterId?.toString(),
-                          )
-                          .map((lesson) => {
-                            const lessonQuiz = quizzes.find(
-                              (quiz) =>
-                                quiz.lessonId.toString() ===
-                                lesson.lessonId.toString(),
-                            );
+                        {chapterLessons.length === 0 ? (
+                          <div className="text-center py-8 text-gray-500 dark:text-gray-400 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                            <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                            <p className="font-medium text-lg mb-2">
+                              No lessons found for this module
+                            </p>
+                            <p className="text-sm mb-4">
+                              Total lessons in context: {lessons.length}
+                              <br />
+                              Chapter ID: {chapter.chapterId}
+                            </p>
+                            <button
+                              onClick={() => {
+                                console.log("Manual refetch triggered");
+                                if (fetchLessons) fetchLessons();
+                                if (fetchQuizzes) fetchQuizzes();
+                              }}
+                              className="mt-2 px-4 py-2 bg-yellow-500 text-gray-900 rounded-lg hover:bg-yellow-600"
+                            >
+                              Retry Loading Lessons
+                            </button>
+                          </div>
+                        ) : null}
+                        {chapterLessons.map((lesson) => {
+                          const lessonQuiz = quizzes.find(
+                            (quiz) =>
+                              quiz.lessonId.toString() ===
+                              lesson.lessonId.toString(),
+                          );
 
-                            return (
-                              <div
-                                key={lesson.lessonId}
-                                className="border-t border-gray-200 dark:border-gray-700 pt-4 sm:pt-6 first:border-0 first:pt-0"
-                              >
-                                <h3 className="text-lg sm:text-xl font-medium text-gray-900 dark:text-white mb-2 sm:mb-3">
-                                  {lesson.lessonName}
-                                </h3>
-                                <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 mb-3 sm:mb-4">
-                                  {lesson.lessonContent}
-                                </p>
+                          return (
+                            <div
+                              key={lesson.lessonId}
+                              className="border-t border-gray-200 dark:border-gray-700 pt-4 sm:pt-6 first:border-0 first:pt-0"
+                            >
+                              <h3 className="text-lg sm:text-xl font-medium text-gray-900 dark:text-white mb-2 sm:mb-3">
+                                {lesson.lessonName}
+                              </h3>
+                              <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 mb-3 sm:mb-4">
+                                {lesson.lessonContent}
+                              </p>
 
-                                {lesson?.additionalResources?.some(
-                                  (r) => r.url,
-                                ) && (
-                                  <div className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
-                                    <h4 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-1 sm:mb-2">
-                                      Additional Resources
-                                    </h4>
-                                    <div className="grid gap-3 sm:gap-4">
-                                      {lesson?.additionalResources
-                                        ?.filter((r) => r.url)
-                                        .map((resource, index) => (
-                                          <div key={index}>
-                                            <Resource resource={resource} />
-                                          </div>
-                                        ))}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Mark as read button */}
-                                {currentCourse.approved && address && (
-                                  <>
-                                    {(() => {
-                                      const userEnrolled = isUserEnrolled(
-                                        currentCourse.enrolledStudents,
-                                        address,
-                                      );
-                                      return userEnrolled;
-                                    })() ? (
-                                      <div className="flex justify-between items-center mt-3 sm:mt-4">
-                                        <button
-                                          className={`bg-yellow-500 text-gray-900 p-2 sm:p-3 my-2 sm:my-3 rounded-lg font-normal flex items-center gap-2 text-sm sm:text-base ${
-                                            completedLessonIds.has(
-                                              lesson.lessonId.toString(),
-                                            ) ||
-                                            markingAsReadIds.has(
-                                              lesson.lessonId.toString(),
-                                            )
-                                              ? "opacity-50 cursor-not-allowed"
-                                              : "hover:bg-yellow-600"
-                                          }`}
-                                          onClick={async () => {
-                                            if (
-                                              !completedLessonIds.has(
-                                                lesson.lessonId.toString(),
-                                              ) &&
-                                              !markingAsReadIds.has(
-                                                lesson.lessonId.toString(),
-                                              )
-                                            ) {
-                                              try {
-                                                await markAsRead(
-                                                  currentCourse.courseId,
-                                                  chapter.chapterId,
-                                                  lesson.lessonId,
-                                                );
-                                              } catch (error) {
-                                                console.error(
-                                                  "Failed to mark lesson as read:",
-                                                  error,
-                                                );
-                                              }
-                                            }
-                                          }}
-                                          disabled={
-                                            completedLessonIds.has(
-                                              lesson.lessonId.toString(),
-                                            ) ||
-                                            markingAsReadIds.has(
-                                              lesson.lessonId.toString(),
-                                            )
-                                          }
+                              {lesson?.additionalResources?.some(
+                                (r) => r.url,
+                              ) && (
+                                <div className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
+                                  <h4 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-1 sm:mb-2">
+                                    Additional Resources
+                                  </h4>
+                                  <div className="grid gap-3 sm:gap-4">
+                                    {lesson?.additionalResources
+                                      ?.filter((r) => r.url)
+                                      .map((resource, index) => (
+                                        <div
+                                          key={`mobile-resource-${lesson.lessonId}-${index}-${resource.url}`}
                                         >
-                                          {markingAsReadIds.has(
+                                          <Resource resource={resource} />
+                                        </div>
+                                      ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Mark as read button */}
+                              {currentCourse.approved && address && (
+                                <>
+                                  {(() => {
+                                    const userEnrolled = isUserEnrolled(
+                                      currentCourse.enrolledStudents,
+                                      address,
+                                    );
+                                    return userEnrolled;
+                                  })() ? (
+                                    <div className="flex justify-between items-center mt-3 sm:mt-4">
+                                      <button
+                                        className={`bg-yellow-500 text-gray-900 p-2 sm:p-3 my-2 sm:my-3 rounded-lg font-normal flex items-center gap-2 text-sm sm:text-base ${
+                                          completedLessonIds.has(
+                                            lesson.lessonId.toString(),
+                                          ) ||
+                                          markingAsReadIds.has(
+                                            lesson.lessonId.toString(),
+                                          )
+                                            ? "opacity-50 cursor-not-allowed"
+                                            : "hover:bg-yellow-600"
+                                        }`}
+                                        onClick={async () => {
+                                          if (
+                                            !completedLessonIds.has(
+                                              lesson.lessonId.toString(),
+                                            ) &&
+                                            !markingAsReadIds.has(
+                                              lesson.lessonId.toString(),
+                                            )
+                                          ) {
+                                            try {
+                                              await markAsRead(
+                                                currentCourse.courseId,
+                                                chapter.chapterId,
+                                                lesson.lessonId,
+                                              );
+                                            } catch (error) {
+                                              console.error(
+                                                "Failed to mark lesson as read:",
+                                                error,
+                                              );
+                                            }
+                                          }
+                                        }}
+                                        disabled={
+                                          completedLessonIds.has(
+                                            lesson.lessonId.toString(),
+                                          ) ||
+                                          markingAsReadIds.has(
+                                            lesson.lessonId.toString(),
+                                          )
+                                        }
+                                      >
+                                        {markingAsReadIds.has(
+                                          lesson.lessonId.toString(),
+                                        ) ? (
+                                          <>
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            <span className="hidden sm:inline">
+                                              Marking...
+                                            </span>
+                                          </>
+                                        ) : completedLessonIds.has(
                                             lesson.lessonId.toString(),
                                           ) ? (
-                                            <>
-                                              <Loader2 className="w-4 h-4 animate-spin" />
-                                              <span className="hidden sm:inline">
-                                                Marking...
-                                              </span>
-                                            </>
-                                          ) : completedLessonIds.has(
-                                              lesson.lessonId.toString(),
-                                            ) ? (
-                                            "Completed"
-                                          ) : (
-                                            "Mark as Read"
-                                          )}
-                                        </button>
-                                      </div>
-                                    ) : null}
-                                  </>
-                                )}
+                                          "Completed"
+                                        ) : (
+                                          "Mark as Read"
+                                        )}
+                                      </button>
+                                    </div>
+                                  ) : null}
+                                </>
+                              )}
 
-                                {lessonQuiz && (
-                                  <div className="mt-4 sm:mt-6 p-4 sm:p-6 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg dark:text-gray-300">
-                                    <div
-                                      className="w-full flex justify-between items-center cursor-pointer"
-                                      onClick={() =>
-                                        toggleQuiz(lesson.lessonId)
-                                      }
-                                    >
-                                      <span className="dark:text-gray-300 text-sm sm:text-base">
-                                        {lessonQuiz.quizTitle}
-                                      </span>
-                                      <ChevronRight
-                                        className={`w-4 h-4 dark:text-yellow-500 transform transition-transform ${
-                                          openQuizIds.has(lesson.lessonId)
-                                            ? "rotate-90"
-                                            : ""
-                                        }`}
-                                      />
-                                    </div>
-                                    <div>
-                                      {openQuizIds.has(lesson.lessonId) && (
-                                        <Quiz
-                                          quiz={lessonQuiz}
-                                          courseId={courseId}
-                                        />
-                                      )}
-                                    </div>
+                              {lessonQuiz && (
+                                <div className="mt-4 sm:mt-6 p-4 sm:p-6 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg dark:text-gray-300">
+                                  <div
+                                    className="w-full flex justify-between items-center cursor-pointer"
+                                    onClick={() => toggleQuiz(lesson.lessonId)}
+                                  >
+                                    <span className="dark:text-gray-300 text-sm sm:text-base">
+                                      {lessonQuiz.quizTitle}
+                                    </span>
+                                    <ChevronRight
+                                      className={`w-4 h-4 dark:text-yellow-500 transform transition-transform ${
+                                        openQuizIds.has(lesson.lessonId)
+                                          ? "rotate-90"
+                                          : ""
+                                      }`}
+                                    />
                                   </div>
-                                )}
-                              </div>
-                            );
-                          })}
+                                  <div>
+                                    {openQuizIds.has(lesson.lessonId) && (
+                                      <Quiz
+                                        quiz={lessonQuiz}
+                                        courseId={courseId}
+                                      />
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );

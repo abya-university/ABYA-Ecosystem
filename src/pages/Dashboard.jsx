@@ -57,7 +57,7 @@ const Dashboard = ({ onCourseSelect }) => {
 
     if (Array.isArray(enrolledStudents)) {
       return enrolledStudents.some(
-        (addr) => addr.toLowerCase() === userAddress.toLowerCase()
+        (addr) => addr.toLowerCase() === userAddress.toLowerCase(),
       );
     }
 
@@ -75,7 +75,7 @@ const Dashboard = ({ onCourseSelect }) => {
 
   // Get enrolled courses count
   const enrolledCoursesCount = courses.filter((course) =>
-    isUserEnrolled(course.enrolledStudents, address)
+    isUserEnrolled(course.enrolledStudents, address),
   ).length;
 
   // Stats data using progress context
@@ -106,35 +106,12 @@ const Dashboard = ({ onCourseSelect }) => {
     },
   ];
 
-  const recentActivity = [
-    {
-      course: "Blockchain Basics",
-      progress: 75,
-      status: "In Progress",
-    },
-    {
-      course: "Smart Contract Development",
-      progress: 100,
-      status: "Completed",
-    },
-    {
-      course: "Web3 Security",
-      progress: 30,
-      status: "Started",
-    },
-  ];
-
-  const getEnrolledStudentsCount = (enrolledStudents) => {
-    if (!enrolledStudents || enrolledStudents.length === 0) return 0;
-    return enrolledStudents.length;
-  };
-
   // Helper function to check if user has claimed certificate for a course
   const hasCertificateForCourse = (courseId) => {
     return certificates.some(
       (cert) =>
         cert.courseId.toString() === courseId.toString() &&
-        cert.owner.toLowerCase() === address.toLowerCase()
+        cert.owner.toLowerCase() === address.toLowerCase(),
     );
   };
 
@@ -148,20 +125,25 @@ const Dashboard = ({ onCourseSelect }) => {
   };
 
   const enrolledCourses = courses.filter((course) =>
-    isUserEnrolled(course.enrolledStudents, address)
+    isUserEnrolled(course.enrolledStudents, address),
   );
+
+  const getEnrolledStudentsCount = (enrolledStudents) => {
+    if (!enrolledStudents || enrolledStudents.length === 0) return 0;
+    return enrolledStudents.length;
+  };
 
   // Helper function to get lessons for a specific course (via chapters)
   const getLessonsForCourse = (courseId) => {
     const courseChapters = chapters.filter(
-      (chapter) => chapter.courseId.toString() === courseId.toString()
+      (chapter) => chapter.courseId.toString() === courseId.toString(),
     );
 
     const courseLessons = lessons.filter((lesson) =>
       courseChapters.some(
         (chapter) =>
-          chapter.chapterId.toString() === lesson.chapterId.toString()
-      )
+          chapter.chapterId.toString() === lesson.chapterId.toString(),
+      ),
     );
 
     return courseLessons;
@@ -173,8 +155,8 @@ const Dashboard = ({ onCourseSelect }) => {
 
     const courseQuizzes = quizzes.filter((quiz) =>
       courseLessons.some(
-        (lesson) => lesson.lessonId.toString() === quiz.lessonId.toString()
-      )
+        (lesson) => lesson.lessonId.toString() === quiz.lessonId.toString(),
+      ),
     );
 
     return courseQuizzes;
@@ -189,11 +171,11 @@ const Dashboard = ({ onCourseSelect }) => {
     const totalQuizzes = courseQuizzes.length;
 
     const completedLessons = courseLessons.filter((lesson) =>
-      completedLessonIds.has(lesson.lessonId.toString())
+      completedLessonIds.has(lesson.lessonId.toString()),
     ).length;
 
     const completedQuizzes = courseQuizzes.filter((quiz) =>
-      completedQuizIds.has(quiz.quizId.toString())
+      completedQuizIds.has(quiz.quizId.toString()),
     ).length;
 
     return {
@@ -203,6 +185,32 @@ const Dashboard = ({ onCourseSelect }) => {
       totalQuizzes,
     };
   };
+
+  // Generate recent activity from enrolled courses (limited to 3)
+  const recentActivity = enrolledCourses
+    .map((course) => {
+      const completionData = getCourseCompletionData(course.courseId);
+      const totalItems =
+        completionData.totalLessons + completionData.totalQuizzes;
+      const completedItems =
+        completionData.completedLessons + completionData.completedQuizzes;
+      const progress =
+        totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+      let status = "Started";
+      if (progress === 100) {
+        status = "Completed";
+      } else if (progress > 0) {
+        status = "In Progress";
+      }
+
+      return {
+        course: course.courseName,
+        progress,
+        status,
+      };
+    })
+    .slice(0, 3);
 
   // Improved refresh function with proper loading state
   const handleRefreshProgress = async () => {
@@ -248,7 +256,7 @@ const Dashboard = ({ onCourseSelect }) => {
   useEffect(() => {
     if (address && enrolledCourses.length > 0) {
       console.log(
-        "Address changed, refreshing progress for all enrolled courses"
+        "Address changed, refreshing progress for all enrolled courses",
       );
       handleRefreshProgress();
     }
