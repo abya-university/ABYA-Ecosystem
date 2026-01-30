@@ -66,9 +66,10 @@ const SettingsPage = () => {
     requirePassword: true,
   });
   const { enrolledCourses } = useUser();
-  const { did, didDocument } = useDid();
+  const { did, didDocument, VC } = useDid();
 
   console.log("Dashboard enrolled courses: ", enrolledCourses);
+  console.log("VC:", VC);
 
   const formatAddress = (addr) => {
     if (!addr) return "Not Connected";

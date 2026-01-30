@@ -49,6 +49,7 @@ import { useProgress } from "../contexts/progressContext";
 import { useNavigate } from "react-router-dom";
 import { generateCertificateImage } from "../services/certificateGenerator";
 import { uploadFileToPinata, uploadMetadataToIPFS } from "../services/pinata";
+import { useDid } from "../contexts/DidContext";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
@@ -854,8 +855,9 @@ const CourseDetails = memo(({ courseId }) => {
     GENERATING_CERTIFICATE: 1,
     CONVERTING_TO_IMAGE: 2,
     UPLOADING_TO_IPFS: 3,
-    MINTING_SBT: 4,
-    COMPLETED: 5,
+    ISSUEING_VC: 4,
+    MINTING_SBT: 5,
+    COMPLETED: 6,
   };
 
   const [currentStage, setCurrentStage] = useState(PROGRESS_STAGES.INITIAL);
@@ -1138,6 +1140,8 @@ const CourseDetails = memo(({ courseId }) => {
     });
   }, []);
 
+  const {issueVC} = useDid();
+
   const handleSubmitReview = useCallback((courseId, ratings) => {
     submitReview(
       courseId,
@@ -1252,147 +1256,274 @@ const CourseDetails = memo(({ courseId }) => {
     setShowCongratsPopup(false);
   };
 
-  //handle claim certificate
-  //Leave it for now
+  // Handle claim certificate with stage-based error handling
   const handleClaimCertificate = async () => {
     setIsIssuingCertificate(true);
     setCurrentStage(PROGRESS_STAGES.INITIAL);
+
     try {
+      // Pre-flight checks
       if (!client) {
-        throw new Error("No client available");
+        throw new Error("Client not initialized. Please refresh the page.");
       }
 
-      // Check if profile is missing
-      if (!profile || profile.fname === null) {
-        alert("Profile not found. Please connect your profile first.");
-        setCurrentStage(PROGRESS_STAGES.INITIAL);
-        return;
+      if (!profile || !profile.fname) {
+        throw new Error("Profile not found. Please create your profile first.");
       }
 
-      // Set learner name from profile
+      if (!address) {
+        throw new Error("Wallet not connected. Please connect your wallet.");
+      }
+
       const fullName = `${profile.fname} ${profile.lname}`;
-      setLearnerName(fullName);
+      const learner = fullName.trim();
 
-      // Optional: update learnerName local variable directly if needed
-      const learner = fullName;
-
-      // Ensure learner name is provided
-      if (!learner.trim()) {
-        alert("Profile not found. Please connect your profile first.");
-        setCurrentStage(PROGRESS_STAGES.INITIAL);
-        return;
+      if (!learner) {
+        throw new Error("Invalid profile name. Please update your profile.");
       }
 
-      // Stage 1: Generating certificate
-      setCurrentStage(PROGRESS_STAGES.GENERATING_CERTIFICATE);
-      const imageFile = await generateCertificateImage(
-        profile,
-        currentCourse,
-        address,
-      );
+      // Declare variables at function scope so they're accessible across all stages
+      let imageFile;
+      let imageUpload;
+      let metadataHash;
 
-      // Stage 2: Converting to image (completed as part of generation)
-      setCurrentStage(PROGRESS_STAGES.CONVERTING_TO_IMAGE);
-      await new Promise((resolve) => setTimeout(resolve, 500)); // Brief delay for UI
+      // ============================================================
+      // Stage 1: Generating Certificate Image
+      // ============================================================
+      try {
+        setCurrentStage(PROGRESS_STAGES.GENERATING_CERTIFICATE);
+        console.log("Stage 1: Generating certificate image...");
 
+        imageFile = await generateCertificateImage(
+          profile,
+          currentCourse,
+          address,
+        );
+
+        if (!imageFile) {
+          throw new Error("Certificate image generation returned null");
+        }
+
+        console.log("✓ Stage 1 completed: Certificate image generated");
+      } catch (err) {
+        throw new Error(
+          `Stage 1 Failed (Generating Certificate): ${err.message}`,
+        );
+      }
+
+      // ============================================================
+      // Stage 2: Converting to Image (UI delay)
+      // ============================================================
+      try {
+        setCurrentStage(PROGRESS_STAGES.CONVERTING_TO_IMAGE);
+        console.log("Stage 2: Converting to image format...");
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        console.log("✓ Stage 2 completed: Image conversion done");
+      } catch (err) {
+        throw new Error(`Stage 2 Failed (Converting to Image): ${err.message}`);
+      }
+
+      // ============================================================
       // Stage 3: Uploading to IPFS
-      setCurrentStage(PROGRESS_STAGES.UPLOADING_TO_IPFS);
-      const imageUpload = await uploadFileToPinata(imageFile);
+      // ============================================================
+      try {
+        setCurrentStage(PROGRESS_STAGES.UPLOADING_TO_IPFS);
+        console.log("Stage 3: Uploading certificate to IPFS...");
+        console.log("Image file details:", {
+          type: imageFile?.type,
+          size: imageFile?.size,
+          name: imageFile?.name,
+        });
 
-      if (!imageUpload) {
-        throw new Error("Image upload failed");
+        if (!imageFile) {
+          throw new Error("Image file is missing or invalid");
+        }
+
+        imageUpload = await uploadFileToPinata(imageFile);
+
+        console.log("Pinata response:", imageUpload);
+
+        if (!imageUpload) {
+          throw new Error(
+            "IPFS upload returned empty hash - Pinata service may be unavailable",
+          );
+        }
+
+        // Validate hash format (IPFS hashes start with Qm)
+        if (typeof imageUpload !== "string" || !imageUpload.startsWith("Qm")) {
+          throw new Error(
+            `Invalid IPFS hash format: ${imageUpload} (expected Qm...)`,
+          );
+        }
+
+        console.log("✓ Stage 3 completed: Certificate uploaded to IPFS", imageUpload);
+      } catch (err) {
+        console.error("Stage 3 detailed error:", {
+          message: err.message,
+          stack: err.stack,
+          uploadResult: imageUpload,
+        });
+        throw new Error(
+          `Stage 3 Failed (Uploading to IPFS): ${err.message}. Check console for details.`,
+        );
       }
 
-      const metadata = {
-        name: `Certificate - ${currentCourse.courseName}`,
-        description: `Certificate of Completion awarded to ${profile.fname} ${profile.lname}`,
-        image: `ipfs://${imageUpload}`, // Your PNG image
-        attributes: [
-          {
-            trait_type: "Course Name",
-            value: currentCourse.courseName,
-          },
-          {
-            trait_type: "Student",
-            value: `${profile.fname} ${profile.lname}`,
-          },
-          {
-            trait_type: "Issue Date",
-            value: new Date().toISOString(),
-          },
-          {
-            trait_type: "Certificate Type",
-            value: "Course Completion",
-          },
-          {
-            trait_type: "Blockchain",
-            value: "Sepolia", // or your chain
-          },
-        ],
-      };
+      // ============================================================
+      // Stage 3b: Upload Metadata to IPFS
+      // ============================================================
+      try {
+        console.log("Stage 3b: Uploading metadata to IPFS...");
 
-      // Upload metadata to IPFS
-      const metadataHash = await uploadMetadataToIPFS(metadata);
+        const metadata = {
+          name: `Certificate - ${currentCourse.courseName}`,
+          description: `Certificate of Completion awarded to ${learner}`,
+          image: `ipfs://${imageUpload}`,
+          attributes: [
+            {
+              trait_type: "Course Name",
+              value: currentCourse.courseName,
+            },
+            {
+              trait_type: "Student",
+              value: learner,
+            },
+            {
+              trait_type: "Issue Date",
+              value: new Date().toISOString(),
+            },
+            {
+              trait_type: "Certificate Type",
+              value: "Course Completion",
+            },
+            {
+              trait_type: "Blockchain",
+              value: "Sepolia",
+            },
+          ],
+        };
 
-      const contract = await getContract({
-        address: DiamondAddress,
-        abi: Ecosystem3Facet_ABI,
-        client,
-        chain: defineChain(11155111),
-      });
+        metadataHash = await uploadMetadataToIPFS(metadata);
 
-      const cert_issuer = "ABYA UNIVERSITY";
-      const issue_date = new Date().toISOString();
+        if (!metadataHash) {
+          throw new Error("Metadata upload returned empty hash");
+        }
 
-      // Create certificate data object
-      const newCertificateData = {
+        console.log(
+          "✓ Stage 3b completed: Metadata uploaded to IPFS",
+          metadataHash,
+        );
+      } catch (err) {
+        throw new Error(
+          `Stage 3b Failed (Uploading Metadata): ${err.message}`,
+        );
+      }
+
+      // ============================================================
+      // Stage 4: Issuing Verifiable Credential
+      // ============================================================
+      try {
+        setCurrentStage(PROGRESS_STAGES.ISSUEING_VC);
+        console.log("Stage 4: Issuing Verifiable Credential...");
+
+        const newCertificateData = {
+          learner,
+          courseName: currentCourse.courseName,
+          issuer: "ABYA UNIVERSITY",
+          issueDate: new Date().toISOString(),
+          courseId: currentCourse.courseId,
+          tokenURI: metadataHash,
+        };
+
+        await issueVC(newCertificateData);
+
+        console.log("✓ Stage 4 completed: Verifiable Credential issued");
+      } catch (err) {
+        throw new Error(
+          `Stage 4 Failed (Issuing Verifiable Credential): ${err.message}`,
+        );
+      }
+
+      // ============================================================
+      // Stage 5: Minting SBT (Soul-Bound Token)
+      // ============================================================
+      try {
+        setCurrentStage(PROGRESS_STAGES.MINTING_SBT);
+        console.log("Stage 5: Minting certificate as SBT...");
+
+        const contract = await getContract({
+          address: DiamondAddress,
+          abi: Ecosystem3Facet_ABI,
+          client,
+          chain: defineChain(11155111),
+        });
+
+        if (!contract) {
+          throw new Error("Failed to initialize contract");
+        }
+
+        const transaction = await prepareContractCall({
+          contract,
+          method: "issueCertificate",
+          params: [
+            BigInt(currentCourse.courseId),
+            learner,
+            currentCourse.courseName,
+            "ABYA UNIVERSITY",
+            BigInt(Math.floor(Date.now() / 1000)),
+            metadataHash,
+          ],
+        });
+
+        if (!transaction) {
+          throw new Error("Transaction preparation failed");
+        }
+
+        const txResult = await sendTransaction({ transaction, account });
+
+        if (!txResult) {
+          throw new Error("Transaction execution failed");
+        }
+
+        console.log("✓ Stage 5 completed: SBT minted successfully", txResult);
+      } catch (err) {
+        throw new Error(`Stage 5 Failed (Minting SBT): ${err.message}`);
+      }
+
+      // ============================================================
+      // Stage 6: Completed
+      // ============================================================
+      setCurrentStage(PROGRESS_STAGES.COMPLETED);
+      console.log("✓ All stages completed successfully");
+
+      toast.success("🎉 Certificate issued successfully!");
+
+      // Update UI state
+      setCertificateData({
         learner,
         courseName: currentCourse.courseName,
-        issuer: cert_issuer,
-        issueDate: issue_date,
+        issuer: "ABYA UNIVERSITY",
+        issueDate: new Date().toISOString(),
         courseId: currentCourse.courseId,
         tokenURI: metadataHash,
-      };
-
-      // Stage 4: Minting SBT
-      setCurrentStage(PROGRESS_STAGES.MINTING_SBT);
-      const transaction = await prepareContractCall({
-        contract,
-        method: "issueCertificate",
-        params: [
-          BigInt(currentCourse.courseId),
-          learner,
-          currentCourse.courseName,
-          cert_issuer,
-          BigInt(Math.floor(Date.now() / 1000)),
-          metadataHash,
-        ],
       });
 
-      await sendTransaction({ transaction, account });
-
-      // Stage 5: Completed
-      setCurrentStage(PROGRESS_STAGES.COMPLETED);
-      toast.success("Certificate issued successfully!");
-
-      // Set certificate data, close congrats popup and show certificate popup
-      setCertificateData(newCertificateData);
       setShowCongratsPopup(false);
       setShowCertificate(true);
     } catch (err) {
-      console.error("Error issuing certificate:", err);
+      // Error handler - stops process and displays error
+      console.error("Certificate issuance failed:", err);
       setCurrentStage(PROGRESS_STAGES.INITIAL);
-      // Extract more error information if possible
-      toast.error(
-        `Failed to issue certificate: ${
-          err.message || "Please try again later."
-        }`,
-      );
-      if (err.error && err.error.message) {
-        console.error("Contract error message:", err.error.message);
-      }
-      if (err.receipt) {
-        console.error("Transaction receipt:", err.receipt);
+
+      const errorMessage = err.message || "Unknown error occurred";
+      const displayMessage = `${errorMessage} Please try again.`;
+
+      toast.error(displayMessage);
+
+      // Log additional debugging info
+      if (err.error?.message) {
+        console.error("Details:", err.error.message);
       }
     } finally {
       setIsIssuingCertificate(false);
