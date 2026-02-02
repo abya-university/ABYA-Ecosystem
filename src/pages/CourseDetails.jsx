@@ -868,9 +868,10 @@ const CourseDetails = memo(({ courseId }) => {
     GENERATING_CERTIFICATE: 1,
     CONVERTING_TO_IMAGE: 2,
     UPLOADING_TO_IPFS: 3,
-    ISSUEING_VC: 4,
-    MINTING_SBT: 5,
-    COMPLETED: 6,
+    ISSUEING_VC_LOCALLY: 4,
+    STORE_VC_ON_CHAIN_: 5,
+    MINTING_SBT: 6,
+    COMPLETED: 7,
   };
 
   const [currentStage, setCurrentStage] = useState(PROGRESS_STAGES.INITIAL);
@@ -1181,7 +1182,7 @@ const CourseDetails = memo(({ courseId }) => {
     });
   }, []);
 
-  const {issueVC} = useDid();
+  const { issueVC, did } = useDid();
 
   const handleSubmitReview = useCallback((courseId, ratings) => {
     submitReview(
@@ -1399,7 +1400,10 @@ const CourseDetails = memo(({ courseId }) => {
           );
         }
 
-        console.log("✓ Stage 3 completed: Certificate uploaded to IPFS", imageUpload);
+        console.log(
+          "✓ Stage 3 completed: Certificate uploaded to IPFS",
+          imageUpload,
+        );
       } catch (err) {
         console.error("Stage 3 detailed error:", {
           message: err.message,
@@ -1456,16 +1460,15 @@ const CourseDetails = memo(({ courseId }) => {
           metadataHash,
         );
       } catch (err) {
-        throw new Error(
-          `Stage 3b Failed (Uploading Metadata): ${err.message}`,
-        );
+        throw new Error(`Stage 3b Failed (Uploading Metadata): ${err.message}`);
       }
 
       // ============================================================
-      // Stage 4: Issuing Verifiable Credential
+      // Stage 4: Issuing Verifiable Credential Locally
       // ============================================================
+      let issuedVC;
       try {
-        setCurrentStage(PROGRESS_STAGES.ISSUEING_VC);
+        setCurrentStage(PROGRESS_STAGES.ISSUEING_VC_LOCALLY);
         console.log("Stage 4: Issuing Verifiable Credential...");
 
         const newCertificateData = {
@@ -1477,7 +1480,14 @@ const CourseDetails = memo(({ courseId }) => {
           tokenURI: metadataHash,
         };
 
-        await issueVC(newCertificateData);
+        const vcResponse = await issueVC(newCertificateData);
+        issuedVC =
+          vcResponse?.verifiableCredential ||
+          vcResponse?.data?.verifiableCredential;
+
+        if (!issuedVC) {
+          throw new Error("VC not returned from issuance");
+        }
 
         console.log("✓ Stage 4 completed: Verifiable Credential issued");
       } catch (err) {
@@ -1487,7 +1497,78 @@ const CourseDetails = memo(({ courseId }) => {
       }
 
       // ============================================================
-      // Stage 5: Minting SBT (Soul-Bound Token)
+      // Stage 5: Storing Verifiable Credential on Chain
+      // ============================================================
+      try {
+        setCurrentStage(PROGRESS_STAGES.STORE_VC_ON_CHAIN_);
+        console.log("Stage 5: Storing Verifiable Credential on-chain...");
+
+        const contract = await getContract({
+          address: DiamondAddress,
+          abi: Ecosystem3Facet_ABI,
+          client,
+          chain: defineChain(11155111),
+        });
+
+        if (!contract) {
+          throw new Error("Failed to initialize contract");
+        }
+
+        const credentialSubject = issuedVC?.credentialSubject || {};
+        const issuerDidValue = issuedVC?.issuer?.id || issuedVC?.issuer;
+        const subjectDidValue =
+          credentialSubject?.id || issuedVC?.credentialSubject?.id || did;
+        const issuerName =
+          credentialSubject?.university ||
+          issuedVC?.issuer ||
+          "ABYA UNIVERSITY";
+        const subjectName = credentialSubject?.name || learner;
+        const credentialTypeValue = Array.isArray(issuedVC?.type)
+          ? issuedVC.type.find((t) => t !== "VerifiableCredential") ||
+            issuedVC.type[0]
+          : issuedVC?.type || "CourseCompletionCredential";
+        const issueDateValue =
+          issuedVC?.issuanceDate ||
+          credentialSubject?.issueDate ||
+          new Date().toISOString();
+        const issueDateSeconds =
+          Math.floor(new Date(issueDateValue).getTime() / 1000) ||
+          Math.floor(Date.now() / 1000);
+        const courseValue =
+          credentialSubject?.course || currentCourse.courseName;
+
+        const transaction = await prepareContractCall({
+          contract,
+          method: "issueVerifiableCredential",
+          params: [
+            address,
+            issuerName,
+            issuerDidValue,
+            subjectName,
+            subjectDidValue,
+            credentialTypeValue,
+            BigInt(issueDateSeconds),
+            courseValue,
+          ],
+        });
+
+        if (!transaction) {
+          throw new Error("Transaction preparation failed");
+        }
+
+        const txResult = await sendTransaction({ transaction, account });
+
+        if (!txResult) {
+          throw new Error("Transaction execution failed");
+        }
+
+        console.log("✓ Stage 5 completed: VC stored on-chain", txResult);
+      } catch (err) {
+        throw new Error(`Stage 5 Failed (Storing VC on-chain): ${err.message}`);
+      }
+
+      // ============================================================
+      // Stage 6: Minting SBT (Soul-Bound Token)
       // ============================================================
       try {
         setCurrentStage(PROGRESS_STAGES.MINTING_SBT);
