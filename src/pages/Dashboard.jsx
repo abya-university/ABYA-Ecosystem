@@ -1,4 +1,5 @@
 import { useState, useContext, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Wallet,
   LineChart,
@@ -23,6 +24,8 @@ import { useCertificates } from "../contexts/certificatesContext";
 import { useUser } from "../contexts/userContext";
 import { useProgress } from "../contexts/progressContext";
 import { useActiveAccount } from "thirdweb/react";
+import CareerOnboardingForm from "../components/ProfileSurveyForm";
+
 
 const Dashboard = ({ onCourseSelect }) => {
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -36,6 +39,7 @@ const Dashboard = ({ onCourseSelect }) => {
   const { lessons } = useContext(LessonContext);
   const { quizzes } = useContext(QuizContext);
   const { certificates } = useCertificates();
+  const [isShowProfileSurveyForm, setShowProfileSurveyForm] = useState(false);
 
   // Use the progress context
   const {
@@ -204,6 +208,13 @@ const Dashboard = ({ onCourseSelect }) => {
     };
   };
 
+  const handleTakeSurvey = () => {
+    setShowProfileSurveyForm(true);
+  }
+  const handleCloseSurvey = () => {
+    setShowProfileSurveyForm(false);
+  }
+
   // Improved refresh function with proper loading state
   const handleRefreshProgress = async () => {
     if (enrolledCourses.length === 0 || refreshInProgressRef.current) return;
@@ -275,9 +286,7 @@ const Dashboard = ({ onCourseSelect }) => {
           </div>
           <div className="lg:flex lg:items-center lg:gap-4 hidden md:flex">
             <button
-              onClick={() =>
-                alert("This feature is under development. Stay tuned!")
-              }
+              onClick={handleTakeSurvey }
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-cyan-900 
                        text-white rounded-lg hover:from-cyan-900 hover:to-yellow-700 
                        transition-all duration-300 transform hover:scale-105 shadow-lg"
@@ -532,6 +541,44 @@ const Dashboard = ({ onCourseSelect }) => {
             ))}
           </div>
         </div>
+
+        {isShowProfileSurveyForm && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+            <div className="relative bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-5xl w-full max-h-[95vh] overflow-hidden flex flex-col">
+              {/* Modal Header */}
+              <div className="relative p-6 border-b-2 border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-900">
+                <div className="absolute inset-0 overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 rounded-full blur-2xl bg-blue-400/20 dark:bg-blue-500/10"></div>
+                  <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full blur-2xl bg-purple-400/20 dark:bg-purple-500/10"></div>
+                </div>
+                <div className="relative flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
+                      Career Onboarding
+                    </h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      Complete your profile to get personalized recommendations
+                    </p>
+                  </div>
+                  <button 
+                    onClick={handleCloseSurvey} 
+                    className="p-2 rounded-xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-red-400 dark:hover:border-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200 shadow-sm hover:shadow-md"
+                    aria-label="Close modal"
+                  >
+                    <svg className="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto">
+                <CareerOnboardingForm userAddress={address} />
+              </div>
+            </div>
+          </div>
+        )}
 
         {showLoading && (
           <div className="text-center py-4">

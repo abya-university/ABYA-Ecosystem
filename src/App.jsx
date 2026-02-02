@@ -8,6 +8,7 @@ import CourseMetricsPage from "./pages/CourseMetricsPage";
 import SettingsPage from "./pages/Settings";
 import { ToastContainer } from "react-toastify";
 
+
 function App() {
   return (
     <>
