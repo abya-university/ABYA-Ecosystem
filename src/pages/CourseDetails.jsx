@@ -1483,7 +1483,9 @@ const CourseDetails = memo(({ courseId }) => {
         const vcResponse = await issueVC(newCertificateData);
         issuedVC =
           vcResponse?.verifiableCredential ||
-          vcResponse?.data?.verifiableCredential;
+          vcResponse?.credential ||
+          vcResponse?.data?.verifiableCredential ||
+          vcResponse?.data?.credential;
 
         if (!issuedVC) {
           throw new Error("VC not returned from issuance");
@@ -2319,194 +2321,307 @@ const CourseDetails = memo(({ courseId }) => {
               </div>
             </div>
 
-            <div className="pt-10 sm:pt-12 lg:pt-14 pb-6 sm:pb-8 px-4 sm:px-6 lg:px-8">
-              <div className="text-center space-y-4 sm:space-y-6">
-                <div>
+            <div className="pt-8 sm:pt-10 lg:pt-12 pb-4 sm:pb-6 px-3 sm:px-5 lg:px-6">
+              <div className="space-y-4 sm:space-y-5">
+                {/* Title */}
+                <div className="text-center">
                   <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                     🎉 Congratulations!
                   </h2>
-                  <div className="w-12 sm:w-14 lg:w-16 h-0.5 sm:h-1 bg-gradient-to-r from-yellow-400 to-yellow-600 mx-auto rounded-full"></div>
-                </div>
-
-                <div className="space-y-3 sm:space-y-4">
-                  <p className="text-sm sm:text-base lg:text-lg text-gray-700 dark:text-gray-300 leading-relaxed">
-                    You have successfully completed the{" "}
-                    <span className="font-semibold text-yellow-600 dark:text-yellow-400 px-2 py-1 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg text-xs sm:text-sm">
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">
+                    You've completed the{" "}
+                    <span className="font-semibold text-yellow-600 dark:text-yellow-400">
                       {currentCourse?.courseName}
                     </span>{" "}
-                    course.
+                    course
                   </p>
+                </div>
 
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-3 sm:p-4 rounded-xl border border-blue-200 dark:border-blue-800">
-                    <div className="flex items-start space-x-2 sm:space-x-3">
-                      <div className="bg-blue-500 p-1 rounded-full flex-shrink-0 mt-0.5">
+                {/* Terminal-Style Progress Display (Only shows when in progress) */}
+                {isIssuingCertificate && (
+                  <div className="bg-black rounded-lg border border-gray-800 p-4 sm:p-5 font-mono h-48 sm:h-56 overflow-y-auto">
+                    {/* Terminal Header */}
+                    <div className="flex items-center gap-2 mb-3 sticky top-0 bg-black z-10 pb-2 border-b border-gray-800">
+                      <div className="flex gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                      </div>
+                      <span className="text-xs text-gray-400">
+                        Certificate Generation Terminal
+                      </span>
+                    </div>
+
+                    {/* Progress Output with auto-scroll container */}
+                    <div className="space-y-3 text-sm" id="terminal-output">
+                      <div className="text-green-400">
+                        $ Starting certificate generation...
+                      </div>
+
+                      {[
+                        {
+                          stage: PROGRESS_STAGES.GENERATING_CERTIFICATE,
+                          label: "Generating certificate document",
+                          command: "generate_certificate",
+                        },
+                        {
+                          stage: PROGRESS_STAGES.CONVERTING_TO_IMAGE,
+                          label: "Converting to image format",
+                          command: "convert_to_image",
+                        },
+                        {
+                          stage: PROGRESS_STAGES.UPLOADING_TO_IPFS,
+                          label: "Uploading to IPFS storage",
+                          command: "upload_to_ipfs",
+                        },
+                        {
+                          stage: PROGRESS_STAGES.ISSUEING_VC_LOCALLY,
+                          label: "Issuing verifiable credential",
+                          command: "issue_verifiable_credential",
+                        },
+                        {
+                          stage: PROGRESS_STAGES.STORE_VC_ON_CHAIN_,
+                          label: "Storing on blockchain",
+                          command: "store_on_chain",
+                        },
+                        {
+                          stage: PROGRESS_STAGES.MINTING_SBT,
+                          label: "Minting certificate NFT",
+                          command: "mint_sbt",
+                        },
+                        {
+                          stage: PROGRESS_STAGES.COMPLETED,
+                          label: "Certificate ready!",
+                          command: "complete",
+                        },
+                      ].map(({ stage, label, command }, index) => {
+                        const isCurrent = currentStage === stage;
+                        const isCompleted = currentStage > stage;
+                        const isNext = currentStage === stage + 1;
+
+                        return (
+                          <div
+                            key={stage}
+                            className="pl-2 transition-opacity duration-300"
+                            id={`stage-${stage}`}
+                          >
+                            {/* Command Line */}
+                            <div className="flex items-start gap-2">
+                              <span
+                                className={`${
+                                  isCompleted
+                                    ? "text-green-400"
+                                    : isCurrent
+                                    ? "text-yellow-400"
+                                    : "text-gray-600"
+                                }`}
+                              >
+                                {isCompleted ? "✔" : isCurrent ? "▶" : ">"}
+                              </span>
+                              <div className="flex-1">
+                                <span
+                                  className={`${
+                                    isCompleted
+                                      ? "text-green-400"
+                                      : isCurrent
+                                      ? "text-yellow-400"
+                                      : "text-gray-500"
+                                  }`}
+                                >
+                                  {command}
+                                </span>
+                                {isCurrent && (
+                                  <div className="mt-1 flex items-center gap-2">
+                                    <div className="flex gap-1">
+                                      <div className="w-1 h-3 bg-yellow-400 animate-bounce"></div>
+                                      <div
+                                        className="w-1 h-3 bg-yellow-400 animate-bounce"
+                                        style={{ animationDelay: "150ms" }}
+                                      ></div>
+                                      <div
+                                        className="w-1 h-3 bg-yellow-400 animate-bounce"
+                                        style={{ animationDelay: "300ms" }}
+                                      ></div>
+                                    </div>
+                                    <span className="text-gray-400 text-xs">
+                                      {label}...
+                                    </span>
+                                  </div>
+                                )}
+                                {isCompleted && (
+                                  <div className="text-green-300 text-xs mt-1">
+                                    ✓ Completed
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Auto-scroll marker - invisible element for scrolling to */}
+                            {isCurrent && (
+                              <div id="current-stage-marker" className="h-0" />
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {/* Completion Message */}
+                      {currentStage === PROGRESS_STAGES.COMPLETED && (
+                        <div className="mt-4 pt-3 border-t border-gray-800">
+                          <div className="text-green-400">
+                            $ Process completed successfully!
+                          </div>
+                          <div className="text-cyan-300 text-xs mt-1">
+                            Certificate generated and stored securely.
+                          </div>
+                          <div className="text-green-300 text-xs mt-2 animate-pulse">
+                            ⚡ Ready for download!
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Auto-scroll Script (Inline for simplicity) */}
+                    <script
+                      dangerouslySetInnerHTML={{
+                        __html: `
+        // Auto-scroll to current stage
+        function scrollToCurrentStage() {
+          const marker = document.getElementById('current-stage-marker');
+          const terminal = document.querySelector('.overflow-y-auto');
+          const completed = document.querySelector('#stage-${PROGRESS_STAGES.COMPLETED}');
+          
+          if (marker) {
+            marker.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          } else if (completed) {
+            completed.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+        
+        // Scroll when component updates
+        if (typeof window !== 'undefined') {
+          setTimeout(scrollToCurrentStage, 100);
+        }
+      `,
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* User Info */}
+                <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-blue-500 p-1.5 rounded-full">
+                      <svg
+                        className="w-4 h-4 text-white"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                        Certificate will be issued to:
+                      </p>
+                      <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
+                        <span className="font-semibold">
+                          {profile?.fname} {profile?.lname}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Profile Warning */}
+                {!hasProfile && (
+                  <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 rounded-xl p-4 border border-red-200 dark:border-red-800">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-red-500 p-1.5 rounded-full">
                         <svg
-                          className="w-3 h-3 sm:w-4 sm:h-4 text-white"
+                          className="w-4 h-4 text-white"
                           fill="currentColor"
                           viewBox="0 0 20 20"
                         >
                           <path
                             fillRule="evenodd"
-                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
                             clipRule="evenodd"
                           />
                         </svg>
                       </div>
-                      <div className="text-left">
-                        <p className="text-xs sm:text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-                          Certificate Information
+                      <div>
+                        <p className="text-sm font-medium text-red-900 dark:text-red-100">
+                          Profile Required
                         </p>
-                        <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
-                          Certificate will be issued to:
-                          <span className="font-semibold text-blue-900 dark:text-blue-100 ml-1">
-                            {profile?.fname} {profile?.lname}
-                          </span>
+                        <p className="text-sm text-red-800 dark:text-red-200 mt-1">
+                          Please create your profile to claim certificate
                         </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {!hasProfile && (
-                    <button
-                      type="button"
-                      onClick={() => navigateTo("/mainpage?section=settings")}
-                      className="text-red-300 dark:text-purple-500 underline items-center justify-center text-md italic sm:text-sm font-medium mt-10"
-                    >
-                      Create Profile now!
-                    </button>
-                  )}
-
-                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                    Click the button below to claim your certificate.
-                  </p>
-                </div>
-
-                {/* Progress Indicator */}
-                {isIssuingCertificate && (
-                  <div className="mt-4 sm:mt-6 space-y-2 sm:space-y-3">
-                    <div className="bg-gray-50 dark:bg-gray-700/50 p-3 sm:p-4 rounded-xl border border-gray-200 dark:border-gray-600">
-                      <div className="space-y-2 sm:space-y-3">
-                        {[
-                          {
-                            stage: PROGRESS_STAGES.GENERATING_CERTIFICATE,
-                            label: "Generating Certificate",
-                            icon: "📝",
-                          },
-                          {
-                            stage: PROGRESS_STAGES.CONVERTING_TO_IMAGE,
-                            label: "Converting to Image",
-                            icon: "🖼️",
-                          },
-                          {
-                            stage: PROGRESS_STAGES.UPLOADING_TO_IPFS,
-                            label: "Uploading to IPFS",
-                            icon: "☁️",
-                          },
-                          {
-                            stage: PROGRESS_STAGES.MINTING_SBT,
-                            label: "Minting Certificate NFT",
-                            icon: "⛓️",
-                          },
-                          {
-                            stage: PROGRESS_STAGES.COMPLETED,
-                            label: "Completed",
-                            icon: "✅",
-                          },
-                        ].map(({ stage, label, icon }) => (
-                          <div
-                            key={stage}
-                            className={`flex items-center gap-2 sm:gap-3 p-2 rounded-lg transition-all duration-300 ${
-                              currentStage === stage
-                                ? "bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700"
-                                : currentStage > stage
-                                ? "bg-green-50 dark:bg-green-900/20"
-                                : "bg-gray-100 dark:bg-gray-700"
-                            }`}
-                          >
-                            <span className="text-lg sm:text-xl">{icon}</span>
-                            <span
-                              className={`text-xs sm:text-sm font-medium flex-1 ${
-                                currentStage === stage
-                                  ? "text-yellow-800 dark:text-yellow-200"
-                                  : currentStage > stage
-                                  ? "text-green-700 dark:text-green-300"
-                                  : "text-gray-500 dark:text-gray-400"
-                              }`}
-                            >
-                              {label}
-                            </span>
-                            {currentStage === stage && (
-                              <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-yellow-600"></div>
-                            )}
-                            {currentStage > stage && (
-                              <svg
-                                className="w-3 h-3 sm:w-4 sm:h-4 text-green-600"
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                            )}
-                          </div>
-                        ))}
+                        <button
+                          onClick={() =>
+                            navigateTo("/mainpage?section=settings")
+                          }
+                          className="text-red-600 dark:text-red-400 underline text-sm font-medium mt-2"
+                        >
+                          Create Profile Now
+                        </button>
                       </div>
                     </div>
                   </div>
                 )}
-              </div>
 
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-6 sm:mt-8">
-                <button
-                  onClick={
-                    hasProfile && !isIssuingCertificate
-                      ? handleClaimCertificate
-                      : undefined
-                  }
-                  disabled={!hasProfile || isIssuingCertificate}
-                  aria-disabled={!hasProfile || isIssuingCertificate}
-                  aria-busy={isIssuingCertificate}
-                  tabIndex={!hasProfile || isIssuingCertificate ? -1 : 0}
-                  className={`flex-1 font-semibold py-2 sm:py-3 px-4 sm:px-6 rounded-xl flex items-center justify-center space-x-2 text-sm sm:text-base transition-all duration-200 ${
-                    hasProfile && !isIssuingCertificate
-                      ? "bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
-                      : "bg-gray-200 text-gray-400 opacity-60 cursor-not-allowed"
-                  }`}
-                >
-                  <svg
-                    className="w-4 h-4 sm:w-5 sm:h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4">
+                  {/* Claim Certificate Button (Original Styling) */}
+                  <button
+                    onClick={
+                      hasProfile && !isIssuingCertificate
+                        ? handleClaimCertificate
+                        : undefined
+                    }
+                    disabled={!hasProfile || isIssuingCertificate}
+                    className={`flex-1 font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 ${
+                      hasProfile && !isIssuingCertificate
+                        ? "bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
+                        : "bg-gray-200 text-gray-400 opacity-60 cursor-not-allowed"
+                    }`}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  <span>
-                    {!isIssuingCertificate ? (
-                      "Claim Certificate"
+                    {isIssuingCertificate ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <span>Issuing Certificate...</span>
+                      </>
                     ) : (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span className="hidden sm:inline">Issuing...</span>
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          />
+                        </svg>
+                        <span>Claim Certificate</span>
                       </>
                     )}
-                  </span>
-                </button>
+                  </button>
 
-                <button
-                  onClick={handleClosePopup}
-                  className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium py-2 sm:py-3 px-4 sm:px-6 rounded-xl transition-all duration-200 border border-gray-300 dark:border-gray-600 text-sm sm:text-base"
-                >
-                  Close
-                </button>
+                  {/* Close Button */}
+                  <button
+                    onClick={handleClosePopup}
+                    className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium py-3 px-6 rounded-xl transition-all duration-200 border border-gray-300 dark:border-gray-600"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>

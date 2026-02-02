@@ -2,6 +2,7 @@
 import { createContext, useState, useEffect, useContext } from "react";
 import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import Ecosystem1FacetABI from "../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
+import Ecosystem3FacetABI from "../artifacts/contracts/Ecosystem3Facet.sol/Ecosystem3Facet.json";
 import PropTypes from "prop-types";
 import { useActiveAccount, useActiveWalletChain } from "thirdweb/react";
 import { client } from "../services/client";
@@ -14,7 +15,10 @@ const DidContext = createContext();
 
 // Pre-configured did:key issuer DID - Option B from Veramo documentation
 // This avoids the bug in the backend's issuer DID creation ("error is not defined")
-const ISSUER_DID_KEY = "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK";
+const ISSUER_DID_KEY =
+  "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK";
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
+const Ecosystem3Facet_ABI = Ecosystem3FacetABI.abi;
 
 export const DidProvider = ({ children }) => {
   const [did, setDid] = useState(null);
@@ -81,7 +85,10 @@ export const DidProvider = ({ children }) => {
   useEffect(() => {
     const initializeIssuerDid = async () => {
       if (issuerDidValue) {
-        console.log("[DidProvider] Issuer DID already initialized:", issuerDidValue);
+        console.log(
+          "[DidProvider] Issuer DID already initialized:",
+          issuerDidValue,
+        );
         return;
       }
 
@@ -93,7 +100,9 @@ export const DidProvider = ({ children }) => {
           body: JSON.stringify({ provider: "did:key" }),
         });
 
-        console.log(`[DidProvider] Issuer DID creation status: ${response.status}`);
+        console.log(
+          `[DidProvider] Issuer DID creation status: ${response.status}`,
+        );
 
         if (!response.ok) {
           let errMsg = `HTTP ${response.status}`;
@@ -115,10 +124,16 @@ export const DidProvider = ({ children }) => {
 
         setIssuerDidValue(data.identifier.did);
         setIssuerDidError(null);
-        console.log("[DidProvider] ✓ Issuer DID initialized:", data.identifier.did);
+        console.log(
+          "[DidProvider] ✓ Issuer DID initialized:",
+          data.identifier.did,
+        );
       } catch (error) {
         const message = error?.message || String(error);
-        console.error("[DidProvider] Failed to initialize issuer DID:", message);
+        console.error(
+          "[DidProvider] Failed to initialize issuer DID:",
+          message,
+        );
         setIssuerDidError(message);
       }
     };
@@ -130,7 +145,10 @@ export const DidProvider = ({ children }) => {
   const createIssuerDid = async () => {
     // If we already have a managed issuer DID recorded, return it
     if (issuerDidValue) {
-      console.log("[createIssuerDid] Returning cached issuer DID:", issuerDidValue);
+      console.log(
+        "[createIssuerDid] Returning cached issuer DID:",
+        issuerDidValue,
+      );
       return issuerDidValue;
     }
 
@@ -143,7 +161,9 @@ export const DidProvider = ({ children }) => {
         body: JSON.stringify({ provider: "did:key" }),
       });
 
-      console.log(`[createIssuerDid] Backend response status: ${response.status}`);
+      console.log(
+        `[createIssuerDid] Backend response status: ${response.status}`,
+      );
 
       if (!response.ok) {
         let errMsg = `HTTP ${response.status}`;
@@ -165,14 +185,17 @@ export const DidProvider = ({ children }) => {
 
       setIssuerDidValue(data.identifier.did);
       setIssuerDidError(null);
-      console.log("[createIssuerDid] ✓ Created issuer DID:", data.identifier.did);
+      console.log(
+        "[createIssuerDid] ✓ Created issuer DID:",
+        data.identifier.did,
+      );
       return data.identifier.did;
     } catch (error) {
       const message = error?.message || String(error);
       console.error("[createIssuerDid] Error:", message);
       setIssuerDidError(message);
       throw new Error(
-        `Failed to create issuer DID via backend: ${message}. \nPlease create a managed did:key on the Veramo service and retry. Example:\n  curl -X POST http://localhost:3000/did/create -H "Content-Type: application/json" -d '{"provider":"did:key"}'`
+        `Failed to create issuer DID via backend: ${message}. \nPlease create a managed did:key on the Veramo service and retry. Example:\n  curl -X POST http://localhost:3000/did/create -H "Content-Type: application/json" -d '{"provider":"did:key"}'`,
       );
     }
   };
@@ -180,7 +203,7 @@ export const DidProvider = ({ children }) => {
   // VC issuance helper (exported) - issues a VC via local Veramo service
   const issueVC = async (credentialInput) => {
     console.log("[issueVC] Starting VC issuance...");
-    
+
     // credentialInput may be either the credential object or { credential: <obj> }
     const credential = credentialInput?.credential || credentialInput;
 
@@ -197,7 +220,7 @@ export const DidProvider = ({ children }) => {
     try {
       // Ensure issuer DID is a DID managed by the Veramo agent
       const issuerDid = issuerDidValue || (await createIssuerDid());
-      
+
       if (!issuerDid) {
         throw new Error("Issuer DID is still null after initialization");
       }
@@ -215,7 +238,8 @@ export const DidProvider = ({ children }) => {
 
       // Remove undefined values from credentialSubject
       Object.keys(credentialSubject).forEach(
-        (key) => credentialSubject[key] === undefined && delete credentialSubject[key]
+        (key) =>
+          credentialSubject[key] === undefined && delete credentialSubject[key],
       );
 
       const credentialPayload = {
@@ -231,7 +255,10 @@ export const DidProvider = ({ children }) => {
         credentialSubject: credentialPayload.credentialSubject,
         type: credentialPayload.type,
       });
-      console.log("[issueVC] Full payload being sent:", JSON.stringify(credentialPayload, null, 2));
+      console.log(
+        "[issueVC] Full payload being sent:",
+        JSON.stringify(credentialPayload, null, 2),
+      );
 
       const response = await fetch("http://localhost:3000/credential/create", {
         method: "POST",
@@ -262,18 +289,24 @@ export const DidProvider = ({ children }) => {
       console.log("[issueVC] Response data:", data);
 
       if (data.success === false) {
-        throw new Error(`Backend error: ${data.error || data.message || "Unknown error"}`);
+        throw new Error(
+          `Backend error: ${data.error || data.message || "Unknown error"}`,
+        );
       }
 
-      if (!data.verifiableCredential) {
-        console.warn("[issueVC] No verifiableCredential in response");
+      const returnedVC = data?.verifiableCredential || data?.credential;
+
+      if (!returnedVC) {
+        console.warn(
+          "[issueVC] No verifiableCredential or credential in response",
+        );
         console.log("[issueVC] Full response:", data);
       }
 
-      setVC(data.verifiableCredential);
+      setVC(returnedVC || null);
       console.log("[issueVC] ✓ VC issuance successful");
-      console.log("[issueVC] Credential returned:", data.verifiableCredential);
-      return data;
+      console.log("[issueVC] Credential returned:", returnedVC);
+      return { ...data, verifiableCredential: returnedVC };
     } catch (error) {
       const errorMsg = error?.message || String(error);
       console.error("[issueVC] Error:", errorMsg);
@@ -281,8 +314,53 @@ export const DidProvider = ({ children }) => {
     }
   };
 
+  // Fetch verifiable credentials for a specific owner from chain
+  const getVerifiableCredentials = async (owner) => {
+    if (!owner) {
+      throw new Error("Owner address is required");
+    }
+
+    const contract = await getContract({
+      address: DiamondAddress,
+      abi: Ecosystem3Facet_ABI,
+      client,
+      chain: defineChain(11155111),
+    });
+
+    return await readContract({
+      contract,
+      method: "getVerifiableCredentials",
+      params: [owner],
+    });
+  };
+
+  // Fetch all verifiable credentials from chain
+  const getAllVerifiableCredentials = async () => {
+    const contract = await getContract({
+      address: DiamondAddress,
+      abi: Ecosystem3Facet_ABI,
+      client,
+      chain: defineChain(11155111),
+    });
+
+    return await readContract({
+      contract,
+      method: "getAllVerifiableCredentials",
+      params: [],
+    });
+  };
+
   return (
-    <DidContext.Provider value={{ did, didDocument, VC, issueVC }}>
+    <DidContext.Provider
+      value={{
+        did,
+        didDocument,
+        VC,
+        issueVC,
+        getVerifiableCredentials,
+        getAllVerifiableCredentials,
+      }}
+    >
       {children}
     </DidContext.Provider>
   );
