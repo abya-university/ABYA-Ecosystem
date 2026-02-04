@@ -60,7 +60,7 @@ const Dashboard = ({ onCourseSelect }) => {
 
     if (Array.isArray(enrolledStudents)) {
       return enrolledStudents.some(
-        (addr) => addr.toLowerCase() === userAddress.toLowerCase()
+        (addr) => addr.toLowerCase() === userAddress.toLowerCase(),
       );
     }
 
@@ -78,7 +78,7 @@ const Dashboard = ({ onCourseSelect }) => {
 
   // Get enrolled courses count
   const enrolledCoursesCount = courses.filter((course) =>
-    isUserEnrolled(course.enrolledStudents, address)
+    isUserEnrolled(course.enrolledStudents, address),
   ).length;
 
   // Stats data using progress context
@@ -114,7 +114,7 @@ const Dashboard = ({ onCourseSelect }) => {
     return certificates.some(
       (cert) =>
         cert.courseId.toString() === courseId.toString() &&
-        cert.owner.toLowerCase() === address.toLowerCase()
+        cert.owner.toLowerCase() === address.toLowerCase(),
     );
   };
 
@@ -128,7 +128,7 @@ const Dashboard = ({ onCourseSelect }) => {
   };
 
   const enrolledCourses = courses.filter((course) =>
-    isUserEnrolled(course.enrolledStudents, address)
+    isUserEnrolled(course.enrolledStudents, address),
   );
 
   const getEnrolledStudentsCount = (enrolledStudents) => {
@@ -139,14 +139,14 @@ const Dashboard = ({ onCourseSelect }) => {
   // Helper function to get lessons for a specific course (via chapters)
   const getLessonsForCourse = (courseId) => {
     const courseChapters = chapters.filter(
-      (chapter) => chapter.courseId.toString() === courseId.toString()
+      (chapter) => chapter.courseId.toString() === courseId.toString(),
     );
 
     const courseLessons = lessons.filter((lesson) =>
       courseChapters.some(
         (chapter) =>
-          chapter.chapterId.toString() === lesson.chapterId.toString()
-      )
+          chapter.chapterId.toString() === lesson.chapterId.toString(),
+      ),
     );
 
     return courseLessons;
@@ -158,8 +158,8 @@ const Dashboard = ({ onCourseSelect }) => {
 
     const courseQuizzes = quizzes.filter((quiz) =>
       courseLessons.some(
-        (lesson) => lesson.lessonId.toString() === quiz.lessonId.toString()
-      )
+        (lesson) => lesson.lessonId.toString() === quiz.lessonId.toString(),
+      ),
     );
 
     return courseQuizzes;
@@ -174,11 +174,11 @@ const Dashboard = ({ onCourseSelect }) => {
     const totalQuizzes = courseQuizzes.length;
 
     const completedLessons = courseLessons.filter((lesson) =>
-      completedLessonIds.has(lesson.lessonId.toString())
+      completedLessonIds.has(lesson.lessonId.toString()),
     ).length;
 
     const completedQuizzes = courseQuizzes.filter((quiz) =>
-      completedQuizIds.has(quiz.quizId.toString())
+      completedQuizIds.has(quiz.quizId.toString()),
     ).length;
 
     return {
@@ -265,7 +265,7 @@ const Dashboard = ({ onCourseSelect }) => {
   useEffect(() => {
     if (address && enrolledCourses.length > 0) {
       console.log(
-        "Address changed, refreshing progress for all enrolled courses"
+        "Address changed, refreshing progress for all enrolled courses",
       );
       handleRefreshProgress();
     }
@@ -549,8 +549,8 @@ const Dashboard = ({ onCourseSelect }) => {
         </div>
 
         {isShowProfileSurveyForm && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
-            <div className="relative bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-5xl w-full max-h-[95vh] overflow-hidden flex flex-col">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn pt-[100px]">
+            <div className="relative bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-5xl w-full max-h-[85vh] overflow-hidden flex flex-col">
               {/* Modal Header */}
               <div className="relative p-6 border-b-2 border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-900">
                 <div className="absolute inset-0 overflow-hidden">
@@ -559,7 +559,7 @@ const Dashboard = ({ onCourseSelect }) => {
                 </div>
                 <div className="relative flex items-center justify-between">
                   <div>
-                    <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
+                    <h2 className="text-2xl font-bold bg-gradient-to-r from-yellow-500 to-yellow-600 dark:from-yellow-600 dark:to-yellow-400 bg-clip-text text-transparent">
                       Career Onboarding
                     </h2>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
