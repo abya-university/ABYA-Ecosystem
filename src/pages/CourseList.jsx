@@ -22,6 +22,7 @@ import { useUser } from "../contexts/userContext";
 import { ChapterContext } from "../contexts/chapterContext";
 import { LessonContext } from "../contexts/lessonContext";
 import { QuizContext } from "../contexts/quizContext";
+import CareerOnboardingForm from "../components/ProfileSurveyForm";
 import Ecosystem1FacetABI from "../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
 import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import { toast, ToastContainer } from "react-toastify";
@@ -55,7 +56,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const { mutateAsync: sendTransaction, isPending: isSending } =
     useSendTransaction();
   const [courseId, setCourseId] = useState(null);
-  const { role } = useUser();
+  const { role, enrolledCourses } = useUser();
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [detailsPosition, setDetailsPosition] = useState({ top: 0, left: 0 });
   const detailsRef = useRef(null);
@@ -82,6 +83,11 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const [showUnenrollConfirm, setShowUnenrollConfirm] = useState(false);
   const [courseToUnenroll, setCourseToUnenroll] = useState(null);
   const [unenrollLoading, setUnenrollLoading] = useState(false);
+
+  // Survey modal state
+  const [showSurveyModal, setShowSurveyModal] = useState(false);
+  const [courseIdPendingEnrollment, setCourseIdPendingEnrollment] =
+    useState(null);
 
   const latestReview = latestReviews[courseId] || {};
   const allReviews = courseReviews[courseId] || [];
@@ -136,12 +142,12 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     const numericCourseId = Number(courseId);
 
     const courseChapters = chapters.filter(
-      (chapter) => chapter.courseId === numericCourseId
+      (chapter) => chapter.courseId === numericCourseId,
     );
 
     const totalDuration = courseChapters.reduce(
       (total, chapter) => total + Number(chapter.duration),
-      0
+      0,
     );
 
     return totalDuration;
@@ -152,12 +158,12 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const calculateCourseStats = (courseChapters) => {
     // Get all lesson IDs that belong to the course chapters
     const courseLessons = lessons.filter((lesson) =>
-      courseChapters.some((chapter) => chapter.chapterId === lesson.chapterId)
+      courseChapters.some((chapter) => chapter.chapterId === lesson.chapterId),
     );
 
     // Count quizzes that belong to the course lessons
     const courseQuizzes = quizzes.filter((quiz) =>
-      courseLessons.some((lesson) => lesson.lessonId === quiz.lessonId)
+      courseLessons.some((lesson) => lesson.lessonId === quiz.lessonId),
     );
 
     setCourseStats({
@@ -182,7 +188,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         console.log(
           `  - Should show buttons: ${
             role === "USER" && course.approved && address
-          }`
+          }`,
         );
         console.log("---");
       });
@@ -223,7 +229,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       await fetchChapters(course.courseId);
       // Calculate lessons and quizzes based on the fetched chapters
       const courseChapters = chapters.filter(
-        (chapter) => chapter.courseId === course.courseId
+        (chapter) => chapter.courseId === course.courseId,
       );
       calculateCourseStats(courseChapters);
     } catch (error) {
@@ -287,7 +293,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         }
       } else {
         toast.error(
-          "Course is not yet ready for eligibility check or has already been checked."
+          "Course is not yet ready for eligibility check or has already been checked.",
         );
       }
     } catch (error) {
@@ -304,19 +310,19 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
 
       // Step 1: Filter chapters by courseId
       const courseChapters = chapters.filter(
-        (chapter) => chapter.courseId === selectedCourse.courseId
+        (chapter) => chapter.courseId === selectedCourse.courseId,
       );
       setFilteredChapters(courseChapters);
 
       // Step 2: Filter lessons by chapterId
       const courseLessons = courseChapters.flatMap((chapter) =>
-        lessons.filter((lesson) => lesson.chapterId === chapter.id)
+        lessons.filter((lesson) => lesson.chapterId === chapter.id),
       );
       setFilteredLessons(courseLessons);
 
       // Step 3: Filter quizzes by lessonId
       const courseQuizzes = courseLessons.flatMap((lesson) =>
-        quizzes.filter((quiz) => quiz.lessonId === lesson.id)
+        quizzes.filter((quiz) => quiz.lessonId === lesson.id),
       );
       setFilteredQuizzes(courseQuizzes);
     }
@@ -330,7 +336,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
 
       // 1. Find the base course from existing courses
       const course = courses.find(
-        (c) => Number(c.courseId) === Number(courseId)
+        (c) => Number(c.courseId) === Number(courseId),
       );
       if (!course) {
         console.error(`Course with ID ${courseId} not found`);
@@ -341,11 +347,11 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       // 2. Fetch chapters specifically for this course
       const chapters = await fetchChapters(courseId);
       const courseChapters = chapters.filter(
-        (chapter) => Number(chapter.courseId) === Number(courseId)
+        (chapter) => Number(chapter.courseId) === Number(courseId),
       );
       console.log(
         `Found ${courseChapters.length} chapters for course:`,
-        courseChapters
+        courseChapters,
       );
 
       console.log("Lessons 4: ", lessons);
@@ -354,11 +360,11 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       const getLessonsForChapter = (chapterId) => {
         // Make sure we're comparing the same types (numbers)
         const lessonsForChapter = lessons.filter(
-          (lesson) => Number(lesson.chapterId) === Number(chapterId)
+          (lesson) => Number(lesson.chapterId) === Number(chapterId),
         );
         console.log(
           `Found ${lessonsForChapter.length} lessons for chapter ${chapterId}:`,
-          lessonsForChapter
+          lessonsForChapter,
         );
         return lessonsForChapter;
       };
@@ -375,18 +381,18 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
 
       console.log(
         `Found ${courseLessons.length} lessons for course:`,
-        courseLessons
+        courseLessons,
       );
 
       // 4. Get quizzes for these lessons - fixed to match correctly
       const courseQuizzes = quizzes.filter((quiz) =>
         courseLessons.some(
-          (lesson) => Number(lesson.lessonId) === Number(quiz.lessonId)
-        )
+          (lesson) => Number(lesson.lessonId) === Number(quiz.lessonId),
+        ),
       );
       console.log(
         `Found ${courseQuizzes.length} quizzes for course:`,
-        courseQuizzes
+        courseQuizzes,
       );
 
       // 5. Compile everything into one object
@@ -402,7 +408,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     } catch (error) {
       console.error(
         `Error fetching complete details for course ${courseId}:`,
-        error
+        error,
       );
       return null;
     } finally {
@@ -464,34 +470,34 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
 
       const review = {
         learnerAgency: ensureValidNumber(
-          evaluationResult.grades?.learnerAgency
+          evaluationResult.grades?.learnerAgency,
         ),
         criticalThinking: ensureValidNumber(
-          evaluationResult.grades?.criticalThinking
+          evaluationResult.grades?.criticalThinking,
         ),
         collaborativeLearning: ensureValidNumber(
-          evaluationResult.grades?.collaborativeLearning
+          evaluationResult.grades?.collaborativeLearning,
         ),
         reflectivePractice: ensureValidNumber(
-          evaluationResult.grades?.reflectivePractice
+          evaluationResult.grades?.reflectivePractice,
         ),
         adaptiveLearning: ensureValidNumber(
-          evaluationResult.grades?.adaptiveLearning
+          evaluationResult.grades?.adaptiveLearning,
         ),
         authenticLearning: ensureValidNumber(
-          evaluationResult.grades?.authenticLearning
+          evaluationResult.grades?.authenticLearning,
         ),
         technologyIntegration: ensureValidNumber(
-          evaluationResult.grades?.technologyIntegration
+          evaluationResult.grades?.technologyIntegration,
         ),
         learnerSupport: ensureValidNumber(
-          evaluationResult.grades?.learnerSupport
+          evaluationResult.grades?.learnerSupport,
         ),
         assessmentForLearning: ensureValidNumber(
-          evaluationResult.grades?.assessmentForLearning
+          evaluationResult.grades?.assessmentForLearning,
         ),
         engagementAndMotivation: ensureValidNumber(
-          evaluationResult.grades?.engagementAndMotivation
+          evaluationResult.grades?.engagementAndMotivation,
         ),
         isSubmitted: true,
         category: category,
@@ -513,7 +519,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
 
       if (!account.address) {
         throw new Error(
-          "Account address is missing - wallet may not be properly connected"
+          "Account address is missing - wallet may not be properly connected",
         );
       }
 
@@ -560,7 +566,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     const quizzes = courseData.quizzes || [];
 
     console.log(
-      `Found ${chapters.length} chapters, ${lessons.length} lessons, ${quizzes.length} quizzes`
+      `Found ${chapters.length} chapters, ${lessons.length} lessons, ${quizzes.length} quizzes`,
     );
 
     let markdown = `# ${courseData.courseName}\n\n`;
@@ -568,7 +574,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       courseData.description || "No description provided."
     }\n\n`;
     markdown += `## Difficulty Level\n${getDifficultyLabel(
-      courseData.difficulty_level
+      courseData.difficulty_level,
     )}\n\n`;
     markdown += `## Creator\n${courseData.creator || "Unknown"}\n\n`;
 
@@ -581,7 +587,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
 
         // Add lessons for each chapter - fixed to use chapterId
         const chapterLessons = lessons.filter(
-          (lesson) => Number(lesson.chapterId) === Number(chapter.chapterId)
+          (lesson) => Number(lesson.chapterId) === Number(chapter.chapterId),
         );
 
         if (chapterLessons.length > 0) {
@@ -592,7 +598,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
 
             // Add quizzes for each lesson - fixed to match correctly
             const lessonQuizzes = quizzes.filter(
-              (quiz) => Number(quiz.lessonId) === Number(lesson.lessonId)
+              (quiz) => Number(quiz.lessonId) === Number(lesson.lessonId),
             );
             if (lessonQuizzes.length > 0) {
               markdown += `###### Quizzes\n`;
@@ -651,7 +657,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
 
             if (isReadyForCheck) {
               console.log(
-                `Course ${course.courseId} is ready for eligibility check`
+                `Course ${course.courseId} is ready for eligibility check`,
               );
 
               await prepareContractCall({
@@ -671,11 +677,11 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                 params: [courseId],
               });
               console.log(
-                `Eligibility feedback for course ${course.courseId}: ${feedback}`
+                `Eligibility feedback for course ${course.courseId}: ${feedback}`,
               );
               if (!feedback.includes("Course meets eligibility criteria")) {
                 console.log(
-                  `Course ${course.courseId} failed eligibility check: ${feedback}`
+                  `Course ${course.courseId} failed eligibility check: ${feedback}`,
                 );
                 continue; // Skip AI review if eligibility check failed
               }
@@ -700,7 +706,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     return certificates.some(
       (cert) =>
         cert.courseId.toString() === courseId.toString() &&
-        cert.owner.toLowerCase() === address.toLowerCase()
+        cert.owner.toLowerCase() === address.toLowerCase(),
     );
   };
 
@@ -733,6 +739,14 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   };
 
   const enroll = async (courseId) => {
+    // Check if user is enrolling in their first course
+    if (enrolledCourses.length === 0) {
+      // Show survey modal for first-time enrollment
+      setShowSurveyModal(true);
+      setCourseIdPendingEnrollment(courseId);
+      return;
+    }
+
     try {
       setLoading(true);
       const contract = getContract({
@@ -757,6 +771,43 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       toast.error("Error enrolling in course. Please try again!");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSurveyComplete = async () => {
+    // Close modal and reset state
+    setShowSurveyModal(false);
+
+    // Auto-enroll in the course after survey completion
+    if (courseIdPendingEnrollment) {
+      try {
+        setLoading(true);
+        const contract = getContract({
+          address: DiamondAddress,
+          abi: Ecosystem2Facet_ABI,
+          client,
+          chain: defineChain(11155111),
+        });
+
+        const transaction = prepareContractCall({
+          contract,
+          method: "enroll",
+          params: [courseIdPendingEnrollment],
+        });
+
+        await sendTransaction(transaction);
+
+        setEnrolled(true);
+        toast.success(
+          `Enrolled into course ${courseIdPendingEnrollment} successfully!`,
+        );
+      } catch (error) {
+        console.error("Error enrolling in course:", error);
+        toast.error("Error enrolling in course. Please try again!");
+      } finally {
+        setLoading(false);
+        setCourseIdPendingEnrollment(null);
+      }
     }
   };
 
@@ -816,7 +867,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         "Missing data - enrolledStudents:",
         enrolledStudents,
         "userAddress:",
-        userAddress
+        userAddress,
       );
       return false;
     }
@@ -824,7 +875,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     // If it's an array, check if it includes the address
     if (Array.isArray(enrolledStudents)) {
       const isEnrolled = enrolledStudents.some(
-        (addr) => addr.toLowerCase() === userAddress.toLowerCase()
+        (addr) => addr.toLowerCase() === userAddress.toLowerCase(),
       );
       console.log(
         "Array check - enrolledStudents:",
@@ -832,7 +883,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         "userAddress:",
         userAddress,
         "isEnrolled:",
-        isEnrolled
+        isEnrolled,
       );
       return isEnrolled;
     }
@@ -850,7 +901,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         "userAddress:",
         userAddress,
         "isEnrolled:",
-        isEnrolled
+        isEnrolled,
       );
       return isEnrolled;
     }
@@ -866,7 +917,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       "userAddress:",
       userAddress,
       "isEnrolled:",
-      isEnrolled
+      isEnrolled,
     );
     return isEnrolled;
   };
@@ -938,7 +989,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                     {/* Difficulty Level Tag */}
                     <div
                       className={`px-2 py-1 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium shadow-sm ${getDifficultyColor(
-                        course.difficulty_level
+                        course.difficulty_level,
                       )}`}
                     >
                       {getDifficultyLabel(course.difficulty_level)}
@@ -947,7 +998,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                     {/* Approval Status Badge */}
                     <div
                       className={`px-2 py-1 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium shadow-sm flex items-center ${getApprovalStatusStyle(
-                        course.approved
+                        course.approved,
                       )}`}
                     >
                       {!course.approved ? (
@@ -1023,10 +1074,10 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                         {(() => {
                           const userEnrolled = isUserEnrolled(
                             course.enrolledStudents,
-                            address
+                            address,
                           );
                           const hasCertificate = hasCertificateForCourse(
-                            course.courseId
+                            course.courseId,
                           );
 
                           if (userEnrolled) {
@@ -1238,7 +1289,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                       </h4>
                       <div
                         className={`inline-block px-2 py-1 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium mt-1 ${getDifficultyColor(
-                          selectedCourse.difficulty_level
+                          selectedCourse.difficulty_level,
                         )}`}
                       >
                         {getDifficultyLabel(selectedCourse.difficulty_level) ||
@@ -1347,11 +1398,11 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                         </h4>
                         <p className="dark:text-gray-300 text-gray-700 text-sm">
                           {typeof calculateTotalDuration(
-                            selectedCourse.courseId
+                            selectedCourse.courseId,
                           ) === "object"
                             ? "0"
                             : calculateTotalDuration(
-                                selectedCourse.courseId
+                                selectedCourse.courseId,
                               )}{" "}
                           Weeks
                         </p>
@@ -1370,11 +1421,11 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                         </h4>
                         <span className="dark:text-gray-300 text-gray-700 text-sm">
                           {typeof getEnrolledStudentsCount(
-                            selectedCourse?.enrolledStudents
+                            selectedCourse?.enrolledStudents,
                           ) === "object"
                             ? "0"
                             : getEnrolledStudentsCount(
-                                selectedCourse?.enrolledStudents
+                                selectedCourse?.enrolledStudents,
                               ) || 0}{" "}
                           Student(s)
                         </span>
@@ -1589,6 +1640,20 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
           </div>
         )}
       </div>
+
+      {/* Survey Modal for First-time Enrollment */}
+      {showSurveyModal && (
+        <CareerOnboardingForm
+          userAddress={account?.address}
+          isModal={true}
+          onFormComplete={handleSurveyComplete}
+          courseIdToEnroll={courseIdPendingEnrollment}
+          onClose={() => {
+            setShowSurveyModal(false);
+            setCourseIdPendingEnrollment(null);
+          }}
+        />
+      )}
     </div>
   );
 };
