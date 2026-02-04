@@ -26,7 +26,6 @@ import { useProgress } from "../contexts/progressContext";
 import { useActiveAccount } from "thirdweb/react";
 import CareerOnboardingForm from "../components/ProfileSurveyForm";
 
-
 const Dashboard = ({ onCourseSelect }) => {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -110,29 +109,6 @@ const Dashboard = ({ onCourseSelect }) => {
     },
   ];
 
-  const recentActivity = [
-    {
-      course: "Blockchain Basics",
-      progress: 75,
-      status: "In Progress",
-    },
-    {
-      course: "Smart Contract Development",
-      progress: 100,
-      status: "Completed",
-    },
-    {
-      course: "Web3 Security",
-      progress: 30,
-      status: "Started",
-    },
-  ];
-
-  const getEnrolledStudentsCount = (enrolledStudents) => {
-    if (!enrolledStudents || enrolledStudents.length === 0) return 0;
-    return enrolledStudents.length;
-  };
-
   // Helper function to check if user has claimed certificate for a course
   const hasCertificateForCourse = (courseId) => {
     return certificates.some(
@@ -154,6 +130,11 @@ const Dashboard = ({ onCourseSelect }) => {
   const enrolledCourses = courses.filter((course) =>
     isUserEnrolled(course.enrolledStudents, address)
   );
+
+  const getEnrolledStudentsCount = (enrolledStudents) => {
+    if (!enrolledStudents || enrolledStudents.length === 0) return 0;
+    return enrolledStudents.length;
+  };
 
   // Helper function to get lessons for a specific course (via chapters)
   const getLessonsForCourse = (courseId) => {
@@ -210,10 +191,35 @@ const Dashboard = ({ onCourseSelect }) => {
 
   const handleTakeSurvey = () => {
     setShowProfileSurveyForm(true);
-  }
+  };
   const handleCloseSurvey = () => {
     setShowProfileSurveyForm(false);
-  }
+  };
+  // Generate recent activity from enrolled courses (limited to 3)
+  const recentActivity = enrolledCourses
+    .map((course) => {
+      const completionData = getCourseCompletionData(course.courseId);
+      const totalItems =
+        completionData.totalLessons + completionData.totalQuizzes;
+      const completedItems =
+        completionData.completedLessons + completionData.completedQuizzes;
+      const progress =
+        totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+      let status = "Started";
+      if (progress === 100) {
+        status = "Completed";
+      } else if (progress > 0) {
+        status = "In Progress";
+      }
+
+      return {
+        course: course.courseName,
+        progress,
+        status,
+      };
+    })
+    .slice(0, 3);
 
   // Improved refresh function with proper loading state
   const handleRefreshProgress = async () => {
@@ -286,9 +292,9 @@ const Dashboard = ({ onCourseSelect }) => {
           </div>
           <div className="lg:flex lg:items-center lg:gap-4 hidden md:flex">
             <button
-              onClick={handleTakeSurvey }
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-cyan-900 
-                       text-white rounded-lg hover:from-cyan-900 hover:to-yellow-700 
+              onClick={handleTakeSurvey}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-cyan-900
+                       text-white rounded-lg hover:from-cyan-900 hover:to-yellow-700
                        transition-all duration-300 transform hover:scale-105 shadow-lg"
             >
               <ClipboardListIcon className="w-4 h-4" />
@@ -297,7 +303,7 @@ const Dashboard = ({ onCourseSelect }) => {
             <button
               onClick={handleRefreshProgress}
               disabled={showLoading || enrolledCourses.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600
              text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {showLoading ? (
@@ -560,18 +566,28 @@ const Dashboard = ({ onCourseSelect }) => {
                       Complete your profile to get personalized recommendations
                     </p>
                   </div>
-                  <button 
-                    onClick={handleCloseSurvey} 
+                  <button
+                    onClick={handleCloseSurvey}
                     className="p-2 rounded-xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-red-400 dark:hover:border-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200 shadow-sm hover:shadow-md"
                     aria-label="Close modal"
                   >
-                    <svg className="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <svg
+                      className="w-6 h-6 text-gray-600 dark:text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>
               </div>
-              
+
               {/* Modal Content */}
               <div className="flex-1 overflow-y-auto">
                 <CareerOnboardingForm userAddress={address} />

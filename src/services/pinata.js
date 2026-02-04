@@ -85,3 +85,31 @@ export const getPinnedData = async () => {
         throw error;
     }
 };
+
+export const uploadVCToIPFS = async (vcData, subjectDid) => {
+    const url = `https://api.pinata.cloud/pinning/pinJSONToIPFS`;
+    
+    // Extract just the DID identifier (e.g., "z6Mkg..." from "did:key:z6Mkg...")
+    const didIdentifier = subjectDid.split(':').pop();
+    const filename = `VC-${didIdentifier}.json`;
+
+    try {
+        const response = await axios.post(url, vcData, {
+            maxContentLength: 'Infinity',
+            maxBodyLength: 'Infinity',
+            timeout: 600000,
+            headers: {
+                'Content-Type': 'application/json',
+                pinata_api_key: pinataApiKey,
+                pinata_secret_api_key: pinataSecretApiKey,
+                'X-Pinata-Custom-Key': filename,
+            },
+        });
+
+        console.log('VC IPFS hash:', response.data.IpfsHash);
+        return response.data.IpfsHash;
+    } catch (error) {
+        console.error('Error uploading VC to IPFS:', error.response ? error.response.data : error.message);
+        throw error;
+    }
+};

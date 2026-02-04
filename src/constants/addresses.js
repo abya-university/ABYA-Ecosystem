@@ -7,7 +7,7 @@ const CONTRACT_ADDRESSES = {
         TokenManagementFacet: "0xF3Dd1E07298861FA33570542e317c381e8498630",
         Ecosystem1Facet: "0xd00B1060F3f681B9E87E43295A0E960380fe271e",
         Ecosystem2Facet: "0xB8Ae6Df66492FD8596dE724C3341aa6Dcf6f2953",
-        Ecosystem3Facet: "0x8696891CD15F0FA9AfD8f03E60cb60CD88d0146f",
+        Ecosystem3Facet: "0x0661D59B524618bC3b9a086bc0862d839B46bD9C",
         CommunityEngagementFacet: "0xA98dC21c8F9835089eeDfC7a4a406D50f5d3AF74",
         CommunityGovernanceFacet: "0x134527fDb572EcE377940f622A7e538885b135F2",
         CommunityBadgesFacet: "0xe7B2e77D448eA59eB29B6F320c81A9F05687aD18",

@@ -39,6 +39,7 @@ import {
   sendTransaction,
 } from "thirdweb";
 import { useUser } from "../contexts/userContext";
+import { useDid } from "../contexts/DidContext";
 
 const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
 const Community_ABI = CommunityABI.abi;
@@ -64,9 +65,11 @@ const SettingsPage = () => {
     sessionTimeout: "30",
     requirePassword: true,
   });
-  const { did, didDocument, enrolledCourses } = useUser();
+  const { enrolledCourses } = useUser();
+  const { did, didDocument, VC } = useDid();
 
   console.log("Dashboard enrolled courses: ", enrolledCourses);
+  console.log("VC:", VC);
 
   const formatAddress = (addr) => {
     if (!addr) return "Not Connected";

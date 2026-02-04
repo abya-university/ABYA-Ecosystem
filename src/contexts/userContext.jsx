@@ -36,8 +36,6 @@ export const UserProvider = ({ children }) => {
   const isConnected = !!account;
   const chain = useActiveWalletChain();
   const [enrolledCourses, setEnrolledCourses] = useState([]);
-  const [did, setDid] = useState(null);
-  const [didDocument, setDidDocument] = useState(null);
 
   useEffect(() => {
     const fetchUserRole = async () => {
@@ -161,106 +159,8 @@ export const UserProvider = ({ children }) => {
     fetchEnrolledCourses();
   }, [address, isConnected, chain, client]);
 
-  // make an api call to veramo service(running on localhost:3000) to create a did:ethr
-  useEffect(() => {
-    const createDID = async () => {
-      if (!isConnected || !address || !chain) return;
-
-      try {
-        const response = await fetch("http://localhost:3000/did/create", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            provider: "did:ethr",
-            walletAddress: address,
-            network: chain?.name?.toLowerCase(), // lowercased network name (e.g., "sepolia")
-            // chainId: chain.id, // include explicit chainId for backend flexibility
-          }),
-        });
-
-        const data = await response.json();
-        console.log("DID Creation Response:", data);
-        setDid(data.identifier?.did);
-      } catch (error) {
-        console.error("Error creating DID:", error);
-      }
-    };
-
-    createDID();
-  }, [address, isConnected, chain]);
-
-  // did resolve
-  useEffect(() => {
-    const resolveDID = async () => {
-      if (!did) return;
-
-      try {
-        const response = await fetch(
-          `http://localhost:3000/did/${did}/resolve`,
-        );
-        const data = await response.json();
-        console.log("DID Resolution Response:", data);
-      } catch (error) {
-        console.error("Error resolving DID:", error);
-      }
-    };
-
-    resolveDID();
-  }, [did]);
-
-  useEffect(() => {
-    const createDID = async () => {
-      if (!isConnected || !address || !chain) return;
-
-      try {
-        const response = await fetch("http://localhost:3000/did/create", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            provider: "did:ethr",
-            walletAddress: address,
-            //network: "skale-titan", // SKALE Titan network
-            network: chain?.name?.toLowerCase(), // lowercased network name (e.g., "sepolia")
-          }),
-        });
-
-        const data = await response.json();
-        console.log("DID Creation Response:", data);
-        setDid(data?.identifier?.did);
-      } catch (error) {
-        console.error("Error creating DID:", error);
-      }
-    };
-
-    createDID();
-  }, [address, isConnected, chain]);
-
-  // did resolve
-  useEffect(() => {
-    const resolveDID = async () => {
-      if (!did) return;
-
-      try {
-        const response = await fetch(
-          `http://localhost:3000/did/${did}/resolve`,
-        );
-        const data = await response.json();
-        console.log("DID Resolution Response:", data);
-        setDidDocument(data?.resolution?.didDocument);
-      } catch (error) {
-        console.error("Error resolving DID:", error);
-      }
-    };
-
-    resolveDID();
-  }, [did]);
-
   return (
-    <UserContext.Provider value={{ role, enrolledCourses, did, didDocument }}>
+    <UserContext.Provider value={{ role, enrolledCourses }}>
       {children}
     </UserContext.Provider>
   );

@@ -38,6 +38,7 @@ import {
   Activity,
 } from "lucide-react";
 import { useCertificates } from "../contexts/certificatesContext";
+import { useDid } from "../contexts/DidContext";
 import Certificate from "../components/Certificate";
 import { CSSTransition } from "react-transition-group";
 import "../index.css";
@@ -102,6 +103,11 @@ const AchievementsPage = () => {
   const [filter, setFilter] = useState("all");
   const [showEventPopup, setShowEventPopup] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [verifiableCredentials, setVerifiableCredentials] = useState([]);
+  const [vcLoading, setVcLoading] = useState(false);
+  const [vcError, setVcError] = useState(null);
+  const [selectedVC, setSelectedVC] = useState(null);
+  const [showVCDetailPopup, setShowVCDetailPopup] = useState(false);
 
   const [userBadge, setUserBadge] = useState(null);
   const { memberBadgeDetails, fetchMemberBadgeDetails } = useCommunityMembers();
@@ -112,6 +118,7 @@ const AchievementsPage = () => {
   const badgeInfo = BADGE_DISPLAY_MAP[currentBadgeLevel];
   const { events, fetchEvents } = useCommunityEvents();
   const { members, fetchMembers } = useCommunityMembers();
+  const { getVerifiableCredentials } = useDid();
 
   // Mock ABYTKN tokens
   const abytkns = [
@@ -144,43 +151,12 @@ const AchievementsPage = () => {
     },
   ];
 
-  // Mock Verifiable Credentials
-  const verifiableCredentials = [
-    {
-      id: 1,
-      name: "KYC Verification",
-      issuer: "IdentityDAO",
-      issueDate: "2024-01-15",
-      expiryDate: "2025-01-15",
-      status: "valid",
-      type: "Identity",
-      description:
-        "Know Your Customer verification compliant with international standards",
-      signature: "0x1234...5678",
-    },
-    {
-      id: 2,
-      name: "Proof of Education",
-      issuer: "University of Blockchain",
-      issueDate: "2024-02-20",
-      expiryDate: "Never",
-      status: "valid",
-      type: "Education",
-      description: "Master's Degree in Blockchain Technology",
-      signature: "0x8765...4321",
-    },
-    {
-      id: 3,
-      name: "Professional Certification",
-      issuer: "Web3 Professionals Association",
-      issueDate: "2024-03-10",
-      expiryDate: "2025-03-10",
-      status: "expiring",
-      type: "Professional",
-      description: "Certified Web3 Developer",
-      signature: "0xabcd...efgh",
-    },
-  ];
+  const formatVCDate = (seconds) => {
+    if (seconds === undefined || seconds === null) return "Unknown";
+    const ms = Number(seconds) * 1000;
+    if (Number.isNaN(ms)) return "Unknown";
+    return new Date(ms).toLocaleDateString();
+  };
 
   useEffect(() => {
     fetchEvents();
@@ -195,6 +171,26 @@ const AchievementsPage = () => {
       setUserBadge(memberBadgeDetails.currentBadge);
     }
   }, [memberBadgeDetails]);
+
+  useEffect(() => {
+    const fetchVCs = async () => {
+      if (!address || !getVerifiableCredentials) return;
+      setVcLoading(true);
+      setVcError(null);
+
+      try {
+        const vcs = await getVerifiableCredentials(address);
+        setVerifiableCredentials(Array.isArray(vcs) ? vcs : []);
+      } catch (error) {
+        console.error("Failed to load VCs:", error);
+        setVcError(error?.message || "Failed to load verifiable credentials");
+      } finally {
+        setVcLoading(false);
+      }
+    };
+
+    fetchVCs();
+  }, [address, getVerifiableCredentials]);
 
   useEffect(() => {
     const fetchTokenURIs = async () => {
@@ -833,51 +829,89 @@ const AchievementsPage = () => {
               </div>
               <div className="p-6">
                 <div className="space-y-3">
-                  {verifiableCredentials.map((vc) => (
-                    <div
-                      key={vc.id}
-                      className="p-4 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 rounded-lg bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30">
-                            {getVCTypeIcon(vc.type)}
-                          </div>
-                          <div>
-                            <h4 className="font-medium text-gray-900 dark:text-white">
-                              {vc.name}
-                            </h4>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                              Issued by {vc.issuer}
-                            </p>
-                            <div className="flex items-center gap-2 mt-2">
-                              <span
-                                className={`text-xs px-2 py-1 rounded-full ${getVCStatusColor(
-                                  vc.status,
-                                )}`}
-                              >
-                                {vc.status === "expiring"
-                                  ? "Expires Soon"
-                                  : vc.status}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {vc.type}
-                              </span>
+                  {vcLoading && (
+                    <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-600 text-sm text-gray-500 dark:text-gray-400">
+                      Loading verifiable credentials...
+                    </div>
+                  )}
+
+                  {!vcLoading && vcError && (
+                    <div className="p-4 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700 dark:border-red-900 dark:bg-red-900/20 dark:text-red-300">
+                      {vcError}
+                    </div>
+                  )}
+
+                  {!vcLoading &&
+                    !vcError &&
+                    verifiableCredentials.length === 0 && (
+                      <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-600 text-sm text-gray-500 dark:text-gray-400">
+                        No verifiable credentials found for this wallet.
+                      </div>
+                    )}
+
+                  {verifiableCredentials.map((vc, index) => {
+                    const vcType = Array.isArray(vc.credentialType)
+                      ? vc.credentialType.find(
+                          (t) => t !== "VerifiableCredential",
+                        ) || vc.credentialType[0]
+                      : vc.credentialType;
+                    const vcStatus = "valid";
+                    const issuedAt = formatVCDate(vc.issuanceDate);
+
+                    return (
+                      <div
+                        key={`${vc.credentialID ?? index}-${vc.owner ?? "vc"}`}
+                        className="p-4 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <div className="p-2 rounded-lg bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 flex-shrink-0">
+                              {getVCTypeIcon(vcType)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-gray-900 dark:text-white">
+                                {vc.course || "Verifiable Credential"}
+                              </h4>
+                              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                Issued by {vc.issuer}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                                Subject: {vc.subject}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                                ID: {vc.credentialID}
+                              </p>
+                              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                <span
+                                  className={`text-xs px-2 py-1 rounded-full ${getVCStatusColor(
+                                    vcStatus,
+                                  )}`}
+                                >
+                                  {vcStatus}
+                                </span>
+                                <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                                  {vcType || "Credential"}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  Issued {issuedAt}
+                                </span>
+                              </div>
                             </div>
                           </div>
+                          <button
+                            onClick={() => {
+                              setSelectedVC(vc);
+                              setShowVCDetailPopup(true);
+                            }}
+                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex-shrink-0"
+                            title="View full VC details"
+                          >
+                            <Eye className="w-4 h-4 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300" />
+                          </button>
                         </div>
-                        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-                          <Eye className="w-4 h-4 text-gray-500" />
-                        </button>
                       </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                  <button className="w-full py-2 px-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
-                    <Database className="w-4 h-4" />
-                    Add New VC
-                  </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -1140,6 +1174,180 @@ const AchievementsPage = () => {
                         <Share2 className="w-5 h-5" />
                       </button>
                     </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </CSSTransition>
+
+        {/* VC Details Popup */}
+        <CSSTransition
+          in={showVCDetailPopup}
+          timeout={300}
+          classNames="popup"
+          unmountOnExit
+        >
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Close button */}
+              <button
+                onClick={() => setShowVCDetailPopup(false)}
+                className="absolute top-4 right-4 z-10 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {selectedVC && (
+                <div className="p-6 sm:p-8">
+                  {/* Header */}
+                  <div className="mb-8">
+                    <div className="flex items-start gap-4 mb-4">
+                      <div className="p-3 rounded-lg bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30">
+                        {getVCTypeIcon(
+                          Array.isArray(selectedVC.credentialType)
+                            ? selectedVC.credentialType.find(
+                                (t) => t !== "VerifiableCredential",
+                              ) || selectedVC.credentialType[0]
+                            : selectedVC.credentialType,
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                          {selectedVC.course || "Verifiable Credential"}
+                        </h2>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          {Array.isArray(selectedVC.credentialType)
+                            ? selectedVC.credentialType.join(", ")
+                            : selectedVC.credentialType}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Grid of details */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    {/* Issuer Details */}
+                    <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-700">
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                        <Shield className="w-4 h-4" />
+                        Issuer Information
+                      </h3>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Issuer
+                          </p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            {selectedVC.issuer}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Issuer DID
+                          </p>
+                          <p className="text-xs font-mono text-gray-700 dark:text-gray-300 break-all">
+                            {selectedVC.issuerDID || "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Subject Details */}
+                    <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-700">
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                        <BadgeCheck className="w-4 h-4" />
+                        Subject Information
+                      </h3>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Subject
+                          </p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            {selectedVC.subject}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Subject DID
+                          </p>
+                          <p className="text-xs font-mono text-gray-700 dark:text-gray-300 break-all">
+                            {selectedVC.subjectDID || "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Credential Details */}
+                    <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-700">
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                        <Key className="w-4 h-4" />
+                        Credential Details
+                      </h3>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Credential ID
+                          </p>
+                          <p className="text-xs font-mono text-gray-700 dark:text-gray-300 break-all">
+                            {selectedVC.credentialID}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Course
+                          </p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            {selectedVC.course}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Dates */}
+                    <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-700">
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        Dates
+                      </h3>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Issued
+                          </p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            {formatVCDate(selectedVC.issuanceDate)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Owner Address
+                          </p>
+                          <p className="text-xs font-mono text-gray-700 dark:text-gray-300 break-all">
+                            {selectedVC.owner}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <button className="flex-1 py-2 px-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+                      <Download className="w-4 h-4" />
+                      Download
+                    </button>
+                    <button className="flex-1 py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2">
+                      <Share2 className="w-4 h-4" />
+                      Share
+                    </button>
+                    <button
+                      onClick={() => setShowVCDetailPopup(false)}
+                      className="flex-1 py-2 px-4 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      Close
+                    </button>
                   </div>
                 </div>
               )}
