@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  ArrowRight, 
-  CheckCircle, 
-  User, 
-  Code, 
-  Target, 
-  Heart, 
-  BookOpen, 
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle,
+  User,
+  Code,
+  Target,
+  Heart,
+  BookOpen,
   FileCheck,
   Sparkles,
   TrendingUp,
@@ -31,29 +31,29 @@ export default function CareerOnboardingForm({ userAddress }) {
     currentRole: '',
     yearsOfExperience: '',
     industryBackground: '',
-    
+
     // Tech Background
     technicalLevel: '',
     programmingLanguages: [],
     hasBlockchainExp: '',
     hasAIExp: '',
-    
+
     // Career Goals
     targetRole: [],
     careerTimeline: '',
     geographicPreference: '',
-    
+
     // Motivation & Interests
     primaryMotivation: [],
     webThreeInterest: '',
     aiInterest: '',
-    
+
     // Skills & Learning
     strongSkills: [],
     wantToImprove: [],
     learningStyle: '',
     timeCommitment: '',
-    
+
     // Goals & Constraints
     shortTermGoal: '',
     concerns: '',
@@ -66,11 +66,11 @@ export default function CareerOnboardingForm({ userAddress }) {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
+
     if (type === 'checkbox' && Array.isArray(formData[name])) {
       setFormData(prev => ({
         ...prev,
-        [name]: checked 
+        [name]: checked
           ? [...prev[name], value]
           : prev[name].filter(item => item !== value)
       }));
@@ -89,27 +89,26 @@ export default function CareerOnboardingForm({ userAddress }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validate required fields
-    if (!formData.currentStatus || 
-        !formData.industryBackground || 
-        !formData.technicalLevel || 
-        !formData.hasBlockchainExp || 
-        !formData.hasAIExp || 
-        !formData.targetRole || 
+    if (!formData.currentStatus ||
+        !formData.industryBackground ||
+        !formData.technicalLevel ||
+        !formData.hasBlockchainExp ||
+        !formData.hasAIExp ||
+        !formData.targetRole ||
         formData.targetRole.length === 0 ||
-        !formData.careerTimeline || 
-        !formData.geographicPreference || 
-        !formData.learningStyle || 
-        !formData.timeCommitment || 
-        !formData.shortTermGoal || 
+        !formData.careerTimeline ||
+        !formData.geographicPreference ||
+        !formData.learningStyle ||
+        !formData.timeCommitment ||
+        !formData.shortTermGoal ||
         !formData.agreeToTerms) {
       alert('Please fill in all required fields');
       return;
+
     }
 
-    console.log('Form Data Submitted:', formData);
-    
     try {
       // Prepare the payload
       const payload = {
@@ -118,44 +117,45 @@ export default function CareerOnboardingForm({ userAddress }) {
         currentRole: formData.currentRole || null,
         yearsOfExperience: formData.yearsOfExperience || null,
         industryBackground: formData.industryBackground,
-        
+
         // Tech Background
         technicalLevel: formData.technicalLevel,
         programmingLanguages: formData.programmingLanguages || [],
         hasBlockchainExp: formData.hasBlockchainExp,
         hasAIExp: formData.hasAIExp,
-        
+
         // Career Goals
         targetRole: formData.targetRole,
         careerTimeline: formData.careerTimeline,
         geographicPreference: formData.geographicPreference,
-        
+
         // Motivation & Interests
         primaryMotivation: formData.primaryMotivation || [],
         webThreeInterest: formData.webThreeInterest || null,
         aiInterest: formData.aiInterest || null,
-        
+
         // Skills & Learning
         strongSkills: formData.strongSkills || [],
         wantToImprove: formData.wantToImprove || [],
         learningStyle: formData.learningStyle,
         timeCommitment: formData.timeCommitment,
-        
+
         // Goals & Constraints
         shortTermGoal: formData.shortTermGoal,
         concerns: formData.concerns || null,
         additionalInfo: formData.additionalInfo || null,
         agreeToTerms: formData.agreeToTerms,
-        
+
         // Metadata
         submittedAt: new Date().toISOString(),
         walletAddress: walletAddress || null, // User's wallet address if connected
       };
+      console.log("Payload:", payload);
 
       // Get API endpoint from environment variable or use default
-      const API_ENDPOINT = import.meta.env.VITE_CAREER_ONBOARDING_API || 
-                          'http://localhost:3001/api/career-onboarding';
-      
+      const API_ENDPOINT = import.meta.env.VITE_CAREER_ONBOARDING_API ||
+                          'http://localhost:8000/api/career-onboarding';
+
       // Send to backend
       const response = await fetch(API_ENDPOINT, {
         method: 'POST',
@@ -174,12 +174,12 @@ export default function CareerOnboardingForm({ userAddress }) {
 
       // Show success state
       setFormSubmitted(true);
-      
+
       // Navigate after delay
       setTimeout(() => {
         navigate('/mainpage?section=dashboard');
       }, 2000);
-      
+
     } catch (error) {
       console.error('Form submission error:', error);
       alert(`Error submitting form: ${error.message}. Please try again.`);
@@ -216,8 +216,8 @@ export default function CareerOnboardingForm({ userAddress }) {
     return (
       <div className="flex items-center justify-center px-4 py-12">
         <div className={`relative rounded-3xl p-8 lg:p-12 text-center max-w-md shadow-2xl overflow-hidden ${
-          darkMode 
-            ? 'bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 border border-blue-500/30' 
+          darkMode
+            ? 'bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 border border-blue-500/30'
             : 'bg-gradient-to-br from-white via-blue-50 to-purple-50 border border-blue-200'
         }`}>
           {/* Animated background elements */}
@@ -229,7 +229,7 @@ export default function CareerOnboardingForm({ userAddress }) {
               darkMode ? 'bg-purple-500/20' : 'bg-purple-400/30'
             } animate-pulse delay-1000`}></div>
           </div>
-          
+
           <div className="relative mb-6">
             <div className="relative inline-block mb-6">
               <div className={`absolute inset-0 rounded-full ${
@@ -238,8 +238,8 @@ export default function CareerOnboardingForm({ userAddress }) {
               <CheckCircle size={80} className={`relative mx-auto ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} strokeWidth={2.5} />
             </div>
             <h2 className={`text-3xl lg:text-4xl font-bold mb-4 bg-gradient-to-r ${
-              darkMode 
-                ? 'from-blue-400 via-purple-400 to-blue-400' 
+              darkMode
+                ? 'from-blue-400 via-purple-400 to-blue-400'
                 : 'from-blue-600 via-purple-600 to-blue-600'
             } bg-clip-text text-transparent`}>
               Profile Complete! 🎉
@@ -254,8 +254,8 @@ export default function CareerOnboardingForm({ userAddress }) {
           <div className="relative">
             <div className={`h-2 rounded-full overflow-hidden ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
               <div className={`h-full rounded-full bg-gradient-to-r ${
-                darkMode 
-                  ? 'from-blue-500 via-purple-500 to-blue-500' 
+                darkMode
+                  ? 'from-blue-500 via-purple-500 to-blue-500'
                   : 'from-blue-500 via-purple-500 to-blue-500'
               } animate-pulse`} style={{ width: '100%' }}></div>
             </div>
@@ -297,8 +297,8 @@ export default function CareerOnboardingForm({ userAddress }) {
             <div className="inline-flex items-center justify-center mb-4">
               <Sparkles className={`w-8 h-8 mr-2 ${darkMode ? 'text-yellow-400' : 'text-yellow-500'}`} />
               <h1 className={`text-3xl lg:text-4xl font-bold bg-gradient-to-r ${
-                darkMode 
-                  ? 'from-blue-400 via-purple-400 to-blue-400' 
+                darkMode
+                  ? 'from-blue-400 via-purple-400 to-blue-400'
                   : 'from-blue-600 via-purple-600 to-blue-600'
               } bg-clip-text text-transparent`}>
                 Career Onboarding
@@ -321,8 +321,8 @@ export default function CareerOnboardingForm({ userAddress }) {
               </span>
             </div>
             <span className={`text-sm font-medium px-3 py-1 rounded-full ${
-              darkMode 
-                ? 'bg-blue-500/20 text-blue-400' 
+              darkMode
+                ? 'bg-blue-500/20 text-blue-400'
                 : 'bg-blue-100 text-blue-700'
             }`}>
               Step {currentSectionIndex + 1} of {sections.length}
@@ -331,10 +331,10 @@ export default function CareerOnboardingForm({ userAddress }) {
           <div className={`h-3 rounded-full overflow-hidden shadow-inner ${
             darkMode ? 'bg-gray-700/50' : 'bg-gray-200'
           }`}>
-            <div 
+            <div
               className={`h-full rounded-full bg-gradient-to-r transition-all duration-500 ${
-                darkMode 
-                  ? 'from-blue-500 via-purple-500 to-blue-500' 
+                darkMode
+                  ? 'from-blue-500 via-purple-500 to-blue-500'
                   : 'from-blue-500 via-purple-500 to-blue-500'
               } shadow-lg`}
               style={{ width: `${((currentSectionIndex + 1) / sections.length) * 100}%` }}
@@ -343,9 +343,9 @@ export default function CareerOnboardingForm({ userAddress }) {
         </div>
 
         {/* Form with enhanced styling */}
-        <form onSubmit={handleSubmit} className={`relative rounded-3xl p-6 lg:p-10 shadow-2xl overflow-hidden ${
-          darkMode 
-            ? 'bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 border border-blue-500/30' 
+        <form className={`relative rounded-3xl p-6 lg:p-10 shadow-2xl overflow-hidden ${
+          darkMode
+            ? 'bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 border border-blue-500/30'
             : 'bg-gradient-to-br from-white via-blue-50/30 to-purple-50/30 border border-blue-200/50'
         }`}>
           {/* Decorative background elements */}
@@ -363,21 +363,21 @@ export default function CareerOnboardingForm({ userAddress }) {
           <div className="space-y-6 transition-all duration-300 animate-fadeIn">
             <div className="flex items-center gap-3 mb-6">
               <div className={`p-3 rounded-xl ${
-                darkMode 
-                  ? 'bg-blue-500/20 text-blue-400' 
+                darkMode
+                  ? 'bg-blue-500/20 text-blue-400'
                   : 'bg-blue-100 text-blue-600'
               }`}>
                 <Briefcase className="w-6 h-6" />
               </div>
               <h2 className={`text-2xl lg:text-3xl font-bold bg-gradient-to-r ${
-                darkMode 
-                  ? 'from-blue-400 to-purple-400' 
+                darkMode
+                  ? 'from-blue-400 to-purple-400'
                   : 'from-blue-600 to-purple-600'
               } bg-clip-text text-transparent`}>
                 Current Situation
               </h2>
             </div>
-            
+
             <div>
               <label className={`block text-sm font-semibold mb-3 flex items-center gap-2 ${
                 darkMode ? 'text-gray-200' : 'text-gray-700'
@@ -391,8 +391,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                 onChange={handleInputChange}
                 required
                 className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
-                  darkMode 
-                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50' 
+                  darkMode
+                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50'
                     : 'bg-white border-gray-300 text-gray-900 hover:border-blue-400 shadow-sm'
                 }`}
               >
@@ -417,8 +417,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                 onChange={handleInputChange}
                 placeholder="e.g., Software Engineer, Data Analyst, etc."
                 className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
-                  darkMode 
-                    ? 'bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 hover:border-blue-500/50' 
+                  darkMode
+                    ? 'bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 hover:border-blue-500/50'
                     : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 hover:border-blue-400 shadow-sm'
                 }`}
               />
@@ -436,8 +436,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                 value={formData.yearsOfExperience}
                 onChange={handleInputChange}
                 className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
-                  darkMode 
-                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50' 
+                  darkMode
+                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50'
                     : 'bg-white border-gray-300 text-gray-900 hover:border-blue-400 shadow-sm'
                 }`}
               >
@@ -465,8 +465,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                 onChange={handleInputChange}
                 required
                 className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
-                  darkMode 
-                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50' 
+                  darkMode
+                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50'
                     : 'bg-white border-gray-300 text-gray-900 hover:border-blue-400 shadow-sm'
                 }`}
               >
@@ -488,21 +488,21 @@ export default function CareerOnboardingForm({ userAddress }) {
           <div className="space-y-6 transition-all duration-300 animate-fadeIn">
             <div className="flex items-center gap-3 mb-6">
               <div className={`p-3 rounded-xl ${
-                darkMode 
-                  ? 'bg-purple-500/20 text-purple-400' 
+                darkMode
+                  ? 'bg-purple-500/20 text-purple-400'
                   : 'bg-purple-100 text-purple-600'
               }`}>
                 <Code className="w-6 h-6" />
               </div>
               <h2 className={`text-2xl lg:text-3xl font-bold bg-gradient-to-r ${
-                darkMode 
-                  ? 'from-purple-400 to-blue-400' 
+                darkMode
+                  ? 'from-purple-400 to-blue-400'
                   : 'from-purple-600 to-blue-600'
               } bg-clip-text text-transparent`}>
                 Technical Background
               </h2>
             </div>
-            
+
             <div>
               <label className={`block text-sm font-semibold mb-3 flex items-center gap-2 ${
                 darkMode ? 'text-gray-200' : 'text-gray-700'
@@ -516,8 +516,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                 onChange={handleInputChange}
                 required
                 className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
-                  darkMode 
-                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50' 
+                  darkMode
+                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50'
                     : 'bg-white border-gray-300 text-gray-900 hover:border-blue-400 shadow-sm'
                 }`}
               >
@@ -541,8 +541,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                       ? darkMode
                         ? 'bg-blue-500/20 border-blue-500 text-blue-300 shadow-lg shadow-blue-500/20'
                         : 'bg-blue-100 border-blue-400 text-blue-700 shadow-md'
-                      : darkMode 
-                        ? 'bg-gray-700/50 border-gray-600 hover:border-purple-500/50 hover:bg-gray-700 text-gray-300' 
+                      : darkMode
+                        ? 'bg-gray-700/50 border-gray-600 hover:border-purple-500/50 hover:bg-gray-700 text-gray-300'
                         : 'bg-white border-gray-200 hover:border-purple-300 hover:bg-purple-50 text-gray-700 shadow-sm'
                   }`}>
                     <input
@@ -572,8 +572,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                 onChange={handleInputChange}
                 required
                 className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
-                  darkMode 
-                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50' 
+                  darkMode
+                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50'
                     : 'bg-white border-gray-300 text-gray-900 hover:border-blue-400 shadow-sm'
                 }`}
               >
@@ -598,8 +598,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                 onChange={handleInputChange}
                 required
                 className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
-                  darkMode 
-                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50' 
+                  darkMode
+                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50'
                     : 'bg-white border-gray-300 text-gray-900 hover:border-blue-400 shadow-sm'
                 }`}
               >
@@ -618,21 +618,21 @@ export default function CareerOnboardingForm({ userAddress }) {
           <div className="space-y-6 transition-all duration-300 animate-fadeIn">
             <div className="flex items-center gap-3 mb-6">
               <div className={`p-3 rounded-xl ${
-                darkMode 
-                  ? 'bg-yellow-500/20 text-yellow-400' 
+                darkMode
+                  ? 'bg-yellow-500/20 text-yellow-400'
                   : 'bg-yellow-100 text-yellow-600'
               }`}>
                 <Target className="w-6 h-6" />
               </div>
               <h2 className={`text-2xl lg:text-3xl font-bold bg-gradient-to-r ${
-                darkMode 
-                  ? 'from-yellow-400 to-orange-400' 
+                darkMode
+                  ? 'from-yellow-400 to-orange-400'
                   : 'from-yellow-600 to-orange-600'
               } bg-clip-text text-transparent`}>
                 Career Goals & Preferences
               </h2>
             </div>
-            
+
             <div>
               <label className={`block text-sm font-semibold mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 Target Roles (Select all that apply) <span className="text-blue-500">*</span>
@@ -654,8 +654,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                       ? darkMode
                         ? 'bg-yellow-500/20 border-yellow-500 text-yellow-300 shadow-lg shadow-yellow-500/20'
                         : 'bg-yellow-100 border-yellow-400 text-yellow-700 shadow-md'
-                      : darkMode 
-                        ? 'bg-gray-700/50 border-gray-600 hover:border-yellow-500/50 hover:bg-gray-700 text-gray-300' 
+                      : darkMode
+                        ? 'bg-gray-700/50 border-gray-600 hover:border-yellow-500/50 hover:bg-gray-700 text-gray-300'
                         : 'bg-white border-gray-200 hover:border-yellow-300 hover:bg-yellow-50 text-gray-700 shadow-sm'
                   }`}>
                     <input
@@ -685,8 +685,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                 onChange={handleInputChange}
                 required
                 className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
-                  darkMode 
-                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50' 
+                  darkMode
+                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50'
                     : 'bg-white border-gray-300 text-gray-900 hover:border-blue-400 shadow-sm'
                 }`}
               >
@@ -711,8 +711,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                 onChange={handleInputChange}
                 required
                 className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
-                  darkMode 
-                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50' 
+                  darkMode
+                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50'
                     : 'bg-white border-gray-300 text-gray-900 hover:border-blue-400 shadow-sm'
                 }`}
               >
@@ -731,21 +731,21 @@ export default function CareerOnboardingForm({ userAddress }) {
           <div className="space-y-6 transition-all duration-300 animate-fadeIn">
             <div className="flex items-center gap-3 mb-6">
               <div className={`p-3 rounded-xl ${
-                darkMode 
-                  ? 'bg-pink-500/20 text-pink-400' 
+                darkMode
+                  ? 'bg-pink-500/20 text-pink-400'
                   : 'bg-pink-100 text-pink-600'
               }`}>
                 <Heart className="w-6 h-6" />
               </div>
               <h2 className={`text-2xl lg:text-3xl font-bold bg-gradient-to-r ${
-                darkMode 
-                  ? 'from-pink-400 to-red-400' 
+                darkMode
+                  ? 'from-pink-400 to-red-400'
                   : 'from-pink-600 to-red-600'
               } bg-clip-text text-transparent`}>
                 Motivation & Interests
               </h2>
             </div>
-            
+
             <div>
               <label className={`block text-sm font-semibold mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 What motivates you most? (Select all that apply)
@@ -764,8 +764,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                       ? darkMode
                         ? 'bg-pink-500/20 border-pink-500 text-pink-300 shadow-lg shadow-pink-500/20'
                         : 'bg-pink-100 border-pink-400 text-pink-700 shadow-md'
-                      : darkMode 
-                        ? 'bg-gray-700/50 border-gray-600 hover:border-pink-500/50 hover:bg-gray-700 text-gray-300' 
+                      : darkMode
+                        ? 'bg-gray-700/50 border-gray-600 hover:border-pink-500/50 hover:bg-gray-700 text-gray-300'
                         : 'bg-white border-gray-200 hover:border-pink-300 hover:bg-pink-50 text-gray-700 shadow-sm'
                   }`}>
                     <input
@@ -794,8 +794,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                 value={formData.webThreeInterest}
                 onChange={handleInputChange}
                 className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
-                  darkMode 
-                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50' 
+                  darkMode
+                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50'
                     : 'bg-white border-gray-300 text-gray-900 hover:border-blue-400 shadow-sm'
                 }`}
               >
@@ -822,8 +822,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                 value={formData.aiInterest}
                 onChange={handleInputChange}
                 className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
-                  darkMode 
-                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50' 
+                  darkMode
+                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50'
                     : 'bg-white border-gray-300 text-gray-900 hover:border-blue-400 shadow-sm'
                 }`}
               >
@@ -844,21 +844,21 @@ export default function CareerOnboardingForm({ userAddress }) {
           <div className="space-y-6 transition-all duration-300 animate-fadeIn">
             <div className="flex items-center gap-3 mb-6">
               <div className={`p-3 rounded-xl ${
-                darkMode 
-                  ? 'bg-green-500/20 text-green-400' 
+                darkMode
+                  ? 'bg-green-500/20 text-green-400'
                   : 'bg-green-100 text-green-600'
               }`}>
                 <BookOpen className="w-6 h-6" />
               </div>
               <h2 className={`text-2xl lg:text-3xl font-bold bg-gradient-to-r ${
-                darkMode 
-                  ? 'from-green-400 to-emerald-400' 
+                darkMode
+                  ? 'from-green-400 to-emerald-400'
                   : 'from-green-600 to-emerald-600'
               } bg-clip-text text-transparent`}>
                 Learning Style & Commitment
               </h2>
             </div>
-            
+
             <div>
               <label className={`block text-sm font-semibold mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 Your Strong Skills (Select all that apply)
@@ -879,8 +879,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                       ? darkMode
                         ? 'bg-green-500/20 border-green-500 text-green-300 shadow-lg shadow-green-500/20'
                         : 'bg-green-100 border-green-400 text-green-700 shadow-md'
-                      : darkMode 
-                        ? 'bg-gray-700/50 border-gray-600 hover:border-green-500/50 hover:bg-gray-700 text-gray-300' 
+                      : darkMode
+                        ? 'bg-gray-700/50 border-gray-600 hover:border-green-500/50 hover:bg-gray-700 text-gray-300'
                         : 'bg-white border-gray-200 hover:border-green-300 hover:bg-green-50 text-gray-700 shadow-sm'
                   }`}>
                     <input
@@ -916,8 +916,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                       ? darkMode
                         ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 shadow-lg shadow-cyan-500/20'
                         : 'bg-cyan-100 border-cyan-400 text-cyan-700 shadow-md'
-                      : darkMode 
-                        ? 'bg-gray-700/50 border-gray-600 hover:border-cyan-500/50 hover:bg-gray-700 text-gray-300' 
+                      : darkMode
+                        ? 'bg-gray-700/50 border-gray-600 hover:border-cyan-500/50 hover:bg-gray-700 text-gray-300'
                         : 'bg-white border-gray-200 hover:border-cyan-300 hover:bg-cyan-50 text-gray-700 shadow-sm'
                   }`}>
                     <input
@@ -947,8 +947,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                 onChange={handleInputChange}
                 required
                 className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
-                  darkMode 
-                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50' 
+                  darkMode
+                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50'
                     : 'bg-white border-gray-300 text-gray-900 hover:border-blue-400 shadow-sm'
                 }`}
               >
@@ -974,8 +974,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                 onChange={handleInputChange}
                 required
                 className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
-                  darkMode 
-                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50' 
+                  darkMode
+                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50'
                     : 'bg-white border-gray-300 text-gray-900 hover:border-blue-400 shadow-sm'
                 }`}
               >
@@ -1000,8 +1000,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                 onChange={handleInputChange}
                 required
                 className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
-                  darkMode 
-                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50' 
+                  darkMode
+                    ? 'bg-gray-700/50 border-gray-600 text-white hover:border-blue-500/50'
                     : 'bg-white border-gray-300 text-gray-900 hover:border-blue-400 shadow-sm'
                 }`}
               >
@@ -1022,21 +1022,21 @@ export default function CareerOnboardingForm({ userAddress }) {
           <div className="space-y-6 transition-all duration-300 animate-fadeIn">
             <div className="flex items-center gap-3 mb-6">
               <div className={`p-3 rounded-xl ${
-                darkMode 
-                  ? 'bg-indigo-500/20 text-indigo-400' 
+                darkMode
+                  ? 'bg-indigo-500/20 text-indigo-400'
                   : 'bg-indigo-100 text-indigo-600'
               }`}>
                 <FileCheck className="w-6 h-6" />
               </div>
               <h2 className={`text-2xl lg:text-3xl font-bold bg-gradient-to-r ${
-                darkMode 
-                  ? 'from-indigo-400 to-purple-400' 
+                darkMode
+                  ? 'from-indigo-400 to-purple-400'
                   : 'from-indigo-600 to-purple-600'
               } bg-clip-text text-transparent`}>
                 Review & Submit
               </h2>
             </div>
-            
+
             <div>
               <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 Any Concerns or Challenges?
@@ -1048,8 +1048,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                 placeholder="Share any concerns, constraints, or challenges you think we should know about..."
                 rows="4"
                 className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none ${
-                  darkMode 
-                    ? 'bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 hover:border-blue-500/50' 
+                  darkMode
+                    ? 'bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 hover:border-blue-500/50'
                     : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 hover:border-blue-400 shadow-sm'
                 }`}
               />
@@ -1066,8 +1066,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                 placeholder="Any additional information that might help us personalize your learning path..."
                 rows="4"
                 className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none ${
-                  darkMode 
-                    ? 'bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 hover:border-blue-500/50' 
+                  darkMode
+                    ? 'bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 hover:border-blue-500/50'
                     : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 hover:border-blue-400 shadow-sm'
                 }`}
               />
@@ -1078,8 +1078,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                 ? darkMode
                   ? 'bg-blue-500/20 border-blue-500 shadow-lg shadow-blue-500/20'
                   : 'bg-blue-50 border-blue-400 shadow-md'
-                : darkMode 
-                  ? 'bg-gray-700/50 border-gray-600 hover:border-blue-500/50 hover:bg-gray-700' 
+                : darkMode
+                  ? 'bg-gray-700/50 border-gray-600 hover:border-blue-500/50 hover:bg-gray-700'
                   : 'bg-white border-gray-200 hover:border-blue-300 hover:bg-blue-50 shadow-sm'
             }`}>
               <input
@@ -1097,8 +1097,8 @@ export default function CareerOnboardingForm({ userAddress }) {
 
             {/* Review Summary */}
             <div className={`rounded-2xl p-6 border-2 backdrop-blur-sm ${
-              darkMode 
-                ? 'bg-gradient-to-br from-gray-700/80 to-gray-800/80 border-indigo-500/30 shadow-xl shadow-indigo-500/10' 
+              darkMode
+                ? 'bg-gradient-to-br from-gray-700/80 to-gray-800/80 border-indigo-500/30 shadow-xl shadow-indigo-500/10'
                 : 'bg-gradient-to-br from-blue-50/80 to-purple-50/80 border-indigo-200 shadow-xl'
             }`}>
               <div className="flex items-center gap-2 mb-4">
@@ -1109,8 +1109,8 @@ export default function CareerOnboardingForm({ userAddress }) {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className={`p-4 rounded-xl border ${
-                  darkMode 
-                    ? 'bg-gray-600/50 border-gray-500' 
+                  darkMode
+                    ? 'bg-gray-600/50 border-gray-500'
                     : 'bg-white border-gray-200 shadow-sm'
                 }`}>
                   <p className={`text-xs font-semibold mb-2 flex items-center gap-1 ${
@@ -1123,8 +1123,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                   </p>
                 </div>
                 <div className={`p-4 rounded-xl border ${
-                  darkMode 
-                    ? 'bg-gray-600/50 border-gray-500' 
+                  darkMode
+                    ? 'bg-gray-600/50 border-gray-500'
                     : 'bg-white border-gray-200 shadow-sm'
                 }`}>
                   <p className={`text-xs font-semibold mb-2 flex items-center gap-1 ${
@@ -1137,8 +1137,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                   </p>
                 </div>
                 <div className={`p-4 rounded-xl border ${
-                  darkMode 
-                    ? 'bg-gray-600/50 border-gray-500' 
+                  darkMode
+                    ? 'bg-gray-600/50 border-gray-500'
                     : 'bg-white border-gray-200 shadow-sm'
                 }`}>
                   <p className={`text-xs font-semibold mb-2 flex items-center gap-1 ${
@@ -1151,8 +1151,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                   </p>
                 </div>
                 <div className={`p-4 rounded-xl border ${
-                  darkMode 
-                    ? 'bg-gray-600/50 border-gray-500' 
+                  darkMode
+                    ? 'bg-gray-600/50 border-gray-500'
                     : 'bg-white border-gray-200 shadow-sm'
                 }`}>
                   <p className={`text-xs font-semibold mb-2 flex items-center gap-1 ${
@@ -1165,8 +1165,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                   </p>
                 </div>
                 <div className={`p-4 rounded-xl border ${
-                  darkMode 
-                    ? 'bg-gray-600/50 border-gray-500' 
+                  darkMode
+                    ? 'bg-gray-600/50 border-gray-500'
                     : 'bg-white border-gray-200 shadow-sm'
                 }`}>
                   <p className={`text-xs font-semibold mb-2 flex items-center gap-1 ${
@@ -1179,8 +1179,8 @@ export default function CareerOnboardingForm({ userAddress }) {
                   </p>
                 </div>
                 <div className={`p-4 rounded-xl border ${
-                  darkMode 
-                    ? 'bg-gray-600/50 border-gray-500' 
+                  darkMode
+                    ? 'bg-gray-600/50 border-gray-500'
                     : 'bg-white border-gray-200 shadow-sm'
                 }`}>
                   <p className={`text-xs font-semibold mb-2 flex items-center gap-1 ${
@@ -1247,8 +1247,8 @@ export default function CareerOnboardingForm({ userAddress }) {
               type="button"
               onClick={handleNext}
               className={`flex items-center gap-2 px-8 py-3 rounded-xl font-semibold text-white transition-all duration-200 bg-gradient-to-r ${
-                darkMode 
-                  ? 'from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700' 
+                darkMode
+                  ? 'from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700'
                   : 'from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600'
               } shadow-lg hover:shadow-xl transform hover:scale-105`}
             >
@@ -1257,13 +1257,14 @@ export default function CareerOnboardingForm({ userAddress }) {
             </button>
           ) : (
             <button
-              type="submit"
+              onClick={handleSubmit}
+
               disabled={!formData.agreeToTerms}
               className={`w-full sm:w-auto px-8 py-3 rounded-xl font-semibold text-white transition-all duration-200 ${
                 formData.agreeToTerms
                   ? `bg-gradient-to-r ${
-                      darkMode 
-                        ? 'from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700' 
+                      darkMode
+                        ? 'from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'
                         : 'from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'
                     } shadow-lg hover:shadow-xl transform hover:scale-105`
                   : 'bg-gray-500 cursor-not-allowed opacity-50'
