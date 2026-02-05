@@ -8,11 +8,14 @@ import CourseMetricsPage from "./pages/CourseMetricsPage";
 import SettingsPage from "./pages/Settings";
 import { ToastContainer } from "react-toastify";
 
-
 function App() {
   return (
     <>
-      <ToastContainer position="bottom-right z-60" theme="colored" />
+      <ToastContainer
+        position="bottom-right"
+        theme="colored"
+        className="z-[9999]"
+      />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/mainpage" element={<MasterPage />} />

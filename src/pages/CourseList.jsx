@@ -747,13 +747,22 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       return;
     }
 
+    let toastId = null;
     try {
       setLoading(true);
+      toastId = toast.loading("Processing enrollment...");
+
       const contract = getContract({
         address: DiamondAddress,
         abi: Ecosystem2Facet_ABI,
         client,
         chain: defineChain(11155111),
+      });
+
+      toast.update(toastId, {
+        render: "Preparing transaction...",
+        type: "info",
+        isLoading: true,
       });
 
       const transaction = prepareContractCall({
@@ -762,63 +771,131 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         params: [courseId],
       });
 
+      toast.update(toastId, {
+        render: "Sending transaction to blockchain...",
+        type: "info",
+        isLoading: true,
+      });
+
       await sendTransaction(transaction);
 
       setEnrolled(true);
-      toast.success(`Enrolled into course ${courseId} successfully!`);
+      toast.update(toastId, {
+        render: `Enrolled into course ${courseId} successfully!`,
+        type: "success",
+        isLoading: false,
+        autoClose: 3000,
+      });
     } catch (error) {
       console.error("Error enrolling in course:", error);
-      toast.error("Error enrolling in course. Please try again!");
+      if (toastId) {
+        toast.update(toastId, {
+          render: "Error enrolling in course. Please try again!",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000,
+        });
+      } else {
+        toast.error("Error enrolling in course. Please try again!");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSurveyComplete = async () => {
+  const handleSurveyComplete = async (finalCourseId = null) => {
     // Close modal and reset state
     setShowSurveyModal(false);
 
-    // Auto-enroll in the course after survey completion
-    if (courseIdPendingEnrollment) {
-      try {
-        setLoading(true);
-        const contract = getContract({
-          address: DiamondAddress,
-          abi: Ecosystem2Facet_ABI,
-          client,
-          chain: defineChain(11155111),
-        });
-
-        const transaction = prepareContractCall({
-          contract,
-          method: "enroll",
-          params: [courseIdPendingEnrollment],
-        });
-
-        await sendTransaction(transaction);
-
-        setEnrolled(true);
-        toast.success(
-          `Enrolled into course ${courseIdPendingEnrollment} successfully!`,
-        );
-      } catch (error) {
-        console.error("Error enrolling in course:", error);
-        toast.error("Error enrolling in course. Please try again!");
-      } finally {
-        setLoading(false);
-        setCourseIdPendingEnrollment(null);
-      }
+    // This function should ONLY be called for first-time users (new enrollments)
+    // Verify that we have a pending enrollment course ID
+    if (!courseIdPendingEnrollment) {
+      console.warn(
+        "Survey complete called but no courseIdPendingEnrollment found. Skipping enrollment.",
+      );
+      return;
     }
-  };
 
-  const unEnroll = async (courseId) => {
+    // Use the finalCourseId from the form if provided (from AI recommendations)
+    // Otherwise fallback to the original courseIdPendingEnrollment
+    const courseToEnroll = finalCourseId || courseIdPendingEnrollment;
+
+    let toastId = null;
+    // Enroll in the course after survey completion
     try {
       setLoading(true);
+      toastId = toast.loading("Processing your enrollment...");
+
       const contract = getContract({
         address: DiamondAddress,
         abi: Ecosystem2Facet_ABI,
         client,
         chain: defineChain(11155111),
+      });
+
+      toast.update(toastId, {
+        render: "Preparing your enrollment transaction...",
+        type: "info",
+        isLoading: true,
+      });
+
+      const transaction = prepareContractCall({
+        contract,
+        method: "enroll",
+        params: [courseToEnroll],
+      });
+
+      toast.update(toastId, {
+        render: "Sending transaction to blockchain...",
+        type: "info",
+        isLoading: true,
+      });
+
+      await sendTransaction(transaction);
+
+      setEnrolled(true);
+      toast.update(toastId, {
+        render: `Successfully enrolled into your first course! Welcome! 🎓`,
+        type: "success",
+        isLoading: false,
+        autoClose: 3000,
+      });
+    } catch (error) {
+      console.error("Error enrolling in course:", error);
+      if (toastId) {
+        toast.update(toastId, {
+          render: "Error enrolling in course. Please try again!",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000,
+        });
+      } else {
+        toast.error("Error enrolling in course. Please try again!");
+      }
+    } finally {
+      setLoading(false);
+      // Clear the pending enrollment state after completion
+      setCourseIdPendingEnrollment(null);
+    }
+  };
+
+  const unEnroll = async (courseId) => {
+    let toastId = null;
+    try {
+      setLoading(true);
+      toastId = toast.loading("Processing unenrollment...");
+
+      const contract = getContract({
+        address: DiamondAddress,
+        abi: Ecosystem2Facet_ABI,
+        client,
+        chain: defineChain(11155111),
+      });
+
+      toast.update(toastId, {
+        render: "Preparing unenrollment transaction...",
+        type: "info",
+        isLoading: true,
       });
 
       const transaction = prepareContractCall({
@@ -827,13 +904,36 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         params: [courseId],
       });
 
+      toast.update(toastId, {
+        render: "Sending transaction to blockchain...",
+        type: "info",
+        isLoading: true,
+      });
+
       await sendTransaction(transaction);
       setUnEnrolled(true);
-      toast.success(`Unenrolled from course ${courseId} successfully!`);
-      window.location.reload();
+      toast.update(toastId, {
+        render: `Unenrolled from course ${courseId} successfully!`,
+        type: "success",
+        isLoading: false,
+        autoClose: 2000,
+      });
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 2500);
     } catch (error) {
       console.error("Error unenrolling from course:", error);
-      toast.error("Error unenrolling from course. Please try again!");
+      if (toastId) {
+        toast.update(toastId, {
+          render: "Error unenrolling from course. Please try again!",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000,
+        });
+      } else {
+        toast.error("Error unenrolling from course. Please try again!");
+      }
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -19,8 +19,8 @@ import {
 } from "lucide-react";
 import { useDarkMode } from "../contexts/themeContext";
 import { useActiveAccount } from "thirdweb/react";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { toast } from "react-toastify";
+import { CourseContext } from "../contexts/courseContext";
 
 export default function CareerOnboardingForm({
   userAddress,
@@ -32,6 +32,7 @@ export default function CareerOnboardingForm({
   const navigate = useNavigate();
   const { darkMode } = useDarkMode();
   const account = useActiveAccount();
+  const { courses } = useContext(CourseContext);
   // Use prop if provided, otherwise get from hook
   const walletAddress = userAddress || account?.address;
   const [formData, setFormData] = useState({
@@ -73,6 +74,8 @@ export default function CareerOnboardingForm({
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [activeSection, setActiveSection] = useState("situationAndTech");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [careerRecommendation, setCareerRecommendation] = useState(null);
+  const [finalCourseId, setFinalCourseId] = useState(courseIdToEnroll);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -123,6 +126,17 @@ export default function CareerOnboardingForm({
     setIsSubmitting(true);
 
     try {
+      // Get selected course details
+      const selectedCourse = courses.find(
+        (course) => course.courseId === courseIdToEnroll,
+      );
+
+      // Prepare all courses array with courseId and courseName
+      const allCourses = courses.map((course) => ({
+        courseId: course.courseId,
+        courseName: course.courseName,
+      }));
+
       // Prepare the payload
       const payload = {
         // Current Situation
@@ -159,6 +173,15 @@ export default function CareerOnboardingForm({
         additionalInfo: formData.additionalInfo || null,
         agreeToTerms: formData.agreeToTerms,
 
+        // Course Information
+        allCourses: allCourses,
+        selectedCourse: selectedCourse
+          ? {
+              courseId: selectedCourse.courseId,
+              courseName: selectedCourse.courseName,
+            }
+          : null,
+
         // Metadata
         submittedAt: new Date().toISOString(),
         walletAddress: walletAddress || null, // User's wallet address if connected
@@ -169,6 +192,8 @@ export default function CareerOnboardingForm({
       const API_ENDPOINT =
         import.meta.env.VITE_CAREER_ONBOARDING_API ||
         "http://localhost:8000/api/career-onboarding";
+
+      let toastId = toast.loading("Analyzing your career profile...");
 
       // Send to backend
       const response = await fetch(API_ENDPOINT, {
@@ -186,27 +211,62 @@ export default function CareerOnboardingForm({
       const result = await response.json();
       console.log("Backend response:", result);
 
-      // Show success state
-      toast.success("Profile created successfully! 🎉");
-      setFormSubmitted(true);
-
-      // If in modal mode, call the completion callback
-      if (isModal && onFormComplete) {
-        setTimeout(() => {
-          onFormComplete();
-        }, 1500);
-      } else {
-        // Otherwise navigate to dashboard
-        setTimeout(() => {
-          navigate("/mainpage?section=dashboard");
-        }, 2000);
+      // Validate that the response contains required fields for career recommendation
+      if (
+        !result ||
+        typeof result !== "object" ||
+        !result.careerProfile ||
+        !result.courseMatchAnalysis
+      ) {
+        toast.dismiss(toastId);
+        toast.error(
+          "Invalid response from server. Please check your form and try again.",
+        );
+        return;
       }
+
+      // Store career recommendation for display only if validation passes
+      setCareerRecommendation(result);
+      toast.dismiss(toastId);
+      toast.success("Career profile analyzed! 🎉");
     } catch (error) {
       console.error("Form submission error:", error);
-      toast.error(`Error submitting form: ${error.message}`);
+      toast.dismiss();
+
+      // Provide specific error messages based on error type
+      let errorMessage = "Error submitting form. Please try again.";
+
+      if (error instanceof TypeError) {
+        errorMessage =
+          "Network error. Please check your connection and try again.";
+      } else if (error.message.includes("HTTP error")) {
+        errorMessage = `Server error: ${error.message}. Please try again later.`;
+      }
+
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleContinueEnrollment = () => {
+    setFormSubmitted(true);
+    // If in modal mode, call the completion callback with the final course ID
+    if (isModal && onFormComplete) {
+      setTimeout(() => {
+        onFormComplete(finalCourseId);
+      }, 1500);
+    } else {
+      // Otherwise navigate to dashboard
+      setTimeout(() => {
+        navigate("/mainpage?section=dashboard");
+      }, 2000);
+    }
+  };
+
+  const handleChangeCourse = (newCourseId) => {
+    setFinalCourseId(newCourseId);
+    toast.success("Course selection updated!");
   };
 
   const sections = [
@@ -230,6 +290,248 @@ export default function CareerOnboardingForm({
       setActiveSection(sections[currentSectionIndex - 1]);
     }
   };
+
+  // Show career recommendation UI if available
+  if (careerRecommendation) {
+    return (
+      <div className="flex items-center justify-center px-4 py-12">
+        <div
+          className={`relative rounded-3xl p-8 lg:p-12 max-w-4xl w-full shadow-2xl overflow-hidden ${
+            darkMode
+              ? "bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 border border-blue-500/30"
+              : "bg-gradient-to-br from-white via-blue-50 to-blue-50 border border-blue-200"
+          }`}
+        >
+          {/* Header */}
+          <div className="text-center mb-8">
+            <Sparkles
+              size={60}
+              className={`mx-auto mb-4 ${
+                darkMode ? "text-blue-400" : "text-blue-600"
+              }`}
+            />
+            <h2
+              className={`text-3xl lg:text-4xl font-bold mb-4 bg-gradient-to-r ${
+                darkMode
+                  ? "from-blue-400 via-purple-400 to-blue-400"
+                  : "from-blue-600 via-purple-600 to-blue-600"
+              } bg-clip-text text-transparent`}
+            >
+              Your Career Profile
+            </h2>
+            <p
+              className={`text-lg ${
+                darkMode ? "text-gray-300" : "text-gray-700"
+              }`}
+            >
+              Based on your responses, here's your personalized career analysis
+            </p>
+          </div>
+
+          {/* Career Profile Summary */}
+          {careerRecommendation.careerProfile && (
+            <div
+              className={`mb-6 p-6 rounded-xl ${
+                darkMode ? "bg-gray-700/50" : "bg-white/80"
+              }`}
+            >
+              <h3
+                className={`text-xl font-bold mb-3 flex items-center gap-2 ${
+                  darkMode ? "text-blue-400" : "text-blue-600"
+                }`}
+              >
+                <User size={24} />
+                Career Profile Summary
+              </h3>
+              <p className={`${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                {careerRecommendation.careerProfile}
+              </p>
+            </div>
+          )}
+
+          {/* Course Match Analysis */}
+          {careerRecommendation.courseMatchAnalysis && (
+            <div
+              className={`mb-6 p-6 rounded-xl ${
+                darkMode ? "bg-gray-700/50" : "bg-white/80"
+              }`}
+            >
+              <h3
+                className={`text-xl font-bold mb-3 flex items-center gap-2 ${
+                  darkMode ? "text-yellow-400" : "text-yellow-600"
+                }`}
+              >
+                <Target size={24} />
+                Your Selected Course Match
+              </h3>
+              <p
+                className={`${
+                  darkMode ? "text-gray-300" : "text-gray-700"
+                } mb-4`}
+              >
+                {careerRecommendation.courseMatchAnalysis}
+              </p>
+              <div
+                className={`p-4 rounded-lg ${
+                  darkMode ? "bg-gray-800/50" : "bg-gray-100"
+                }`}
+              >
+                <p
+                  className={`font-semibold ${
+                    darkMode ? "text-blue-300" : "text-blue-700"
+                  }`}
+                >
+                  Selected Course:{" "}
+                  {courses.find((c) => c.courseId === finalCourseId)
+                    ?.courseName || "Loading..."}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Alternative Course Suggestions */}
+          {careerRecommendation.suggestedCourses &&
+            careerRecommendation.suggestedCourses.length > 0 && (
+              <div
+                className={`mb-6 p-6 rounded-xl ${
+                  darkMode ? "bg-gray-700/50" : "bg-white/80"
+                }`}
+              >
+                <h3
+                  className={`text-xl font-bold mb-3 flex items-center gap-2 ${
+                    darkMode ? "text-purple-400" : "text-purple-600"
+                  }`}
+                >
+                  <BookOpen size={24} />
+                  Other Courses That Match Your Profile
+                </h3>
+                <p
+                  className={`mb-4 ${
+                    darkMode ? "text-gray-400" : "text-gray-600"
+                  }`}
+                >
+                  Click on any course below to change your enrollment selection
+                </p>
+                <div className="grid gap-3">
+                  {careerRecommendation.suggestedCourses.map(
+                    (suggestedCourse) => {
+                      const courseDetails = courses.find(
+                        (c) => c.courseId === suggestedCourse.courseId,
+                      );
+                      const isSelected =
+                        finalCourseId === suggestedCourse.courseId;
+
+                      return (
+                        <button
+                          key={suggestedCourse.courseId}
+                          onClick={() =>
+                            handleChangeCourse(suggestedCourse.courseId)
+                          }
+                          className={`p-4 rounded-lg text-left transition-all ${
+                            isSelected
+                              ? darkMode
+                                ? "bg-blue-600/30 border-2 border-blue-500"
+                                : "bg-blue-100 border-2 border-blue-500"
+                              : darkMode
+                              ? "bg-gray-800/50 hover:bg-gray-800 border-2 border-transparent"
+                              : "bg-gray-100 hover:bg-gray-200 border-2 border-transparent"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p
+                                className={`font-semibold mb-1 ${
+                                  darkMode ? "text-blue-300" : "text-blue-700"
+                                }`}
+                              >
+                                {courseDetails?.courseName ||
+                                  suggestedCourse.courseName}
+                              </p>
+                              {suggestedCourse.reason && (
+                                <p
+                                  className={`text-sm ${
+                                    darkMode ? "text-gray-400" : "text-gray-600"
+                                  }`}
+                                >
+                                  {suggestedCourse.reason}
+                                </p>
+                              )}
+                            </div>
+                            {isSelected && (
+                              <CheckCircle
+                                size={20}
+                                className={
+                                  darkMode ? "text-blue-400" : "text-blue-600"
+                                }
+                              />
+                            )}
+                          </div>
+                        </button>
+                      );
+                    },
+                  )}
+                </div>
+              </div>
+            )}
+
+          {/* Confirmation Question */}
+          <div
+            className={`mb-6 p-6 rounded-xl text-center ${
+              darkMode
+                ? "bg-yellow-500/10 border border-yellow-500/30"
+                : "bg-yellow-50 border border-yellow-200"
+            }`}
+          >
+            <p
+              className={`text-lg font-semibold mb-2 ${
+                darkMode ? "text-yellow-300" : "text-yellow-800"
+              }`}
+            >
+              Do you want to continue enrolling in this course?
+            </p>
+            <p
+              className={`text-sm ${
+                darkMode ? "text-gray-400" : "text-gray-600"
+              }`}
+            >
+              Current selection:{" "}
+              <span className="font-semibold">
+                {courses.find((c) => c.courseId === finalCourseId)
+                  ?.courseName || "Loading..."}
+              </span>
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-4 justify-center">
+            {onClose && (
+              <button
+                onClick={onClose}
+                className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                  darkMode
+                    ? "bg-gray-700 hover:bg-gray-600 text-white"
+                    : "bg-gray-300 hover:bg-gray-400 text-gray-800"
+                }`}
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              onClick={handleContinueEnrollment}
+              className={`px-8 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+                darkMode
+                  ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white"
+                  : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+              }`}
+            >
+              <GraduationCap size={20} />
+              Continue Enrollment
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (formSubmitted) {
     return (
@@ -323,7 +625,6 @@ export default function CareerOnboardingForm({
           onClick={onClose}
         ></div>
       )}
-      <ToastContainer position="top-right" theme="colored" autoClose={3000} />
 
       <div
         className={
