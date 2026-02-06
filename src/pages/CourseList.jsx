@@ -77,12 +77,12 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const [error, setError] = useState(null);
   const [enrolled, setEnrolled] = useState(false);
   const [unEnrolled, setUnEnrolled] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [enrollingCourseId, setEnrollingCourseId] = useState(null);
+  const [unenrollingCourseId, setUnenrollingCourseId] = useState(null);
 
   const { certificates } = useCertificates();
   const [showUnenrollConfirm, setShowUnenrollConfirm] = useState(false);
   const [courseToUnenroll, setCourseToUnenroll] = useState(null);
-  const [unenrollLoading, setUnenrollLoading] = useState(false);
 
   // Survey modal state
   const [showSurveyModal, setShowSurveyModal] = useState(false);
@@ -749,7 +749,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
 
     let toastId = null;
     try {
-      setLoading(true);
+      setEnrollingCourseId(courseId);
       toastId = toast.loading("Processing enrollment...");
 
       const contract = getContract({
@@ -799,7 +799,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         toast.error("Error enrolling in course. Please try again!");
       }
     } finally {
-      setLoading(false);
+      setEnrollingCourseId(null);
     }
   };
 
@@ -823,7 +823,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     let toastId = null;
     // Enroll in the course after survey completion
     try {
-      setLoading(true);
+      setEnrollingCourseId(courseToEnroll);
       toastId = toast.loading("Processing your enrollment...");
 
       const contract = getContract({
@@ -873,7 +873,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         toast.error("Error enrolling in course. Please try again!");
       }
     } finally {
-      setLoading(false);
+      setEnrollingCourseId(null);
       // Clear the pending enrollment state after completion
       setCourseIdPendingEnrollment(null);
     }
@@ -882,7 +882,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const unEnroll = async (courseId) => {
     let toastId = null;
     try {
-      setLoading(true);
+      setUnenrollingCourseId(courseId);
       toastId = toast.loading("Processing unenrollment...");
 
       const contract = getContract({
@@ -935,7 +935,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         toast.error("Error unenrolling from course. Please try again!");
       }
     } finally {
-      setLoading(false);
+      setUnenrollingCourseId(null);
     }
   };
 
@@ -1206,30 +1206,38 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                                       setCourseToUnenroll(course);
                                       setShowUnenrollConfirm(true);
                                     }}
-                                    disabled={loading}
+                                    disabled={
+                                      unenrollingCourseId === course.courseId
+                                    }
                                     className={`flex-1 bg-red-700 text-white py-2 px-2 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center text-sm ${
-                                      loading
+                                      unenrollingCourseId === course.courseId
                                         ? "opacity-50 cursor-not-allowed"
                                         : ""
                                     }`}
                                   >
                                     <WifiOffIcon className="w-4 h-4 md:w-5 md:h-5 mr-2" />
-                                    {loading ? "Unenrolling..." : "Unenroll"}
+                                    {unenrollingCourseId === course.courseId
+                                      ? "Unenrolling..."
+                                      : "Unenroll"}
                                   </button>
                                 )}
                               </div>
                             );
                           } else {
+                            const isEnrolling =
+                              enrollingCourseId === course.courseId;
                             return (
                               <button
                                 onClick={() => enroll(course.courseId)}
-                                disabled={loading}
+                                disabled={isEnrolling}
                                 className={`w-full bg-gray-700 text-white py-2 px-2 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center text-sm ${
-                                  loading ? "opacity-50 cursor-not-allowed" : ""
+                                  isEnrolling
+                                    ? "opacity-50 cursor-not-allowed"
+                                    : ""
                                 }`}
                               >
                                 <Wifi className="w-4 h-4 md:w-5 md:h-5 mr-2" />
-                                {loading ? "Enrolling..." : "Enroll"}
+                                {isEnrolling ? "Enrolling..." : "Enroll"}
                               </button>
                             );
                           }
@@ -1275,28 +1283,29 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                       setShowUnenrollConfirm(false);
                       setCourseToUnenroll(null);
                     }}
-                    disabled={unenrollLoading}
+                    disabled={
+                      unenrollingCourseId === courseToUnenroll?.courseId
+                    }
                     className="flex-1 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 py-3 px-4 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors font-medium"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={async () => {
-                      setUnenrollLoading(true);
                       try {
                         await unEnroll(courseToUnenroll.courseId);
                         setShowUnenrollConfirm(false);
                         setCourseToUnenroll(null);
                       } catch (error) {
                         console.error("Failed to unenroll:", error);
-                      } finally {
-                        setUnenrollLoading(false);
                       }
                     }}
-                    disabled={unenrollLoading}
+                    disabled={
+                      unenrollingCourseId === courseToUnenroll?.courseId
+                    }
                     className="flex-1 bg-red-600 text-white py-3 px-4 rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center justify-center"
                   >
-                    {unenrollLoading ? (
+                    {unenrollingCourseId === courseToUnenroll?.courseId ? (
                       <>
                         <Loader className="w-4 h-4 animate-spin mr-2" />
                         Unenrolling...

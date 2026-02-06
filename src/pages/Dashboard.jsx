@@ -13,6 +13,7 @@ import {
   CheckCircle,
   ClipboardListIcon,
   RefreshCw,
+  X,
 } from "lucide-react";
 import { CourseContext } from "../contexts/courseContext";
 import { useProfile } from "../contexts/ProfileContext";
@@ -549,50 +550,21 @@ const Dashboard = ({ onCourseSelect }) => {
         </div>
 
         {isShowProfileSurveyForm && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn pt-[100px]">
-            <div className="relative bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-5xl w-full max-h-[85vh] overflow-hidden flex flex-col">
-              {/* Modal Header */}
-              <div className="relative p-6 border-b-2 border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-900">
-                <div className="absolute inset-0 overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 rounded-full blur-2xl bg-blue-400/20 dark:bg-blue-500/10"></div>
-                  <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full blur-2xl bg-purple-400/20 dark:bg-purple-500/10"></div>
-                </div>
-                <div className="relative flex items-center justify-between">
-                  <div>
-                    <h2 className="text-2xl font-bold bg-gradient-to-r from-yellow-500 to-yellow-600 dark:from-yellow-600 dark:to-yellow-400 bg-clip-text text-transparent">
-                      Career Onboarding
-                    </h2>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                      Complete your profile to get personalized recommendations
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleCloseSurvey}
-                    className="p-2 rounded-xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-red-400 dark:hover:border-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200 shadow-sm hover:shadow-md"
-                    aria-label="Close modal"
-                  >
-                    <svg
-                      className="w-6 h-6 text-gray-600 dark:text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+          <div className="relative z-50">
+            {/* Explicit Close Button */}
+            <button
+              onClick={handleCloseSurvey}
+              className="fixed lg:top-24 lg:right-64 top-16 right-4 z-[70] p-3 rounded-full bg-red-500 hover:bg-red-600 text-white shadow-2xl transition-all duration-200 hover:scale-110 flex items-center gap-2 font-medium"
+              aria-label="Close survey"
+            >
+              <X className="w-5 h-5 font-bold" />
+            </button>
 
-              {/* Modal Content */}
-              <div className="flex-1 overflow-y-auto">
-                <CareerOnboardingForm userAddress={address} />
-              </div>
-            </div>
+            <CareerOnboardingForm
+              userAddress={address}
+              isModal={true}
+              onClose={handleCloseSurvey}
+            />
           </div>
         )}
 
