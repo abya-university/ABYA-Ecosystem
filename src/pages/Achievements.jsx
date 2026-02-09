@@ -108,6 +108,10 @@ const AchievementsPage = () => {
   const [vcError, setVcError] = useState(null);
   const [selectedVC, setSelectedVC] = useState(null);
   const [showVCDetailPopup, setShowVCDetailPopup] = useState(false);
+  const [showVPModal, setShowVPModal] = useState(false);
+  const [vpLoading, setVpLoading] = useState(false);
+  const [vpError, setVpError] = useState(null);
+  const [createdVP, setCreatedVP] = useState(null);
 
   const [userBadge, setUserBadge] = useState(null);
   const { memberBadgeDetails, fetchMemberBadgeDetails } = useCommunityMembers();
@@ -118,7 +122,7 @@ const AchievementsPage = () => {
   const badgeInfo = BADGE_DISPLAY_MAP[currentBadgeLevel];
   const { events, fetchEvents } = useCommunityEvents();
   const { members, fetchMembers } = useCommunityMembers();
-  const { getVerifiableCredentials } = useDid();
+  const { getVerifiableCredentials, did } = useDid();
 
   // Mock ABYTKN tokens
   const abytkns = [
@@ -251,6 +255,125 @@ const AchievementsPage = () => {
   const handleClosePopup = () => {
     setShowPopup(false);
     setTimeout(() => setSelectedCertificate(null), 300);
+  };
+
+  const convertBigIntToString = (obj) => {
+    if (obj === null || obj === undefined) return obj;
+    
+    if (typeof obj === "bigint") {
+      return obj.toString();
+    }
+    
+    if (typeof obj === "object") {
+      if (Array.isArray(obj)) {
+        return obj.map(item => convertBigIntToString(item));
+      }
+      const converted = {};
+      for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+          converted[key] = convertBigIntToString(obj[key]);
+        }
+      }
+      return converted;
+    }
+    
+    return obj;
+  };
+
+  const handleCreateVP = async (vc) => {
+    if (!vc) return;
+
+    setVpLoading(true);
+    setVpError(null);
+    setCreatedVP(null);
+
+    try {
+      // Convert BigInt values to strings for JSON serialization
+      const convertedVc = convertBigIntToString(vc);
+      
+      // Encode the VC as a JWT string for the backend
+      const vcJwt = JSON.stringify(convertedVc);
+      
+      let holderDid = did || vc.subjectDID || vc.subject;
+
+      const looksLikeWalletDid = (d) => {
+        return typeof d === "string" && d.startsWith("did:ethr:") && d.includes("0x");
+      };
+
+      // If the selected DID looks wallet-controlled (user's wallet) or no DID, request
+      // an agent-managed generated DID so the Veramo agent can sign the presentation.
+      if (!holderDid || looksLikeWalletDid(holderDid)) {
+        try {
+          const genRes = await fetch("http://localhost:3000/did/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ provider: "did:ethr" }),
+          });
+
+          if (genRes.ok) {
+            const genData = await genRes.json();
+            holderDid = genData?.identifier?.did || holderDid;
+            console.log("Using agent-managed holder DID:", holderDid);
+          } else {
+            console.warn("Generated agent DID creation failed, trying did:key", genRes.status);
+            const keyRes = await fetch("http://localhost:3000/did/create", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ provider: "did:key" }),
+            });
+
+            if (keyRes.ok) {
+              const keyData = await keyRes.json();
+              holderDid = keyData?.identifier?.did || holderDid;
+              console.log("Using fallback did:key holder DID:", holderDid);
+            } else {
+              console.warn("Fallback did:key creation also failed", keyRes.status);
+            }
+          }
+        } catch (e) {
+          console.error("Auto-create agent-managed DID failed:", e);
+        }
+      }
+      const payload = {
+        verifiableCredentials: [vcJwt], // array of JWT strings (common expectation)
+        verifiableCredentialsWithJwt: [{ jwt: vcJwt }], // alternate shape
+        rawVerifiableCredentials: [convertedVc], // fallback raw object
+        holderDid,
+        jwt: vcJwt, // top-level jwt string for servers that expect it
+      };
+
+      console.log("VP Payload:", JSON.stringify(payload, null, 2));
+
+      const res = await fetch("http://localhost:3000/presentation/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        let errorMessage = `Failed to create Verifiable Presentation (${res.status})`;
+        try {
+          const errData = await res.json();
+          errorMessage = errData.error || errData.message || errorMessage;
+        } catch {
+          const errText = await res.text();
+          errorMessage = errText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await res.json();
+
+      // depending on backend response
+      setCreatedVP(data.presentation || data.vp || data);
+    } catch (err) {
+      console.error("VP Creation Error:", err);
+      setVpError(err.message || "Failed to create VP");
+    } finally {
+      setVpLoading(false);
+    }
   };
 
   const handleEventDetailsClick = (event) => {
@@ -1338,9 +1461,16 @@ const AchievementsPage = () => {
                       <Download className="w-4 h-4" />
                       Download
                     </button>
-                    <button className="flex-1 py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2">
-                      <Share2 className="w-4 h-4" />
-                      Share
+                    <button
+                      onClick={() => {
+                        setShowVPModal(true);
+                        setCreatedVP(null);
+                        setVpError(null);
+                      }}
+                      className="flex-1 py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Presentation
                     </button>
                     <button
                       onClick={() => setShowVCDetailPopup(false)}
@@ -1349,6 +1479,175 @@ const AchievementsPage = () => {
                       Close
                     </button>
                   </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </CSSTransition>
+
+        {/* VP Modal */}
+        <CSSTransition
+          in={showVPModal}
+          timeout={300}
+          classNames="popup"
+          unmountOnExit
+        >
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden max-w-xl w-full">
+              {/* Close */}
+              <button
+                onClick={() => setShowVPModal(false)}
+                className="absolute top-4 right-4 z-10 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {selectedVC && (
+                <div className="p-6 sm:p-8">
+                  {/* Header */}
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-3 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg">
+                      <Verified className="w-6 h-6" />
+                    </div>
+
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                        VC Presentation
+                      </h2>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Create a Verifiable Presentation for sharing with employers or institutions
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Professional VC Card */}
+                  <div className="rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-lg bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
+                    <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          {selectedVC.course || "Credential Presentation"}
+                        </h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Presentation-ready credential summary
+                        </p>
+                      </div>
+
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 flex items-center gap-1">
+                        <CheckCircle className="w-4 h-4" />
+                        Verified VC
+                      </span>
+                    </div>
+
+                    <div className="p-6 space-y-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Issuer
+                          </p>
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white break-all">
+                            {selectedVC.issuer}
+                          </p>
+                        </div>
+
+                        <div className="text-right">
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Issued
+                          </p>
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {formatVCDate(selectedVC.issuanceDate)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Subject DID
+                        </p>
+                        <p className="text-xs font-mono text-gray-700 dark:text-gray-300 break-all">
+                          {selectedVC.subjectDID || selectedVC.subject}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Credential ID
+                        </p>
+                        <p className="text-xs font-mono text-gray-700 dark:text-gray-300 break-all">
+                          {selectedVC.credentialID}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* VP Status */}
+                  <div className="mt-6">
+                    {vpError && (
+                      <div className="p-4 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700 dark:border-red-900 dark:bg-red-900/20 dark:text-red-300">
+                        {vpError}
+                      </div>
+                    )}
+
+                    {createdVP && (
+                      <div className="p-4 rounded-lg border border-green-200 bg-green-50 text-sm text-green-700 dark:border-green-900 dark:bg-green-900/20 dark:text-green-300">
+                        ✅ Verifiable Presentation created successfully!
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-3 mt-6">
+                    <button
+                      disabled={vpLoading}
+                      onClick={() => handleCreateVP(selectedVC)}
+                      className={`flex-1 py-3 px-4 rounded-lg font-medium transition-opacity flex items-center justify-center gap-2 ${
+                        vpLoading
+                          ? "bg-gray-200 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+                          : "bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:opacity-90"
+                      }`}
+                    >
+                      {vpLoading ? (
+                        <>
+                          <Clock className="w-4 h-4 animate-spin" />
+                          Creating VP...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4" />
+                          Create Presentation
+                        </>
+                      )}
+                    </button>
+
+                    {createdVP && (
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(
+                            typeof createdVP === "string"
+                              ? createdVP
+                              : JSON.stringify(createdVP, null, 2),
+                          );
+                        }}
+                        className="py-3 px-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Hash className="w-4 h-4" />
+                        Copy VP
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Raw VP Display */}
+                  {createdVP && (
+                    <div className="mt-6">
+                      <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                        Generated Verifiable Presentation (VP)
+                      </p>
+                      <pre className="text-xs p-4 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 overflow-x-auto max-h-60">
+                        {typeof createdVP === "string"
+                          ? createdVP
+                          : JSON.stringify(createdVP, null, 2)}
+                      </pre>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
