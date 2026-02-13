@@ -16,6 +16,8 @@ import {
   GraduationCap,
   Zap,
   Loader,
+  AlertCircle,
+  X,
 } from "lucide-react";
 import { useDarkMode } from "../contexts/themeContext";
 import { useActiveAccount } from "thirdweb/react";
@@ -75,6 +77,7 @@ export default function CareerOnboardingForm({
   const [activeSection, setActiveSection] = useState("situationAndTech");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [careerRecommendation, setCareerRecommendation] = useState(null);
+  const [submissionError, setSubmissionError] = useState(null);
   const [finalCourseId, setFinalCourseId] = useState(courseIdToEnroll);
 
   const handleInputChange = (e) => {
@@ -124,6 +127,9 @@ export default function CareerOnboardingForm({
     }
 
     setIsSubmitting(true);
+    setSubmissionError(null);
+    setCareerRecommendation(null);
+    setActiveSection("results");
 
     try {
       // Get selected course details
@@ -219,14 +225,17 @@ export default function CareerOnboardingForm({
         !result.courseMatchAnalysis
       ) {
         toast.dismiss(toastId);
-        toast.error(
-          "Invalid response from server. Please check your form and try again.",
-        );
+        const invalidMessage =
+          "Invalid response from server. Please check your form and try again.";
+        setSubmissionError(invalidMessage);
+        setActiveSection("results");
+        toast.error(invalidMessage);
         return;
       }
 
       // Store career recommendation for display only if validation passes
       setCareerRecommendation(result);
+      setActiveSection("results");
       toast.dismiss(toastId);
       toast.success("Career profile analyzed! 🎉");
     } catch (error) {
@@ -243,6 +252,8 @@ export default function CareerOnboardingForm({
         errorMessage = `Server error: ${error.message}. Please try again later.`;
       }
 
+      setSubmissionError(errorMessage);
+      setActiveSection("results");
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -250,13 +261,19 @@ export default function CareerOnboardingForm({
   };
 
   const handleContinueEnrollment = () => {
-    setFormSubmitted(true);
     // If in modal mode, call the completion callback with the final course ID
     if (isModal && onFormComplete) {
       setTimeout(() => {
         onFormComplete(finalCourseId);
-      }, 1500);
+      }, 2000);
+      return;
+    }
+
+    if (isModal && onClose) {
+      onClose();
+      return;
     } else {
+      setFormSubmitted(true);
       // Otherwise navigate to dashboard
       setTimeout(() => {
         navigate("/mainpage?section=dashboard");
@@ -269,269 +286,40 @@ export default function CareerOnboardingForm({
     toast.success("Course selection updated!");
   };
 
+  const handleTryAgain = () => {
+    setSubmissionError(null);
+    setCareerRecommendation(null);
+    setActiveSection("learningAndReview");
+  };
+
   const sections = [
     "situationAndTech",
     "goalsAndMotivation",
     "learningAndReview",
+    "results",
   ];
 
+  const inputSections = sections.slice(0, 3);
   const currentSectionIndex = sections.indexOf(activeSection);
-  const isLastSection = currentSectionIndex === sections.length - 1;
-  const isFirstSection = currentSectionIndex === 0;
+  const inputSectionIndex = inputSections.indexOf(activeSection);
+  const isResultsSection = activeSection === "results";
+  const isLastSection = activeSection === "learningAndReview";
+  const isFirstSection = inputSectionIndex === 0;
+  const progressIndex = isResultsSection
+    ? inputSections.length
+    : inputSectionIndex + 1;
 
   const handleNext = () => {
-    if (currentSectionIndex < sections.length - 1) {
-      setActiveSection(sections[currentSectionIndex + 1]);
+    if (inputSectionIndex < inputSections.length - 1) {
+      setActiveSection(inputSections[inputSectionIndex + 1]);
     }
   };
 
   const handlePrevious = () => {
-    if (currentSectionIndex > 0) {
-      setActiveSection(sections[currentSectionIndex - 1]);
+    if (inputSectionIndex > 0) {
+      setActiveSection(inputSections[inputSectionIndex - 1]);
     }
   };
-
-  // Show career recommendation UI if available
-  if (careerRecommendation) {
-    return (
-      <div className="flex items-center justify-center px-4 py-12">
-        <div
-          className={`relative rounded-3xl p-8 lg:p-12 max-w-4xl w-full shadow-2xl overflow-hidden ${
-            darkMode
-              ? "bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 border border-blue-500/30"
-              : "bg-gradient-to-br from-white via-blue-50 to-blue-50 border border-blue-200"
-          }`}
-        >
-          {/* Header */}
-          <div className="text-center mb-8">
-            <Sparkles
-              size={60}
-              className={`mx-auto mb-4 ${
-                darkMode ? "text-blue-400" : "text-blue-600"
-              }`}
-            />
-            <h2
-              className={`text-3xl lg:text-4xl font-bold mb-4 bg-gradient-to-r ${
-                darkMode
-                  ? "from-blue-400 via-purple-400 to-blue-400"
-                  : "from-blue-600 via-purple-600 to-blue-600"
-              } bg-clip-text text-transparent`}
-            >
-              Your Career Profile
-            </h2>
-            <p
-              className={`text-lg ${
-                darkMode ? "text-gray-300" : "text-gray-700"
-              }`}
-            >
-              Based on your responses, here's your personalized career analysis
-            </p>
-          </div>
-
-          {/* Career Profile Summary */}
-          {careerRecommendation.careerProfile && (
-            <div
-              className={`mb-6 p-6 rounded-xl ${
-                darkMode ? "bg-gray-700/50" : "bg-white/80"
-              }`}
-            >
-              <h3
-                className={`text-xl font-bold mb-3 flex items-center gap-2 ${
-                  darkMode ? "text-blue-400" : "text-blue-600"
-                }`}
-              >
-                <User size={24} />
-                Career Profile Summary
-              </h3>
-              <p className={`${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                {careerRecommendation.careerProfile}
-              </p>
-            </div>
-          )}
-
-          {/* Course Match Analysis */}
-          {careerRecommendation.courseMatchAnalysis && (
-            <div
-              className={`mb-6 p-6 rounded-xl ${
-                darkMode ? "bg-gray-700/50" : "bg-white/80"
-              }`}
-            >
-              <h3
-                className={`text-xl font-bold mb-3 flex items-center gap-2 ${
-                  darkMode ? "text-yellow-400" : "text-yellow-600"
-                }`}
-              >
-                <Target size={24} />
-                Your Selected Course Match
-              </h3>
-              <p
-                className={`${
-                  darkMode ? "text-gray-300" : "text-gray-700"
-                } mb-4`}
-              >
-                {careerRecommendation.courseMatchAnalysis}
-              </p>
-              <div
-                className={`p-4 rounded-lg ${
-                  darkMode ? "bg-gray-800/50" : "bg-gray-100"
-                }`}
-              >
-                <p
-                  className={`font-semibold ${
-                    darkMode ? "text-blue-300" : "text-blue-700"
-                  }`}
-                >
-                  Selected Course:{" "}
-                  {courses.find((c) => c.courseId === finalCourseId)
-                    ?.courseName || "Loading..."}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Alternative Course Suggestions */}
-          {careerRecommendation.suggestedCourses &&
-            careerRecommendation.suggestedCourses.length > 0 && (
-              <div
-                className={`mb-6 p-6 rounded-xl ${
-                  darkMode ? "bg-gray-700/50" : "bg-white/80"
-                }`}
-              >
-                <h3
-                  className={`text-xl font-bold mb-3 flex items-center gap-2 ${
-                    darkMode ? "text-purple-400" : "text-purple-600"
-                  }`}
-                >
-                  <BookOpen size={24} />
-                  Other Courses That Match Your Profile
-                </h3>
-                <p
-                  className={`mb-4 ${
-                    darkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  Click on any course below to change your enrollment selection
-                </p>
-                <div className="grid gap-3">
-                  {careerRecommendation.suggestedCourses.map(
-                    (suggestedCourse) => {
-                      const courseDetails = courses.find(
-                        (c) => c.courseId === suggestedCourse.courseId,
-                      );
-                      const isSelected =
-                        finalCourseId === suggestedCourse.courseId;
-
-                      return (
-                        <button
-                          key={suggestedCourse.courseId}
-                          onClick={() =>
-                            handleChangeCourse(suggestedCourse.courseId)
-                          }
-                          className={`p-4 rounded-lg text-left transition-all ${
-                            isSelected
-                              ? darkMode
-                                ? "bg-blue-600/30 border-2 border-blue-500"
-                                : "bg-blue-100 border-2 border-blue-500"
-                              : darkMode
-                              ? "bg-gray-800/50 hover:bg-gray-800 border-2 border-transparent"
-                              : "bg-gray-100 hover:bg-gray-200 border-2 border-transparent"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <p
-                                className={`font-semibold mb-1 ${
-                                  darkMode ? "text-blue-300" : "text-blue-700"
-                                }`}
-                              >
-                                {courseDetails?.courseName ||
-                                  suggestedCourse.courseName}
-                              </p>
-                              {suggestedCourse.reason && (
-                                <p
-                                  className={`text-sm ${
-                                    darkMode ? "text-gray-400" : "text-gray-600"
-                                  }`}
-                                >
-                                  {suggestedCourse.reason}
-                                </p>
-                              )}
-                            </div>
-                            {isSelected && (
-                              <CheckCircle
-                                size={20}
-                                className={
-                                  darkMode ? "text-blue-400" : "text-blue-600"
-                                }
-                              />
-                            )}
-                          </div>
-                        </button>
-                      );
-                    },
-                  )}
-                </div>
-              </div>
-            )}
-
-          {/* Confirmation Question */}
-          <div
-            className={`mb-6 p-6 rounded-xl text-center ${
-              darkMode
-                ? "bg-yellow-500/10 border border-yellow-500/30"
-                : "bg-yellow-50 border border-yellow-200"
-            }`}
-          >
-            <p
-              className={`text-lg font-semibold mb-2 ${
-                darkMode ? "text-yellow-300" : "text-yellow-800"
-              }`}
-            >
-              Do you want to continue enrolling in this course?
-            </p>
-            <p
-              className={`text-sm ${
-                darkMode ? "text-gray-400" : "text-gray-600"
-              }`}
-            >
-              Current selection:{" "}
-              <span className="font-semibold">
-                {courses.find((c) => c.courseId === finalCourseId)
-                  ?.courseName || "Loading..."}
-              </span>
-            </p>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-4 justify-center">
-            {onClose && (
-              <button
-                onClick={onClose}
-                className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-                  darkMode
-                    ? "bg-gray-700 hover:bg-gray-600 text-white"
-                    : "bg-gray-300 hover:bg-gray-400 text-gray-800"
-                }`}
-              >
-                Cancel
-              </button>
-            )}
-            <button
-              onClick={handleContinueEnrollment}
-              className={`px-8 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-                darkMode
-                  ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white"
-                  : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
-              }`}
-            >
-              <GraduationCap size={20} />
-              Continue Enrollment
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (formSubmitted) {
     return (
@@ -633,35 +421,10 @@ export default function CareerOnboardingForm({
             : "max-w-4xl mx-auto"
         }
       >
-        {isModal && (
-          <button
-            onClick={onClose}
-            className={`fixed top-2 right-2 sm:top-4 sm:right-4 z-[60] p-2 rounded-lg transition-colors shadow-lg ${
-              darkMode
-                ? "text-gray-400 hover:bg-gray-700/50 hover:text-gray-200 bg-gray-800 border border-gray-700"
-                : "text-gray-500 hover:bg-gray-100 hover:text-gray-700 bg-white border border-gray-200"
-            }`}
-          >
-            <svg
-              className="w-5 h-5 sm:w-6 sm:h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        )}
-
         {/* Form Card with Two-Column Layout */}
         <form
           onSubmit={handleSubmit}
-          className={`rounded-2xl shadow-xl overflow-hidden w-full ${
+          className={`relative rounded-2xl shadow-xl overflow-hidden w-full ${
             isModal ? "max-w-6xl my-4" : ""
           } ${
             darkMode
@@ -669,6 +432,20 @@ export default function CareerOnboardingForm({
               : "bg-white border border-gray-200"
           }`}
         >
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className={`absolute top-3 right-3 z-20 p-2 rounded-lg transition-colors shadow-md ${
+                darkMode
+                  ? "text-gray-300 hover:bg-gray-700/60 hover:text-white bg-gray-800/80 border border-gray-700"
+                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-800 bg-white/90 border border-gray-200"
+              }`}
+              aria-label="Close onboarding"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
           <div className="flex flex-col lg:flex-row">
             {/* Left Sidebar - Title & Progress */}
             <div
@@ -732,7 +509,7 @@ export default function CareerOnboardingForm({
                 >
                   <div
                     className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                      currentSectionIndex > 0
+                      progressIndex > 1
                         ? "bg-green-500 text-white"
                         : activeSection === "situationAndTech"
                         ? darkMode
@@ -743,7 +520,7 @@ export default function CareerOnboardingForm({
                         : "bg-gray-300 text-gray-600"
                     }`}
                   >
-                    {currentSectionIndex > 0 ? "✓" : "1"}
+                    {progressIndex > 1 ? "✓" : "1"}
                   </div>
                   <div className="flex-1">
                     <h4
@@ -787,7 +564,7 @@ export default function CareerOnboardingForm({
                 >
                   <div
                     className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                      currentSectionIndex > 1
+                      progressIndex > 2
                         ? "bg-green-500 text-white"
                         : activeSection === "goalsAndMotivation"
                         ? darkMode
@@ -798,7 +575,7 @@ export default function CareerOnboardingForm({
                         : "bg-gray-300 text-gray-600"
                     }`}
                   >
-                    {currentSectionIndex > 1 ? "✓" : "2"}
+                    {progressIndex > 2 ? "✓" : "2"}
                   </div>
                   <div className="flex-1">
                     <h4
@@ -842,7 +619,7 @@ export default function CareerOnboardingForm({
                 >
                   <div
                     className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                      currentSectionIndex > 2
+                      isResultsSection
                         ? "bg-green-500 text-white"
                         : activeSection === "learningAndReview"
                         ? darkMode
@@ -853,7 +630,7 @@ export default function CareerOnboardingForm({
                         : "bg-gray-300 text-gray-600"
                     }`}
                   >
-                    {currentSectionIndex > 2 ? "✓" : "3"}
+                    {isResultsSection ? "✓" : "3"}
                   </div>
                   <div className="flex-1">
                     <h4
@@ -895,10 +672,7 @@ export default function CareerOnboardingForm({
                       darkMode ? "text-blue-400" : "text-blue-600"
                     }`}
                   >
-                    {Math.round(
-                      ((currentSectionIndex + 1) / sections.length) * 100,
-                    )}
-                    %
+                    {Math.round((progressIndex / inputSections.length) * 100)}%
                   </span>
                 </div>
                 <div
@@ -913,9 +687,7 @@ export default function CareerOnboardingForm({
                         : "from-blue-500 via-purple-500 to-pink-500"
                     }`}
                     style={{
-                      width: `${
-                        ((currentSectionIndex + 1) / sections.length) * 100
-                      }%`,
+                      width: `${(progressIndex / inputSections.length) * 100}%`,
                     }}
                   />
                 </div>
@@ -1768,106 +1540,430 @@ export default function CareerOnboardingForm({
                     </div>
                   </div>
                 )}
+
+                {/* SLIDE 4: Results */}
+                {activeSection === "results" && (
+                  <div className="space-y-6">
+                    <div
+                      className={`p-6 rounded-2xl border ${
+                        darkMode
+                          ? "bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 border-blue-500/30"
+                          : "bg-gradient-to-br from-white via-blue-50 to-blue-50 border-blue-200"
+                      }`}
+                    >
+                      <div className="text-center mb-6">
+                        {isSubmitting ? (
+                          <Loader
+                            size={48}
+                            className={`mx-auto mb-4 animate-spin ${
+                              darkMode ? "text-blue-400" : "text-blue-600"
+                            }`}
+                          />
+                        ) : (
+                          <Sparkles
+                            size={48}
+                            className={`mx-auto mb-4 ${
+                              darkMode ? "text-blue-400" : "text-blue-600"
+                            }`}
+                          />
+                        )}
+                        <h2
+                          className={`text-2xl lg:text-3xl font-bold mb-2 bg-gradient-to-r ${
+                            darkMode
+                              ? "from-blue-400 via-purple-400 to-blue-400"
+                              : "from-blue-600 via-purple-600 to-blue-600"
+                          } bg-clip-text text-transparent`}
+                        >
+                          {isSubmitting
+                            ? "Analyzing Your Profile"
+                            : submissionError
+                            ? "We Hit a Snag"
+                            : "Your Career Profile"}
+                        </h2>
+                        <p
+                          className={`text-sm ${
+                            darkMode ? "text-gray-400" : "text-gray-600"
+                          }`}
+                        >
+                          {isSubmitting
+                            ? "Hang tight while we process your responses."
+                            : submissionError
+                            ? "Please review the error below or try again."
+                            : "Based on your responses, here is your personalized analysis."}
+                        </p>
+                      </div>
+
+                      {submissionError && (
+                        <div
+                          className={`p-4 rounded-xl border ${
+                            darkMode
+                              ? "bg-red-500/10 border-red-500/30"
+                              : "bg-red-50 border-red-200"
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <AlertCircle
+                              className={
+                                darkMode ? "text-red-400" : "text-red-600"
+                              }
+                            />
+                            <p
+                              className={`text-sm ${
+                                darkMode ? "text-red-200" : "text-red-700"
+                              }`}
+                            >
+                              {submissionError}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {careerRecommendation && !submissionError && (
+                        <div className="space-y-5">
+                          {careerRecommendation.careerProfile && (
+                            <div
+                              className={`p-4 rounded-xl ${
+                                darkMode ? "bg-gray-700/50" : "bg-white/80"
+                              }`}
+                            >
+                              <h3
+                                className={`text-lg font-semibold mb-2 flex items-center gap-2 ${
+                                  darkMode ? "text-blue-400" : "text-blue-600"
+                                }`}
+                              >
+                                <User size={20} />
+                                Career Profile Summary
+                              </h3>
+                              <p
+                                className={`${
+                                  darkMode ? "text-gray-300" : "text-gray-700"
+                                }`}
+                              >
+                                {careerRecommendation.careerProfile}
+                              </p>
+                            </div>
+                          )}
+
+                          {careerRecommendation.courseMatchAnalysis && (
+                            <div
+                              className={`p-4 rounded-xl ${
+                                darkMode ? "bg-gray-700/50" : "bg-white/80"
+                              }`}
+                            >
+                              <h3
+                                className={`text-lg font-semibold mb-2 flex items-center gap-2 ${
+                                  darkMode
+                                    ? "text-yellow-400"
+                                    : "text-yellow-600"
+                                }`}
+                              >
+                                <Target size={20} />
+                                Your Selected Course Match
+                              </h3>
+                              <p
+                                className={`${
+                                  darkMode ? "text-gray-300" : "text-gray-700"
+                                }`}
+                              >
+                                {careerRecommendation.courseMatchAnalysis}
+                              </p>
+                              <div
+                                className={`mt-3 p-3 rounded-lg ${
+                                  darkMode ? "bg-gray-800/50" : "bg-gray-100"
+                                }`}
+                              >
+                                <p
+                                  className={`font-semibold ${
+                                    darkMode ? "text-blue-300" : "text-blue-700"
+                                  }`}
+                                >
+                                  Selected Course:{" "}
+                                  {courses.find(
+                                    (c) => c.courseId === finalCourseId,
+                                  )?.courseName || "Loading..."}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {careerRecommendation.suggestedCourses &&
+                            careerRecommendation.suggestedCourses.length >
+                              0 && (
+                              <div
+                                className={`p-4 rounded-xl ${
+                                  darkMode ? "bg-gray-700/50" : "bg-white/80"
+                                }`}
+                              >
+                                <h3
+                                  className={`text-lg font-semibold mb-2 flex items-center gap-2 ${
+                                    darkMode
+                                      ? "text-purple-400"
+                                      : "text-purple-600"
+                                  }`}
+                                >
+                                  <BookOpen size={20} />
+                                  Other Courses That Match Your Profile
+                                </h3>
+                                <p
+                                  className={`mb-3 text-sm ${
+                                    darkMode ? "text-gray-400" : "text-gray-600"
+                                  }`}
+                                >
+                                  Click a course below to change your enrollment
+                                  selection.
+                                </p>
+                                <div className="grid gap-3">
+                                  {careerRecommendation.suggestedCourses.map(
+                                    (suggestedCourse) => {
+                                      const courseDetails = courses.find(
+                                        (c) =>
+                                          c.courseId ===
+                                          suggestedCourse.courseId,
+                                      );
+                                      const isSelected =
+                                        finalCourseId ===
+                                        suggestedCourse.courseId;
+
+                                      return (
+                                        <button
+                                          key={suggestedCourse.courseId}
+                                          onClick={() =>
+                                            handleChangeCourse(
+                                              suggestedCourse.courseId,
+                                            )
+                                          }
+                                          className={`p-3 rounded-lg text-left transition-all ${
+                                            isSelected
+                                              ? darkMode
+                                                ? "bg-blue-600/30 border-2 border-blue-500"
+                                                : "bg-blue-100 border-2 border-blue-500"
+                                              : darkMode
+                                              ? "bg-gray-800/50 hover:bg-gray-800 border-2 border-transparent"
+                                              : "bg-gray-100 hover:bg-gray-200 border-2 border-transparent"
+                                          }`}
+                                        >
+                                          <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                              <p
+                                                className={`font-semibold mb-1 ${
+                                                  darkMode
+                                                    ? "text-blue-300"
+                                                    : "text-blue-700"
+                                                }`}
+                                              >
+                                                {courseDetails?.courseName ||
+                                                  suggestedCourse.courseName}
+                                              </p>
+                                              {suggestedCourse.reason && (
+                                                <p
+                                                  className={`text-sm ${
+                                                    darkMode
+                                                      ? "text-gray-400"
+                                                      : "text-gray-600"
+                                                  }`}
+                                                >
+                                                  {suggestedCourse.reason}
+                                                </p>
+                                              )}
+                                            </div>
+                                            {isSelected && (
+                                              <CheckCircle
+                                                size={18}
+                                                className={
+                                                  darkMode
+                                                    ? "text-blue-400"
+                                                    : "text-blue-600"
+                                                }
+                                              />
+                                            )}
+                                          </div>
+                                        </button>
+                                      );
+                                    },
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                          <div
+                            className={`p-4 rounded-xl text-center ${
+                              darkMode
+                                ? "bg-yellow-500/10 border border-yellow-500/30"
+                                : "bg-yellow-50 border border-yellow-200"
+                            }`}
+                          >
+                            <p
+                              className={`text-base font-semibold mb-1 ${
+                                darkMode ? "text-yellow-300" : "text-yellow-800"
+                              }`}
+                            >
+                              Do you want to continue enrolling in this course?
+                            </p>
+                            <p
+                              className={`text-xs ${
+                                darkMode ? "text-gray-400" : "text-gray-600"
+                              }`}
+                            >
+                              Current selection:{" "}
+                              <span className="font-semibold">
+                                {courses.find(
+                                  (c) => c.courseId === finalCourseId,
+                                )?.courseName || "Loading..."}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap gap-3 justify-center mt-6">
+                        {submissionError && onClose && (
+                          <button
+                            type="button"
+                            onClick={onClose}
+                            className={`px-6 py-2.5 rounded-lg font-semibold transition-all ${
+                              darkMode
+                                ? "bg-gray-700 hover:bg-gray-600 text-white"
+                                : "bg-gray-300 hover:bg-gray-400 text-gray-800"
+                            }`}
+                          >
+                            Close
+                          </button>
+                        )}
+
+                        {submissionError && (
+                          <button
+                            type="button"
+                            onClick={handleTryAgain}
+                            className={`px-6 py-2.5 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+                              darkMode
+                                ? "bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-500 hover:to-yellow-600 text-white"
+                                : "bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white"
+                            }`}
+                          >
+                            Try Again
+                          </button>
+                        )}
+
+                        {careerRecommendation && !submissionError && (
+                          <button
+                            type="button"
+                            onClick={handleContinueEnrollment}
+                            className={`px-7 py-2.5 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+                              darkMode
+                                ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white"
+                                : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                            }`}
+                          >
+                            <GraduationCap size={18} />
+                            Continue Enrollment
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Navigation Footer */}
-              <div
-                className={`px-4 sm:px-6 lg:px-8 py-4 sm:py-5 border-t ${
-                  darkMode
-                    ? "border-gray-700 bg-gray-800/30"
-                    : "border-gray-200 bg-gray-50"
-                } flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4`}
-              >
-                <div className="w-full sm:w-auto flex justify-between sm:justify-start items-center gap-3 order-2 sm:order-1">
-                  <button
-                    type="button"
-                    onClick={handlePrevious}
-                    disabled={isFirstSection}
-                    className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg font-medium text-xs sm:text-sm transition-all ${
-                      isFirstSection
-                        ? darkMode
-                          ? "bg-gray-700/50 text-gray-500 cursor-not-allowed"
-                          : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                        : darkMode
-                        ? "bg-gray-700/50 text-white hover:bg-gray-600 border border-gray-600"
-                        : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-300"
-                    }`}
-                  >
-                    <ArrowLeft size={14} className="sm:w-4 sm:h-4" />
-                    <span className="hidden sm:inline">Previous</span>
-                    <span className="sm:hidden">Back</span>
-                  </button>
-
-                  {!isLastSection ? (
+              {activeSection !== "results" && (
+                <div
+                  className={`px-4 sm:px-6 lg:px-8 py-4 sm:py-5 border-t ${
+                    darkMode
+                      ? "border-gray-700 bg-gray-800/30"
+                      : "border-gray-200 bg-gray-50"
+                  } flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4`}
+                >
+                  <div className="w-full sm:w-auto flex justify-between sm:justify-start items-center gap-3 order-2 sm:order-1">
                     <button
                       type="button"
-                      onClick={handleNext}
-                      className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg font-medium text-xs sm:text-sm text-white transition-all bg-gradient-to-r ${
-                        darkMode
-                          ? "from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800"
-                          : "from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700"
-                      } shadow-md hover:shadow-lg`}
-                    >
-                      Next
-                      <ArrowRight size={14} className="sm:w-4 sm:h-4" />
-                    </button>
-                  ) : (
-                    <button
-                      type="submit"
-                      disabled={!formData.agreeToTerms || isSubmitting}
-                      className={`flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg font-medium text-xs sm:text-sm text-white transition-all ${
-                        formData.agreeToTerms && !isSubmitting
-                          ? `bg-gradient-to-r ${
-                              darkMode
-                                ? "from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-                                : "from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
-                            } shadow-md hover:shadow-lg`
-                          : "bg-gray-500 cursor-not-allowed opacity-50"
-                      }`}
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader
-                            size={14}
-                            className="animate-spin sm:w-4 sm:h-4"
-                          />
-                          <span className="hidden sm:inline">
-                            Submitting...
-                          </span>
-                          <span className="sm:hidden">Saving...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle size={14} className="sm:w-4 sm:h-4" />
-                          Complete
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex justify-center gap-1.5 order-1 sm:order-2">
-                  {sections.map((section, idx) => (
-                    <button
-                      key={section}
-                      type="button"
-                      onClick={() => setActiveSection(section)}
-                      className={`rounded-full transition-all ${
-                        activeSection === section
-                          ? "w-6 sm:w-8 h-2 bg-gradient-to-r from-blue-500 to-purple-500"
-                          : idx <= currentSectionIndex
-                          ? "w-2 h-2 bg-green-500"
+                      onClick={handlePrevious}
+                      disabled={isFirstSection}
+                      className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg font-medium text-xs sm:text-sm transition-all ${
+                        isFirstSection
+                          ? darkMode
+                            ? "bg-gray-700/50 text-gray-500 cursor-not-allowed"
+                            : "bg-gray-200 text-gray-400 cursor-not-allowed"
                           : darkMode
-                          ? "w-2 h-2 bg-gray-600"
-                          : "w-2 h-2 bg-gray-300"
+                          ? "bg-gray-700/50 text-white hover:bg-gray-600 border border-gray-600"
+                          : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-300"
                       }`}
-                      disabled={idx > currentSectionIndex}
-                    />
-                  ))}
-                </div>
+                    >
+                      <ArrowLeft size={14} className="sm:w-4 sm:h-4" />
+                      <span className="hidden sm:inline">Previous</span>
+                      <span className="sm:hidden">Back</span>
+                    </button>
 
-                <div className="hidden sm:block w-24" />
-              </div>
+                    {!isLastSection ? (
+                      <button
+                        type="button"
+                        onClick={handleNext}
+                        className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg font-medium text-xs sm:text-sm text-white transition-all bg-gradient-to-r ${
+                          darkMode
+                            ? "from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800"
+                            : "from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700"
+                        } shadow-md hover:shadow-lg`}
+                      >
+                        Next
+                        <ArrowRight size={14} className="sm:w-4 sm:h-4" />
+                      </button>
+                    ) : (
+                      <button
+                        type="submit"
+                        disabled={!formData.agreeToTerms || isSubmitting}
+                        className={`flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg font-medium text-xs sm:text-sm text-white transition-all ${
+                          formData.agreeToTerms && !isSubmitting
+                            ? `bg-gradient-to-r ${
+                                darkMode
+                                  ? "from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                                  : "from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
+                              } shadow-md hover:shadow-lg`
+                            : "bg-gray-500 cursor-not-allowed opacity-50"
+                        }`}
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <Loader
+                              size={14}
+                              className="animate-spin sm:w-4 sm:h-4"
+                            />
+                            <span className="hidden sm:inline">
+                              Submitting...
+                            </span>
+                            <span className="sm:hidden">Saving...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle size={14} className="sm:w-4 sm:h-4" />
+                            Complete
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex justify-center gap-1.5 order-1 sm:order-2">
+                    {inputSections.map((section, idx) => (
+                      <button
+                        key={section}
+                        type="button"
+                        onClick={() => setActiveSection(section)}
+                        className={`rounded-full transition-all ${
+                          activeSection === section
+                            ? "w-6 sm:w-8 h-2 bg-gradient-to-r from-blue-500 to-purple-500"
+                            : idx <= inputSectionIndex
+                            ? "w-2 h-2 bg-green-500"
+                            : darkMode
+                            ? "w-2 h-2 bg-gray-600"
+                            : "w-2 h-2 bg-gray-300"
+                        }`}
+                        disabled={idx > inputSectionIndex}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="hidden sm:block w-24" />
+                </div>
+              )}
             </div>
           </div>
         </form>
