@@ -1,7 +1,7 @@
 {
   "_format": "hh-sol-artifact-1",
   "contractName": "ITokenManagement",
-  "sourceName": "contracts/CommunityBadgesFacet.sol",
+  "sourceName": "contracts/VestingFacet.sol",
   "abi": [
     {
       "inputs": [

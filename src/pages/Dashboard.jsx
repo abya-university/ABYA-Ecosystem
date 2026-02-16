@@ -27,6 +27,9 @@ import { useProgress } from "../contexts/progressContext";
 import { useActiveAccount } from "thirdweb/react";
 import CareerOnboardingForm from "../components/ProfileSurveyForm";
 
+const FALLBACK_COURSE_IMAGE = "/Vision.jpg";
+const IPFS_GATEWAY_BASE = "https://ipfs.io/ipfs/";
+
 const Dashboard = ({ onCourseSelect }) => {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -195,6 +198,39 @@ const Dashboard = ({ onCourseSelect }) => {
   };
   const handleCloseSurvey = () => {
     setShowProfileSurveyForm(false);
+  };
+
+  const formatPriceUSDC = (value) => {
+    if (value === null || value === undefined) {
+      return "Free";
+    }
+
+    const numeric = Number(value) / 1_000_000;
+    if (!Number.isFinite(numeric) || numeric === 0) {
+      return "Free";
+    }
+
+    const formatted = numeric.toLocaleString(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+    return `${formatted} USDC`;
+  };
+
+  const getCourseImage = (course) => {
+    const imageUrl = course?.imageURL?.trim();
+    if (!imageUrl) {
+      return FALLBACK_COURSE_IMAGE;
+    }
+
+    if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+      return imageUrl;
+    }
+
+    const normalizedHash = imageUrl.startsWith("ipfs://")
+      ? imageUrl.slice("ipfs://".length)
+      : imageUrl;
+    return `${IPFS_GATEWAY_BASE}${normalizedHash}`;
   };
   // Generate recent activity from enrolled courses (limited to 3)
   const recentActivity = enrolledCourses
@@ -384,7 +420,7 @@ const Dashboard = ({ onCourseSelect }) => {
                       {/* Small course image in top-right corner */}
                       <div className="absolute top-2 right-2 w-16 h-16 rounded-lg overflow-hidden shadow-lg border-2 border-white dark:border-gray-600">
                         <img
-                          src="/Vision.jpg"
+                          src={getCourseImage(course)}
                           alt={course.courseName}
                           className="w-full h-full object-cover"
                         />
@@ -400,6 +436,9 @@ const Dashboard = ({ onCourseSelect }) => {
                       <p className="text-sm dark:text-gray-300 text-gray-600 mb-3 line-clamp-2">
                         {course.description}
                       </p>
+                      <div className="text-sm font-semibold text-yellow-500 mb-3">
+                        {formatPriceUSDC(course.priceUSDC)}
+                      </div>
                       <div className="flex items-center gap-2 text-sm dark:text-gray-400 text-gray-500 mb-3">
                         <Users className="w-4 h-4" />
                         <span>

@@ -21,65 +21,90 @@ const CourseProvider = ({ children }) => {
 
   useEffect(() => {
     const fetchCourses = async () => {
-      if (client) {
+      console.log("🔍 fetchCourses called, client:", client);
+      console.log("🔍 DiamondAddress:", DiamondAddress);
+
+      if (!client) {
+        console.error(
+          "❌ Client is not available. Check VITE_APP_THIRDWEB_CLIENT_ID",
+        );
+        return;
+      }
+
+      if (!DiamondAddress) {
+        console.error("❌ Diamond contract address is not configured");
+        return;
+      }
+
+      try {
+        const contract = getContract({
+          address: DiamondAddress,
+          abi: Ecosystem1Facet_ABI,
+          client,
+          chain: defineChain(11155111), // Sepolia
+        });
+
+        console.log("✅ Contract instance created:", contract);
+
         try {
-          const contract = getContract({
-            address: DiamondAddress,
-            abi: Ecosystem1Facet_ABI,
-            client,
-            chain: defineChain(11155111), // Sepolia
+          // Use readContract directly
+          const coursesData = await readContract({
+            contract,
+            method: "getAllCourses",
+            params: [],
           });
 
-          console.log("Contract instance:", contract);
+          console.log("✅ Raw Courses Data:", coursesData);
 
-          try {
-            // Use readContract directly instead of useReadContract hook
-            const coursesData = await readContract({
-              contract,
-              method: "getAllCourses",
-              params: [],
-            });
+          const formattedCourses = Array.isArray(coursesData)
+            ? coursesData.map((course) => {
+                const enrolledStudents = Array.isArray(course.enrolledStudents)
+                  ? course.enrolledStudents
+                  : [];
 
-            console.log("Raw Courses Data:", coursesData);
+                return {
+                  courseId: course.courseId.toString(),
+                  courseName: course.courseName,
+                  description: course.description,
+                  approved: course.approved,
+                  score: course.score.toString(),
+                  creator: course.creator,
+                  enrolledStudents: enrolledStudents.map((student) =>
+                    student.toString(),
+                  ),
+                  difficulty_level: Number(course.difficultyLevel),
+                  creationTime: course.creationTime.toString(),
+                  priceUSDC: course?.priceUSDC?.toString?.() ?? "0",
+                  imageURL: course?.imageURL || "",
+                };
+              })
+            : [];
 
-            const formattedCourses = coursesData.map((course) => {
-              return {
-                courseId: course.courseId.toString(),
-                courseName: course.courseName,
-                description: course.description,
-                approved: course.approved,
-                score: course.score.toString(),
-                creator: course.creator,
-                enrolledStudents: course.enrolledStudents.map((student) =>
-                  student.toString()
-                ),
-                difficulty_level: Number(course.difficultyLevel),
-                creationTime: course.creationTime.toString(),
-              };
-            });
+          console.log("✅ Formatted Courses:", formattedCourses);
+          setCourses(formattedCourses);
 
-            console.log("Formatted Courses:", formattedCourses);
-            setCourses(formattedCourses);
-
-            // Fetch reviews and feedback for each course
-            for (const course of formattedCourses) {
-              await fetchCourseReviews(contract, course.courseId);
-              await fetchLatestReview(contract, course.courseId);
-              await fetchCourseFeedback(contract, course.courseId);
-            }
-          } catch (fetchError) {
-            console.error("Error fetching courses:", fetchError);
+          // Fetch reviews and feedback for each course
+          for (const course of formattedCourses) {
+            await fetchCourseReviews(contract, course.courseId);
+            await fetchLatestReview(contract, course.courseId);
+            await fetchCourseFeedback(contract, course.courseId);
           }
-        } catch (contractError) {
-          console.error("Error creating contract instance:", contractError);
+        } catch (fetchError) {
+          console.error("❌ Error fetching courses:", fetchError);
+          console.error(
+            "❌ Error details:",
+            fetchError.message,
+            fetchError.stack,
+          );
         }
-      } else {
-        console.warn("No signer available");
+      } catch (contractError) {
+        console.error("❌ Error creating contract instance:", contractError);
+        console.error("❌ Contract error details:", contractError.message);
       }
     };
 
     fetchCourses();
-  }, [client]);
+  }, []);
 
   // Function to fetch all reviews for a course
   const fetchCourseReviews = async (contract, courseId) => {
@@ -94,8 +119,7 @@ const CourseProvider = ({ children }) => {
       // Use readContract directly
       const reviews = await readContract({
         contract,
-        method:
-          "function getAllCourseReviews(uint256 courseId) view returns ((uint256 learnerAgency, uint256 criticalThinking, uint256 collaborativeLearning, uint256 reflectivePractice, uint256 adaptiveLearning, uint256 authenticLearning, uint256 technologyIntegration, uint256 learnerSupport, uint256 assessmentForLearning, uint256 engagementAndMotivation, bool isSubmitted, string category, uint256 score, bool passed)[])",
+        method: "getAllCourseReviews",
         params: [courseId],
       });
 
@@ -186,7 +210,7 @@ const CourseProvider = ({ children }) => {
     } catch (error) {
       console.error(
         `Error fetching latest review for course ${courseId}:`,
-        error
+        error,
       );
       setLatestReviews((prev) => ({
         ...prev,
@@ -242,7 +266,7 @@ const CourseProvider = ({ children }) => {
     } catch (error) {
       console.error(
         `Error fetching complete data for course ${courseId}:`,
-        error
+        error,
       );
     }
   };
