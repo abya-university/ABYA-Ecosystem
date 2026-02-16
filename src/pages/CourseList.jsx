@@ -42,6 +42,8 @@ import { useCertificates } from "../contexts/certificatesContext";
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
+const FALLBACK_COURSE_IMAGE = "/Vision.jpg";
+const IPFS_GATEWAY_BASE = "https://ipfs.io/ipfs/";
 
 const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const {
@@ -115,6 +117,39 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       default:
         return "Unknown";
     }
+  };
+
+  const formatPriceUSDC = (value) => {
+    if (value === null || value === undefined) {
+      return "Free";
+    }
+
+    const numeric = Number(value) / 1_000_000;
+    if (!Number.isFinite(numeric) || numeric === 0) {
+      return "Free";
+    }
+
+    const formatted = numeric.toLocaleString(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+    return `${formatted} USDC`;
+  };
+
+  const getCourseImage = (course) => {
+    const imageUrl = course?.imageURL?.trim();
+    if (!imageUrl) {
+      return FALLBACK_COURSE_IMAGE;
+    }
+
+    if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+      return imageUrl;
+    }
+
+    const normalizedHash = imageUrl.startsWith("ipfs://")
+      ? imageUrl.slice("ipfs://".length)
+      : imageUrl;
+    return `${IPFS_GATEWAY_BASE}${normalizedHash}`;
   };
 
   useEffect(() => {
@@ -1079,7 +1114,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                 {/* Course Image */}
                 <div className="relative">
                   <img
-                    src="/Vision.jpg"
+                    src={getCourseImage(course)}
                     alt={course.courseName}
                     className="w-full h-40 md:h-48 object-cover rounded-xl"
                     style={{ opacity: 0.75 }}
@@ -1140,7 +1175,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                       </div>
                     </div>
                     <div className="text-yellow-500 font-semibold text-sm md:text-base">
-                      10 ETH
+                      {formatPriceUSDC(course.priceUSDC)}
                     </div>
                   </div>
 

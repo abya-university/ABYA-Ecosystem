@@ -1,23 +1,23 @@
 const CONTRACT_ADDRESSES = {
-    diamond: "0xd0b444D291f979A91aEDc4406126d6896Ccd43a1",
+    diamond: "0xc53530FD812F84B0d0bBEd140D962978FE21C720",
     facets: {
-        DiamondCutFacet: "0x3F408d3b2BB10daabc66f84b96093314D22C98fF",
-        DiamondLoupeFacet: "0x0A9d49285db713cc9aeaa9a5cF3A089c2bf92830",
-        OwnershipFacet: "0xC08aEE41751a258dBE71Df8f9eBD1c527d24AB35",
-        TokenManagementFacet: "0xF3Dd1E07298861FA33570542e317c381e8498630",
-        Ecosystem1Facet: "0xd00B1060F3f681B9E87E43295A0E960380fe271e",
-        Ecosystem2Facet: "0x0590f55e05df597FaFb41720F39CB2FCa65ce291",
-        Ecosystem3Facet: "0x0661D59B524618bC3b9a086bc0862d839B46bD9C",
-        CommunityEngagementFacet: "0xA98dC21c8F9835089eeDfC7a4a406D50f5d3AF74",
-        CommunityGovernanceFacet: "0x134527fDb572EcE377940f622A7e538885b135F2",
-        CommunityBadgesFacet: "0xe7B2e77D448eA59eB29B6F320c81A9F05687aD18",
-        ProfileFacet: "0xbEa20409b1FFa4a56635E6d44757F99911005AaF",
-        AmbassadorNetworkFacet: "0x212D2bB1bDBd0d3123a07421a678B9b17F006c67",
-        RevenueSharingFacet: "0x9210dBb58e07B8eD79774100E7C1463c92406D97",
-        VestingFacet: "0xDBC76B96611bcB68537Ee52593D53B720fF7e1bA"
+        DiamondCutFacet: "0xCA6b5FFBB864099d727609C799a867cfA937910E",
+        DiamondLoupeFacet: "0x15c457a5D2A494EaF93CfD58339A8ed11c7341d9",
+        OwnershipFacet: "0x3334ef19D6de796261fD3b8D77A8Ca2da59c5550",
+        TokenManagementFacet: "0x4f5057D276D86145Fde1eD17FF3b8eab9Ae43eed",
+        Ecosystem1Facet: "0x97E3D94613F5820F4458C8d2a14590B9862EA371",
+        Ecosystem2Facet: "0x7fF74Cc6bF18055ED0e61264d89C267B938b6Df0",
+        Ecosystem3Facet: "0x697184e1f9A61E2744a384FD28E1eb8418d36Bca",
+        CommunityEngagementFacet: "0x1bbFA7Aa74Ea67ceF5c0635f932C45830FAC9f27",
+        CommunityGovernanceFacet: "0x7F673F7ca3F8c86e378A45456787f870f4611777",
+        CommunityBadgesFacet: "0x226506541C7F77e4B7A96ad98A4D8B873B922EC9",
+        ProfileFacet: "0x14D5cF145676CaD0Bc293C4b19000Ec2d9ddBc6F",
+        AmbassadorNetworkFacet: "0x828841d093c9f8Eb34AfB30390C0Adb7ae98B449",
+        RevenueSharingFacet: "0x5345bf3F133e0b790f9B8Cd2f01c6A7d1Dd0cd8c",
+        VestingFacet: "0x7Cf8f0C492dd56A687EA70ed3116133Bdb32D825"
     },
     init: {
-        DiamondInit: "0x0acCd49E6326c95E964b0C009eA031f238818aB4"
+        DiamondInit: "0xfaab9f879C3ECC7C212Bf36c1145951ef0E6aaa5"
     }
 };
 
