@@ -21,6 +21,7 @@ import { ThirdwebProvider } from "thirdweb/react";
 import { ThemeProvider } from "./contexts/themeContext.jsx";
 import { ProgressProvider } from "./contexts/progressContext.jsx";
 import { DidProvider } from "./contexts/DidContext.jsx";
+import { AmbassadorNetworkProvider } from "./contexts/ambassadorNetworkContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -44,7 +45,9 @@ createRoot(document.getElementById("root")).render(
                                   <UserPositionProvider>
                                     <ProgressProvider>
                                       <DidProvider>
-                                        <App />
+                                        <AmbassadorNetworkProvider>
+                                          <App />
+                                        </AmbassadorNetworkProvider>
                                       </DidProvider>
                                     </ProgressProvider>
                                   </UserPositionProvider>
@@ -64,5 +67,5 @@ createRoot(document.getElementById("root")).render(
         </ThemeProvider>
       </ProfileProvider>
     </ThirdwebProvider>
-  </StrictMode>
+  </StrictMode>,
 );
