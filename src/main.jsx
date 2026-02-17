@@ -22,6 +22,7 @@ import { ThemeProvider } from "./contexts/themeContext.jsx";
 import { ProgressProvider } from "./contexts/progressContext.jsx";
 import { DidProvider } from "./contexts/DidContext.jsx";
 import { AmbassadorNetworkProvider } from "./contexts/ambassadorNetworkContext.jsx";
+import { RevenueSharingProvider } from "./contexts/RevenueSharingContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -46,7 +47,9 @@ createRoot(document.getElementById("root")).render(
                                     <ProgressProvider>
                                       <DidProvider>
                                         <AmbassadorNetworkProvider>
-                                          <App />
+                                          <RevenueSharingProvider>
+                                            <App />
+                                          </RevenueSharingProvider>
                                         </AmbassadorNetworkProvider>
                                       </DidProvider>
                                     </ProgressProvider>
