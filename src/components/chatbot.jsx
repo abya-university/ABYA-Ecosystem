@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useContext } from "react";
 import { MessageCircle, Send, X, Sparkles, User, Bot, Loader2 } from "lucide-react";
 import { useActiveAccount } from "thirdweb/react";
-import { CourseContext } from "../contexts /courseContext";
+import { CourseContext } from "../contexts/courseContext";
+
 
 // Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-const API_TIMEOUT = 30000; // 30 seconds
+const API_TIMEOUT = 60000; // 60 seconds
 const MAX_MESSAGE_LENGTH = 1000;
 
 // Helper function to fetch with timeout
