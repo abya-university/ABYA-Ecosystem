@@ -5,8 +5,8 @@ import CourseCreationPipeline from "./components/courseCreationPipeline";
 import ProfileDash from "./pages/ProfileDash";
 import NotFoundPage from "./pages/404Page";
 import CourseMetricsPage from "./pages/CourseMetricsPage";
-import SettingsPage from "./pages/Settings";
 import { ToastContainer } from "react-toastify";
+import NetworkMainpage from "./pages/AmbassadorNetworkPages/NetworkMainpage";
 
 function App() {
   return (
@@ -27,6 +27,9 @@ function App() {
           path="/course-metrics/:courseId"
           element={<CourseMetricsPage />}
         />
+
+        <Route path="/networkMainpage" element={<NetworkMainpage />} />
+
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </>

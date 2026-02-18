@@ -7,7 +7,6 @@ import AchievementsPage from "./Achievements";
 import CommunityPage from "./Community";
 import SettingsPage from "./Settings";
 import CoursesPage from "./CourseList";
-import AbyaChatbot from "../components/chatbot";
 import DiscussionsPage from "./Discussions";
 import CourseDetails from "./CourseDetails";
 import LiquidityPage from "./LiquidityPage";
@@ -175,8 +174,6 @@ const MasterPage = () => {
         onSidebarToggle={setSidebarExpanded}
         isExpanded={sidebarExpanded}
       />
-
-      <AbyaChatbot />
 
       {/* Main Content - Adjusts margin based on sidebar state */}
       <main

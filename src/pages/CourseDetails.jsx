@@ -25,6 +25,7 @@ import {
   Loader,
 } from "lucide-react";
 import ReviewModal from "../components/ReviewModal";
+import AbyaChatbot from "../components/chatbot";
 import { useUser } from "../contexts/userContext";
 import PropTypes from "prop-types";
 import ProgressBar from "../components/progressBar";
@@ -1678,6 +1679,27 @@ const CourseDetails = memo(({ courseId }) => {
     );
   }
 
+  // Compute current chapter info for chatbot
+  const currentChapter = useMemo(
+    () => filteredChapters?.find((ch) => ch.chapterId?.toString() === activeChapterId),
+    [filteredChapters, activeChapterId],
+  );
+
+  // Get current chapter summary from lessons
+  const currentChapterSummary = useMemo(() => {
+    if (!activeChapterId) return null;
+    const chapterLessons = lessons.filter(
+      (lesson) => lesson.chapterId.toString() === activeChapterId,
+    );
+    if (chapterLessons.length === 0) return null;
+    // Combine first 2 lesson contents as summary
+    return chapterLessons
+      .slice(0, 2)
+      .map((lesson) => lesson.lessonContent)
+      .join(" ")
+      .substring(0, 200);
+  }, [lessons, activeChapterId]);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-4 sm:py-8 lg:py-12 px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 lg:pt-[100px]">
       <div className="max-w-7xl mx-auto">
@@ -2627,6 +2649,14 @@ const CourseDetails = memo(({ courseId }) => {
           </div>
         </div>
       )}
+
+      {/* ABYA Chatbot - Course-Specific */}
+      <AbyaChatbot
+        userAddress={address}
+        currentCourseId={courseId}
+        currentChapterTitle={currentChapter?.chapterName || null}
+        currentChapterSummary={currentChapterSummary}
+      />
 
       {/* Certificate Modal - Responsive */}
       {showCertificate && certificateData && (
