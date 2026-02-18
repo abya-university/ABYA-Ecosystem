@@ -1,6 +1,7 @@
 import { createContext, useState, useEffect, useContext } from "react";
 import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import Ecosystem1FacetABI from "../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
+import AmbassadorNetworkFacetABI from "../artifacts/contracts/AmbassadorNetworkFacet.sol/AmbassadorNetworkFacet.json";
 import PropTypes from "prop-types";
 import { useActiveAccount, useActiveWalletChain } from "thirdweb/react";
 import { client } from "../services/client";
@@ -12,6 +13,7 @@ import { defineChain } from "thirdweb/chains";
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
+const AmbassadorNetworkFacet_ABI = AmbassadorNetworkFacetABI.abi;
 
 const REVIEWER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("REVIEWER_ROLE"));
 const MULTISIG_APPROVER = ethers.keccak256(
@@ -111,6 +113,41 @@ export const UserProvider = ({ children }) => {
         params: [GENERAL_AMBASSADOR_ROLE, address],
       });
 
+      // FALLBACK: Check ambassador contract directly if hasRole returns false
+      // Contract Tier enum: NONE=0, GENERAL=1, FOUNDING=2
+      let ambassadorTier = null;
+      if (!isFoundingAmbassador && !isGeneralAmbassador) {
+        try {
+          const ambassadorContract = await getContract({
+            address: DiamondAddress,
+            abi: AmbassadorNetworkFacet_ABI,
+            client,
+            chain: defineChain(11155111),
+          });
+
+          const ambassadorDetails = await readContract({
+            contract: ambassadorContract,
+            method:
+              "function getAmbassadorDetails(address _ambassador) view returns (bytes32 did, uint8 tier, uint8 level, address sponsor, address leftLeg, address rightLeg, uint256 totalDownlineSales, uint256 lifetimeCommissions, bool isActive)",
+            params: [address],
+          });
+
+          // If DID is not bytes32(0), user is an ambassador
+          if (ambassadorDetails[0] !== ethers.ZeroHash) {
+            ambassadorTier = ambassadorDetails[1]; // tier is 2nd element (index 1)
+            console.log(
+              "Ambassador detected via fallback check. Tier:",
+              ambassadorTier,
+            );
+          }
+        } catch (fallbackError) {
+          console.log(
+            "Fallback ambassador check failed (user likely not an ambassador):",
+            fallbackError.message,
+          );
+        }
+      }
+
       if (isReviewer) {
         setRole("Reviewer");
       } else if (isMultisigApprover) {
@@ -121,9 +158,10 @@ export const UserProvider = ({ children }) => {
         setRole("Community Manager");
       } else if (isDefaultAdmin) {
         setRole("ADMIN");
-      } else if (isFoundingAmbassador) {
+      } else if (isFoundingAmbassador || ambassadorTier === 2) {
+        // Tier enum: NONE=0, GENERAL=1, FOUNDING=2
         setRole("Founding Ambassador");
-      } else if (isGeneralAmbassador) {
+      } else if (isGeneralAmbassador || ambassadorTier === 1) {
         setRole("General Ambassador");
       } else {
         setRole("USER");
@@ -131,12 +169,17 @@ export const UserProvider = ({ children }) => {
 
       console.log(
         "Role updated:",
-        isFoundingAmbassador
+        isFoundingAmbassador || ambassadorTier === 2
           ? "Founding Ambassador"
-          : isGeneralAmbassador
+          : isGeneralAmbassador || ambassadorTier === 1
           ? "General Ambassador"
           : "USER",
       );
+      console.log("hasRole checks:", {
+        isFoundingAmbassador,
+        isGeneralAmbassador,
+      });
+      console.log("Fallback tier:", ambassadorTier);
     } catch (error) {
       console.error("Detailed Error:", error);
     }

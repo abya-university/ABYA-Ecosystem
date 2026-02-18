@@ -50,6 +50,8 @@ export default function NetworkDashboard() {
   const REGISTRATION_FEE = ethers.parseUnits("100", 6); // 100 USDC (6 decimals)
   const USDC_ABI = UsdCoinABI.abi;
 
+  console.log("Ambassador Details: ", userAmbassadorDetails);
+
   useEffect(() => {
     if (!account?.address || !fetchAmbassadors) return;
     fetchAmbassadors().catch((error) => {
@@ -402,14 +404,14 @@ export default function NetworkDashboard() {
           <div className="flex items-center gap-3 mb-6">
             <div
               className={`rounded-full p-3 ${
-                userAmbassadorDetails.tier === 0
+                userAmbassadorDetails.tier === 2
                   ? "bg-yellow-100 dark:bg-yellow-900/30"
                   : "bg-green-100 dark:bg-green-900/30"
               }`}
             >
               <CheckCircle
                 className={`h-6 w-6 ${
-                  userAmbassadorDetails.tier === 0
+                  userAmbassadorDetails.tier === 2
                     ? "text-yellow-600 dark:text-yellow-400"
                     : "text-green-600 dark:text-green-400"
                 }`}
@@ -418,7 +420,7 @@ export default function NetworkDashboard() {
             <div>
               <h2 className="text-xl font-semibold">Your Ambassador Profile</h2>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                {userAmbassadorDetails.tier === 0 ? "Founding" : "General"}{" "}
+                {userAmbassadorDetails.tier === 2 ? "Founding" : "General"}{" "}
                 Ambassador • Level {userAmbassadorDetails.level}
               </p>
             </div>
@@ -430,7 +432,11 @@ export default function NetworkDashboard() {
                 Tier
               </p>
               <p className="text-lg font-semibold text-slate-700 dark:text-slate-200">
-                {userAmbassadorDetails.tier === 0 ? "Founding" : "General"}
+                {userAmbassadorDetails.tier === 2
+                  ? "Founding"
+                  : userAmbassadorDetails.tier === 1
+                  ? "General"
+                  : "None"}
               </p>
             </div>
 
