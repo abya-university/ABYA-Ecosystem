@@ -1,11 +1,14 @@
 import { useMemo } from "react";
-import { ArrowUpRight, Coins, LineChart } from "lucide-react";
+import { ArrowUpRight, Coins, LineChart, CheckCircle } from "lucide-react";
 import { useDarkMode } from "../../contexts/themeContext";
 import { useAmbassadorNetwork } from "../../contexts/ambassadorNetworkContext";
+import { useUser } from "../../contexts/userContext";
+import VestingInfo from "../../components/AmbassadorComponents/VestingInfo";
 
 export default function RevenuePortfolio() {
   const { darkMode } = useDarkMode();
   const { ambassadorDetails } = useAmbassadorNetwork();
+  const { role } = useUser();
 
   const ambassadorList = Array.isArray(ambassadorDetails)
     ? ambassadorDetails
@@ -14,14 +17,15 @@ export default function RevenuePortfolio() {
   const totals = useMemo(() => {
     return ambassadorList.reduce(
       (accumulator, ambassador) => {
-        const rewards = Number(ambassador.totalRewards);
+        const commissions = Number(ambassador.lifetimeCommissions);
 
         return {
-          totalRewards:
-            accumulator.totalRewards + (Number.isNaN(rewards) ? 0 : rewards),
+          totalCommissions:
+            accumulator.totalCommissions +
+            (Number.isNaN(commissions) ? 0 : commissions),
         };
       },
-      { totalRewards: 0 },
+      { totalCommissions: 0 },
     );
   }, [ambassadorList]);
 
@@ -33,19 +37,46 @@ export default function RevenuePortfolio() {
     <section className="space-y-6">
       <header className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-          Revenue Sharing
+          Portfolio & Earnings
         </p>
-        <h1 className="text-3xl font-semibold">Revenue Portfolio</h1>
-        <p className="text-slate-600 dark:text-slate-300">
-          Monitor revenue streams, unlock rewards, and keep payouts on track.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold">Revenue & Vesting</h1>
+            <p className="text-slate-600 dark:text-slate-300">
+              Monitor revenue streams, vesting schedules, unlock rewards, and
+              keep payouts on track.
+            </p>
+          </div>
+          {role &&
+            (role === "Founding Ambassador" ||
+              role === "General Ambassador") && (
+              <div
+                className={`rounded-xl px-3 py-2 text-sm font-semibold ${
+                  role === "Founding Ambassador"
+                    ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
+                    : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  {role}
+                </div>
+              </div>
+            )}
+        </div>
       </header>
 
+      {/* Vesting Section - using reusable component */}
+      <VestingInfo showClaimButton={true} />
+
+      {/* Revenue Section */}
       <div className="grid gap-4 md:grid-cols-3">
         {[
           {
             title: "Pending Payouts",
-            value: totals.totalRewards ? `$${totals.totalRewards}` : "$--",
+            value: totals.totalCommissions
+              ? `$${Number(totals.totalCommissions).toLocaleString()}`
+              : "$--",
             icon: Coins,
           },
           { title: "Monthly Growth", value: "+18.2%", icon: LineChart },
@@ -78,6 +109,7 @@ export default function RevenuePortfolio() {
         <ul className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
           <li>Confirm ambassador tiers and bonus eligibility.</li>
           <li>Review payout cadence and schedule reminders.</li>
+          <li>Check vesting schedule and claim eligible tokens.</li>
           <li>Approve next payout batch.</li>
         </ul>
       </div>

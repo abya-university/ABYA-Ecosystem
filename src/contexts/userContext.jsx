@@ -26,6 +26,12 @@ const DEFAULT_ADMIN_ROLE = ethers.keccak256(
 const COMMUNITY_MANAGER = ethers.keccak256(
   ethers.toUtf8Bytes("COMMUNITY_MANAGER"),
 );
+const FOUNDING_AMBASSADOR_ROLE = ethers.keccak256(
+  ethers.toUtf8Bytes("FOUNDING_AMBASSADOR_ROLE"),
+);
+const GENERAL_AMBASSADOR_ROLE = ethers.keccak256(
+  ethers.toUtf8Bytes("GENERAL_AMBASSADOR_ROLE"),
+);
 
 const UserContext = createContext();
 
@@ -37,78 +43,107 @@ export const UserProvider = ({ children }) => {
   const chain = useActiveWalletChain();
   const [enrolledCourses, setEnrolledCourses] = useState([]);
 
+  // Function to fetch and update user role
+  const refreshRole = async () => {
+    console.log("Refreshing user role...");
+    console.log("Connection Status:", isConnected);
+    console.log("Address:", address);
+
+    if (!isConnected || !address || !chain) {
+      console.log("Early return - not connected or no address");
+      return;
+    }
+
+    try {
+      const contract = await getContract({
+        address: DiamondAddress,
+        abi: Ecosystem2Facet_ABI,
+        client,
+        chain: defineChain(11155111), // Sepolia chain
+      });
+
+      const isReviewer = await readContract({
+        contract,
+        method:
+          "function hasRole(bytes32 role, address account) view returns (bool)",
+        params: [REVIEWER_ROLE, address],
+      });
+
+      const isMultisigApprover = await readContract({
+        contract,
+        method:
+          "function hasRole(bytes32 role, address account) view returns (bool)",
+        params: [MULTISIG_APPROVER, address],
+      });
+
+      const isCourseOwner = await readContract({
+        contract,
+        method:
+          "function hasRole(bytes32 role, address account) view returns (bool)",
+        params: [COURSE_OWNER_ROLE, address],
+      });
+
+      const isDefaultAdmin = await readContract({
+        contract,
+        method:
+          "function hasRole(bytes32 role, address account) view returns (bool)",
+        params: [DEFAULT_ADMIN_ROLE, address],
+      });
+
+      const isCommunityManager = await readContract({
+        contract,
+        method:
+          "function hasRole(bytes32 role, address account) view returns (bool)",
+        params: [COMMUNITY_MANAGER, address],
+      });
+
+      const isFoundingAmbassador = await readContract({
+        contract,
+        method:
+          "function hasRole(bytes32 role, address account) view returns (bool)",
+        params: [FOUNDING_AMBASSADOR_ROLE, address],
+      });
+
+      const isGeneralAmbassador = await readContract({
+        contract,
+        method:
+          "function hasRole(bytes32 role, address account) view returns (bool)",
+        params: [GENERAL_AMBASSADOR_ROLE, address],
+      });
+
+      if (isReviewer) {
+        setRole("Reviewer");
+      } else if (isMultisigApprover) {
+        setRole("Multisig Approver");
+      } else if (isCourseOwner) {
+        setRole("Course Owner");
+      } else if (isCommunityManager) {
+        setRole("Community Manager");
+      } else if (isDefaultAdmin) {
+        setRole("ADMIN");
+      } else if (isFoundingAmbassador) {
+        setRole("Founding Ambassador");
+      } else if (isGeneralAmbassador) {
+        setRole("General Ambassador");
+      } else {
+        setRole("USER");
+      }
+
+      console.log(
+        "Role updated:",
+        isFoundingAmbassador
+          ? "Founding Ambassador"
+          : isGeneralAmbassador
+          ? "General Ambassador"
+          : "USER",
+      );
+    } catch (error) {
+      console.error("Detailed Error:", error);
+    }
+  };
+
   useEffect(() => {
-    const fetchUserRole = async () => {
-      console.log("Connection Status:", isConnected);
-      console.log("Address:", address);
-
-      if (!isConnected || !address || !chain) {
-        console.log("Early return - not connected or no address");
-        return;
-      }
-
-      try {
-        const contract = await getContract({
-          address: DiamondAddress,
-          abi: Ecosystem2Facet_ABI,
-          client,
-          chain, // use the currently connected chain
-        });
-
-        const isReviewer = await readContract({
-          contract,
-          method:
-            "function hasRole(bytes32 role, address account) view returns (bool)",
-          params: [REVIEWER_ROLE, address],
-        });
-
-        const isMultisigApprover = await readContract({
-          contract,
-          method:
-            "function hasRole(bytes32 role, address account) view returns (bool)",
-          params: [MULTISIG_APPROVER, address],
-        });
-
-        const isCourseOwner = await readContract({
-          contract,
-          method:
-            "function hasRole(bytes32 role, address account) view returns (bool)",
-          params: [COURSE_OWNER_ROLE, address],
-        });
-
-        const isDefaultAdmin = await readContract({
-          contract,
-          method:
-            "function hasRole(bytes32 role, address account) view returns (bool)",
-          params: [DEFAULT_ADMIN_ROLE, address],
-        });
-
-        const isCommunityManager = await readContract({
-          contract,
-          method:
-            "function hasRole(bytes32 role, address account) view returns (bool)",
-          params: [COMMUNITY_MANAGER, address],
-        });
-
-        if (isReviewer) {
-          setRole("Reviewer");
-        } else if (isMultisigApprover) {
-          setRole("Multisig Approver");
-        } else if (isCourseOwner) {
-          setRole("Course Owner");
-        } else if (isCommunityManager) {
-          setRole("Community Manager");
-        } else if (isDefaultAdmin) {
-          setRole("ADMIN");
-        } else {
-          setRole("USER");
-        }
-      } catch (error) {
-        console.error("Detailed Error:", error);
-      }
-    };
-
-    fetchUserRole();
+    refreshRole();
   }, [address, isConnected, chain, client]);
 
   //function to get all user enrolled courses
@@ -160,7 +195,7 @@ export const UserProvider = ({ children }) => {
   }, [address, isConnected, chain, client]);
 
   return (
-    <UserContext.Provider value={{ role, enrolledCourses }}>
+    <UserContext.Provider value={{ role, enrolledCourses, refreshRole }}>
       {children}
     </UserContext.Provider>
   );

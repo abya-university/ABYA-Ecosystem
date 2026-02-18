@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { BarChart3, Users } from "lucide-react";
+import { BarChart3, Users, Info } from "lucide-react";
 import NetworkNavbar from "../../components/AmbassadorComponents/navigation/NetworkNavbar";
 import NetworkSidebar from "../../components/AmbassadorComponents/navigation/NetworkSidebar";
 import NetworkDashboard from "./NetworkDashboard";
 import RevenuePortfolio from "./RevenuePortfolio";
+import AmbassadorAbout from "./AmbassadorAbout";
 
 export default function NetworkMainpage() {
   const [searchParams] = useSearchParams();
@@ -21,6 +22,12 @@ export default function NetworkMainpage() {
         label: "Revenue Sharing",
         icon: BarChart3,
         component: <RevenuePortfolio />,
+      },
+      {
+        id: "about",
+        label: "About",
+        icon: Info,
+        component: <AmbassadorAbout />,
       },
     ],
     [],
