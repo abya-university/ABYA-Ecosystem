@@ -110,16 +110,17 @@ export const AmbassadorNetworkProvider = ({ children }) => {
         hashedDID: hashedDID,
       });
 
-      const transaction = await prepareContractCall({
+      const transaction = prepareContractCall({
         contract,
         method: "registerFoundingAmbassador",
         params: [resolvedSponsorAddress, hashedDID],
       });
 
       const tx = await sendTransaction({ transaction, account });
-      console.log("Transaction sent:", tx);
-      await tx.wait();
-      console.log("Transaction confirmed:", tx);
+      console.log(
+        "Founding ambassador registration transaction:",
+        tx.transactionHash,
+      );
 
       toast.update(toastId, {
         render: "Successfully registered as founding ambassador!",
@@ -169,9 +170,11 @@ export const AmbassadorNetworkProvider = ({ children }) => {
       return;
     }
 
-    if (!did || !courseId) {
-      const errorMsg = "Missing DID or courseId";
-      toast.error(errorMsg);
+    // Check for missing DID or courseId (handle BigInt courseId properly)
+    if (!did || courseId === undefined || courseId === null) {
+      const errorMsg = `Missing DID or courseId. DID: ${did}, courseId: ${courseId}`;
+      console.error(errorMsg);
+      toast.error("Missing DID or courseId");
       setError(errorMsg);
       return;
     }
@@ -207,16 +210,17 @@ export const AmbassadorNetworkProvider = ({ children }) => {
         courseId: courseId,
       });
 
-      const transaction = await prepareContractCall({
+      const transaction = prepareContractCall({
         contract,
         method: "registerGeneralAmbassador",
         params: [sponsorAddress, hashedDID, courseId],
       });
 
       const tx = await sendTransaction({ transaction, account });
-      console.log("Transaction sent:", tx);
-      await tx.wait();
-      console.log("Transaction confirmed:", tx);
+      console.log(
+        "General ambassador registration transaction:",
+        tx.transactionHash,
+      );
 
       toast.update(toastId, {
         render: "Successfully registered as general ambassador!",
@@ -774,6 +778,8 @@ export const AmbassadorNetworkProvider = ({ children }) => {
         getAllAmbassadors,
         registerFoundingAmbassador,
         registerGeneralAmbassador,
+        deregisterFoundingAmbassador,
+        deregisterGeneralAmbassador,
         getAmbassadorTree,
         getRootAmbassadors,
         getDirectDownline,

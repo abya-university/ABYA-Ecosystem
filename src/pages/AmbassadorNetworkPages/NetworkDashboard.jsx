@@ -6,8 +6,20 @@ import {
   Users2,
   AlertCircle,
   CheckCircle,
+  Copy,
+  Check,
+  TrendingUp,
+  Award,
+  Shield,
+  Sparkles,
+  Link2,
+  Wallet,
+  UserCheck,
+  GraduationCap,
+  ArrowRight,
+  ExternalLink,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
   getContract,
@@ -33,24 +45,35 @@ export default function NetworkDashboard() {
     fetchAmbassadors,
     registerFoundingAmbassador,
     registerGeneralAmbassador,
+    deregisterFoundingAmbassador,
+    deregisterGeneralAmbassador,
   } = useAmbassadorNetwork();
   const { enrolledCourses, role, refreshRole } = useUser();
   const account = useActiveAccount();
   const { did } = useDid();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [statusMessage, setStatusMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittingGeneral, setIsSubmittingGeneral] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sponsorAddress, setSponsorAddress] = useState("");
   const [userAmbassadorDetails, setUserAmbassadorDetails] = useState(null);
+  const [copiedToClipboard, setCopiedToClipboard] = useState(false);
+  const [hoveredCard, setHoveredCard] = useState(null);
 
   // USDC configuration
   const USDC_ADDRESS = import.meta.env.VITE_APP_SEPOLIA_USDC_ADDRESS;
   const REGISTRATION_FEE = ethers.parseUnits("100", 6); // 100 USDC (6 decimals)
   const USDC_ABI = UsdCoinABI.abi;
 
-  console.log("Ambassador Details: ", userAmbassadorDetails);
+  // Pre-fill sponsor address from URL parameter
+  useEffect(() => {
+    const sponsorFromUrl = searchParams.get("sponsor");
+    if (sponsorFromUrl && /^0x[a-fA-F0-9]{40}$/.test(sponsorFromUrl)) {
+      setSponsorAddress(sponsorFromUrl);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!account?.address || !fetchAmbassadors) return;
@@ -61,24 +84,17 @@ export default function NetworkDashboard() {
 
   // Refetch ambassadors when role changes (after registration)
   useEffect(() => {
-    console.log("Role changed to:", role);
     if (
       role &&
       (role === "Founding Ambassador" || role === "General Ambassador")
     ) {
-      console.log("User is ambassador, fetching details...");
       fetchAmbassadors().catch((error) => {
         console.error("Failed to refresh ambassador details:", error);
       });
 
-      // Also fetch current user's ambassador details
       if (account?.address) {
         const fetchUserDetails = async () => {
           try {
-            console.log(
-              "Fetching user ambassador details for:",
-              account.address,
-            );
             const diamondContract = await getContract({
               address: CONTRACT_ADDRESSES.diamond,
               abi: AmbassadorNetworkFacetABI.abi,
@@ -106,7 +122,6 @@ export default function NetworkDashboard() {
               isActive: details[8],
             };
 
-            console.log("User ambassador details fetched:", ambassadorData);
             setUserAmbassadorDetails(ambassadorData);
           } catch (error) {
             console.error("Error fetching user ambassador details:", error);
@@ -115,8 +130,6 @@ export default function NetworkDashboard() {
 
         fetchUserDetails();
       }
-    } else {
-      console.log("User is not ambassador, role:", role);
     }
   }, [role, fetchAmbassadors, account?.address]);
 
@@ -214,7 +227,9 @@ export default function NetworkDashboard() {
   };
 
   const handleGeneralRegister = () => {
-    navigate("/mainpage?section=courses");
+    // Preserve sponsor parameter when navigating to courses
+    const sponsorParam = sponsorAddress ? `&sponsor=${sponsorAddress}` : "";
+    navigate(`/mainpage?section=courses${sponsorParam}`);
   };
 
   const handleGeneralAmbassadorRegister = async (event) => {
@@ -235,11 +250,27 @@ export default function NetworkDashboard() {
       return;
     }
 
+    // Validate that user has enrolled courses
+    if (!enrolledCourses || enrolledCourses.length === 0) {
+      const error =
+        "You must be enrolled in at least one course to become a general ambassador.";
+      setStatusMessage(error);
+      toast.error(error);
+      return;
+    }
+
     setIsSubmittingGeneral(true);
     const toastId = toast.loading("Registering as general ambassador...");
     try {
-      // Get the first enrolled course ID for registration (could be modified to allow course selection)
-      const firstCourseId = enrolledCourses?.[0]?.courseId || 1;
+      // Get the first enrolled course ID for registration
+      const firstCourse = enrolledCourses[0];
+      const firstCourseId = firstCourse?.courseId;
+
+      if (firstCourseId === undefined || firstCourseId === null) {
+        throw new Error(
+          "Course ID not found. Please ensure you're enrolled in a valid course.",
+        );
+      }
 
       await registerGeneralAmbassador(sponsorAddress, did, firstCourseId);
       toast.update(toastId, {
@@ -300,6 +331,27 @@ export default function NetworkDashboard() {
   const isFoundingAmbassador = !!userAmbassadorStatus;
   const isGeneralAmbassador = !!userAmbassadorStatus;
 
+  // Generate referral link
+  const generateReferralLink = () => {
+    if (!account?.address) return "";
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/networkMainpage?sponsor=${account.address}`;
+  };
+
+  // Copy referral link to clipboard
+  const copyReferralLink = async () => {
+    const link = generateReferralLink();
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedToClipboard(true);
+      toast.success("Referral link copied to clipboard!");
+      setTimeout(() => setCopiedToClipboard(false), 3000);
+    } catch (error) {
+      console.error("Failed to copy to clipboard:", error);
+      toast.error("Failed to copy link");
+    }
+  };
+
   const totals = useMemo(() => {
     return ambassadorList.reduce(
       (accumulator, ambassador) => {
@@ -322,184 +374,283 @@ export default function NetworkDashboard() {
   }, [ambassadorList]);
 
   const cardStyle = darkMode
-    ? "border-white/10 bg-slate-900/60"
-    : "border-slate-200/70 bg-white";
+    ? "bg-gradient-to-br from-slate-900/90 to-slate-800/90 border-slate-700/50 hover:border-slate-600/50"
+    : "bg-gradient-to-br from-white to-slate-50/90 border-slate-200/70 hover:border-slate-300/70";
+
+  const glassCardStyle = darkMode
+    ? "bg-slate-800/40 backdrop-blur-xl border-slate-700/30"
+    : "bg-white/70 backdrop-blur-xl border-slate-200/50";
 
   return (
-    <section className="space-y-6">
-      <header className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-          Ambassador Network
-        </p>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold">Network Dashboard</h1>
-            <p className="text-slate-600 dark:text-slate-300">
+    <section className="space-y-8">
+      {/* Header with modern gradient */}
+      <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-yellow-500/10 via-yellow-400/5 to-transparent p-8">
+        <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-yellow-500/20 blur-3xl" />
+        <div className="absolute bottom-0 left-0 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
+
+        <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.3em] text-yellow-600 dark:text-yellow-400">
+              <Sparkles className="h-4 w-4" />
+              <span>Ambassador Network</span>
+            </div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+              Network Dashboard
+            </h1>
+            <p className="text-slate-600 dark:text-slate-300 max-w-2xl">
               Track growth, manage your community, and stay on top of ambassador
-              performance.
+              performance with real-time analytics.
             </p>
           </div>
+
           {role &&
             (role === "Founding Ambassador" ||
               role === "General Ambassador") && (
               <div
-                className={`rounded-xl px-3 py-2 text-sm font-semibold ${
+                className={`group relative inline-flex items-center gap-3 rounded-2xl px-6 py-3 ${
                   role === "Founding Ambassador"
-                    ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
-                    : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                    ? "bg-gradient-to-r from-yellow-500/20 to-amber-500/20 text-yellow-700 dark:text-yellow-300 border border-yellow-500/30"
+                    : "bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-700 dark:text-green-300 border border-green-500/30"
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4" />
-                  {role}
-                </div>
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <CheckCircle className="h-5 w-5" />
+                <span className="font-semibold">{role}</span>
               </div>
             )}
         </div>
       </header>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* Stats Cards with modern design */}
+      <div className="grid gap-6 md:grid-cols-3">
         {[
           {
             title: "Active Ambassadors",
             value: totals.activeCount || 0,
             icon: Users2,
+            gradient: "from-blue-500/20 to-cyan-500/20",
+            iconColor: "text-blue-600 dark:text-blue-400",
           },
           {
             title: "Total Downline Sales",
-            value: totals.totalDownlineSales || "--",
-            icon: Globe,
+            value: `$${totals.totalDownlineSales?.toLocaleString() || "0"}`,
+            icon: TrendingUp,
+            gradient: "from-green-500/20 to-emerald-500/20",
+            iconColor: "text-green-600 dark:text-green-400",
           },
           {
             title: "Total Commissions",
-            value: totals.totalCommissions || "--",
-            icon: Activity,
+            value: `$${totals.totalCommissions?.toLocaleString() || "0"}`,
+            icon: Award,
+            gradient: "from-purple-500/20 to-pink-500/20",
+            iconColor: "text-purple-600 dark:text-purple-400",
           },
-        ].map((card) => {
+        ].map((card, index) => {
           const Icon = card.icon;
           return (
             <div
               key={card.title}
-              className={`rounded-2xl border p-4 shadow-sm ${cardStyle}`}
+              className={`group relative overflow-hidden rounded-2xl border p-6 shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl ${cardStyle}`}
+              onMouseEnter={() => setHoveredCard(index)}
+              onMouseLeave={() => setHoveredCard(null)}
             >
-              <div className="flex items-center justify-between">
+              <div
+                className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}
+              />
+              <div className="relative flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                     {card.title}
                   </p>
-                  <p className="text-2xl font-semibold">{card.value}</p>
+                  <p className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">
+                    {card.value}
+                  </p>
                 </div>
-                <div className="rounded-xl bg-yellow-500/15 p-2 text-yellow-600 dark:text-yellow-400">
-                  <Icon className="h-5 w-5" />
+                <div
+                  className={`rounded-xl p-3 ${card.iconColor} bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm`}
+                >
+                  <Icon className="h-6 w-6" />
                 </div>
+              </div>
+              <div className="relative mt-4 h-1 w-full rounded-full bg-slate-200 dark:bg-slate-700">
+                <div
+                  className={`h-1 rounded-full bg-gradient-to-r ${card.gradient.replace(
+                    "/20",
+                    "",
+                  )}`}
+                  style={{ width: hoveredCard === index ? "100%" : "0%" }}
+                />
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* User Ambassador Details Section - PROMINENT DISPLAY */}
+      {/* User Ambassador Profile - Modern Card */}
       {userAmbassadorDetails ? (
-        <div className={`rounded-3xl border p-6 shadow-lg ${cardStyle}`}>
-          <div className="flex items-center gap-3 mb-6">
-            <div
-              className={`rounded-full p-3 ${
-                userAmbassadorDetails.tier === 2
-                  ? "bg-yellow-100 dark:bg-yellow-900/30"
-                  : "bg-green-100 dark:bg-green-900/30"
-              }`}
-            >
-              <CheckCircle
-                className={`h-6 w-6 ${
-                  userAmbassadorDetails.tier === 2
-                    ? "text-yellow-600 dark:text-yellow-400"
-                    : "text-green-600 dark:text-green-400"
-                }`}
-              />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold">Your Ambassador Profile</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                {userAmbassadorDetails.tier === 2 ? "Founding" : "General"}{" "}
-                Ambassador • Level {userAmbassadorDetails.level}
-              </p>
-            </div>
-          </div>
+        <div
+          className={`relative overflow-hidden rounded-3xl border p-8 shadow-xl ${cardStyle}`}
+        >
+          <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-yellow-500/10 blur-3xl" />
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1 font-semibold">
-                Tier
-              </p>
-              <p className="text-lg font-semibold text-slate-700 dark:text-slate-200">
-                {userAmbassadorDetails.tier === 2
-                  ? "Founding"
-                  : userAmbassadorDetails.tier === 1
-                  ? "General"
-                  : "None"}
-              </p>
-            </div>
+          <div className="relative">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex items-center gap-4">
+                <div
+                  className={`rounded-2xl p-4 ${
+                    userAmbassadorDetails.tier === 2
+                      ? "bg-gradient-to-br from-yellow-500/20 to-amber-500/20"
+                      : "bg-gradient-to-br from-green-500/20 to-emerald-500/20"
+                  }`}
+                >
+                  <Shield
+                    className={`h-8 w-8 ${
+                      userAmbassadorDetails.tier === 2
+                        ? "text-yellow-600 dark:text-yellow-400"
+                        : "text-green-600 dark:text-green-400"
+                    }`}
+                  />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold">
+                    Your Ambassador Profile
+                  </h2>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span
+                      className={`rounded-full px-3 py-1 text-sm font-semibold ${
+                        userAmbassadorDetails.tier === 2
+                          ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
+                          : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                      }`}
+                    >
+                      {userAmbassadorDetails.tier === 2
+                        ? "Founding"
+                        : "General"}{" "}
+                      Ambassador
+                    </span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">
+                      Level {userAmbassadorDetails.level}
+                    </span>
+                  </div>
+                </div>
+              </div>
 
-            <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1 font-semibold">
-                Level
-              </p>
-              <p className="text-lg font-semibold text-slate-700 dark:text-slate-200">
-                {userAmbassadorDetails.level}
-              </p>
-            </div>
-
-            <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1 font-semibold">
-                Status
-              </p>
-              <p className="text-lg font-semibold text-slate-700 dark:text-slate-200">
-                {userAmbassadorDetails.isActive ? "🟢 Active" : "⚪ Inactive"}
-              </p>
-            </div>
-
-            <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1 font-semibold">
-                Downline Sales
-              </p>
-              <p className="text-lg font-semibold text-slate-700 dark:text-slate-200">
-                $
-                {Number(
-                  userAmbassadorDetails.totalDownlineSales || 0,
-                ).toLocaleString()}
-              </p>
-            </div>
-
-            <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50 lg:col-span-2">
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-semibold">
-                DID Hash (bytes32)
-              </p>
-              <p className="break-all font-mono text-xs text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-900/30 p-2 rounded">
-                {userAmbassadorDetails.did}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                Keccak256 hash of your original DID
-              </p>
-            </div>
-
-            {userAmbassadorDetails.sponsor &&
-              userAmbassadorDetails.sponsor !==
-                "0x0000000000000000000000000000000000000000" && (
-                <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50 lg:col-span-2">
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-semibold">
-                    Sponsor Address
-                  </p>
-                  <p className="break-all font-mono text-xs text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-900/30 p-2 rounded">
-                    {userAmbassadorDetails.sponsor}
-                  </p>
+              {/* Referral Section */}
+              {userAmbassadorDetails.tier === 2 && (
+                <div className="w-full lg:w-96">
+                  <div className="rounded-2xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 p-6 border border-blue-500/20">
+                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-3">
+                      <Link2 className="h-5 w-5" />
+                      <p className="font-semibold">Share Your Network</p>
+                    </div>
+                    <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">
+                      Invite new ambassadors and earn commissions from their
+                      network growth!
+                    </p>
+                    <button
+                      onClick={copyReferralLink}
+                      className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-semibold text-white transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/25"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                      <div className="relative flex items-center justify-center gap-2">
+                        {copiedToClipboard ? (
+                          <>
+                            <Check className="h-4 w-4" />
+                            Copied to Clipboard!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-4 w-4" />
+                            Copy Referral Link
+                          </>
+                        )}
+                      </div>
+                    </button>
+                  </div>
                 </div>
               )}
+            </div>
+
+            {/* Ambassador Details Grid */}
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-xl bg-slate-100/50 p-4 dark:bg-slate-800/50 backdrop-blur-sm">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                  Status
+                </p>
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`h-2 w-2 rounded-full ${
+                      userAmbassadorDetails.isActive
+                        ? "bg-green-500 animate-pulse"
+                        : "bg-slate-400"
+                    }`}
+                  />
+                  <p className="font-semibold">
+                    {userAmbassadorDetails.isActive ? "Active" : "Inactive"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-slate-100/50 p-4 dark:bg-slate-800/50 backdrop-blur-sm">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                  Downline Sales
+                </p>
+                <p className="text-xl font-bold text-green-600 dark:text-green-400">
+                  $
+                  {Number(
+                    userAmbassadorDetails.totalDownlineSales || 0,
+                  ).toLocaleString()}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-slate-100/50 p-4 dark:bg-slate-800/50 backdrop-blur-sm">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                  Lifetime Commissions
+                </p>
+                <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
+                  $
+                  {Number(
+                    userAmbassadorDetails.lifetimeCommissions || 0,
+                  ).toLocaleString()}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-slate-100/50 p-4 dark:bg-slate-800/50 backdrop-blur-sm">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                  DID Hash
+                </p>
+                <p
+                  className="font-mono text-xs truncate"
+                  title={userAmbassadorDetails.did}
+                >
+                  {userAmbassadorDetails.did?.slice(0, 10)}...
+                  {userAmbassadorDetails.did?.slice(-8)}
+                </p>
+              </div>
+
+              {userAmbassadorDetails.sponsor &&
+                userAmbassadorDetails.sponsor !==
+                  "0x0000000000000000000000000000000000000000" && (
+                  <div className="rounded-xl bg-slate-100/50 p-4 dark:bg-slate-800/50 backdrop-blur-sm lg:col-span-2">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                      Sponsor
+                    </p>
+                    <p className="font-mono text-sm">
+                      {userAmbassadorDetails.sponsor.slice(0, 6)}...
+                      {userAmbassadorDetails.sponsor.slice(-4)}
+                    </p>
+                  </div>
+                )}
+            </div>
           </div>
         </div>
       ) : role === "Founding Ambassador" || role === "General Ambassador" ? (
-        <div className={`rounded-3xl border p-6 ${cardStyle}`}>
-          <div className="flex items-center justify-center gap-3 py-8">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-yellow-500 dark:border-slate-600 dark:border-t-yellow-400"></div>
+        <div className={`rounded-3xl border p-12 ${cardStyle}`}>
+          <div className="flex flex-col items-center justify-center gap-4">
+            <div className="relative">
+              <div className="h-12 w-12 animate-spin rounded-full border-4 border-slate-300 border-t-yellow-500 dark:border-slate-600 dark:border-t-yellow-400"></div>
+              <div className="absolute inset-0 h-12 w-12 animate-ping rounded-full bg-yellow-500/20"></div>
+            </div>
             <p className="text-sm text-slate-600 dark:text-slate-300">
               Loading your ambassador profile...
             </p>
@@ -507,30 +658,84 @@ export default function NetworkDashboard() {
         </div>
       ) : null}
 
-      <div className={`rounded-3xl border p-6 ${cardStyle}`}>
-        <h2 className="text-lg font-semibold">Today&apos;s focus</h2>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-          Prioritize regional meetups, highlight top referrers, and queue
-          content drops for the next ambassador wave.
-        </p>
+      {/* Today's Focus - Modern Card */}
+      <div
+        className={`group relative overflow-hidden rounded-3xl border p-8 ${glassCardStyle}`}
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        <div className="relative">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-yellow-500" />
+            Today's Focus
+          </h2>
+          <p className="mt-2 text-slate-600 dark:text-slate-300">
+            Prioritize regional meetups, highlight top referrers, and queue
+            content drops for the next ambassador wave.
+          </p>
+        </div>
       </div>
 
-      <div className={`rounded-3xl border p-6 ${cardStyle}`}>
-        <div className="space-y-6">
+      {/* Registration Section */}
+      <div
+        className={`relative overflow-hidden rounded-3xl border p-8 ${glassCardStyle}`}
+      >
+        <div className="absolute top-0 right-0 h-96 w-96 rounded-full bg-gradient-to-br from-yellow-500/10 to-green-500/10 blur-3xl" />
+
+        <div className="relative space-y-6">
           <div>
-            <h2 className="text-lg font-semibold">Register as Ambassador</h2>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-              Founding members pay 100 USDC. General ambassadors enroll in a
-              paid course (50+ USDC) to join.
+            <h2 className="text-2xl font-bold">Become an Ambassador</h2>
+            <p className="mt-1 text-slate-600 dark:text-slate-300">
+              Join our network and start earning commissions through education
+              and referrals.
             </p>
           </div>
 
-          {statusMessage && (
+          {userAmbassadorStatus ? (
+            /* Already Registered - Show warning with de-register button */
+            <div className="rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-6 border border-amber-500/20">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-amber-700 dark:text-amber-300">
+                      Already registered as{" "}
+                      {userAmbassadorStatus.tier === 2 ? "Founding" : "General"}{" "}
+                      Ambassador
+                    </p>
+                    <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+                      You cannot register as multiple ambassador types. Please
+                      deregister first if you wish to switch.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      if (userAmbassadorStatus.tier === 2) {
+                        await deregisterFoundingAmbassador();
+                      } else {
+                        await deregisterGeneralAmbassador();
+                      }
+                      await fetchAmbassadors();
+                      await refreshRole();
+                    } catch (error) {
+                      console.error("De-registration failed:", error);
+                    }
+                  }}
+                  className="flex-shrink-0 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/25"
+                >
+                  De-register
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {!userAmbassadorStatus && statusMessage && (
             <div
-              className={`flex gap-3 rounded-xl p-3 ${
+              className={`rounded-xl p-4 flex gap-3 ${
                 statusMessage.includes("successful")
-                  ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                  : "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                  ? "bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 text-green-700 dark:text-green-300"
+                  : "bg-gradient-to-r from-amber-500/10 to-red-500/10 border border-red-500/20 text-red-700 dark:text-red-300"
               }`}
             >
               {statusMessage.includes("successful") ? (
@@ -542,231 +747,253 @@ export default function NetworkDashboard() {
             </div>
           )}
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Founding Ambassador Section */}
-            <div className="space-y-4 rounded-2xl border border-slate-200/70 p-4 dark:border-white/10">
-              <div>
-                <h3 className="text-base font-semibold">Founding Ambassador</h3>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  Become a founding member and lead your network from day one.
-                </p>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Note: The first founder has no sponsor. Subsequent founders
-                  must have a sponsor.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/50">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Wallet Connected
-                  </p>
-                  <p className="break-all font-mono text-xs text-slate-700 dark:text-slate-200">
-                    {account?.address
-                      ? `${account.address.slice(
-                          0,
-                          6,
-                        )}...${account.address.slice(-4)}`
-                      : "Not connected"}
-                  </p>
-                </div>
-
-                <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/50">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Digital Identity (DID)
-                  </p>
-                  <p className="break-all font-mono text-xs text-slate-700 dark:text-slate-200">
-                    {did ? (
-                      <span className="flex items-center gap-2">
-                        <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
-                        Ready
-                      </span>
-                    ) : (
-                      <span className="text-amber-600 dark:text-amber-400">
-                        Initializing...
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {userAmbassadorStatus && (
-                <div className="rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                    <p className="text-sm font-semibold text-red-700 dark:text-red-300">
-                      Already registered as ambassador
-                    </p>
-                  </div>
-                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                    You cannot register as multiple ambassador types. Deregister
-                    first to switch.
-                  </p>
-                </div>
-              )}
-
-              <button
-                onClick={handleFoundingRegister}
-                disabled={
-                  isSubmitting ||
-                  !did ||
-                  !account?.address ||
-                  loading ||
-                  !!userAmbassadorStatus
-                }
-                className="w-full rounded-xl bg-yellow-500 px-4 py-2.5 text-sm font-semibold text-slate-900 transition duration-200 hover:bg-yellow-400 disabled:cursor-not-allowed disabled:bg-yellow-500/60 disabled:text-slate-700"
-              >
-                {isSubmitting ? "Registering..." : "Become Founding Ambassador"}
-              </button>
-
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                One-time fee: 100 USDC
-              </p>
-            </div>
-
-            {/* General Ambassador Section */}
-            <div className="space-y-4 rounded-2xl border border-slate-200/70 p-4 dark:border-white/10">
-              <div>
-                <h3 className="text-base font-semibold">General Ambassador</h3>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  Enroll in paid courses (50+ USDC total) to qualify as an
-                  ambassador.
-                </p>
-              </div>
-
-              {isQualifiedForGeneralAmbassador ? (
-                // User has enrolled in courses worth >= 50 USDC - show registration form
-                <div className="space-y-3">
-                  <div className="rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                      <p className="text-sm font-semibold text-green-700 dark:text-green-300">
-                        You're qualified!
+          {!userAmbassadorStatus && (
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* Founding Ambassador Section */}
+              <div className="group relative overflow-hidden rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-transparent p-6 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/10">
+                <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="rounded-xl bg-yellow-500/20 p-3">
+                      <Award className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold">
+                        Founding Ambassador
+                      </h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Lead the network from day one
                       </p>
                     </div>
-                    <p className="mt-1 text-xs text-green-600 dark:text-green-400">
-                      Total spent: ${totalEnrolledUSDC.toFixed(2)} USDC
-                    </p>
                   </div>
 
-                  <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/50">
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Wallet Connected
-                    </p>
-                    <p className="break-all font-mono text-xs text-slate-700 dark:text-slate-200">
-                      {account?.address
-                        ? `${account.address.slice(
-                            0,
-                            6,
-                          )}...${account.address.slice(-4)}`
-                        : "Not connected"}
-                    </p>
-                  </div>
-
-                  <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/50">
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Digital Identity (DID)
-                    </p>
-                    <p className="break-all font-mono text-xs text-slate-700 dark:text-slate-200">
-                      {did ? (
-                        <span className="flex items-center gap-2">
-                          <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
-                          Ready
-                        </span>
-                      ) : (
-                        <span className="text-amber-600 dark:text-amber-400">
-                          Initializing...
-                        </span>
-                      )}
-                    </p>
-                  </div>
-
-                  <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/50">
-                    <label className="block text-xs text-slate-500 dark:text-slate-400 mb-2">
-                      Sponsor Address (Founding Ambassador)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="0x..."
-                      value={sponsorAddress}
-                      onChange={(e) => setSponsorAddress(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono focus:border-green-500 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
-                    />
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      Enter the wallet address of your founding ambassador
-                      sponsor
-                    </p>
-                  </div>
-
-                  {userAmbassadorStatus && (
-                    <div className="rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                        <p className="text-sm font-semibold text-red-700 dark:text-red-300">
-                          Already registered as ambassador
+                  <div className="space-y-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between rounded-lg bg-slate-100/50 p-3 dark:bg-slate-800/50">
+                        <div className="flex items-center gap-2">
+                          <Wallet className="h-4 w-4 text-slate-500" />
+                          <span className="text-sm">Wallet</span>
+                        </div>
+                        <p className="font-mono text-sm">
+                          {account?.address
+                            ? `${account.address.slice(
+                                0,
+                                6,
+                              )}...${account.address.slice(-4)}`
+                            : "Not connected"}
                         </p>
                       </div>
-                      <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                        You cannot register as multiple ambassador types.
-                        Deregister first to switch.
+
+                      <div className="flex items-center justify-between rounded-lg bg-slate-100/50 p-3 dark:bg-slate-800/50">
+                        <div className="flex items-center gap-2">
+                          <UserCheck className="h-4 w-4 text-slate-500" />
+                          <span className="text-sm">DID Status</span>
+                        </div>
+                        {did ? (
+                          <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                            <CheckCircle className="h-4 w-4" />
+                            <span className="text-sm">Ready</span>
+                          </span>
+                        ) : (
+                          <span className="text-sm text-amber-600 dark:text-amber-400">
+                            Initializing...
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleFoundingRegister}
+                      disabled={
+                        isSubmitting || !did || !account?.address || loading
+                      }
+                      className="group/btn relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-yellow-500 to-amber-500 px-6 py-3 text-sm font-semibold text-slate-900 transition-all duration-300 hover:shadow-lg hover:shadow-yellow-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700" />
+                      <span className="relative flex items-center justify-center gap-2">
+                        {isSubmitting
+                          ? "Registering..."
+                          : "Become Founding Ambassador"}
+                        <ArrowRight className="h-4 w-4" />
+                      </span>
+                    </button>
+
+                    <p className="text-xs text-center text-slate-500 dark:text-slate-400">
+                      One-time fee:{" "}
+                      <span className="font-semibold text-yellow-600 dark:text-yellow-400">
+                        100 USDC
+                      </span>
+                    </p>
+                    <p className="text-xs text-center text-slate-500 dark:text-slate-400">
+                      Note: First founder has no sponsor. Subsequent founders
+                      require one.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* General Ambassador Section */}
+              <div className="group relative overflow-hidden rounded-2xl border border-green-500/20 bg-gradient-to-br from-green-500/5 to-transparent p-6 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/10">
+                <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="rounded-xl bg-green-500/20 p-3">
+                      <GraduationCap className="h-6 w-6 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold">
+                        General Ambassador
+                      </h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Enroll in courses to qualify
+                      </p>
+                    </div>
+                  </div>
+
+                  {isQualifiedForGeneralAmbassador ? (
+                    <div className="space-y-4">
+                      <div className="rounded-xl bg-gradient-to-r from-green-500/20 to-emerald-500/20 p-4 border border-green-500/30">
+                        <div className="flex items-center gap-2 mb-2">
+                          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                          <p className="font-semibold text-green-700 dark:text-green-300">
+                            You're qualified!
+                          </p>
+                        </div>
+                        <p className="text-sm text-green-600 dark:text-green-400">
+                          Total spent: ${totalEnrolledUSDC.toFixed(2)} USDC
+                        </p>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between rounded-lg bg-slate-100/50 p-3 dark:bg-slate-800/50">
+                          <div className="flex items-center gap-2">
+                            <Wallet className="h-4 w-4 text-slate-500" />
+                            <span className="text-sm">Wallet</span>
+                          </div>
+                          <p className="font-mono text-sm">
+                            {account?.address
+                              ? `${account.address.slice(
+                                  0,
+                                  6,
+                                )}...${account.address.slice(-4)}`
+                              : "Not connected"}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between rounded-lg bg-slate-100/50 p-3 dark:bg-slate-800/50">
+                          <div className="flex items-center gap-2">
+                            <UserCheck className="h-4 w-4 text-slate-500" />
+                            <span className="text-sm">DID Status</span>
+                          </div>
+                          {did ? (
+                            <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                              <CheckCircle className="h-4 w-4" />
+                              <span className="text-sm">Ready</span>
+                            </span>
+                          ) : (
+                            <span className="text-sm text-amber-600 dark:text-amber-400">
+                              Initializing...
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="rounded-lg bg-slate-100/50 p-4 dark:bg-slate-800/50">
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                            Sponsor Address
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="0x..."
+                            value={sponsorAddress}
+                            onChange={(e) => setSponsorAddress(e.target.value)}
+                            className="w-full rounded-xl border border-slate-300 bg-white/50 px-4 py-3 text-sm font-mono focus:border-green-500 focus:ring-2 focus:ring-green-500/20 focus:outline-none dark:border-slate-600 dark:bg-slate-800/50 dark:text-slate-100"
+                          />
+                          {sponsorAddress &&
+                            /^0x[a-fA-F0-9]{40}$/.test(sponsorAddress) && (
+                              <p className="mt-2 flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                                <CheckCircle className="h-3 w-3" />
+                                Valid sponsor address detected
+                              </p>
+                            )}
+                        </div>
+
+                        <button
+                          onClick={handleGeneralAmbassadorRegister}
+                          disabled={
+                            isSubmittingGeneral ||
+                            !did ||
+                            !account?.address ||
+                            loading ||
+                            !sponsorAddress
+                          }
+                          className="group/btn relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700" />
+                          <span className="relative flex items-center justify-center gap-2">
+                            {isSubmittingGeneral
+                              ? "Registering..."
+                              : "Become General Ambassador"}
+                            <ArrowRight className="h-4 w-4" />
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 p-4 border border-amber-500/30">
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                          <p className="font-semibold text-amber-700 dark:text-amber-300">
+                            Not yet qualified
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm text-amber-600 dark:text-amber-400">
+                            Current spend:{" "}
+                            <span className="font-semibold">
+                              ${totalEnrolledUSDC.toFixed(2)} USDC
+                            </span>
+                          </p>
+                          <p className="text-sm text-amber-600 dark:text-amber-400">
+                            Required:{" "}
+                            <span className="font-semibold">$50.00 USDC</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {sponsorAddress && (
+                        <div className="rounded-xl bg-gradient-to-r from-blue-500/10 to-indigo-500/10 p-4 border border-blue-500/20">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                            Sponsor Address
+                          </p>
+                          <p className="font-mono text-sm break-all">
+                            {sponsorAddress.slice(0, 6)}...
+                            {sponsorAddress.slice(-4)}
+                          </p>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={handleGeneralRegister}
+                        className="group/btn relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:shadow-lg dark:from-slate-700 dark:to-slate-800"
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700" />
+                        <span className="relative flex items-center justify-center gap-2">
+                          View Courses to Enroll
+                          <ExternalLink className="h-4 w-4" />
+                        </span>
+                      </button>
+
+                      <p className="text-xs text-center text-slate-500 dark:text-slate-400">
+                        Fees vary by course
                       </p>
                     </div>
                   )}
-
-                  <button
-                    onClick={handleGeneralAmbassadorRegister}
-                    disabled={
-                      isSubmittingGeneral ||
-                      !did ||
-                      !account?.address ||
-                      loading ||
-                      !sponsorAddress ||
-                      !!userAmbassadorStatus
-                    }
-                    className="w-full rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition duration-200 hover:bg-green-500 disabled:cursor-not-allowed disabled:bg-green-600/60 disabled:text-slate-200"
-                  >
-                    {isSubmittingGeneral
-                      ? "Registering..."
-                      : "Become General Ambassador"}
-                  </button>
                 </div>
-              ) : (
-                // User hasn't enrolled in enough paid courses - show enrollment prompt
-                <div className="space-y-3">
-                  <div className="rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                      <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">
-                        Not yet qualified
-                      </p>
-                    </div>
-                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                      Current spend: ${totalEnrolledUSDC.toFixed(2)} USDC
-                      <br />
-                      Required: $50.00 USDC
-                    </p>
-                  </div>
-
-                  <p className="text-sm text-slate-600 dark:text-slate-300">
-                    Start earning commissions and build your network through
-                    education!
-                  </p>
-
-                  <button
-                    type="button"
-                    onClick={handleGeneralRegister}
-                    className="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition duration-200 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700"
-                  >
-                    View Courses to Enroll
-                  </button>
-
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Fees vary by course
-                  </p>
-                </div>
-              )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </section>
