@@ -33,6 +33,7 @@ import { useDarkMode } from "../../contexts/themeContext";
 import { useAmbassadorNetwork } from "../../contexts/ambassadorNetworkContext";
 import { useDid } from "../../contexts/DidContext";
 import { useUser } from "../../contexts/userContext";
+import BinaryTreeVisualization from "../../components/AmbassadorComponents/BinaryTreeVisualization";
 import { client } from "../../services/client";
 import UsdCoinABI from "../../artifacts/fakeLiquidityArtifacts/UsdCoin.sol/UsdCoin.json";
 import CONTRACT_ADDRESSES from "../../constants/addresses";
@@ -508,6 +509,12 @@ export default function NetworkDashboard() {
           );
         })}
       </div>
+
+      {/* Binary Tree Visualization */}
+      {role &&
+        (role === "Founding Ambassador" || role === "General Ambassador") && (
+          <BinaryTreeVisualization darkMode={darkMode} />
+        )}
 
       {/* User Ambassador Profile - Modern Card */}
       {userAmbassadorDetails ? (

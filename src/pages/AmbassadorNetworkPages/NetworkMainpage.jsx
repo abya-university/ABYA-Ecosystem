@@ -12,6 +12,7 @@ export default function NetworkMainpage() {
   const { darkMode } = useDarkMode();
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const sections = useMemo(
     () => [
@@ -129,6 +130,7 @@ export default function NetworkMainpage() {
             activeSection={activeSection}
             onSelect={setActiveSection}
             sections={sections}
+            onSidebarToggle={setIsSidebarOpen}
           />
 
           <main className="flex-1 py-4">
