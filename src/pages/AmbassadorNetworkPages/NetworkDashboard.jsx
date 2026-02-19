@@ -86,52 +86,75 @@ export default function NetworkDashboard() {
   useEffect(() => {
     if (
       role &&
-      (role === "Founding Ambassador" || role === "General Ambassador")
+      (role === "Founding Ambassador" || role === "General Ambassador") &&
+      account?.address
     ) {
-      fetchAmbassadors().catch((error) => {
-        console.error("Failed to refresh ambassador details:", error);
-      });
+      const fetchUserDetails = async () => {
+        try {
+          const diamondContract = await getContract({
+            address: CONTRACT_ADDRESSES.diamond,
+            abi: AmbassadorNetworkFacetABI.abi,
+            client,
+            chain: defineChain(11155111), // Sepolia
+          });
 
-      if (account?.address) {
-        const fetchUserDetails = async () => {
-          try {
-            const diamondContract = await getContract({
-              address: CONTRACT_ADDRESSES.diamond,
-              abi: AmbassadorNetworkFacetABI.abi,
-              client,
-              chain: defineChain(11155111), // Sepolia
-            });
+          const details = await readContract({
+            contract: diamondContract,
+            method:
+              "function getAmbassadorDetails(address _ambassador) view returns (bytes32 did, uint8 tier, uint8 level, address sponsor, address leftLeg, address rightLeg, uint256 totalDownlineSales, uint256 lifetimeCommissions, bool isActive)",
+            params: [account.address],
+          });
 
-            const details = await readContract({
-              contract: diamondContract,
-              method:
-                "function getAmbassadorDetails(address _ambassador) view returns (bytes32 did, uint8 tier, uint8 level, address sponsor, address leftLeg, address rightLeg, uint256 totalDownlineSales, uint256 lifetimeCommissions, bool isActive)",
-              params: [account.address],
-            });
+          const ambassadorData = {
+            address: account.address,
+            did: details[0],
+            tier: details[1],
+            level: details[2],
+            sponsor: details[3],
+            leftLeg: details[4],
+            rightLeg: details[5],
+            totalDownlineSales: details[6],
+            lifetimeCommissions: details[7],
+            isActive: details[8],
+          };
 
-            const ambassadorData = {
-              address: account.address,
-              did: details[0],
-              tier: details[1],
-              level: details[2],
-              sponsor: details[3],
-              leftLeg: details[4],
-              rightLeg: details[5],
-              totalDownlineSales: details[6],
-              lifetimeCommissions: details[7],
-              isActive: details[8],
-            };
+          setUserAmbassadorDetails(ambassadorData);
+        } catch (error) {
+          console.error("Error fetching user ambassador details:", error);
+        }
+      };
 
-            setUserAmbassadorDetails(ambassadorData);
-          } catch (error) {
-            console.error("Error fetching user ambassador details:", error);
-          }
-        };
-
-        fetchUserDetails();
-      }
+      fetchUserDetails();
     }
-  }, [role, fetchAmbassadors, account?.address]);
+  }, [role, account?.address]);
+
+  // Memoized check for subordinates - only recalculates when userAmbassadorDetails changes
+  const hasSubordinates = useMemo(() => {
+    if (!userAmbassadorDetails) return false;
+
+    const hasLeftLeg =
+      userAmbassadorDetails.leftLeg &&
+      userAmbassadorDetails.leftLeg !==
+        "0x0000000000000000000000000000000000000000";
+    const hasRightLeg =
+      userAmbassadorDetails.rightLeg &&
+      userAmbassadorDetails.rightLeg !==
+        "0x0000000000000000000000000000000000000000";
+
+    return hasLeftLeg || hasRightLeg;
+  }, [userAmbassadorDetails]);
+
+  // Memoized refund percentage calculation
+  const refundPercentage = useMemo(() => {
+    // Since we don't have entry timestamp from contract, provide general refund info
+    // You can add entry timestamp to contract response if needed
+    return {
+      threeDay: 80,
+      tenDay: 50,
+      thirtyDay: 15,
+      beyond: 5,
+    };
+  }, []);
 
   const handleFoundingRegister = async (event) => {
     if (event) event.preventDefault();
@@ -692,40 +715,192 @@ export default function NetworkDashboard() {
 
           {userAmbassadorStatus ? (
             /* Already Registered - Show warning with de-register button */
-            <div className="rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-6 border border-amber-500/20">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-semibold text-amber-700 dark:text-amber-300">
-                      Already registered as{" "}
-                      {userAmbassadorStatus.tier === 2 ? "Founding" : "General"}{" "}
-                      Ambassador
-                    </p>
-                    <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
-                      You cannot register as multiple ambassador types. Please
-                      deregister first if you wish to switch.
-                    </p>
+            <div className="space-y-4">
+              <div className="rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-6 border border-amber-500/20">
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-amber-700 dark:text-amber-300">
+                        Already registered as{" "}
+                        {userAmbassadorStatus.tier === 2
+                          ? "Founding"
+                          : "General"}{" "}
+                        Ambassador
+                      </p>
+                      <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+                        You cannot register as multiple ambassador types.
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <button
-                  onClick={async () => {
-                    try {
-                      if (userAmbassadorStatus.tier === 2) {
-                        await deregisterFoundingAmbassador();
-                      } else {
-                        await deregisterGeneralAmbassador();
-                      }
-                      await fetchAmbassadors();
-                      await refreshRole();
-                    } catch (error) {
-                      console.error("De-registration failed:", error);
-                    }
-                  }}
-                  className="flex-shrink-0 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/25"
-                >
-                  De-register
-                </button>
+              </div>
+
+              {/* De-registration Section */}
+              <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-6 border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-2 mb-4">
+                  <AlertCircle className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                  <h3 className="font-semibold text-slate-900 dark:text-white">
+                    De-registration
+                  </h3>
+                </div>
+
+                {/* Check if has subordinates */}
+                {hasSubordinates || userAmbassadorStatus.isActive ? (
+                  /* Has subordinates - Cannot de-register */
+                  <div className="space-y-3">
+                    <div className="rounded-xl bg-red-50 dark:bg-red-900/20 p-4 border border-red-200 dark:border-red-800">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-semibold text-red-700 dark:text-red-300 mb-2">
+                            De-registration Not Available
+                          </p>
+                          <p className="text-sm text-red-600 dark:text-red-400">
+                            You cannot de-register because:
+                          </p>
+                          <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400 mt-2 space-y-1">
+                            {hasSubordinates && (
+                              <li>
+                                You have active subordinates in your network
+                                (left or right leg)
+                              </li>
+                            )}
+                            {userAmbassadorStatus.isActive && (
+                              <li>
+                                Your account is active with direct recruits
+                              </li>
+                            )}
+                          </ul>
+                          <p className="text-xs text-red-500 dark:text-red-400 mt-3 italic">
+                            Note: The contract requires you to have no
+                            subordinates and withdraw all commissions before
+                            de-registering.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      disabled
+                      className="w-full rounded-xl bg-slate-400 dark:bg-slate-700 px-6 py-3 text-sm font-semibold text-white cursor-not-allowed opacity-50"
+                    >
+                      De-register (Not Available)
+                    </button>
+                  </div>
+                ) : (
+                  /* Can de-register */
+                  <div className="space-y-4">
+                    {/* Refund Information for Founding Ambassadors */}
+                    {userAmbassadorStatus.tier === 2 && (
+                      <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 p-4 border border-blue-200 dark:border-blue-700">
+                        <div className="flex items-start gap-3">
+                          <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                              Refund Information
+                            </p>
+                            <p className="text-sm text-blue-600 dark:text-blue-400 mb-3">
+                              Your refund amount depends on how long you've been
+                              an ambassador:
+                            </p>
+                            <div className="mt-3 space-y-1 text-xs text-blue-600 dark:text-blue-400">
+                              <p>
+                                • 0-3 days: {refundPercentage.threeDay}% refund
+                                (80 USDC)
+                              </p>
+                              <p>
+                                • 3-10 days: {refundPercentage.tenDay}% refund
+                                (50 USDC)
+                              </p>
+                              <p>
+                                • 10-30 days: {refundPercentage.thirtyDay}%
+                                refund (15 USDC)
+                              </p>
+                              <p>
+                                • 30+ days: {refundPercentage.beyond}% refund (5
+                                USDC)
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* General Ambassador - No Refund */}
+                    {userAmbassadorStatus.tier === 1 && (
+                      <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 p-4 border border-amber-200 dark:border-amber-700">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
+                              No Refund for General Ambassadors
+                            </p>
+                            <p className="text-sm text-amber-600 dark:text-amber-400">
+                              General ambassadors do not receive refunds upon
+                              de-registration as entry was through course
+                              enrollment.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Consequences Warning */}
+                    <div className="rounded-xl bg-slate-100 dark:bg-slate-800 p-4 border border-slate-300 dark:border-slate-600">
+                      <p className="font-semibold text-slate-700 dark:text-slate-300 mb-2 text-sm">
+                        ⚠️ You will lose access to:
+                      </p>
+                      <ul className="list-disc list-inside text-sm text-slate-600 dark:text-slate-400 space-y-1">
+                        <li>Your ambassador network and downline</li>
+                        <li>Future commission earnings</li>
+                        <li>Ambassador benefits and privileges</li>
+                        <li>Your referral link and recruitment ability</li>
+                      </ul>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-3 italic">
+                        Make sure to withdraw any pending commissions and claim
+                        vested tokens before de-registering.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={async () => {
+                        const confirmed = window.confirm(
+                          `Are you absolutely sure you want to de-register as a ${
+                            userAmbassadorStatus.tier === 2
+                              ? "Founding"
+                              : "General"
+                          } Ambassador? This action cannot be undone.`,
+                        );
+
+                        if (!confirmed) return;
+
+                        try {
+                          if (userAmbassadorStatus.tier === 2) {
+                            await deregisterFoundingAmbassador();
+                            toast.success(
+                              "Successfully de-registered as Founding Ambassador!",
+                            );
+                          } else {
+                            await deregisterGeneralAmbassador();
+                            toast.success(
+                              "Successfully de-registered as General Ambassador!",
+                            );
+                          }
+                          await fetchAmbassadors();
+                          await refreshRole();
+                        } catch (error) {
+                          console.error("De-registration failed:", error);
+                          toast.error(
+                            error.message || "De-registration failed",
+                          );
+                        }
+                      }}
+                      className="w-full rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:shadow-lg hover:shadow-red-500/25"
+                    >
+                      Confirm De-registration
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ) : null}
