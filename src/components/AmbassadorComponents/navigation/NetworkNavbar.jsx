@@ -1,12 +1,14 @@
 import { Link } from "react-router-dom";
-import { Menu, Moon, Sun, X } from "lucide-react";
+import { Menu, Moon, Sun, X, CheckCircle } from "lucide-react";
 import { useState } from "react";
 import { useDarkMode } from "../../../contexts/themeContext";
+import { useUser } from "../../../contexts/userContext";
 import ErrorBoundary from "../../ErrorBoundary";
 import WalletConnection from "../../WalletConnection";
 
 export default function NetworkNavbar() {
   const { darkMode, setDarkMode } = useDarkMode();
+  const { role } = useUser();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLinkClick = () => {
@@ -48,6 +50,20 @@ export default function NetworkNavbar() {
         </div>
 
         <div className="flex items-center gap-3">
+          {role &&
+            (role === "Founding Ambassador" ||
+              role === "General Ambassador") && (
+              <div
+                className={`hidden rounded-lg px-3 py-1.5 text-xs font-semibold md:flex items-center gap-2 ${
+                  role === "Founding Ambassador"
+                    ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
+                    : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                }`}
+              >
+                <CheckCircle className="h-3.5 w-3.5" />
+                {role}
+              </div>
+            )}
           <div className="hidden md:block">
             <ErrorBoundary>
               <WalletConnection />

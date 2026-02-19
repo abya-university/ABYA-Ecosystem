@@ -22,6 +22,7 @@ import { useUser } from "../contexts/userContext";
 import { ChapterContext } from "../contexts/chapterContext";
 import { LessonContext } from "../contexts/lessonContext";
 import { QuizContext } from "../contexts/quizContext";
+import { useRevenueSharing } from "../contexts/RevenueSharingContext";
 import CareerOnboardingForm from "../components/ProfileSurveyForm";
 import Ecosystem1FacetABI from "../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
 import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
@@ -65,6 +66,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const { chapters, fetchChapters } = useContext(ChapterContext);
   const { lessons } = useContext(LessonContext);
   const { quizzes } = useContext(QuizContext);
+  const { purchaseCourse, purchaseLoading } = useRevenueSharing();
   const [isLoading, setIsLoading] = useState(false);
   const [courseStats, setCourseStats] = useState({
     totalLessons: 0,
@@ -785,6 +787,46 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     let toastId = null;
     try {
       setEnrollingCourseId(courseId);
+
+      // Find the course to check its price
+      const course = courses.find((c) => c.courseId === courseId);
+
+      if (!course) {
+        toast.error("Course not found");
+        setEnrollingCourseId(null);
+        return;
+      }
+
+      // Check if course has a price and handle payment
+      // Note: priceUSDC is stored as raw value with 6 decimals (e.g., "57890000" = 57.89 USDC)
+      if (course.priceUSDC && Number(course.priceUSDC) > 0) {
+        toastId = toast.loading("Processing course purchase...");
+
+        // Call coursePurchase from RevenueSharingContext
+        // Pass raw USDC value (with 6 decimals) as-is to the contract
+        // Reviewer address is set to zero address (0x0) for now
+        const purchaseResult = await purchaseCourse(
+          address, // buyer address
+          course.creator, // creator address
+          BigInt(courseId), // courseId as BigInt for contract
+          BigInt(course.priceUSDC), // raw USDC value with 6 decimals
+          "0x0000000000000000000000000000000000000000", // reviewer address (zero address)
+        );
+
+        if (!purchaseResult.success) {
+          // Purchase failed, toast already handled in context
+          setEnrollingCourseId(null);
+          return;
+        }
+
+        // Close purchase toast as enrollment will show its own toast
+        if (toastId) {
+          toast.dismiss(toastId);
+          toastId = null;
+        }
+      }
+
+      // Proceed with enrollment
       toastId = toast.loading("Processing enrollment...");
 
       const contract = getContract({
@@ -859,6 +901,48 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     // Enroll in the course after survey completion
     try {
       setEnrollingCourseId(courseToEnroll);
+
+      // Find the course to check its price
+      const course = courses.find((c) => c.courseId === courseToEnroll);
+
+      if (!course) {
+        toast.error("Course not found");
+        setEnrollingCourseId(null);
+        setCourseIdPendingEnrollment(null);
+        return;
+      }
+
+      // Check if course has a price and handle payment
+      // Note: priceUSDC is stored as raw value with 6 decimals (e.g., "57890000" = 57.89 USDC)
+      if (course.priceUSDC && Number(course.priceUSDC) > 0) {
+        toastId = toast.loading("Processing course purchase...");
+
+        // Call coursePurchase from RevenueSharingContext
+        // Pass raw USDC value (with 6 decimals) as-is to the contract
+        // Reviewer address is set to zero address (0x0) for now
+        const purchaseResult = await purchaseCourse(
+          address, // buyer address
+          course.creator, // creator address
+          BigInt(courseToEnroll), // courseId as BigInt for contract
+          BigInt(course.priceUSDC), // raw USDC value with 6 decimals
+          "0x0000000000000000000000000000000000000000", // reviewer address (zero address)
+        );
+
+        if (!purchaseResult.success) {
+          // Purchase failed, toast already handled in context
+          setEnrollingCourseId(null);
+          setCourseIdPendingEnrollment(null);
+          return;
+        }
+
+        // Close purchase toast as enrollment will show its own toast
+        if (toastId) {
+          toast.dismiss(toastId);
+          toastId = null;
+        }
+      }
+
+      // Proceed with enrollment
       toastId = toast.loading("Processing your enrollment...");
 
       const contract = getContract({
