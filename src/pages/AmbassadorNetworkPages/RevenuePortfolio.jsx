@@ -32,7 +32,20 @@ export default function RevenuePortfolio() {
   const totals = useMemo(() => {
     return ambassadorList.reduce(
       (accumulator, ambassador) => {
-        const commissions = Number(ambassador.lifetimeCommissions);
+        // Safely handle BigInt conversion
+        let commissions = 0;
+        try {
+          if (ambassador?.lifetimeCommissions) {
+            // Convert BigInt to Number, handling USDC decimals (6 decimals)
+            const commissionsRaw = BigInt(
+              ambassador.lifetimeCommissions.toString(),
+            );
+            commissions = Number(commissionsRaw) / 1e6; // Convert from wei to USDC
+          }
+        } catch (error) {
+          console.error("Error converting commissions:", error);
+          commissions = 0;
+        }
 
         return {
           totalCommissions:
@@ -56,8 +69,11 @@ export default function RevenuePortfolio() {
     {
       title: "Pending Payouts",
       value: totals.totalCommissions
-        ? `$${Number(totals.totalCommissions).toLocaleString()}`
-        : "$0",
+        ? `$${totals.totalCommissions.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}`
+        : "$0.00",
       icon: Coins,
       gradient: "from-yellow-500/20 to-amber-500/20",
       iconColor: "text-yellow-600 dark:text-yellow-400",
@@ -362,7 +378,11 @@ export default function RevenuePortfolio() {
                   Total Earned
                 </span>
                 <span className="text-lg font-bold text-green-600 dark:text-green-400">
-                  ${Number(totals.totalCommissions).toLocaleString()}
+                  $
+                  {totals.totalCommissions.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </span>
               </div>
               <div className="flex justify-between items-center">

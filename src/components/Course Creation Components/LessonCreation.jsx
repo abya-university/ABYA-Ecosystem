@@ -32,8 +32,33 @@ const LessonCreation = () => {
   const [error, setError] = useState("");
 
   const createLesson = async () => {
-    if (!client) throw new Error("Client is required to access the contract.");
+    if (!lessonName.trim()) {
+      toast.warning("Please enter a lesson name");
+      return;
+    }
+
+    if (!lessonContent.trim()) {
+      toast.warning("Please enter lesson content");
+      return;
+    }
+
+    if (!chapterId) {
+      toast.warning("Please select a chapter");
+      return;
+    }
+
+    if (!isConnected) {
+      toast.error("Please connect your wallet");
+      return;
+    }
+
+    if (!client) {
+      toast.error("Client is required to access the contract");
+      return;
+    }
+
     setLoading(true);
+    const toastId = toast.loading("Creating lesson...");
     try {
       const diamondContract = await getContract({
         address: DiamondAddress,
@@ -42,17 +67,40 @@ const LessonCreation = () => {
         chain: defineChain(11155111),
       });
 
+      toast.update(toastId, {
+        render: "Processing transaction...",
+        isLoading: true,
+      });
+
       const tx = await prepareContractCall({
         contract: diamondContract,
         method: "addLesson",
         params: [chapterId.toString(), lessonName, lessonContent],
       });
+
+      toast.update(toastId, {
+        render: "Waiting for transaction confirmation...",
+        isLoading: true,
+      });
+
       await sendTransaction({ transaction: tx, account });
-      toast.success(`${lessonName} lesson created successfully!`);
+
+      toast.update(toastId, {
+        render: `${lessonName} lesson created successfully!`,
+        type: "success",
+        isLoading: false,
+        autoClose: 5000,
+      });
+
       setLessonName("");
       setLessonContent("");
     } catch (err) {
-      toast.error(`Failed to create lesson: ${err.message}`);
+      toast.update(toastId, {
+        render: `Failed to create lesson: ${err.message}`,
+        type: "error",
+        isLoading: false,
+        autoClose: 5000,
+      });
     } finally {
       setLoading(false);
     }
@@ -61,7 +109,7 @@ const LessonCreation = () => {
   useEffect(() => {
     if (courseId) {
       const filtered = chapters.filter(
-        (chapter) => Number(chapter.courseId) === Number(courseId)
+        (chapter) => Number(chapter.courseId) === Number(courseId),
       );
       setFilteredChapters(filtered);
     } else {
@@ -115,7 +163,7 @@ const LessonCreation = () => {
                 >
                   {course.courseName}
                 </option>
-              )
+              ),
           )}
         </select>
       </div>
@@ -164,9 +212,9 @@ const LessonCreation = () => {
 
       {/* Validation Hint */}
       {(!lessonName.trim() || !lessonContent.trim() || !chapterId) && (
-        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-          {!lessonName.trim() && "• Lesson name is required\n"}
-          {!lessonContent.trim() && "• Lesson content is required\n"}
+        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-1">
+          {!lessonName.trim() && "• Lesson name is required"}
+          {!lessonContent.trim() && "• Lesson content is required"}
           {!chapterId && "• Please select a chapter"}
         </div>
       )}

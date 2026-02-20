@@ -33,55 +33,103 @@ const ChapterCreation = () => {
   console.log("Coursess: ", courses);
 
   const createChapter = async () => {
-    if (isConnected) {
-      setLoading(true);
-      try {
-        if (!client) {
-          throw new Error("Client is required to access the contract.");
-        }
+    if (!isConnected) {
+      toast.error("Please connect your wallet");
+      return;
+    }
 
-        const parsedCourseId = Number(courseId);
+    if (!courseId) {
+      toast.warning("Please select a course");
+      return;
+    }
 
-        if (chapters.length === 0) {
-          throw new Error("Chapters array cannot be empty");
-        }
+    if (chapters.length === 0) {
+      toast.warning("Please add at least one chapter");
+      return;
+    }
 
-        if (chapters.length !== durations.length) {
-          throw new Error("Number of chapters and durations must match");
-        }
+    if (chapters.length !== durations.length) {
+      toast.warning("Number of chapters and durations must match");
+      return;
+    }
 
-        const diamondContract = await getContract({
-          address: DiamondAddress,
-          abi: Ecosystem2Facet_ABI,
-          client,
-          chain: defineChain(11155111),
-        });
-
-        const tx = await prepareContractCall({
-          contract: diamondContract,
-          method: "addChapters",
-          params: [parsedCourseId, chapters, durations],
-        });
-        await sendTransaction({ transaction: tx, account });
-        toast.success("Chapters created successfully!");
-        setChapters([]);
-        setDurations([]);
-        setCourseId("");
-      } catch (err) {
-        toast.error(`Failed to create chapters: ${err.message}`);
-      } finally {
-        setLoading(false);
+    setLoading(true);
+    const toastId = toast.loading("Creating chapters...");
+    try {
+      if (!client) {
+        throw new Error("Client is required to access the contract.");
       }
+
+      const parsedCourseId = Number(courseId);
+
+      const diamondContract = await getContract({
+        address: DiamondAddress,
+        abi: Ecosystem2Facet_ABI,
+        client,
+        chain: defineChain(11155111),
+      });
+
+      toast.update(toastId, {
+        render: "Processing transaction...",
+        isLoading: true,
+      });
+
+      const tx = await prepareContractCall({
+        contract: diamondContract,
+        method: "addChapters",
+        params: [parsedCourseId, chapters, durations],
+      });
+
+      toast.update(toastId, {
+        render: "Waiting for transaction confirmation...",
+        isLoading: true,
+      });
+
+      await sendTransaction({ transaction: tx, account });
+
+      toast.update(toastId, {
+        render: "Chapters created successfully!",
+        type: "success",
+        isLoading: false,
+        autoClose: 5000,
+      });
+
+      setChapters([]);
+      setDurations([]);
+      setCourseId("");
+    } catch (err) {
+      toast.update(toastId, {
+        render: `Failed to create chapters: ${err.message}`,
+        type: "error",
+        isLoading: false,
+        autoClose: 5000,
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   const addChapter = () => {
-    if (chapterName.trim() && duration) {
-      setChapters([...chapters, chapterName.trim()]);
-      setDurations([...durations, Number(duration)]);
-      setChapterName("");
-      setDuration("");
+    if (!chapterName.trim()) {
+      toast.warning("Please enter a chapter name");
+      return;
     }
+
+    if (!duration) {
+      toast.warning("Please enter a duration");
+      return;
+    }
+
+    if (Number(duration) <= 0) {
+      toast.warning("Duration must be greater than 0");
+      return;
+    }
+
+    setChapters([...chapters, chapterName.trim()]);
+    setDurations([...durations, Number(duration)]);
+    setChapterName("");
+    setDuration("");
+    toast.success(`Chapter "${chapterName.trim()}" added!`);
   };
 
   return (
