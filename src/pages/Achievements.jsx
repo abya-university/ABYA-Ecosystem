@@ -41,6 +41,7 @@ import "../index.css";
 import { useCommunityMembers } from "../contexts/communityMembersContext";
 import { useCommunityEvents } from "../contexts/communityEventsContext";
 import { useActiveAccount } from "thirdweb/react";
+import QRCode from "react-qr-code";
 
 const BADGE_DISPLAY_MAP = {
   0: {
@@ -125,6 +126,13 @@ const AchievementsPage = () => {
   const [vpListLoading, setVpListLoading] = useState(false);
   const [vpListError, setVpListError] = useState(null);
   const [selectedPresentation, setSelectedPresentation] = useState(null);
+
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareError, setShareError] = useState(null);
+  const [shareMap, setShareMap] = useState({});
+  const [shareInfo, setShareInfo] = useState(null);
+  const [shareTtl, setShareTtl] = useState(3600);
+  const [shareCountdown, setShareCountdown] = useState(null);
 
 
   // Mock ABYTKN tokens
@@ -309,7 +317,47 @@ const AchievementsPage = () => {
     return () => controller.abort();
   }, [showVCPresentationsPopup, did, address]);
 
+  useEffect(() => {
+    if (!shareInfo) {
+      setShareCountdown(null);
+      return;
+    }
+    const update = () => {
+      const expiresAt = new Date(shareInfo.expiresAt).getTime();
+      const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+      setShareCountdown(remaining);
+      if (remaining <= 0) {
+        // clean up expired share in UI (optionally)
+        // you can also refetch shareInfo if desired
+      }
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [shareInfo]);
 
+  useEffect(() => {
+    // clear UI errors when switching
+    setShareError(null);
+
+    if (!selectedPresentation) {
+      setShareInfo(null);
+      setShareCountdown(null);
+      return;
+    }
+
+    const pid = selectedPresentation.presentationId;
+    const list = shareMap?.[pid] ?? [];
+
+    // choose the most recent share by created order (0 = newest if you push unshift)
+    const latest = list.length > 0 ? list[0] : null;
+    setShareInfo(latest);
+
+    // reset countdown effect (it already watches shareInfo)
+    if (!latest) {
+      setShareCountdown(null);
+    }
+  }, [selectedPresentation, shareMap]);
 
   const handleSBTSelect = (cert, meta) => {
     const imageCid = meta?.image?.replace("ipfs://", "");
@@ -797,6 +845,96 @@ const AchievementsPage = () => {
         ))}
       </dl>
     );
+  };
+
+  const createShareLink = async () => {
+    if (!selectedPresentation?.presentationId) {
+      setShareError("Select a presentation first");
+      return;
+    }
+    setShareLoading(true);
+    setShareError(null);
+
+    try {
+      const res = await fetch("http://localhost:3000/share/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          presentationId: selectedPresentation.presentationId,
+          ttlSeconds: shareTtl,
+          ownerDid: selectedPresentation.ownerDid,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || err.message || `Failed to create share (${res.status})`);
+      }
+      const data = await res.json();
+      const newShare = { token: data.token, shareUrl: data.shareUrl, expiresAt: data.expiresAt };
+
+      setShareMap((prev) => {
+        const pid = selectedPresentation.presentationId;
+        const arr = prev[pid] ? [...prev[pid]] : [];
+        // avoid duplicate tokens if any
+        if (!arr.find((s) => s.token === newShare.token)) {
+          arr.unshift(newShare);
+        }
+        return { ...prev, [pid]: arr };
+      });
+
+      setShareInfo(newShare);
+    } catch (e) {
+      console.error("createShareLink error", e);
+      setShareError(e.message || "Failed to create share link");
+    } finally {
+      setShareLoading(false);
+    }
+  };
+
+  const revokeShare = async (tokenToRevoke) => {
+    const token = tokenToRevoke || shareInfo?.token;
+    if (!token) return;
+
+    try {
+      const res = await fetch("http://localhost:3000/share/revoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || err.message || "Failed to revoke");
+      }
+
+      // remove from shareMap
+      setShareMap((prev) => {
+        if (!selectedPresentation) return prev;
+        const pid = selectedPresentation.presentationId;
+        const arr = (prev[pid] || []).filter((s) => s.token !== token);
+        const next = { ...prev, [pid]: arr };
+        if (arr.length === 0) delete next[pid];
+        return next;
+      });
+
+      // if the revoked token is the one shown in UI, clear it or show next available
+      setShareInfo((current) => (current?.token === token ? null : current));
+    } catch (e) {
+      console.error("revokeShare error", e);
+      setShareError(e.message || "Failed to revoke share");
+    }
+  };
+
+  const formatRemaining = (s) => {
+    if (s == null) return "";
+    if (s <= 0) return "expired";
+    const days = Math.floor(s / 86400);
+    const hrs = Math.floor((s % 86400) / 3600);
+    const mins = Math.floor((s % 3600) / 60);
+    const secs = s % 60;
+    if (days) return `${days}d ${hrs}h ${mins}m`;
+    if (hrs) return `${hrs}h ${mins}m`;
+    if (mins) return `${mins}m ${secs}s`;
+    return `${secs}s`;
   };
 
 
@@ -2313,6 +2451,93 @@ const AchievementsPage = () => {
                               </a>
                             </div>
                           </details>
+                        </div>
+
+                        {/* --- Share panel (QR + expiring link) --- */}
+                        <div className="mt-4 bg-gray-50 dark:bg-gray-900 rounded-md p-3 border border-gray-200 dark:border-gray-700">
+                          <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Share presentation</h4>
+
+                          <div className="flex items-center gap-2 mb-2">
+                            <label className="text-xs text-gray-500 dark:text-gray-400">Expires in:</label>
+                            <select
+                              value={shareTtl}
+                              onChange={(e) => setShareTtl(Number(e.target.value))}
+                              className="text-sm p-1 border rounded bg-white dark:bg-gray-800"
+                            >
+                              <option value={3600}>1 hour</option>
+                              <option value={86400}>24 hours</option>
+                              <option value={604800}>7 days</option>
+                              <option value={2592000}>30 days</option>
+                            </select>
+
+                            <button
+                              onClick={createShareLink}
+                              disabled={shareLoading || !selectedPresentation}
+                              className="ml-auto px-3 py-1 bg-blue-600 text-white rounded-md hover:brightness-95 disabled:opacity-60"
+                            >
+                              {shareLoading ? "Generating..." : "Generate link"}
+                            </button>
+                          </div>
+
+                          {shareError && <div className="text-xs text-red-600 mb-2">{shareError}</div>}
+
+                          {/* Existing shares list for this presentation */}
+                          {selectedPresentation && (shareMap[selectedPresentation.presentationId] ?? []).length > 0 && (
+                            <div className="mb-3 text-xs">
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Existing shares for this presentation:</p>
+                              <div className="space-y-2">
+                                {shareMap[selectedPresentation.presentationId].map((s) => (
+                                  <div key={s.token} className="flex items-center gap-2 p-2 rounded border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={() => setShareInfo(s)}
+                                          className={`text-left truncate text-sm ${shareInfo?.token === s.token ? "font-semibold" : ""}`}
+                                        >
+                                          {s.shareUrl}
+                                        </button>
+                                      </div>
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Expires: {new Date(s.expiresAt).toLocaleString()}</p>
+                                    </div>
+
+                                    <div className="flex items-center gap-1">
+                                      <button onClick={() => copyToClipboard(s.shareUrl)} className="px-2 py-0.5 border rounded text-xs">Copy</button>
+                                      <button onClick={() => window.open(s.shareUrl, "_blank")} className="px-2 py-0.5 border rounded text-xs">Open</button>
+                                      <button onClick={() => revokeShare(s.token)} className="px-2 py-0.5 border rounded text-xs text-red-600">Revoke</button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Main preview / QR area for the selected shareInfo */}
+                          {shareInfo ? (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
+                              <div className="md:col-span-2">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Share URL</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <input readOnly value={shareInfo.shareUrl} className="flex-1 p-2 text-sm rounded border bg-white dark:bg-gray-800" />
+                                  <button onClick={() => copyToClipboard(shareInfo.shareUrl)} className="px-2 py-1 border rounded text-sm">Copy</button>
+                                  <button onClick={() => window.open(shareInfo.shareUrl, "_blank")} className="px-2 py-1 border rounded text-sm">Open</button>
+                                  <button onClick={() => revokeShare(shareInfo.token)} className="px-2 py-1 border rounded text-sm text-red-600">Revoke</button>
+                                </div>
+
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                  Expires in: <span className="font-mono">{formatRemaining(shareCountdown)}</span>
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Token: <span className="font-mono">{shareInfo.token}</span></p>
+                              </div>
+
+                              <div className="flex items-center justify-center md:col-span-1">
+                                <div className="bg-white p-2 rounded">
+                                  <QRCode value={shareInfo.shareUrl} size={128} />
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Generate an expiring link or QR code to share this presentation.</p>
+                          )}
                         </div>
                       </>
                     )}
