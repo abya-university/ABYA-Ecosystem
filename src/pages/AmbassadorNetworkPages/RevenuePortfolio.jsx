@@ -74,6 +74,12 @@ export default function RevenuePortfolio() {
             maximumFractionDigits: 2,
           })}`
         : "$0.00",
+      subtitle: totals.totalCommissions
+        ? `${totals.totalCommissions.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })} USDC`
+        : "0.00 USDC",
       icon: Coins,
       gradient: "from-yellow-500/20 to-amber-500/20",
       iconColor: "text-yellow-600 dark:text-yellow-400",
@@ -251,6 +257,11 @@ export default function RevenuePortfolio() {
                   <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
                     {card.value}
                   </p>
+                  {card.subtitle && (
+                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                      {card.subtitle}
+                    </p>
+                  )}
                   {card.subtext && (
                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                       {card.subtext}
@@ -377,13 +388,22 @@ export default function RevenuePortfolio() {
                 <span className="text-sm text-slate-500 dark:text-slate-400">
                   Total Earned
                 </span>
-                <span className="text-lg font-bold text-green-600 dark:text-green-400">
-                  $
-                  {totals.totalCommissions.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
+                <div className="text-right">
+                  <span className="text-lg font-bold text-green-600 dark:text-green-400 block">
+                    $
+                    {totals.totalCommissions.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                  <span className="text-xs text-slate-400 dark:text-slate-500">
+                    {totals.totalCommissions.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                    USDC
+                  </span>
+                </div>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-slate-500 dark:text-slate-400">
@@ -435,9 +455,14 @@ export default function RevenuePortfolio() {
                 <span className="text-sm text-slate-500 dark:text-slate-400">
                   Estimated Amount
                 </span>
-                <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                  $234.56
-                </span>
+                <div className="text-right">
+                  <span className="text-lg font-bold text-blue-600 dark:text-blue-400 block">
+                    $234.56
+                  </span>
+                  <span className="text-xs text-slate-400 dark:text-slate-500">
+                    234.56 USDC
+                  </span>
+                </div>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-slate-500 dark:text-slate-400">

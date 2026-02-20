@@ -379,8 +379,10 @@ export default function NetworkDashboard() {
   const totals = useMemo(() => {
     return ambassadorList.reduce(
       (accumulator, ambassador) => {
-        const downlineSales = Number(ambassador.totalDownlineSales || 0);
-        const commissions = Number(ambassador.lifetimeCommissions || 0);
+        const downlineSales =
+          Number(ambassador.totalDownlineSales || 0) / 1_000_000;
+        const commissions =
+          Number(ambassador.lifetimeCommissions || 0) / 1_000_000;
         const isActive = ambassador.isActive === true;
 
         return {
@@ -457,14 +459,28 @@ export default function NetworkDashboard() {
           },
           {
             title: "Total Downline Sales",
-            value: `$${totals.totalDownlineSales?.toLocaleString() || "0"}`,
+            value: `$${(totals.totalDownlineSales || 0).toLocaleString(
+              undefined,
+              { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+            )}`,
+            subtitle: `${(totals.totalDownlineSales || 0).toLocaleString(
+              undefined,
+              { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+            )} USDC`,
             icon: TrendingUp,
             gradient: "from-green-500/20 to-emerald-500/20",
             iconColor: "text-green-600 dark:text-green-400",
           },
           {
             title: "Total Commissions",
-            value: `$${totals.totalCommissions?.toLocaleString() || "0"}`,
+            value: `$${(totals.totalCommissions || 0).toLocaleString(
+              undefined,
+              { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+            )}`,
+            subtitle: `${(totals.totalCommissions || 0).toLocaleString(
+              undefined,
+              { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+            )} USDC`,
             icon: Award,
             gradient: "from-purple-500/20 to-pink-500/20",
             iconColor: "text-purple-600 dark:text-purple-400",
@@ -489,6 +505,11 @@ export default function NetworkDashboard() {
                   <p className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">
                     {card.value}
                   </p>
+                  {card.subtitle && (
+                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                      {card.subtitle}
+                    </p>
+                  )}
                 </div>
                 <div
                   className={`rounded-xl p-3 ${card.iconColor} bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm`}
@@ -627,9 +648,23 @@ export default function NetworkDashboard() {
                 </p>
                 <p className="text-xl font-bold text-green-600 dark:text-green-400">
                   $
-                  {Number(
-                    userAmbassadorDetails.totalDownlineSales || 0,
-                  ).toLocaleString()}
+                  {(
+                    Number(userAmbassadorDetails.totalDownlineSales || 0) /
+                    1_000_000
+                  ).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                  {(
+                    Number(userAmbassadorDetails.totalDownlineSales || 0) /
+                    1_000_000
+                  ).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  USDC
                 </p>
               </div>
 
@@ -639,9 +674,23 @@ export default function NetworkDashboard() {
                 </p>
                 <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
                   $
-                  {Number(
-                    userAmbassadorDetails.lifetimeCommissions || 0,
-                  ).toLocaleString()}
+                  {(
+                    Number(userAmbassadorDetails.lifetimeCommissions || 0) /
+                    1_000_000
+                  ).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                  {(
+                    Number(userAmbassadorDetails.lifetimeCommissions || 0) /
+                    1_000_000
+                  ).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  USDC
                 </p>
               </div>
 
