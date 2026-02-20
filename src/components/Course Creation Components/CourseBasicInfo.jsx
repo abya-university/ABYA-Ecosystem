@@ -68,7 +68,7 @@ const CourseBasicInfo = () => {
       !courseData.basicInfo.name.trim() ||
       !courseData.basicInfo.description.trim()
     ) {
-      toast.error("Please fill in all required fields");
+      toast.warning("Please fill in all required fields");
       return;
     }
 
@@ -78,18 +78,19 @@ const CourseBasicInfo = () => {
     }
 
     if (!courseData.basicInfo.image) {
-      toast.error("Please upload a course image");
+      toast.warning("Please upload a course image");
       return;
     }
 
     if (!courseData.basicInfo.isFree && priceUSDCUnits === null) {
-      toast.error("Please enter a valid course price");
+      toast.warning("Please enter a valid course price");
       return;
     }
 
     setLoading(true);
     setSuccess("");
     setError("");
+    const toastId = toast.loading("Creating course...");
     try {
       const diamondContract = await getContract({
         address: DiamondAddress,
@@ -98,9 +99,19 @@ const CourseBasicInfo = () => {
         chain: defineChain(11155111),
       });
 
+      toast.update(toastId, {
+        render: "Uploading course image...",
+        isLoading: true,
+      });
+
       const imageIpfsHash = await uploadFileToPinata(
         courseData.basicInfo.image,
       );
+
+      toast.update(toastId, {
+        render: "Processing transaction...",
+        isLoading: true,
+      });
 
       const tx = await prepareContractCall({
         contract: diamondContract,
@@ -114,11 +125,22 @@ const CourseBasicInfo = () => {
         ],
       });
 
+      toast.update(toastId, {
+        render: "Waiting for transaction confirmation...",
+        isLoading: true,
+      });
+
       console.log("Transaction sent:", tx.hash);
       const receipt = await sendTransaction({ transaction: tx, account });
       console.log("Transaction confirmed:", receipt.transactionHash);
 
-      toast.success("Course created successfully!");
+      toast.update(toastId, {
+        render: "Course created successfully!",
+        type: "success",
+        isLoading: false,
+        autoClose: 5000,
+      });
+
       setSuccess("Course created successfully!");
       setCourseData({
         basicInfo: {
@@ -145,7 +167,12 @@ const CourseBasicInfo = () => {
       // console.log("Has COURSE_OWNER_ROLE:", hasRole);
     } catch (err) {
       const message = err?.message || "Unknown error";
-      toast.error(`Failed to create course: ${message}`);
+      toast.update(toastId, {
+        render: `Failed to create course: ${message}`,
+        type: "error",
+        isLoading: false,
+        autoClose: 5000,
+      });
       setError(`Failed to create course: ${message}`);
     } finally {
       setLoading(false);

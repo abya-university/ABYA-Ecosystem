@@ -8,8 +8,10 @@ import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
 import { toast } from "react-toastify";
 import { useActiveAccount } from "thirdweb/react";
 import { client } from "../../services/client";
-import { useContext } from "react";
+import { useContext, useMemo } from "react";
 import { LessonContext } from "../../contexts/lessonContext";
+import { CourseContext } from "../../contexts/courseContext";
+import { ChapterContext } from "../../contexts/chapterContext";
 import {
   uploadFileToPinata,
   uploadMetadataToIPFS,
@@ -26,6 +28,8 @@ const ResourcesCreation = () => {
   const [file, setFile] = useState(null);
   const [resources, setResources] = useState([]);
   const { lessons } = useContext(LessonContext);
+  const { courses } = useContext(CourseContext);
+  const { chapters } = useContext(ChapterContext);
   const [lessonId, setLessonId] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [success, setSuccess] = useState("");
@@ -33,6 +37,45 @@ const ResourcesCreation = () => {
   const account = useActiveAccount();
   const address = account?.address || "";
   const isConnected = !!address;
+
+  // Filter lessons to only show those from courses created by the current user
+  const userLessons = useMemo(() => {
+    if (!address || !courses?.length || !chapters?.length || !lessons?.length) {
+      return [];
+    }
+
+    // Helper function to normalize IDs
+    const normalizeId = (id) => {
+      if (typeof id === "bigint") return id.toString();
+      if (typeof id === "number") return id.toString();
+      return String(id);
+    };
+
+    // Get course IDs created by current user
+    const userCourses = courses.filter(
+      (course) => course.creator?.toLowerCase() === address.toLowerCase(),
+    );
+
+    const userCourseIds = userCourses.map((course) =>
+      normalizeId(course.courseId),
+    );
+
+    // Get chapter IDs from those courses
+    const userChapters = chapters.filter((chapter) =>
+      userCourseIds.includes(normalizeId(chapter.courseId)),
+    );
+
+    const userChapterIds = userChapters.map((chapter) =>
+      normalizeId(chapter.chapterId),
+    );
+
+    // Filter lessons from those chapters
+    const filteredLessons = lessons.filter((lesson) =>
+      userChapterIds.includes(normalizeId(lesson.chapterId)),
+    );
+
+    return filteredLessons;
+  }, [address, courses, chapters, lessons]);
 
   // Enum mapping matching the contract
   const ContentTypeEnum = {
@@ -44,28 +87,46 @@ const ResourcesCreation = () => {
   const addResource = async () => {
     try {
       if (!lessonId || !contentType || !resourceName) {
-        alert("Please fill in all required fields");
+        toast.warning(
+          "Please fill in all required fields: lesson, content type, and resource name",
+        );
         return;
       }
 
       if (!isConnected || !address) {
-        setError("Wallet is not connected");
+        toast.error("Please connect your wallet");
+        return;
+      }
+
+      if (contentType !== "Video" && !file) {
+        toast.warning("Please upload a file");
+        return;
+      }
+
+      if (contentType === "Video" && !resourceLink) {
+        toast.warning("Please provide a video URL");
         return;
       }
 
       setIsUploading(true);
+      const toastId = toast.loading("Adding resource...");
+
       let finalLink = "";
 
       // Handle file upload for Image/Document
       if (contentType !== "Video") {
-        if (!file) {
-          alert("Please upload a file");
-          return;
-        }
+        toast.update(toastId, {
+          render: `Uploading ${contentType}...`,
+          isLoading: true,
+        });
         // Upload to Pinata
         const fileCid = await uploadFileToPinata(file);
         console.log("File uploaded to Pinata with CID:", fileCid);
 
+        toast.update(toastId, {
+          render: "Creating metadata...",
+          isLoading: true,
+        });
         // Create and upload metadata
         const metadata = {
           type: contentType.toLowerCase(),
@@ -75,6 +136,11 @@ const ResourcesCreation = () => {
       } else {
         finalLink = resourceLink;
       }
+
+      toast.update(toastId, {
+        render: "Processing transaction...",
+        isLoading: true,
+      });
 
       // Create resource object matching contract structure
       const newResource = {
@@ -95,7 +161,14 @@ const ResourcesCreation = () => {
         method: "addResourcesToLesson",
         params: [lessonId, ContentTypeEnum[contentType], [newResource]],
       });
+
+      toast.update(toastId, {
+        render: "Waiting for transaction confirmation...",
+        isLoading: true,
+      });
+
       await sendTransaction({ transaction: tx, account });
+
       // Update local state
       setResources([
         ...resources,
@@ -106,7 +179,12 @@ const ResourcesCreation = () => {
         },
       ]);
 
-      toast.success("Resource added successfully!");
+      toast.update(toastId, {
+        render: "Resource added successfully!",
+        type: "success",
+        isLoading: false,
+        autoClose: 5000,
+      });
 
       // Reset form
       setResourceName("");
@@ -149,7 +227,7 @@ const ResourcesCreation = () => {
         {/* Lesson Selection */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Select Lesson
+            Select Lesson (from your courses)
           </label>
           <select
             value={lessonId}
@@ -157,9 +235,11 @@ const ResourcesCreation = () => {
             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm md:text-base"
           >
             <option value="" className="text-gray-500 dark:text-gray-400">
-              Choose a lesson
+              {userLessons.length === 0
+                ? "No lessons found - create a course first"
+                : "Choose a lesson"}
             </option>
-            {lessons.map((lesson) => (
+            {userLessons.map((lesson) => (
               <option
                 key={lesson.lessonId}
                 value={lesson.lessonId}
@@ -169,6 +249,12 @@ const ResourcesCreation = () => {
               </option>
             ))}
           </select>
+          {userLessons.length === 0 && address && (
+            <p className="text-sm text-amber-600 dark:text-amber-400">
+              No lessons found from your courses. Make sure you've created
+              courses, chapters, and lessons first.
+            </p>
+          )}
         </div>
 
         {/* Content Type Selection */}

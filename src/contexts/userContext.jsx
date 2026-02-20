@@ -215,20 +215,25 @@ export const UserProvider = ({ children }) => {
           params: [address],
         });
 
-        // Fetch details for each enrolled course
+        // Fetch details for each enrolled course and include the courseId
         const coursesDetails = await Promise.all(
-          courseIds.map((courseId) =>
-            readContract({
+          courseIds.map(async (courseId) => {
+            const courseData = await readContract({
               contract,
               method: "getCourse",
               params: [courseId],
-            }),
-          ),
+            });
+            // Return course data with the courseId included (keep as BigInt for contract compatibility)
+            return {
+              courseId: courseId,
+              ...courseData,
+            };
+          }),
         );
 
         setEnrolledCourses(coursesDetails);
 
-        console.log("Enrolled Courses:", coursesDetails);
+        console.log("Enrolled Courses with IDs:", coursesDetails);
       } catch (error) {
         console.error("Error fetching enrolled courses:", error);
       }

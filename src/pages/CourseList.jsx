@@ -454,19 +454,36 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   };
 
   const approveCourse = async (course) => {
+    let toastId = null;
     try {
       setIsLoading(true);
+      toastId = toast.loading("Preparing course for review...");
 
       // 1. Get complete course details
       const completeDetails = await getCompleteCourseDeatils(course.courseId);
       if (!completeDetails) {
-        toast.error("Failed to load course details for review.");
+        toast.update(toastId, {
+          render: "Failed to load course details for review.",
+          type: "error",
+          isLoading: false,
+          autoClose: 5000,
+        });
         return;
       }
+
+      toast.update(toastId, {
+        render: "Generating course documentation...",
+        isLoading: true,
+      });
 
       // 2. Generate markdown for AI evaluation
       const courseMarkdown = generateCourseMarkdown(completeDetails);
       console.log("Generated markdown length:", courseMarkdown.length);
+
+      toast.update(toastId, {
+        render: "Sending to AI evaluation service...",
+        isLoading: true,
+      });
 
       // 3. Send to AI microservice
       const formData = new FormData();
@@ -482,6 +499,11 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       if (!response.ok) {
         throw new Error(`AI evaluation failed: ${response.statusText}`);
       }
+
+      toast.update(toastId, {
+        render: "Processing evaluation results...",
+        isLoading: true,
+      });
 
       // 4. Process AI evaluation results
       const evaluationResult = await response.json();
@@ -560,6 +582,11 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         );
       }
 
+      toast.update(toastId, {
+        render: "Sending to blockchain for approval...",
+        isLoading: true,
+      });
+
       // 7. Send to blockchain
       const contract = getContract({
         address: DiamondAddress,
@@ -574,11 +601,31 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         params: [course.courseId, finalScore, review],
       });
 
+      toast.update(toastId, {
+        render: "Waiting for blockchain confirmation...",
+        isLoading: true,
+      });
+
       await sendTransaction(transaction);
-      toast.success("Course approved successfully!");
+
+      toast.update(toastId, {
+        render: "Course submitted for review successfully!",
+        type: "success",
+        isLoading: false,
+        autoClose: 5000,
+      });
     } catch (error) {
       console.error("Error in course approval process:", error);
-      toast.error(`Failed to approve course: ${error.message}`);
+      if (toastId) {
+        toast.update(toastId, {
+          render: `Failed to submit course for review: ${error.message}`,
+          type: "error",
+          isLoading: false,
+          autoClose: 5000,
+        });
+      } else {
+        toast.error(`Failed to submit course for review: ${error.message}`);
+      }
     } finally {
       setIsLoading(false);
     }

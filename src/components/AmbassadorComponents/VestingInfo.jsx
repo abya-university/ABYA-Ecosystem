@@ -34,18 +34,22 @@ export default function VestingInfo({
   } = useVesting();
 
   const [isLoading, setIsLoading] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const targetAddress = ambassadorAddress || account?.address;
 
   // Fetch vesting data on mount or when target address changes
   useEffect(() => {
-    if (targetAddress) {
+    if (targetAddress && !hasLoadedOnce) {
       setIsLoading(true);
       Promise.all([
         getVestingInfo(targetAddress),
         getVestingSchedule(targetAddress),
-      ]).finally(() => setIsLoading(false));
+      ]).finally(() => {
+        setIsLoading(false);
+        setHasLoadedOnce(true);
+      });
     }
-  }, [targetAddress, getVestingInfo, getVestingSchedule]);
+  }, [targetAddress]); // Remove function dependencies to prevent infinite loops
 
   const handleClaimTokens = async () => {
     await claimVestedTokens();
@@ -55,12 +59,19 @@ export default function VestingInfo({
     }
   };
 
-  // Format token amounts
+  // Format token amounts - safely handle BigInt
   const formatTokens = (amount) => {
     if (!amount) return "0";
-    const num = Number(amount);
-    if (isNaN(num)) return "0";
-    return (num / 1e18).toFixed(2);
+    try {
+      const bigIntAmount =
+        typeof amount === "bigint" ? amount : BigInt(amount.toString());
+      const num = Number(bigIntAmount) / 1e18;
+      if (isNaN(num)) return "0";
+      return num.toFixed(2);
+    } catch (error) {
+      console.error("Error formatting tokens:", error);
+      return "0";
+    }
   };
 
   const cardStyle = darkMode
