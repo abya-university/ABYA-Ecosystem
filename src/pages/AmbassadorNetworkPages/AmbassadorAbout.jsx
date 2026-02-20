@@ -169,14 +169,17 @@ export default function AmbassadorAbout() {
                   Founding Ambassadors
                 </h3>
                 <p className="mt-3 text-yellow-800 dark:text-yellow-300">
-                  The first members who lead the network from day one. They pay
-                  a 100 USDC registration fee to become ambassadors immediately.
+                  The first members who establish the network from the
+                  beginning. They pay a one-time registration fee of 100 USDC to
+                  become ambassadors immediately and begin building their
+                  downline.
                 </p>
                 <div className="mt-6 space-y-3">
                   {[
-                    "Build their own network directly",
-                    "Receive higher tier benefits",
-                    "Earn commissions from direct and indirect referrals",
+                    "Lead the network before general ambassadors join",
+                    "Build a binary tree structure with left and right legs",
+                    "Earn tier bonuses and higher commission percentages",
+                    "Can recruit both founding and general ambassadors",
                   ].map((item, idx) => (
                     <div key={idx} className="flex items-start gap-3">
                       <div className="mt-0.5 rounded-full bg-yellow-500/20 p-1">
@@ -206,14 +209,17 @@ export default function AmbassadorAbout() {
                   General Ambassadors
                 </h3>
                 <p className="mt-3 text-blue-800 dark:text-blue-300">
-                  Members who complete a paid course (50+ USDC) to become
-                  ambassadors. They build their network through education.
+                  Members who enroll in paid courses (minimum 50 USDC total
+                  spend) to become ambassadors. They grow their network through
+                  education and referrals, with a sponsor from the founding
+                  tier.
                 </p>
                 <div className="mt-6 space-y-3">
                   {[
-                    "Complete course enrollment requirement",
-                    "Earn while learning",
-                    "Build network through referrals",
+                    "Require enrollment in at least one course to qualify",
+                    "Must have a founding ambassador as sponsor",
+                    "Earn commissions on their network's purchases",
+                    "Entry-fee covered through course enrollment",
                   ].map((item, idx) => (
                     <div key={idx} className="flex items-start gap-3">
                       <div className="mt-0.5 rounded-full bg-blue-500/20 p-1">
@@ -231,34 +237,32 @@ export default function AmbassadorAbout() {
             </div>
           </div>
 
-          {/* Ambassador Levels */}
+          {/* Ambassador Tiers & Progression */}
           <div className={`mt-6 rounded-2xl border p-6 ${glassCardStyle}`}>
             <div className="flex items-start gap-3 mb-4">
               <Layers className="h-6 w-6 text-purple-600 dark:text-purple-400" />
               <h3 className="text-xl font-semibold">
-                Ambassador Levels & Tiers
+                Ambassador Tiers & Progression
               </h3>
             </div>
             <p className="text-slate-600 dark:text-slate-300 mb-6">
-              Ambassadors progress through levels based on their network size
-              and activity. Each level unlocks additional benefits:
+              There are two ambassador tiers: General (Tier 1) and Founding
+              (Tier 2). Within each tier, ambassadors progress through levels
+              based on their network depth and activity. The network uses a
+              binary tree structure where each ambassador can have a left and
+              right leg, with commissions flowing from both directions.
             </p>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2">
               {[
                 {
-                  level: "Level 1",
-                  desc: "Base rewards, limited upline depth",
+                  tier: "Tier 1: General Ambassador",
+                  desc: "Entered through course enrollment (50+ USDC). Earn commissions on network purchases with a founding ambassador sponsor.",
                   color: "blue",
                 },
                 {
-                  level: "Level 2",
-                  desc: "Increased rewards, expanded network reach",
-                  color: "green",
-                },
-                {
-                  level: "Level 3+",
-                  desc: "Premium benefits, maximum earning potential",
-                  color: "purple",
+                  tier: "Tier 2: Founding Ambassador",
+                  desc: "Direct entry with 100 USDC registration fee. Higher tier benefits and can act as sponsors for general ambassadors.",
+                  color: "yellow",
                 },
               ].map((item, idx) => (
                 <div
@@ -272,7 +276,7 @@ export default function AmbassadorAbout() {
                       colorVariants[item.color].text
                     }`}
                   >
-                    {item.level}
+                    {item.tier}
                   </p>
                   <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
                     {item.desc}
@@ -280,6 +284,10 @@ export default function AmbassadorAbout() {
                 </div>
               ))}
             </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-4 italic">
+              Note: Progression levels (1, 2, 3+) within each tier are
+              determined by network depth, activity, and performance metrics.
+            </p>
           </div>
         </div>
       </div>
@@ -499,26 +507,29 @@ export default function AmbassadorAbout() {
                 <h3 className="text-xl font-semibold text-green-900 dark:text-green-200 mb-4">
                   Commission Structure
                 </h3>
-                <p className="text-green-800 dark:text-green-300 mb-4">
-                  When team members purchase courses or products, commissions
-                  are distributed:
+                <p className="mt-3 text-green-800 dark:text-green-300 mb-4">
+                  Commission distribution is based on network member purchases.
+                  Important: The first purchase by a newly registered member
+                  does not generate commissions. Subsequent purchases by the
+                  same member will trigger commissions throughout the network
+                  hierarchy:
                 </p>
                 <div className="space-y-4">
                   {[
                     {
-                      title: "Direct Referral",
-                      rate: "15-20%",
-                      desc: "commission from direct purchases",
+                      title: "First Purchase (Registration)",
+                      rate: "No Commission",
+                      desc: "initial course enrollment to become general ambassador",
                     },
                     {
-                      title: "Level 2",
-                      rate: "5-10%",
-                      desc: "from second-tier network",
+                      title: "Subsequent Purchases",
+                      rate: "Varies by Tier",
+                      desc: "commissions distributed through entire upline and network",
                     },
                     {
-                      title: "Level 3+",
-                      rate: "Tiered",
-                      desc: "commissions deeper in network",
+                      title: "Refunds",
+                      rate: "Reversed",
+                      desc: "commissions are deducted from ambassador accounts",
                     },
                   ].map((item, idx) => (
                     <div key={idx} className="flex items-start gap-3">
@@ -544,13 +555,16 @@ export default function AmbassadorAbout() {
 
             {/* Revenue Triggers */}
             <div className={`rounded-2xl border p-6 ${glassCardStyle}`}>
-              <h3 className="text-xl font-semibold mb-4">Revenue Triggers</h3>
+              <h3 className="text-xl font-semibold mb-4">
+                Revenue Triggers & Payment
+              </h3>
               <div className="space-y-3">
                 {[
-                  "Course purchases by network members",
-                  "Product or service transactions",
-                  "Additional purchases by referred members",
-                  "Bonus activations for tier achievements",
+                  "Course purchases by network members (not first registration)",
+                  "Additional purchases and course re-enrollments",
+                  "Commissions paid in USDC stablecoin to your wallet",
+                  "Withdrawal available anytime (no waiting period)",
+                  "Refunds automatically reverse associated commissions",
                 ].map((item, idx) => (
                   <div key={idx} className="flex items-start gap-3">
                     <div className="mt-0.5 rounded-full bg-green-500/20 p-1">
@@ -564,47 +578,68 @@ export default function AmbassadorAbout() {
               </div>
             </div>
 
-            {/* Payment & Withdrawal */}
+            {/* De-registration Section */}
             <div
               className={`lg:col-span-3 rounded-2xl border p-6 ${glassCardStyle}`}
             >
               <h3 className="text-xl font-semibold mb-4">
-                Payment & Withdrawal
+                De-registration & Refunds
               </h3>
-              <div className="grid gap-4 sm:grid-cols-4">
-                {[
-                  { label: "Commission", value: "Held in USDC", icon: Wallet },
-                  {
-                    label: "Withdrawal",
-                    value: "Withdraw anytime",
-                    icon: Gift,
-                  },
-                  {
-                    label: "Frequency",
-                    value: "Real-time updates",
-                    icon: Clock,
-                  },
-                  {
-                    label: "Refunds",
-                    value: "Reverse commissions",
-                    icon: ArrowRight,
-                  },
-                ].map((item, idx) => {
-                  const Icon = item.icon;
-                  return (
-                    <div key={idx} className="flex items-start gap-3">
-                      <div className="rounded-lg bg-slate-100 p-2 dark:bg-slate-800">
-                        <Icon className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          {item.label}
-                        </p>
-                        <p className="text-sm font-semibold">{item.value}</p>
-                      </div>
+              <div className="space-y-4">
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  Founding ambassadors can de-register if they have no active
+                  subordinates (left or right leg members). Refunds are tiered
+                  based on how long you've been registered:
+                </p>
+                <div className="grid gap-3 sm:grid-cols-4">
+                  {[
+                    {
+                      period: "0-3 days",
+                      refund: "80 USDC (80% refund)",
+                      color: "green",
+                    },
+                    {
+                      period: "3-10 days",
+                      refund: "50 USDC (50% refund)",
+                      color: "yellow",
+                    },
+                    {
+                      period: "10-30 days",
+                      refund: "15 USDC (15% refund)",
+                      color: "orange",
+                    },
+                    {
+                      period: "30+ days",
+                      refund: "5 USDC (5% refund)",
+                      color: "red",
+                    },
+                  ].map((item, idx) => (
+                    <div
+                      key={idx}
+                      className={`rounded-lg border p-3 text-center ${
+                        item.color === "green"
+                          ? "border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20"
+                          : item.color === "yellow"
+                          ? "border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/20"
+                          : item.color === "orange"
+                          ? "border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20"
+                          : "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20"
+                      }`}
+                    >
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        {item.period}
+                      </p>
+                      <p className="text-sm font-bold mt-1 text-slate-900 dark:text-slate-100">
+                        {item.refund}
+                      </p>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+                  Note: General ambassadors do not receive refunds upon
+                  de-registration as their entry was through course enrollment,
+                  not a direct fee.
+                </p>
               </div>
             </div>
           </div>
@@ -699,23 +734,35 @@ export default function AmbassadorAbout() {
           {[
             {
               q: "Can I be both a founding and general ambassador?",
-              a: "No, you must choose one path. Founding ambassadors have priority and higher tier benefits.",
+              a: "No, you must choose one path. Founding ambassadors have priority and higher tier benefits, plus early network advantages.",
             },
             {
               q: "When can I claim my vested tokens?",
-              a: "Tokens vest linearly over 365 days. You can claim anytime after they're vested.",
+              a: "Tokens vest linearly over 365 days at no cost. You can claim anytime after they're vested by accepting the withdrawal transaction.",
+            },
+            {
+              q: "What is the binary tree network structure?",
+              a: "Each ambassador can have up to two direct recruits: a left leg and a right leg. Your network depth can be unlimited, and commissions flow from all members in your tree.",
+            },
+            {
+              q: "Why don't I earn commissions on my first purchase?",
+              a: "The first course purchase registers you as a general ambassador. Only subsequent purchases by network members trigger commission distribution.",
             },
             {
               q: "How are commissions calculated?",
-              a: "Commissions are based on your tier, level, and the purchase amounts of your network.",
+              a: "Commissions are based on your tier, level, and the purchase amounts of your network members. The first purchase doesn't generate commissions, but all subsequent purchases do.",
             },
             {
               q: "Can I withdraw commissions immediately?",
-              a: "Yes! Commissions in USDC can be withdrawn to your wallet anytime.",
+              a: "Yes! Commissions in USDC stablecoin can be withdrawn to your wallet anytime without waiting periods.",
+            },
+            {
+              q: "Are commissions paid in USDC or another token?",
+              a: "All commissions are paid in USDC stablecoin, which maintains a 1:1 peg with the US dollar. You can manage and withdraw them through your wallet.",
             },
             {
               q: "What happens if someone in my network gets a refund?",
-              a: "Commissions on refunded purchases are reversed from your account.",
+              a: "Commissions on refunded purchases are automatically reversed and deducted from your account.",
             },
           ].map((faq, idx) => (
             <details
