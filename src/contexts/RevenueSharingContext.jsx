@@ -188,6 +188,31 @@ export const RevenueSharingProvider = ({ children }) => {
       const receipt = await sendTransaction({ transaction, account });
       console.log("Course purchased, transaction receipt:", receipt);
 
+      // Read the purchase counter to get the purchaseId that was just created
+      let purchaseId = null;
+      try {
+        const contract = getContract({
+          address: DiamondAddress,
+          abi: RevenueSharingFacet_ABI,
+          client,
+          chain: defineChain(11155111),
+        });
+
+        // The purchaseId is the current purchaseCounter value
+        const counterValue = await readContract({
+          contract,
+          method: "getPurchaseCounter",
+          params: [],
+        });
+        purchaseId = counterValue;
+        console.log("Purchase created with ID:", purchaseId);
+      } catch (counterError) {
+        console.warn(
+          "Could not retrieve purchaseId from contract:",
+          counterError,
+        );
+      }
+
       const successMsg = "Course purchased successfully";
       setSuccess(successMsg);
       toast.update(toastId, {
@@ -197,7 +222,7 @@ export const RevenueSharingProvider = ({ children }) => {
         autoClose: 5000,
       });
       setPurchaseLoading(false);
-      return { success: true, data: receipt };
+      return { success: true, data: receipt, purchaseId };
     } catch (err) {
       console.error("Error purchasing course:", err);
       const errorMsg = err.message || "Failed to purchase course";
@@ -363,10 +388,18 @@ export const RevenueSharingProvider = ({ children }) => {
         params: [targetAddress],
       });
 
-      setCommissionsBalance(balance);
-      console.log("Commissions balance fetched:", balance);
+      const normalizedBalance = Array.isArray(balance)
+        ? {
+            pending: balance[0],
+            lifetime: balance[1],
+            withdrawn: balance[2],
+          }
+        : balance;
+
+      setCommissionsBalance(normalizedBalance);
+      console.log("Commissions balance fetched:", normalizedBalance);
       setLoading(false);
-      return { success: true, data: balance };
+      return { success: true, data: normalizedBalance };
     } catch (err) {
       console.error("Error fetching commissions balance:", err);
       const errorMsg = err.message || "Failed to fetch commissions balance";

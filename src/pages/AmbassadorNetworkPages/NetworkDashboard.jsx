@@ -587,16 +587,21 @@ export default function NetworkDashboard() {
               </div>
 
               {/* Referral Section */}
-              {userAmbassadorDetails.tier === 2 && (
+              {userAmbassadorDetails && (
                 <div className="w-full lg:w-96">
                   <div className="rounded-2xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 p-6 border border-blue-500/20">
                     <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-3">
                       <Link2 className="h-5 w-5" />
-                      <p className="font-semibold">Share Your Network</p>
+                      <p className="font-semibold">
+                        {userAmbassadorDetails.tier === 2
+                          ? "Share Your Network"
+                          : "Share Your Sponsor Link"}
+                      </p>
                     </div>
                     <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">
-                      Invite new ambassadors and earn commissions from their
-                      network growth!
+                      {userAmbassadorDetails.tier === 2
+                        ? "Invite new ambassadors and earn commissions from their network growth!"
+                        : "Invite new learners to join under your sponsor link and grow your network."}
                     </p>
                     <button
                       onClick={copyReferralLink}
@@ -612,7 +617,9 @@ export default function NetworkDashboard() {
                         ) : (
                           <>
                             <Copy className="h-4 w-4" />
-                            Copy Referral Link
+                            {userAmbassadorDetails.tier === 2
+                              ? "Copy Referral Link"
+                              : "Copy Sponsor Link"}
                           </>
                         )}
                       </div>
