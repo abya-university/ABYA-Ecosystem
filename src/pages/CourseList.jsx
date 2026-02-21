@@ -1491,7 +1491,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                             <>
                               <button
                                 onClick={() => viewCourse(course.courseId)}
-                                className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2 px-3 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/25 transition-all flex items-center justify-center gap-2"
+                                className="flex-1 bg-gradient-to-r from-yellow-500 to-yellow-500 text-white py-2 px-3 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/25 transition-all flex items-center justify-center gap-2"
                               >
                                 <Eye className="w-4 h-4" />
                                 View Course
@@ -1527,7 +1527,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                             <button
                               onClick={() => enroll(course.courseId)}
                               disabled={enrollingCourseId === course.courseId}
-                              className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-2 px-3 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-green-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                              className="w-full bg-gradient-to-r from-gray-600 to-gray-700 text-white py-2 px-3 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-white-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                               <Wifi className="w-4 h-4" />
                               {enrollingCourseId === course.courseId
@@ -2039,7 +2039,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                       disabled={
                         unenrollingCourseId === courseToUnenroll?.courseId
                       }
-                      className="flex-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors font-medium"
+                      className="flex-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors font-medium dark:text-white text-black"
                     >
                       Cancel
                     </button>
