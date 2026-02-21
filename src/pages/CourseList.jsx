@@ -3,7 +3,6 @@ import {
   Book,
   Eye,
   Clock,
-  Check,
   AlertCircle,
   Wifi,
   Info,
@@ -12,10 +11,29 @@ import {
   Users,
   CheckCircle,
   WifiOff,
-  ChartBar,
   ArrowLeft,
-  ExternalLink,
-  WifiOffIcon,
+  Search,
+  Filter,
+  Star,
+  TrendingUp,
+  GraduationCap,
+  ChevronDown,
+  Grid,
+  List,
+  BookOpen,
+  Target,
+  Globe,
+  PlayCircle,
+  BarChart3,
+  FilePlus,
+  FileText as FileTextIcon,
+  Lock as LockIcon,
+  Video as VideoIcon,
+  Wifi as WifiIcon,
+  WifiOff as WifiOffIcon2,
+  Cloud as CloudIcon,
+  MapPin as MapPinIcon,
+  CircleDashed as CircleDashedIcon,
 } from "lucide-react";
 import { CourseContext } from "../contexts/courseContext";
 import { useUser } from "../contexts/userContext";
@@ -39,6 +57,7 @@ import { defineChain } from "thirdweb/chains";
 import { useChainMetadata } from "thirdweb/react";
 import CONTRACT_ADDRESSES from "../constants/addresses";
 import { useCertificates } from "../contexts/certificatesContext";
+import { useDarkMode } from "../contexts/themeContext";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
@@ -47,6 +66,7 @@ const FALLBACK_COURSE_IMAGE = "/Vision.jpg";
 const IPFS_GATEWAY_BASE = "https://ipfs.io/ipfs/";
 
 const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
+  const { darkMode } = useDarkMode();
   const {
     courses,
     latestReviews,
@@ -72,7 +92,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     totalLessons: 0,
     totalQuizzes: 0,
   });
-  // const { address, isConnected } = useAccount();
   const account = useActiveAccount();
   const address = account?.address;
   const isConnected = !!account;
@@ -88,6 +107,14 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const [showUnenrollConfirm, setShowUnenrollConfirm] = useState(false);
   const [courseToUnenroll, setCourseToUnenroll] = useState(null);
 
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDifficulty, setSelectedDifficulty] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'list'
+  const [sortBy, setSortBy] = useState("newest"); // 'newest', 'popular', 'price-low', 'price-high'
+  const [filteredCourses, setFilteredCourses] = useState([]);
+
   // Survey modal state
   const [showSurveyModal, setShowSurveyModal] = useState(false);
   const [courseIdPendingEnrollment, setCourseIdPendingEnrollment] =
@@ -97,8 +124,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const allReviews = courseReviews[courseId] || [];
   const feedback = courseFeedback[courseId];
 
-  console.log("Courses in courselist:", courses);
-
   const { data: chainMetadata } = useChainMetadata(defineChain(11155111));
 
   const [activeTab, setActiveTab] = useState("details");
@@ -107,6 +132,59 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const [filteredLessons, setFilteredLessons] = useState([]);
   const [filteredQuizzes, setFilteredQuizzes] = useState([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+
+  // Difficulty options
+  const difficultyOptions = [
+    { value: "all", label: "All Levels", icon: Globe },
+    { value: "0", label: "Beginner", icon: GraduationCap },
+    { value: "1", label: "Intermediate", icon: TrendingUp },
+    { value: "2", label: "Advanced", icon: Target },
+  ];
+
+  // Filter and search courses
+  useEffect(() => {
+    if (!courses) return;
+
+    let filtered = [...courses];
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (course) =>
+          course.courseName?.toLowerCase().includes(query) ||
+          course.description?.toLowerCase().includes(query) ||
+          course.creator?.toLowerCase().includes(query),
+      );
+    }
+
+    // Apply difficulty filter
+    if (selectedDifficulty !== "all") {
+      filtered = filtered.filter(
+        (course) => course.difficulty_level?.toString() === selectedDifficulty,
+      );
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "newest":
+          return (b.courseId || 0) - (a.courseId || 0);
+        case "popular":
+          const aStudents = getEnrolledStudentsCount(a.enrolledStudents);
+          const bStudents = getEnrolledStudentsCount(b.enrolledStudents);
+          return bStudents - aStudents;
+        case "price-low":
+          return (Number(a.priceUSDC) || 0) - (Number(b.priceUSDC) || 0);
+        case "price-high":
+          return (Number(b.priceUSDC) || 0) - (Number(a.priceUSDC) || 0);
+        default:
+          return 0;
+      }
+    });
+
+    setFilteredCourses(filtered);
+  }, [courses, searchQuery, selectedDifficulty, sortBy]);
 
   const getDifficultyLabel = (level) => {
     switch (Number(level)) {
@@ -160,89 +238,103 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     }
   }, [courseId, getCourseData]);
 
+  // Fetch chapters/lessons/quizzes for all courses to populate card counts
+  useEffect(() => {
+    const loadAllCourseData = async () => {
+      if (courses && courses.length > 0) {
+        try {
+          // Fetch chapters for all courses
+          for (const course of courses) {
+            await fetchChapters(course.courseId);
+          }
+        } catch (error) {
+          console.error("Error loading course data:", error);
+        }
+      }
+    };
+
+    loadAllCourseData();
+  }, [courses, fetchChapters]);
+
   const getDifficultyColor = (level) => {
     switch (Number(level)) {
       case 0:
-        return "text-green-500 bg-green-100";
+        return {
+          bg: "bg-green-500/10",
+          text: "text-green-600 dark:text-green-400",
+          border: "border-green-500/20",
+          light: "bg-green-50 dark:bg-green-900/20",
+        };
       case 1:
-        return "text-blue-500 bg-blue-100";
+        return {
+          bg: "bg-blue-500/10",
+          text: "text-blue-600 dark:text-blue-400",
+          border: "border-blue-500/20",
+          light: "bg-blue-50 dark:bg-blue-900/20",
+        };
       case 2:
-        return "text-red-500 bg-red-100";
+        return {
+          bg: "bg-red-500/10",
+          text: "text-red-600 dark:text-red-400",
+          border: "border-red-500/20",
+          light: "bg-red-50 dark:bg-red-900/20",
+        };
       default:
-        return "text-gray-500 bg-gray-100";
+        return {
+          bg: "bg-gray-500/10",
+          text: "text-gray-600 dark:text-gray-400",
+          border: "border-gray-500/20",
+          light: "bg-gray-50 dark:bg-gray-900/20",
+        };
     }
   };
 
-  // Add this inside the component before the return statement
   const calculateTotalDuration = (courseId) => {
-    // Convert courseId to number for comparison since it comes as string from the course object
     const numericCourseId = Number(courseId);
-
     const courseChapters = chapters.filter(
       (chapter) => chapter.courseId === numericCourseId,
     );
-
     const totalDuration = courseChapters.reduce(
       (total, chapter) => total + Number(chapter.duration),
       0,
     );
-
     return totalDuration;
   };
 
-  console.log("Chapters s:", chapters);
-
   const calculateCourseStats = (courseChapters) => {
-    // Get all lesson IDs that belong to the course chapters
     const courseLessons = lessons.filter((lesson) =>
       courseChapters.some((chapter) => chapter.chapterId === lesson.chapterId),
     );
-
-    // Count quizzes that belong to the course lessons
     const courseQuizzes = quizzes.filter((quiz) =>
       courseLessons.some((lesson) => lesson.lessonId === quiz.lessonId),
     );
-
     setCourseStats({
       totalLessons: courseLessons.length,
       totalQuizzes: courseQuizzes.length,
     });
   };
 
-  // Debug useEffect to log enrollment status for all courses
-  useEffect(() => {
-    if (courses && courses.length > 0 && address) {
-      console.log("=== ENROLLMENT DEBUG INFO ===");
-      console.log("Current user address:", address);
-      console.log("Current role:", role);
-      courses.forEach((course) => {
-        const isEnrolled = isUserEnrolled(course.enrolledStudents, address);
-        console.log(`Course ${course.courseId}:`);
-        console.log(`  - Name: ${course.courseName}`);
-        console.log(`  - Approved: ${course.approved}`);
-        console.log(`  - enrolledStudents:`, course.enrolledStudents);
-        console.log(`  - User enrolled: ${isEnrolled}`);
-        console.log(
-          `  - Should show buttons: ${
-            role === "USER" && course.approved && address
-          }`,
-        );
-        console.log("---");
-      });
-      console.log("=== END ENROLLMENT DEBUG ===");
-    }
-  }, [courses, address, role]);
-
   const getApprovalStatusStyle = (approved) => {
     if (approved) {
-      return "bg-green-500/20 text-green-500";
+      return {
+        bg: "bg-green-500/20",
+        text: "text-green-600 dark:text-green-400",
+        border: "border-green-500/30",
+        icon: CheckCircle,
+        label: "Approved",
+      };
     } else {
-      return "bg-yellow-500/20 text-yellow-500";
+      return {
+        bg: "bg-yellow-500/20",
+        text: "text-yellow-600 dark:text-yellow-400",
+        border: "border-yellow-500/30",
+        icon: Clock,
+        label: "Pending Review",
+      };
     }
   };
 
   const viewCourse = (courseId) => {
-    console.log("Viewing course:", courseId);
     onCourseSelect(courseId);
   };
 
@@ -262,9 +354,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     setCourseId(course.courseId);
 
     try {
-      // Fetch chapters for the selected course
       await fetchChapters(course.courseId);
-      // Calculate lessons and quizzes based on the fetched chapters
       const courseChapters = chapters.filter(
         (chapter) => chapter.courseId === course.courseId,
       );
@@ -287,7 +377,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // This function checks if a course is ready for eligibility check
   const checkCourseEligibility = async (courseId) => {
     try {
       setIsLoading(true);
@@ -300,7 +389,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         chain: defineChain(11155111),
       });
 
-      // First check if the course is ready for eligibility check
       const isReadyForCheck = await readContract({
         contract,
         method:
@@ -317,8 +405,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
 
         toast.success("Course eligibility check completed!");
 
-        // Get feedback if any
-        // const feedback = await diamondContract.getCourseFeedback(courseId);
         const feedback = await readContract({
           contract,
           method:
@@ -345,19 +431,16 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     if (selectedCourse) {
       fetchCourseFeedback(selectedCourse.courseId);
 
-      // Step 1: Filter chapters by courseId
       const courseChapters = chapters.filter(
         (chapter) => chapter.courseId === selectedCourse.courseId,
       );
       setFilteredChapters(courseChapters);
 
-      // Step 2: Filter lessons by chapterId
       const courseLessons = courseChapters.flatMap((chapter) =>
         lessons.filter((lesson) => lesson.chapterId === chapter.id),
       );
       setFilteredLessons(courseLessons);
 
-      // Step 3: Filter quizzes by lessonId
       const courseQuizzes = courseLessons.flatMap((lesson) =>
         quizzes.filter((quiz) => quiz.lessonId === lesson.id),
       );
@@ -365,74 +448,40 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     }
   }, [selectedCourse, chapters, lessons, quizzes]);
 
-  // Function to get all course details
   const getCompleteCourseDeatils = async (courseId) => {
     try {
-      console.log(`Fetching complete details for course ID: ${courseId}`);
       setIsLoading(true);
 
-      // 1. Find the base course from existing courses
       const course = courses.find(
         (c) => Number(c.courseId) === Number(courseId),
       );
       if (!course) {
-        console.error(`Course with ID ${courseId} not found`);
         return null;
       }
-      console.log("Base course found:", course);
 
-      // 2. Fetch chapters specifically for this course
       const chapters = await fetchChapters(courseId);
       const courseChapters = chapters.filter(
         (chapter) => Number(chapter.courseId) === Number(courseId),
       );
-      console.log(
-        `Found ${courseChapters.length} chapters for course:`,
-        courseChapters,
-      );
 
-      console.log("Lessons 4: ", lessons);
-
-      // Fixed function - use chapterId correctly
       const getLessonsForChapter = (chapterId) => {
-        // Make sure we're comparing the same types (numbers)
-        const lessonsForChapter = lessons.filter(
+        return lessons.filter(
           (lesson) => Number(lesson.chapterId) === Number(chapterId),
         );
-        console.log(
-          `Found ${lessonsForChapter.length} lessons for chapter ${chapterId}:`,
-          lessonsForChapter,
-        );
-        return lessonsForChapter;
       };
 
-      // Initialize courseLessons as an empty array
       const courseLessons = [];
-
-      // Fixed: Iterate over courseChapters and collect lessons using the correct property
       courseChapters.forEach((chapter) => {
-        // Use chapter.chapterId instead of chapter.id
         const lessonsForChapter = getLessonsForChapter(chapter.chapterId);
-        courseLessons.push(...lessonsForChapter); // Spread operator to merge arrays
+        courseLessons.push(...lessonsForChapter);
       });
 
-      console.log(
-        `Found ${courseLessons.length} lessons for course:`,
-        courseLessons,
-      );
-
-      // 4. Get quizzes for these lessons - fixed to match correctly
       const courseQuizzes = quizzes.filter((quiz) =>
         courseLessons.some(
           (lesson) => Number(lesson.lessonId) === Number(quiz.lessonId),
         ),
       );
-      console.log(
-        `Found ${courseQuizzes.length} quizzes for course:`,
-        courseQuizzes,
-      );
 
-      // 5. Compile everything into one object
       const completeDetails = {
         ...course,
         chapters: courseChapters,
@@ -440,13 +489,9 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         quizzes: courseQuizzes,
       };
 
-      console.log("Complete course details:", completeDetails);
       return completeDetails;
     } catch (error) {
-      console.error(
-        `Error fetching complete details for course ${courseId}:`,
-        error,
-      );
+      console.error(error);
       return null;
     } finally {
       setIsLoading(false);
@@ -459,7 +504,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       setIsLoading(true);
       toastId = toast.loading("Preparing course for review...");
 
-      // 1. Get complete course details
       const completeDetails = await getCompleteCourseDeatils(course.courseId);
       if (!completeDetails) {
         toast.update(toastId, {
@@ -476,21 +520,17 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         isLoading: true,
       });
 
-      // 2. Generate markdown for AI evaluation
       const courseMarkdown = generateCourseMarkdown(completeDetails);
-      console.log("Generated markdown length:", courseMarkdown.length);
 
       toast.update(toastId, {
         render: "Sending to AI evaluation service...",
         isLoading: true,
       });
 
-      // 3. Send to AI microservice
       const formData = new FormData();
       const courseBlob = new Blob([courseMarkdown], { type: "text/plain" });
       formData.append("file", courseBlob, "course.txt");
 
-      console.log("Sending request to AI microservice...");
       const response = await fetch("http://localhost:5000/evaluate", {
         method: "POST",
         body: formData,
@@ -505,23 +545,13 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         isLoading: true,
       });
 
-      // 4. Process AI evaluation results
       const evaluationResult = await response.json();
-      console.log("AI Evaluation result:", evaluationResult);
 
-      // DEBUG: Check the raw score value
-      console.log("Raw score from backend:", evaluationResult.score);
-      console.log("Type of score:", typeof evaluationResult.score);
-
-      // Fixed-point arithmetic for blockchain (multiply by 100 to handle decimals)
       const finalScore = Math.floor(Number(evaluationResult.score) * 100);
       const category = evaluationResult.category || "General";
       const passed =
         evaluationResult.passed === "Yes" || evaluationResult.passed === true;
 
-      console.log("Final score for blockchain:", finalScore);
-
-      // 5. Prepare review object for blockchain
       const ensureValidNumber = (value) => {
         const num = Number(value);
         return isNaN(num) ? 0 : Math.min(Math.max(num, 0), 100);
@@ -560,18 +590,10 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         ),
         isSubmitted: true,
         category: category,
-        score: finalScore, // This will be 5525 for 55.25%
+        score: finalScore,
         passed: passed,
       };
 
-      console.log("Review object for blockchain:", review);
-
-      // 6. Debug the account issue
-      console.log("Account object:", account);
-      console.log("Account ID:", account?.id);
-      console.log("Account address:", account?.address);
-
-      // Check if we have a valid account
       if (!account) {
         throw new Error("Account is undefined - please connect your wallet");
       }
@@ -587,7 +609,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         isLoading: true,
       });
 
-      // 7. Send to blockchain
       const contract = getContract({
         address: DiamondAddress,
         abi: Ecosystem1Facet_ABI,
@@ -631,27 +652,18 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     }
   };
 
-  // Helper function to generate markdown from course data
   const generateCourseMarkdown = (courseData) => {
-    console.log("Course data for markdown generation:", courseData);
-
     if (!courseData) {
-      console.error("No course data provided for markdown generation!");
       return "No course data available.";
     }
 
     if (!courseData.courseName) {
-      console.error("Course data is missing courseName!");
       return "Invalid course data - missing course name.";
     }
 
     const chapters = courseData.chapters || [];
     const lessons = courseData.lessons || [];
     const quizzes = courseData.quizzes || [];
-
-    console.log(
-      `Found ${chapters.length} chapters, ${lessons.length} lessons, ${quizzes.length} quizzes`,
-    );
 
     let markdown = `# ${courseData.courseName}\n\n`;
     markdown += `## Description\n${
@@ -662,14 +674,12 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     )}\n\n`;
     markdown += `## Creator\n${courseData.creator || "Unknown"}\n\n`;
 
-    // Add chapters
     if (chapters && chapters.length > 0) {
       markdown += `## Chapters\n`;
       chapters.forEach((chapter, index) => {
         markdown += `### ${index + 1}. ${chapter.chapterName}\n`;
         markdown += `${chapter.description || "No chapter description"}\n\n`;
 
-        // Add lessons for each chapter - fixed to use chapterId
         const chapterLessons = lessons.filter(
           (lesson) => Number(lesson.chapterId) === Number(chapter.chapterId),
         );
@@ -680,7 +690,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
             markdown += `##### ${lessonIndex + 1}. ${lesson.lessonName}\n`;
             markdown += `${lesson.lessonContent || "No lesson content"}\n\n`;
 
-            // Add quizzes for each lesson - fixed to match correctly
             const lessonQuizzes = quizzes.filter(
               (quiz) => Number(quiz.lessonId) === Number(lesson.lessonId),
             );
@@ -688,7 +697,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
               markdown += `###### Quizzes\n`;
               lessonQuizzes.forEach((quiz, quizIndex) => {
                 markdown += `- ${quiz.quizTitle}\n`;
-                // Add quiz questions if available - adjusted for your structure
                 if (quiz.questions && quiz.questions.length > 0) {
                   quiz.questions.forEach((question, qIndex) => {
                     markdown += `  - Q${qIndex + 1}: ${
@@ -713,7 +721,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       markdown += `## Chapters\nNo chapters available for this course.\n\n`;
     }
 
-    console.log("Generated markdown preview:", markdown.substring(0, 1000));
     return markdown;
   };
 
@@ -731,7 +738,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
               chain: defineChain(11155111),
             });
 
-            // Check if eligibility check is ready
             const isReadyForCheck = await readContract({
               contract,
               method:
@@ -740,10 +746,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
             });
 
             if (isReadyForCheck) {
-              console.log(
-                `Course ${course.courseId} is ready for eligibility check`,
-              );
-
               await prepareContractCall({
                 contract,
                 method:
@@ -751,7 +753,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                 params: [courseId],
               });
 
-              // Wait a bit for the eligibility check to process
               await new Promise((resolve) => setTimeout(resolve, 15000));
 
               const feedback = await readContract({
@@ -760,17 +761,10 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                   "function getCourseFeedback(uint256 courseId) view returns (string)",
                 params: [courseId],
               });
-              console.log(
-                `Eligibility feedback for course ${course.courseId}: ${feedback}`,
-              );
               if (!feedback.includes("Course meets eligibility criteria")) {
-                console.log(
-                  `Course ${course.courseId} failed eligibility check: ${feedback}`,
-                );
-                continue; // Skip AI review if eligibility check failed
+                continue;
               }
 
-              // Submit for AI review
               await submitForAIReview(course.courseId);
             }
           } catch (error) {
@@ -781,7 +775,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     };
 
     checkCoursesForApproval();
-    const intervalId = setInterval(checkCoursesForApproval, 60000); // Check every minute
+    const intervalId = setInterval(checkCoursesForApproval, 60000);
 
     return () => clearInterval(intervalId);
   }, [courses, isConnected, role]);
@@ -805,14 +799,12 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         chain: defineChain(11155111),
       });
 
-      // const feedback = await diamondContract.getCourseFeedback(courseId);
       const feedback = await readContract({
         contract,
         method:
           "function getCourseFeedback(uint256 courseId) view returns (string)",
         params: [courseId],
       });
-      console.log(`Fetched feedback for course ${courseId}: ${feedback}`);
       setCourseFeedback(feedback);
     } catch (error) {
       console.error("Error fetching course feedback:", error);
@@ -823,9 +815,7 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   };
 
   const enroll = async (courseId) => {
-    // Check if user is enrolling in their first course
     if (enrolledCourses.length === 0) {
-      // Show survey modal for first-time enrollment
       setShowSurveyModal(true);
       setCourseIdPendingEnrollment(courseId);
       return;
@@ -835,7 +825,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
     try {
       setEnrollingCourseId(courseId);
 
-      // Find the course to check its price
       const course = courses.find((c) => c.courseId === courseId);
 
       if (!course) {
@@ -844,36 +833,28 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         return;
       }
 
-      // Check if course has a price and handle payment
-      // Note: priceUSDC is stored as raw value with 6 decimals (e.g., "57890000" = 57.89 USDC)
       if (course.priceUSDC && Number(course.priceUSDC) > 0) {
         toastId = toast.loading("Processing course purchase...");
 
-        // Call coursePurchase from RevenueSharingContext
-        // Pass raw USDC value (with 6 decimals) as-is to the contract
-        // Reviewer address is set to zero address (0x0) for now
         const purchaseResult = await purchaseCourse(
-          address, // buyer address
-          course.creator, // creator address
-          BigInt(courseId), // courseId as BigInt for contract
-          BigInt(course.priceUSDC), // raw USDC value with 6 decimals
-          "0x0000000000000000000000000000000000000000", // reviewer address (zero address)
+          address,
+          course.creator,
+          BigInt(courseId),
+          BigInt(course.priceUSDC),
+          "0x0000000000000000000000000000000000000000",
         );
 
         if (!purchaseResult.success) {
-          // Purchase failed, toast already handled in context
           setEnrollingCourseId(null);
           return;
         }
 
-        // Close purchase toast as enrollment will show its own toast
         if (toastId) {
           toast.dismiss(toastId);
           toastId = null;
         }
       }
 
-      // Proceed with enrollment
       toastId = toast.loading("Processing enrollment...");
 
       const contract = getContract({
@@ -928,28 +909,18 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   };
 
   const handleSurveyComplete = async (finalCourseId = null) => {
-    // Close modal and reset state
     setShowSurveyModal(false);
 
-    // This function should ONLY be called for first-time users (new enrollments)
-    // Verify that we have a pending enrollment course ID
     if (!courseIdPendingEnrollment) {
-      console.warn(
-        "Survey complete called but no courseIdPendingEnrollment found. Skipping enrollment.",
-      );
       return;
     }
 
-    // Use the finalCourseId from the form if provided (from AI recommendations)
-    // Otherwise fallback to the original courseIdPendingEnrollment
     const courseToEnroll = finalCourseId || courseIdPendingEnrollment;
 
     let toastId = null;
-    // Enroll in the course after survey completion
     try {
       setEnrollingCourseId(courseToEnroll);
 
-      // Find the course to check its price
       const course = courses.find((c) => c.courseId === courseToEnroll);
 
       if (!course) {
@@ -959,37 +930,29 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         return;
       }
 
-      // Check if course has a price and handle payment
-      // Note: priceUSDC is stored as raw value with 6 decimals (e.g., "57890000" = 57.89 USDC)
       if (course.priceUSDC && Number(course.priceUSDC) > 0) {
         toastId = toast.loading("Processing course purchase...");
 
-        // Call coursePurchase from RevenueSharingContext
-        // Pass raw USDC value (with 6 decimals) as-is to the contract
-        // Reviewer address is set to zero address (0x0) for now
         const purchaseResult = await purchaseCourse(
-          address, // buyer address
-          course.creator, // creator address
-          BigInt(courseToEnroll), // courseId as BigInt for contract
-          BigInt(course.priceUSDC), // raw USDC value with 6 decimals
-          "0x0000000000000000000000000000000000000000", // reviewer address (zero address)
+          address,
+          course.creator,
+          BigInt(courseToEnroll),
+          BigInt(course.priceUSDC),
+          "0x0000000000000000000000000000000000000000",
         );
 
         if (!purchaseResult.success) {
-          // Purchase failed, toast already handled in context
           setEnrollingCourseId(null);
           setCourseIdPendingEnrollment(null);
           return;
         }
 
-        // Close purchase toast as enrollment will show its own toast
         if (toastId) {
           toast.dismiss(toastId);
           toastId = null;
         }
       }
 
-      // Proceed with enrollment
       toastId = toast.loading("Processing your enrollment...");
 
       const contract = getContract({
@@ -1040,7 +1003,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
       }
     } finally {
       setEnrollingCourseId(null);
-      // Clear the pending enrollment state after completion
       setCourseIdPendingEnrollment(null);
     }
   };
@@ -1106,391 +1068,512 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   };
 
   const getEnrolledStudentsCount = (enrolledStudentsString) => {
-    // If empty or undefined, return 0
     if (!enrolledStudentsString) return 0;
 
-    // If it's an array, return its length
     if (Array.isArray(enrolledStudentsString)) {
       return enrolledStudentsString.length;
     }
 
-    // Convert to string if it's not already a string
     const studentsStr = String(enrolledStudentsString);
 
-    // If it's a single address, return 1
     if (studentsStr.startsWith("0x") && !studentsStr.includes(",")) {
       return 1;
     }
 
-    // If multiple addresses, split and count
     return studentsStr.split(",").length;
   };
 
-  // Helper function to check if current user is enrolled in a course
   const isUserEnrolled = (enrolledStudents, userAddress) => {
     if (!enrolledStudents || !userAddress) {
-      console.log(
-        "Missing data - enrolledStudents:",
-        enrolledStudents,
-        "userAddress:",
-        userAddress,
-      );
       return false;
     }
 
-    // If it's an array, check if it includes the address
     if (Array.isArray(enrolledStudents)) {
-      const isEnrolled = enrolledStudents.some(
+      return enrolledStudents.some(
         (addr) => addr.toLowerCase() === userAddress.toLowerCase(),
       );
-      console.log(
-        "Array check - enrolledStudents:",
-        enrolledStudents,
-        "userAddress:",
-        userAddress,
-        "isEnrolled:",
-        isEnrolled,
-      );
-      return isEnrolled;
     }
 
-    // Convert to string and check
     const studentsStr = String(enrolledStudents);
 
-    // If it's a single address, check if it matches
     if (studentsStr.startsWith("0x") && !studentsStr.includes(",")) {
-      const isEnrolled =
-        studentsStr.toLowerCase() === userAddress.toLowerCase();
-      console.log(
-        "Single address check - studentsStr:",
-        studentsStr,
-        "userAddress:",
-        userAddress,
-        "isEnrolled:",
-        isEnrolled,
-      );
-      return isEnrolled;
+      return studentsStr.toLowerCase() === userAddress.toLowerCase();
     }
 
-    // If multiple addresses, split and check
     const addressList = studentsStr
       .split(",")
       .map((addr) => addr.trim().toLowerCase());
-    const isEnrolled = addressList.includes(userAddress.toLowerCase());
-    console.log(
-      "Multiple addresses check - addressList:",
-      addressList,
-      "userAddress:",
-      userAddress,
-      "isEnrolled:",
-      isEnrolled,
-    );
-    return isEnrolled;
+    return addressList.includes(userAddress.toLowerCase());
   };
 
+  // Modern card style
+  const cardStyle = darkMode
+    ? "bg-gradient-to-br from-slate-900/90 to-slate-800/90 border-slate-700/50 hover:border-slate-600/50"
+    : "bg-gradient-to-br from-white to-slate-50/90 border-slate-200/70 hover:border-slate-300/70";
+
+  const glassCardStyle = darkMode
+    ? "bg-slate-800/40 backdrop-blur-xl border-slate-700/30"
+    : "bg-white/70 backdrop-blur-xl border-slate-200/50";
+
   return (
-    <div className="dark:bg-gray-900 dark:text-gray-100 bg-white text-gray-900 min-h-screen p-4 md:p-6 transition-colors duration-300 pt-20 md:pt-[100px]">
-      <ToastContainer position="bottom-right" theme="colored" />
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8">
-          <div className="flex items-center space-x-3 md:space-x-4">
-            <Book className="w-6 h-6 md:w-8 md:h-8 text-yellow-500" />
-            <h1 className="text-2xl md:text-3xl font-bold dark:text-yellow-400 text-yellow-500">
-              Available Courses
-            </h1>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-4 md:p-6 transition-colors duration-300 pt-20 md:pt-[100px]">
+      <ToastContainer
+        position="bottom-right"
+        theme={darkMode ? "dark" : "light"}
+      />
+
+      <div className="max-w-7xl mx-auto">
+        {/* Header with gradient */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-yellow-500/10 via-yellow-400/5 to-transparent p-8 mb-8">
+          <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-yellow-500/20 blur-3xl" />
+          <div className="absolute bottom-0 left-0 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
+
+          <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex items-center gap-4">
+              <div className="rounded-2xl bg-gradient-to-br from-yellow-500/20 to-amber-500/20 p-4">
+                <Book className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
+              </div>
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-yellow-600 to-amber-600 dark:from-yellow-400 dark:to-amber-400 bg-clip-text text-transparent">
+                  Available Courses
+                </h1>
+                <p className="text-slate-600 dark:text-slate-300 mt-1">
+                  Explore our curated collection of blockchain and Web3 courses
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() =>
+                onNavigateToCreateCourse && onNavigateToCreateCourse()
+              }
+              className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-yellow-500 to-amber-500 px-6 py-3 text-black font-semibold transition-all duration-300 hover:shadow-lg hover:shadow-yellow-500/25"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+              <span className="relative flex items-center gap-2">
+                <FilePlus className="w-4 h-4" />
+                Create New Course
+              </span>
+            </button>
           </div>
-          <button
-            onClick={() =>
-              onNavigateToCreateCourse && onNavigateToCreateCourse()
-            }
-            className="w-full sm:w-auto bg-yellow-500 text-black px-4 md:px-6 py-2 rounded-lg hover:bg-yellow-600 transition-colors text-sm md:text-base"
-          >
-            Create New Course
-          </button>
+        </div>
+
+        {/* Search and Filter Bar */}
+        <div
+          className={`relative rounded-2xl border p-4 mb-6 ${glassCardStyle}`}
+        >
+          <div className="flex flex-col lg:flex-row gap-4">
+            {/* Search Input */}
+            <div className="flex-1 relative dark:text-white text-bla">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Search courses by name, description, or creator..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-yellow-500/20 transition-all"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Filter Toggle Button */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-4 py-3 rounded-xl border transition-all ${
+                showFilters
+                  ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-600 dark:text-yellow-400"
+                  : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+              }`}
+            >
+              <Filter className="w-5 h-5 dark:text-white text-bla" />
+              <span className="font-medium dark:text-white text-black">
+                Filters
+              </span>
+              <ChevronDown
+                className={`w-4 h-4 transition-transform dark:text-white text-bla ${
+                  showFilters ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {/* View Toggle */}
+            <div className="flex rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`p-3 transition-all ${
+                  viewMode === "grid"
+                    ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+                    : "hover:bg-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <Grid className="w-5 h-5 dark:text-white text-bla" />
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={`p-3 transition-all border-l border-slate-200 dark:border-slate-700 ${
+                  viewMode === "list"
+                    ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+                    : "hover:bg-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <List className="w-5 h-5 dark:text-white text-bla" />
+              </button>
+            </div>
+          </div>
+
+          {/* Expanded Filters */}
+          {showFilters && (
+            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Difficulty Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
+                    Difficulty Level
+                  </label>
+                  <div className="flex flex-wrap gap-2 dark:text-white text-bla">
+                    {difficultyOptions.map((option) => {
+                      const Icon = option.icon;
+                      const isSelected = selectedDifficulty === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          onClick={() => setSelectedDifficulty(option.value)}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
+                            isSelected
+                              ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-600 dark:text-yellow-400"
+                              : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                          <span className="text-sm font-medium">
+                            {option.label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Sort By */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
+                    Sort By
+                  </label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-yellow-500/20 dark:text-white text-bla transition-all"
+                  >
+                    <option value="newest">Newest First</option>
+                    <option value="popular">Most Popular</option>
+                    <option value="price-low">Price: Low to High</option>
+                    <option value="price-high">Price: High to Low</option>
+                  </select>
+                </div>
+
+                {/* Results Count */}
+                <div className="flex items-end">
+                  <div className="w-full px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800">
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      Showing{" "}
+                      <span className="font-bold text-yellow-600 dark:text-yellow-400">
+                        {filteredCourses.length}
+                      </span>{" "}
+                      of{" "}
+                      <span className="font-bold">{courses?.length || 0}</span>{" "}
+                      courses
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Status Messages */}
         {(success || error) && (
           <div
-            className={`mb-4 p-3 md:p-4 rounded-lg flex items-center ${
-              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
+            className={`mb-6 p-4 rounded-xl flex items-center gap-3 ${
+              success
+                ? "bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400"
+                : "bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400"
             }`}
           >
             {success ? (
-              <CheckCircle className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+              <CheckCircle className="h-5 w-5 flex-shrink-0" />
             ) : (
-              <AlertCircle className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+              <AlertCircle className="h-5 w-5 flex-shrink-0" />
             )}
-            <span className="text-sm md:text-base">{success || error}</span>
+            <span className="text-sm">{success || error}</span>
           </div>
         )}
 
-        {/* Courses Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-          {courses?.length > 0 ? (
-            courses.map((course) => (
-              <div
-                key={course.courseId}
-                className="relative p-4 md:p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200 transform hover:scale-105 transition-transform duration-1000 mb-4 md:mb-5"
-              >
-                {/* Info Icon */}
-                <button
-                  onClick={(e) => openCourseDetails(course, e)}
-                  className="absolute bottom-3 right-3 md:bottom-4 md:right-4 z-10 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-yellow-500 hover:bg-gray-400 mt-2 md:mt-3 dark:hover:bg-gray-600 transition-colors"
+        {/* Courses Grid/List */}
+        {filteredCourses.length > 0 ? (
+          <div
+            className={
+              viewMode === "grid"
+                ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+                : "space-y-4"
+            }
+          >
+            {filteredCourses.map((course) => {
+              const difficultyColors = getDifficultyColor(
+                course.difficulty_level,
+              );
+              const approvalStatus = getApprovalStatusStyle(course.approved);
+              const ApprovalIcon = approvalStatus.icon;
+              const userEnrolled = isUserEnrolled(
+                course.enrolledStudents,
+                address,
+              );
+              const hasCertificate = hasCertificateForCourse(course.courseId);
+              const studentCount = getEnrolledStudentsCount(
+                course.enrolledStudents,
+              );
+
+              return (
+                <div
+                  key={course.courseId}
+                  className={`group relative overflow-hidden rounded-2xl border transition-all duration-300 hover:scale-[1.02] hover:shadow-xl ${
+                    viewMode === "list" ? "flex" : ""
+                  } ${cardStyle}`}
                 >
-                  <Info className="w-4 h-4 md:w-5 md:h-5" />
-                </button>
+                  {/* Course Image - List view adjustment */}
+                  <div
+                    className={viewMode === "list" ? "w-48 shrink-0" : "w-full"}
+                  >
+                    <div className="relative h-48 overflow-hidden">
+                      <img
+                        src={getCourseImage(course)}
+                        alt={course.courseName}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      />
 
-                {/* Course Image */}
-                <div className="relative">
-                  <img
-                    src={getCourseImage(course)}
-                    alt={course.courseName}
-                    className="w-full h-40 md:h-48 object-cover rounded-xl"
-                    style={{ opacity: 0.75 }}
-                  />
+                      {/* Overlay gradient */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
 
-                  <div className="absolute top-3 left-3 right-3 md:top-4 md:left-4 md:right-4 flex justify-between items-start">
-                    {/* Difficulty Level Tag */}
-                    <div
-                      className={`px-2 py-1 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium shadow-sm ${getDifficultyColor(
-                        course.difficulty_level,
-                      )}`}
-                    >
-                      {getDifficultyLabel(course.difficulty_level)}
+                      {/* Difficulty Badge */}
+                      <div
+                        className={`absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm ${difficultyColors.bg} ${difficultyColors.border} border`}
+                      >
+                        {course.difficulty_level === 0 && (
+                          <GraduationCap className="w-3 h-3" />
+                        )}
+                        {course.difficulty_level === 1 && (
+                          <TrendingUp className="w-3 h-3" />
+                        )}
+                        {course.difficulty_level === 2 && (
+                          <Target className="w-3 h-3" />
+                        )}
+                        <span className={difficultyColors.text}>
+                          {getDifficultyLabel(course.difficulty_level)}
+                        </span>
+                      </div>
+
+                      {/* Approval Status Badge */}
+                      <div
+                        className={`absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm ${approvalStatus.bg} ${approvalStatus.border} border`}
+                      >
+                        <ApprovalIcon
+                          className={`w-3 h-3 ${approvalStatus.text}`}
+                        />
+                        <span className={approvalStatus.text}>
+                          {approvalStatus.label}
+                        </span>
+                      </div>
+
+                      {/* Info Button */}
+                      <button
+                        onClick={(e) => openCourseDetails(course, e)}
+                        className="absolute bottom-3 right-3 p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-yellow-500/80 transition-colors"
+                      >
+                        <Info className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Course Content */}
+                  <div className={viewMode === "list" ? "flex-1 p-5" : "p-5"}>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h3 className="text-lg font-bold line-clamp-1 text-slate-900 dark:text-white group-hover:text-yellow-600 dark:group-hover:text-yellow-400 transition-colors">
+                        {course.courseName}
+                      </h3>
                     </div>
 
-                    {/* Approval Status Badge */}
-                    <div
-                      className={`px-2 py-1 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium shadow-sm flex items-center ${getApprovalStatusStyle(
-                        course.approved,
-                      )}`}
-                    >
-                      {!course.approved ? (
+                    <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 mb-4">
+                      {course.description}
+                    </p>
+
+                    {/* Course Stats */}
+                    <div className="grid grid-cols-3 gap-2 mb-4">
+                      <div className="text-center p-2 rounded-lg bg-slate-100/50 dark:bg-slate-800/50">
+                        <BookOpen className="w-4 h-4 mx-auto mb-1 text-yellow-500" />
+                        <span className="text-xs font-medium block text-slate-900 dark:text-white">
+                          {chapters.filter(
+                            (c) =>
+                              Number(c.courseId) === Number(course.courseId),
+                          ).length || 0}
+                        </span>
+                        <span className="text-xs text-slate-500 dark:text-slate-300">
+                          Chapters
+                        </span>
+                      </div>
+                      <div className="text-center p-2 rounded-lg bg-slate-100/50 dark:bg-slate-800/50">
+                        <PlayCircle className="w-4 h-4 mx-auto mb-1 text-blue-500" />
+                        <span className="text-xs font-medium block text-slate-900 dark:text-white">
+                          {lessons.filter((l) => {
+                            const chapterIds = chapters
+                              .filter(
+                                (c) =>
+                                  Number(c.courseId) ===
+                                  Number(course.courseId),
+                              )
+                              .map((c) => c.chapterId);
+                            return chapterIds.includes(l.chapterId);
+                          }).length || 0}
+                        </span>
+                        <span className="text-xs text-slate-500 dark:text-slate-300">
+                          Lessons
+                        </span>
+                      </div>
+                      <div className="text-center p-2 rounded-lg bg-slate-100/50 dark:bg-slate-800/50">
+                        <Users className="w-4 h-4 mx-auto mb-1 text-green-500" />
+                        <span className="text-xs font-medium block text-slate-900 dark:text-white">
+                          {studentCount}
+                        </span>
+                        <span className="text-xs text-slate-500 dark:text-slate-300">
+                          Students
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Meta Info */}
+                    <div className="flex items-center justify-between text-sm mb-4">
+                      <div className="flex items-center gap-2 text-slate-500">
+                        <Clock className="w-4 h-4" />
+                        <span>
+                          {calculateTotalDuration(course.courseId)} weeks
+                        </span>
+                      </div>
+                      <div className="font-bold text-yellow-600 dark:text-yellow-400">
+                        {formatPriceUSDC(course.priceUSDC)}
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      {!course.approved && course.creator === address && (
+                        <button
+                          onClick={async () => approveCourse(course)}
+                          disabled={isLoading || course.approved}
+                          className="flex-1 bg-gradient-to-r from-yellow-500 to-amber-500 text-black py-2 px-3 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-yellow-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {isLoading ? (
+                            <Loader className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4" />
+                          )}
+                          {course.approved ? "Approved" : "Request Review"}
+                        </button>
+                      )}
+
+                      {course.approved && address && (
                         <>
-                          <Clock className="w-3 h-3 md:w-4 md:h-4 mr-1" />
-                          <span>Pending</span>
-                        </>
-                      ) : (
-                        <>
-                          <Check className="w-3 h-3 md:w-4 md:h-4 mr-1" />
-                          <span>Approved</span>
+                          {userEnrolled ? (
+                            <>
+                              <button
+                                onClick={() => viewCourse(course.courseId)}
+                                className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2 px-3 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/25 transition-all flex items-center justify-center gap-2"
+                              >
+                                <Eye className="w-4 h-4" />
+                                View Course
+                              </button>
+
+                              {hasCertificate ? (
+                                <button
+                                  className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-2 px-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 cursor-default opacity-75"
+                                  disabled
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                  Completed
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setCourseToUnenroll(course);
+                                    setShowUnenrollConfirm(true);
+                                  }}
+                                  disabled={
+                                    unenrollingCourseId === course.courseId
+                                  }
+                                  className="flex-1 bg-gradient-to-r from-red-500 to-rose-500 text-white py-2 px-3 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-red-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                  <WifiOff className="w-4 h-4" />
+                                  {unenrollingCourseId === course.courseId
+                                    ? "..."
+                                    : "Unenroll"}
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => enroll(course.courseId)}
+                              disabled={enrollingCourseId === course.courseId}
+                              className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-2 px-3 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-green-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                              <Wifi className="w-4 h-4" />
+                              {enrollingCourseId === course.courseId
+                                ? "Enrolling..."
+                                : "Enroll Now"}
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
-                  </div>
-                </div>
 
-                {/* Course Details */}
-                <div className="p-3 md:p-5">
-                  <h2 className="text-lg md:text-xl font-bold mb-2 text-yellow-500 truncate max-w-[200px] md:max-w-[300px]">
-                    {course.courseName}
-                  </h2>
-                  <p className="text-gray-400 mb-3 md:mb-4 line-clamp-2 text-sm md:text-base">
-                    {course.description}
-                  </p>
-
-                  {/* Course Meta Information */}
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3 md:mb-4">
-                    <div className="text-xs md:text-sm text-gray-500 space-y-1">
-                      <div className="flex items-center">
-                        <Book className="inline-block w-3 h-3 md:w-4 md:h-4 mr-1" />
-                        <span className="truncate max-w-[120px] md:max-w-[100px] overflow-hidden text-ellipsis whitespace-nowrap">
-                          {course.creator}
+                    {/* Creator Info */}
+                    <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+                      <p className="text-xs text-slate-500 truncate">
+                        Created by:{" "}
+                        <span className="font-mono">
+                          {course.creator?.slice(0, 6)}...
+                          {course.creator?.slice(-4)}
                         </span>
-                      </div>
-                      <div className="flex items-center">
-                        <Clock className="inline-block w-3 h-3 md:w-4 md:h-4 mr-1" />
-                        {calculateTotalDuration(course.courseId)} Weeks
-                      </div>
-                    </div>
-                    <div className="text-yellow-500 font-semibold text-sm md:text-base">
-                      {formatPriceUSDC(course.priceUSDC)}
+                      </p>
                     </div>
                   </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex flex-col sm:flex-row sm:space-x-3 space-y-2 sm:space-y-0">
-                    {!course.approved && course.creator === address && (
-                      <button
-                        onClick={async () => approveCourse(course)}
-                        className={`w-full bg-gray-800 text-white dark:bg-gray-300 dark:text-black py-2 px-2 rounded-lg 
-      ${
-        isLoading || course.approved
-          ? "opacity-70 cursor-not-allowed"
-          : "hover:bg-gray-600"
-      } 
-      transition-colors flex items-center justify-center text-sm`}
-                        disabled={isLoading || course.approved}
-                      >
-                        {isLoading ? (
-                          <Loader className="w-4 h-4 md:w-5 md:h-5 mr-2 animate-spin" />
-                        ) : (
-                          <AlertCircle className="w-4 h-4 md:w-5 md:h-5 mr-2" />
-                        )}
-                        {course.approved
-                          ? "Already Approved"
-                          : "Request Review"}
-                      </button>
-                    )}
-
-                    {course.approved && address && (
-                      <>
-                        {(() => {
-                          const userEnrolled = isUserEnrolled(
-                            course.enrolledStudents,
-                            address,
-                          );
-                          const hasCertificate = hasCertificateForCourse(
-                            course.courseId,
-                          );
-
-                          if (userEnrolled) {
-                            return (
-                              <div className="flex flex-col sm:flex-row gap-2 w-full">
-                                <button
-                                  onClick={() => viewCourse(course.courseId)}
-                                  className="flex-1 bg-yellow-500 text-gray-800 py-2 px-2 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center text-sm"
-                                >
-                                  <Eye className="w-4 h-4 md:w-5 md:h-5 mr-2" />
-                                  View Course
-                                </button>
-
-                                {/* Show "Completed" if user has certificate, otherwise show "Unenroll" */}
-                                {hasCertificate ? (
-                                  <button
-                                    className="flex-1 bg-green-600 text-white py-2 px-2 rounded-lg flex items-center justify-center text-sm cursor-default"
-                                    disabled
-                                  >
-                                    <CheckCircle className="w-4 h-4 md:w-5 md:h-5 mr-2" />
-                                    Completed
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => {
-                                      setCourseToUnenroll(course);
-                                      setShowUnenrollConfirm(true);
-                                    }}
-                                    disabled={
-                                      unenrollingCourseId === course.courseId
-                                    }
-                                    className={`flex-1 bg-red-700 text-white py-2 px-2 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center text-sm ${
-                                      unenrollingCourseId === course.courseId
-                                        ? "opacity-50 cursor-not-allowed"
-                                        : ""
-                                    }`}
-                                  >
-                                    <WifiOffIcon className="w-4 h-4 md:w-5 md:h-5 mr-2" />
-                                    {unenrollingCourseId === course.courseId
-                                      ? "Unenrolling..."
-                                      : "Unenroll"}
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          } else {
-                            const isEnrolling =
-                              enrollingCourseId === course.courseId;
-                            return (
-                              <button
-                                onClick={() => enroll(course.courseId)}
-                                disabled={isEnrolling}
-                                className={`w-full bg-gray-700 text-white py-2 px-2 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center text-sm ${
-                                  isEnrolling
-                                    ? "opacity-50 cursor-not-allowed"
-                                    : ""
-                                }`}
-                              >
-                                <Wifi className="w-4 h-4 md:w-5 md:h-5 mr-2" />
-                                {isEnrolling ? "Enrolling..." : "Enroll"}
-                              </button>
-                            );
-                          }
-                        })()}
-                      </>
-                    )}
-                  </div>
                 </div>
-              </div>
-            ))
-          ) : (
-            <div className="col-span-full text-center text-gray-900 dark:text-gray-300 text-base md:text-normal py-8">
-              No courses available!
-            </div>
-          )}
-        </div>
-
-        {/* Unenrollment Confirmation Popup */}
-        {showUnenrollConfirm && courseToUnenroll && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6">
-              <div className="text-center">
-                {/* Warning Icon */}
-                <div className="mx-auto w-16 h-16 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mb-4">
-                  <WifiOffIcon className="w-8 h-8 text-red-600 dark:text-red-400" />
-                </div>
-
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                  Confirm Unenrollment
-                </h3>
-
-                <p className="text-gray-600 dark:text-gray-300 mb-6">
-                  Are you sure you want to unenroll from{" "}
-                  <span className="font-semibold text-yellow-600 dark:text-yellow-400">
-                    {courseToUnenroll.courseName}
-                  </span>
-                  ? You will lose all your progress in this course.
-                </p>
-
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={() => {
-                      setShowUnenrollConfirm(false);
-                      setCourseToUnenroll(null);
-                    }}
-                    disabled={
-                      unenrollingCourseId === courseToUnenroll?.courseId
-                    }
-                    className="flex-1 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 py-3 px-4 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors font-medium"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={async () => {
-                      try {
-                        await unEnroll(courseToUnenroll.courseId);
-                        setShowUnenrollConfirm(false);
-                        setCourseToUnenroll(null);
-                      } catch (error) {
-                        console.error("Failed to unenroll:", error);
-                      }
-                    }}
-                    disabled={
-                      unenrollingCourseId === courseToUnenroll?.courseId
-                    }
-                    className="flex-1 bg-red-600 text-white py-3 px-4 rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center justify-center"
-                  >
-                    {unenrollingCourseId === courseToUnenroll?.courseId ? (
-                      <>
-                        <Loader className="w-4 h-4 animate-spin mr-2" />
-                        Unenrolling...
-                      </>
-                    ) : (
-                      "Yes, Unenroll"
-                    )}
-                  </button>
-                </div>
-
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
-                  Note: This action cannot be undone.
-                </p>
+              );
+            })}
+          </div>
+        ) : (
+          <div
+            className={`text-center py-16 rounded-3xl border ${glassCardStyle}`}
+          >
+            <div className="relative inline-block">
+              <Book className="w-16 h-16 mx-auto mb-4 text-slate-400" />
+              <div className="absolute inset-0 animate-ping">
+                <Book className="w-16 h-16 mx-auto opacity-20" />
               </div>
             </div>
+            <h3 className="text-xl font-semibold mb-2">No Courses Found</h3>
+            <p className="text-slate-500 dark:text-slate-400">
+              {searchQuery || selectedDifficulty !== "all"
+                ? "Try adjusting your search or filters"
+                : "No courses available at the moment"}
+            </p>
           </div>
         )}
 
-        {/* Absolute Course Details Panel */}
+        {/* Course Details Panel */}
         {selectedCourse && (
           <div
             ref={detailsRef}
@@ -1498,17 +1581,17 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
               top: `${detailsPosition.top}px`,
               left: `${detailsPosition.left}px`,
             }}
-            className="fixed w-11/12 sm:w-80 max-w-sm dark:bg-gray-900 bg-gray-100 dark:text-gray-100 text-gray-800 rounded-lg overflow-x-hidden shadow-xl p-4 z-50 dark:border dark:border-gray-700 border-none mx-4 sm:mx-0"
+            className={`fixed w-96 max-w-[calc(100vw-2rem)] rounded-2xl border shadow-2xl overflow-hidden z-50 ${glassCardStyle}`}
           >
-            {/* Panel Tabs */}
-            <div className="flex justify-between items-center mb-2">
-              <div className="flex gap-1 md:gap-2">
+            {/* Panel Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+              <div className="flex gap-1">
                 <button
                   onClick={() => setActiveTab("details")}
-                  className={`px-2 py-1 md:px-3 md:py-1 text-xs md:text-sm font-medium rounded-t-lg ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     activeTab === "details"
-                      ? "bg-yellow-500 text-white"
-                      : "text-yellow-500 hover:bg-yellow-100 dark:hover:bg-gray-800"
+                      ? "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400"
+                      : "hover:bg-slate-100 dark:hover:bg-slate-800 dak:text-white text-black"
                   }`}
                 >
                   Details
@@ -1521,10 +1604,10 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
                         getCourseData(selectedCourse.courseId);
                       }
                     }}
-                    className={`px-2 py-1 md:px-3 md:py-1 text-xs md:text-sm font-medium rounded-t-lg ${
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                       activeTab === "metrics"
-                        ? "bg-yellow-500 text-white"
-                        : "text-yellow-500 hover:bg-yellow-100 dark:hover:bg-gray-800"
+                        ? "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400"
+                        : "hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-white text-black"
                     }`}
                   >
                     Metrics
@@ -1533,402 +1616,482 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
               </div>
               <button
                 onClick={() => setSelectedCourse(null)}
-                className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-200"
+                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
-                <X className="w-4 h-4 md:w-5 md:h-5" />
+                <X className="w-4 h-4 dark:text-white text-black" />
               </button>
             </div>
 
-            {isLoading ? (
-              <div className="flex items-center justify-center h-48 md:h-64">
-                <Loader className="w-6 h-6 md:w-8 md:h-8 text-yellow-500 animate-spin" />
-              </div>
-            ) : (
-              <>
-                {/* DETAILS TAB */}
-                {activeTab === "details" && (
-                  <div className="space-y-3 md:space-y-4 max-h-80 md:max-h-96 overflow-y-auto">
-                    <div>
-                      <h4 className="font-semibold text-yellow-500 text-sm md:text-base">
-                        Course Name
-                      </h4>
-                      <p className="dark:text-gray-300 text-gray-700 text-sm">
-                        {selectedCourse.courseName || ""}
-                      </p>
-                    </div>
-
-                    {/* Rest of details content with responsive text sizes */}
-                    <div>
-                      <h4 className="font-semibold text-yellow-500 text-sm md:text-base">
-                        Difficulty Level
-                      </h4>
-                      <div
-                        className={`inline-block px-2 py-1 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium mt-1 ${getDifficultyColor(
-                          selectedCourse.difficulty_level,
-                        )}`}
-                      >
-                        {getDifficultyLabel(selectedCourse.difficulty_level) ||
-                          ""}
-                      </div>
-                    </div>
-
-                    {/* Approval Status */}
-                    <div>
-                      <h4 className="font-semibold text-yellow-500 text-sm md:text-base">
-                        Status
-                      </h4>
-                      <div
-                        className={`inline-block px-2 py-1 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium mt-1 ${
-                          selectedCourse.approved
-                            ? "bg-green-100 text-green-700"
-                            : "bg-yellow-100 text-yellow-700"
-                        }`}
-                      >
-                        {selectedCourse.approved ? "Approved" : "Pending"}
-                      </div>
-                    </div>
-
-                    {/* Score Section */}
-                    {selectedCourse.approvalCount > 0 && (
+            {/* Panel Content */}
+            <div className="p-4 max-h-[70vh] overflow-y-auto">
+              {isLoading ? (
+                <div className="flex items-center justify-center h-48">
+                  <Loader className="w-8 h-8 text-yellow-500 animate-spin" />
+                </div>
+              ) : (
+                <>
+                  {/* Details Tab */}
+                  {activeTab === "details" && (
+                    <div className="space-y-4">
                       <div>
-                        <h4 className="font-semibold text-yellow-500 text-sm md:text-base">
-                          Review Score
+                        <h4 className="text-sm font-medium text-yellow-500 mb-1">
+                          Course Name
+                        </h4>
+                        <p className="text-sm text-slate-900 dark:text-white">
+                          {selectedCourse.courseName}
+                        </p>
+                      </div>
+
+                      <div>
+                        <h4 className="text-sm font-medium text-yellow-500 mb-1">
+                          Difficulty Level
                         </h4>
                         <div
-                          className={`inline-block px-2 py-1 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium mt-1 ${
-                            selectedCourse.approvalCount >= 80
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+                            getDifficultyColor(selectedCourse.difficulty_level)
+                              .bg
                           }`}
                         >
-                          {selectedCourse.approvalCount}%
+                          {selectedCourse.difficulty_level === 0 && (
+                            <GraduationCap className="w-3 h-3" />
+                          )}
+                          {selectedCourse.difficulty_level === 1 && (
+                            <TrendingUp className="w-3 h-3" />
+                          )}
+                          {selectedCourse.difficulty_level === 2 && (
+                            <Target className="w-3 h-3" />
+                          )}
+                          <span
+                            className={
+                              getDifficultyColor(
+                                selectedCourse.difficulty_level,
+                              ).text
+                            }
+                          >
+                            {getDifficultyLabel(
+                              selectedCourse.difficulty_level,
+                            )}
+                          </span>
                         </div>
                       </div>
-                    )}
 
-                    {/* Feedback Section */}
-                    {(selectedCourse.creator === address || role === "ADMIN") &&
-                      !selectedCourse.approved && (
+                      <div>
+                        <h4 className="text-sm font-medium text-yellow-500 mb-1">
+                          Status
+                        </h4>
+                        <div
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+                            selectedCourse.approved
+                              ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                              : "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+                          }`}
+                        >
+                          {selectedCourse.approved ? (
+                            <>
+                              <CheckCircle className="w-3 h-3" />
+                              <span>Approved</span>
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-3 h-3" />
+                              <span>Pending Review</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {selectedCourse.approvalCount > 0 && (
                         <div>
-                          <h4 className="font-semibold text-yellow-500 text-sm md:text-base">
-                            Feedback
+                          <h4 className="text-sm font-medium text-yellow-500 mb-1">
+                            Review Score
                           </h4>
-                          <div className="mt-1 p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
-                            {feedbackLoading ? (
-                              <div className="flex justify-center py-2">
-                                <Loader className="w-4 h-4 text-yellow-500 animate-spin" />
-                              </div>
-                            ) : courseFeedback ? (
-                              <p className="text-xs md:text-sm dark:text-gray-300 text-gray-700">
-                                {typeof courseFeedback === "string"
-                                  ? courseFeedback
-                                  : JSON.stringify(courseFeedback)}
-                              </p>
-                            ) : (
-                              <p className="text-xs md:text-sm text-gray-500 italic">
-                                No feedback available yet
-                              </p>
-                            )}
+                          <div
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+                              selectedCourse.approvalCount >= 80
+                                ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                                : "bg-red-500/10 text-red-600 dark:text-red-400"
+                            }`}
+                          >
+                            <Star className="w-3 h-3" />
+                            <span>{selectedCourse.approvalCount}%</span>
                           </div>
                         </div>
                       )}
 
-                    <div>
-                      <h4 className="font-semibold text-yellow-500 text-sm md:text-base">
-                        Description
-                      </h4>
-                      <p className="dark:text-gray-300 text-gray-700 text-sm">
-                        {selectedCourse.description || ""}
-                      </p>
-                    </div>
+                      {(selectedCourse.creator === address ||
+                        role === "ADMIN") &&
+                        !selectedCourse.approved && (
+                          <div>
+                            <h4 className="text-sm font-medium text-yellow-500 mb-1">
+                              Feedback
+                            </h4>
+                            <div className="p-3 rounded-lg bg-slate-100/50 dark:bg-slate-800/50 text-sm text-slate-900 dark:text-white">
+                              {feedbackLoading ? (
+                                <div className="flex justify-center py-2">
+                                  <Loader className="w-4 h-4 text-yellow-500 animate-spin" />
+                                </div>
+                              ) : courseFeedback ? (
+                                <p className="text-slate-900 dark:text-white">
+                                  {typeof courseFeedback === "string"
+                                    ? courseFeedback
+                                    : JSON.stringify(courseFeedback)}
+                                </p>
+                              ) : (
+                                <p className="text-slate-500 dark:text-slate-300 italic">
+                                  No feedback available yet
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
-                    <div className="grid grid-cols-2 gap-3 md:gap-4">
                       <div>
-                        <h4 className="font-semibold text-yellow-500 text-xs md:text-sm">
-                          Chapters
+                        <h4 className="text-sm font-medium text-yellow-500 mb-1">
+                          Description
                         </h4>
-                        <p className="dark:text-gray-300 text-gray-700 text-sm">
-                          {chapters?.length || 0}
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          {selectedCourse.description}
                         </p>
                       </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 rounded-lg bg-slate-100/50 dark:bg-slate-800/50">
+                          <p className="text-xs text-slate-500 dark:text-slate-300 mb-1">
+                            Chapters
+                          </p>
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">
+                            {chapters?.filter(
+                              (c) =>
+                                Number(c.courseId) ===
+                                Number(selectedCourse.courseId),
+                            ).length || 0}
+                          </p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-slate-100/50 dark:bg-slate-800/50">
+                          <p className="text-xs text-slate-500 dark:text-slate-300 mb-1">
+                            Lessons
+                          </p>
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">
+                            {lessons?.length || 0}
+                          </p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-slate-100/50 dark:bg-slate-800/50">
+                          <p className="text-xs text-slate-500 dark:text-slate-300 mb-1">
+                            Quizzes
+                          </p>
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">
+                            {quizzes?.length || 0}
+                          </p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-slate-100/50 dark:bg-slate-800/50">
+                          <p className="text-xs text-slate-500 dark:text-slate-300 mb-1">
+                            Duration
+                          </p>
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">
+                            {calculateTotalDuration(selectedCourse.courseId)}{" "}
+                            weeks
+                          </p>
+                        </div>
+                      </div>
+
                       <div>
-                        <h4 className="font-semibold text-yellow-500 text-xs md:text-sm">
-                          Lessons
+                        <h4 className="text-sm font-medium text-yellow-500 mb-1">
+                          Creator
                         </h4>
-                        <p className="dark:text-gray-300 text-gray-700 text-sm">
-                          {lessons?.length || 0}
+                        <p className="font-mono text-sm bg-slate-100/50 dark:bg-slate-800/50 p-2 rounded-lg text-slate-900 dark:text-white">
+                          {selectedCourse.creator}
                         </p>
                       </div>
-                      <div>
-                        <h4 className="font-semibold text-yellow-500 text-xs md:text-sm">
-                          Quizzes
-                        </h4>
-                        <p className="dark:text-gray-300 text-gray-700 text-sm">
-                          {quizzes?.length || 0}
-                        </p>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-yellow-500 text-xs md:text-sm">
-                          Duration
-                        </h4>
-                        <p className="dark:text-gray-300 text-gray-700 text-sm">
-                          {typeof calculateTotalDuration(
-                            selectedCourse.courseId,
-                          ) === "object"
-                            ? "0"
-                            : calculateTotalDuration(
-                                selectedCourse.courseId,
-                              )}{" "}
-                          Weeks
-                        </p>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-yellow-500 text-xs md:text-sm">
-                          Prerequisites
-                        </h4>
-                        <p className="dark:text-gray-300 text-gray-700 text-sm">
-                          None
-                        </p>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-yellow-500 text-xs md:text-sm">
-                          Enrolled
-                        </h4>
-                        <span className="dark:text-gray-300 text-gray-700 text-sm">
-                          {typeof getEnrolledStudentsCount(
-                            selectedCourse?.enrolledStudents,
-                          ) === "object"
-                            ? "0"
-                            : getEnrolledStudentsCount(
-                                selectedCourse?.enrolledStudents,
-                              ) || 0}{" "}
-                          Student(s)
-                        </span>
+
+                      <div className="pt-2">
+                        <button
+                          onClick={() => setActiveTab("metrics")}
+                          className="w-full py-3 bg-gradient-to-r from-yellow-500 to-amber-500 text-black rounded-xl font-medium hover:shadow-lg hover:shadow-yellow-500/25 transition-all flex items-center justify-center gap-2"
+                        >
+                          <BarChart3 className="w-4 h-4" />
+                          View Course Metrics
+                        </button>
                       </div>
                     </div>
+                  )}
 
-                    <div>
-                      <h4 className="font-semibold text-yellow-500 text-sm md:text-base">
-                        Creator
-                      </h4>
-                      <p className="dark:text-gray-300 text-gray-700 text-sm truncate max-w-[200px] md:max-w-64">
-                        {selectedCourse.creator || ""}
-                      </p>
-                    </div>
-
-                    {/* View Metrics Button */}
-                    <div className="pt-2">
-                      <button
-                        onClick={() => setActiveTab("metrics")}
-                        className="w-full py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors text-sm"
-                      >
-                        <ChartBar className="w-4 h-4 md:w-5 md:h-5" />
-                        <span>View Course Metrics</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* METRICS TAB - Similar responsive adjustments */}
-                {activeTab === "metrics" && (
-                  <div className="space-y-3 md:space-y-4 max-h-80 md:max-h-96 overflow-y-auto">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg md:text-xl font-bold text-yellow-500">
-                        Course Metrics
-                      </h3>
-                      <button
-                        onClick={() => setActiveTab("details")}
-                        className="text-yellow-500 hover:text-yellow-600 flex items-center gap-1 text-sm"
-                      >
-                        <ArrowLeft className="w-3 h-3 md:w-4 md:h-4" />
-                        <span>Back</span>
-                      </button>
-                    </div>
-
-                    {!latestReviews[selectedCourse.courseId] ? (
-                      <div className="flex justify-center items-center h-40 md:h-64">
-                        <Loader className="w-6 h-6 md:w-8 md:h-8 text-yellow-500 animate-spin" />
+                  {/* Metrics Tab */}
+                  {activeTab === "metrics" && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-yellow-500 dark:text-white">
+                          Course Metrics
+                        </h3>
+                        <button
+                          onClick={() => setActiveTab("details")}
+                          className="text-yellow-500 dark:text-white hover:text-yellow-600 dark:hover:text-slate-300 flex items-center gap-1 text-sm"
+                        >
+                          <ArrowLeft className="w-3 h-3" />
+                          Back
+                        </button>
                       </div>
-                    ) : (
-                      <>
-                        {/* Evaluation Summary */}
-                        <div className="dark:bg-gray-800 bg-gray-200 rounded-lg p-3 md:p-4">
-                          <h4 className="text-yellow-500 font-medium mb-2 md:mb-3 text-sm md:text-base">
-                            Evaluation Summary
-                          </h4>
-                          <div className="flex justify-center py-2 md:py-4">
-                            <div className="relative w-24 h-24 md:w-32 md:h-32">
-                              {/* Circular Progress - same logic but smaller on mobile */}
-                              {(() => {
-                                const latestReview =
-                                  latestReviews[selectedCourse.courseId];
-                                const approvalPercentage = latestReview?.score
-                                  ? latestReview.score / 100
-                                  : 0;
-                                const isPassed = approvalPercentage >= 50;
 
-                                return (
-                                  <>
-                                    <svg
-                                      className="w-full h-full"
-                                      viewBox="0 0 100 100"
-                                    >
-                                      <circle
-                                        cx="50"
-                                        cy="50"
-                                        r="45"
-                                        fill="transparent"
-                                        stroke="#f3f4f6"
-                                        strokeWidth="10"
-                                      />
-                                      <circle
-                                        cx="50"
-                                        cy="50"
-                                        r="45"
-                                        fill="transparent"
-                                        stroke={
-                                          isPassed ? "#22c55e" : "#f43f5e"
-                                        }
-                                        strokeWidth="10"
-                                        strokeDasharray={`${
-                                          approvalPercentage * 2.83
-                                        } 283`}
-                                        strokeDashoffset="0"
-                                        transform="rotate(-90 50 50)"
-                                      />
-                                    </svg>
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                      <span className="text-lg md:text-2xl font-bold text-yellow-500 dark:text-yellow-500">
-                                        {approvalPercentage.toFixed(2)}%
+                      {!latestReviews[selectedCourse.courseId] ? (
+                        <div className="flex justify-center items-center h-48">
+                          <Loader className="w-8 h-8 text-yellow-500 animate-spin" />
+                        </div>
+                      ) : (
+                        <>
+                          {/* Evaluation Summary */}
+                          <div className="bg-gradient-to-br from-slate-100 to-white dark:from-slate-800 dark:to-slate-900 rounded-xl p-4">
+                            <h4 className="text-yellow-500 dark:text-white font-medium mb-3">
+                              Evaluation Summary
+                            </h4>
+                            <div className="flex justify-center py-4">
+                              <div className="relative w-32 h-32">
+                                {(() => {
+                                  const latestReview =
+                                    latestReviews[selectedCourse.courseId];
+                                  const approvalPercentage = latestReview?.score
+                                    ? latestReview.score / 100
+                                    : 0;
+                                  const isPassed = approvalPercentage >= 50;
+
+                                  return (
+                                    <>
+                                      <svg
+                                        className="w-full h-full"
+                                        viewBox="0 0 100 100"
+                                      >
+                                        <circle
+                                          cx="50"
+                                          cy="50"
+                                          r="45"
+                                          fill="transparent"
+                                          stroke="#e2e8f0"
+                                          strokeWidth="10"
+                                        />
+                                        <circle
+                                          cx="50"
+                                          cy="50"
+                                          r="45"
+                                          fill="transparent"
+                                          stroke={
+                                            isPassed ? "#22c55e" : "#f43f5e"
+                                          }
+                                          strokeWidth="10"
+                                          strokeDasharray={`${
+                                            approvalPercentage * 2.83
+                                          } 283`}
+                                          strokeDashoffset="0"
+                                          transform="rotate(-90 50 50)"
+                                          className="transition-all duration-1000"
+                                        />
+                                      </svg>
+                                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                        <span className="text-2xl font-bold text-yellow-500">
+                                          {approvalPercentage.toFixed(2)}%
+                                        </span>
+                                        <span className="text-xs uppercase text-gray-400 dark:text-slate-400">
+                                          {isPassed ? "PASSED" : "FAILED"}
+                                        </span>
+                                      </div>
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
+                              <div>
+                                <span className="text-gray-400 dark:text-slate-400">
+                                  Category:
+                                </span>
+                                <p className="text-yellow-500 dark:text-white truncate">
+                                  {latestReviews[selectedCourse.courseId]
+                                    ?.category || "General"}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="text-gray-400 dark:text-slate-400">
+                                  Pass Mark:
+                                </span>
+                                <p className="text-yellow-500 dark:text-white">
+                                  75%
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Performance Breakdown */}
+                          <div className="bg-gradient-to-br from-slate-100 to-white dark:from-slate-800 dark:to-slate-900 rounded-xl p-4">
+                            <h4 className="text-yellow-500 dark:text-white font-medium mb-3">
+                              Performance Breakdown
+                            </h4>
+                            {latestReviews[selectedCourse.courseId] &&
+                            Object.keys(latestReviews[selectedCourse.courseId])
+                              .length > 0 ? (
+                              <div className="space-y-3">
+                                {Object.entries({
+                                  "Learner Agency":
+                                    latestReviews[selectedCourse.courseId]
+                                      .learnerAgency || 0,
+                                  "Critical Thinking":
+                                    latestReviews[selectedCourse.courseId]
+                                      .criticalThinking || 0,
+                                  "Collaborative Learning":
+                                    latestReviews[selectedCourse.courseId]
+                                      .collaborativeLearning || 0,
+                                  "Reflective Practice":
+                                    latestReviews[selectedCourse.courseId]
+                                      .reflectivePractice || 0,
+                                  "Adaptive Learning":
+                                    latestReviews[selectedCourse.courseId]
+                                      .adaptiveLearning || 0,
+                                  "Authentic Learning":
+                                    latestReviews[selectedCourse.courseId]
+                                      .authenticLearning || 0,
+                                  "Technology Integration":
+                                    latestReviews[selectedCourse.courseId]
+                                      .technologyIntegration || 0,
+                                  "Learner Support":
+                                    latestReviews[selectedCourse.courseId]
+                                      .learnerSupport || 0,
+                                  "Assessment for Learning":
+                                    latestReviews[selectedCourse.courseId]
+                                      .assessmentForLearning || 0,
+                                  "Engagement and Motivation":
+                                    latestReviews[selectedCourse.courseId]
+                                      .engagementAndMotivation || 0,
+                                }).map(([key, value]) => (
+                                  <div key={key}>
+                                    <div className="flex justify-between mb-1">
+                                      <span className="text-xs text-slate-600 dark:text-slate-300">
+                                        {key}
                                       </span>
-                                      <span className="text-xs uppercase text-gray-400">
-                                        {isPassed ? "PASSED" : "FAILED"}
+                                      <span
+                                        className={`text-xs font-medium ${
+                                          value >= 70
+                                            ? "text-green-500"
+                                            : value >= 50
+                                            ? "text-yellow-500"
+                                            : "text-red-500"
+                                        }`}
+                                      >
+                                        {value}%
                                       </span>
                                     </div>
-                                  </>
-                                );
-                              })()}
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 mt-2 text-xs md:text-sm">
-                            <div>
-                              <span className="text-gray-400">Category:</span>
-                              <p className="text-yellow-500 truncate">
-                                {latestReviews[selectedCourse.courseId]
-                                  ?.category || "General"}
-                              </p>
-                            </div>
-                            <div>
-                              <span className="text-gray-400">Pass Mark:</span>
-                              <p className="dark:text-yellow-500 text-gray-700">
-                                75%
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Performance Breakdown */}
-                        <div className="bg-gray-200 dark:bg-gray-800 rounded-lg p-3 md:p-4">
-                          <h4 className="text-yellow-500 font-medium mb-3 text-sm md:text-base">
-                            Performance Breakdown
-                          </h4>
-                          {latestReviews[selectedCourse.courseId] &&
-                          Object.keys(latestReviews[selectedCourse.courseId])
-                            .length > 0 ? (
-                            <div className="grid grid-cols-1 gap-2 md:gap-3">
-                              {Object.entries({
-                                "Learner Agency":
-                                  latestReviews[selectedCourse.courseId]
-                                    .learnerAgency || 0,
-                                "Critical Thinking":
-                                  latestReviews[selectedCourse.courseId]
-                                    .criticalThinking || 0,
-                                "Collaborative Learning":
-                                  latestReviews[selectedCourse.courseId]
-                                    .collaborativeLearning || 0,
-                                "Reflective Practice":
-                                  latestReviews[selectedCourse.courseId]
-                                    .reflectivePractice || 0,
-                                "Adaptive Learning":
-                                  latestReviews[selectedCourse.courseId]
-                                    .adaptiveLearning || 0,
-                                "Authentic Learning":
-                                  latestReviews[selectedCourse.courseId]
-                                    .authenticLearning || 0,
-                                "Technology Integration":
-                                  latestReviews[selectedCourse.courseId]
-                                    .technologyIntegration || 0,
-                                "Learner Support":
-                                  latestReviews[selectedCourse.courseId]
-                                    .learnerSupport || 0,
-                                "Assessment for Learning":
-                                  latestReviews[selectedCourse.courseId]
-                                    .assessmentForLearning || 0,
-                                "Engagement and Motivation":
-                                  latestReviews[selectedCourse.courseId]
-                                    .engagementAndMotivation || 0,
-                              }).map(([key, value]) => (
-                                <div key={key} className="mb-1">
-                                  <div className="flex justify-between mb-1">
-                                    <span className="text-xs dark:text-gray-300 text-gray-700 truncate max-w-[100px] md:max-w-none">
-                                      {key}
-                                    </span>
-                                    <span
-                                      className={`text-xs font-medium ${
-                                        value >= 70
-                                          ? "text-green-400"
-                                          : value >= 50
-                                          ? "text-yellow-400"
-                                          : "text-red-400"
-                                      }`}
-                                    >
-                                      {value}%
-                                    </span>
+                                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                                      <div
+                                        className={`h-2 rounded-full transition-all duration-500 ${
+                                          value >= 70
+                                            ? "bg-green-500"
+                                            : value >= 50
+                                            ? "bg-yellow-500"
+                                            : "bg-red-500"
+                                        }`}
+                                        style={{ width: `${value}%` }}
+                                      />
+                                    </div>
                                   </div>
-                                  <div className="w-full bg-gray-700 rounded-full h-2">
-                                    <div
-                                      className={`h-2 rounded-full ${
-                                        value >= 70
-                                          ? "bg-green-500"
-                                          : value >= 50
-                                          ? "bg-yellow-500"
-                                          : "bg-red-500"
-                                      }`}
-                                      style={{ width: `${value}%` }}
-                                    />
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-center py-3 md:py-4 text-gray-400 text-sm">
-                              No detailed metrics available for this course
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-4 text-gray-400 dark:text-slate-400">
+                                No detailed metrics available
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         )}
-      </div>
 
-      {/* Survey Modal for First-time Enrollment */}
-      {showSurveyModal && (
-        <CareerOnboardingForm
-          userAddress={account?.address}
-          isModal={true}
-          onFormComplete={handleSurveyComplete}
-          courseIdToEnroll={courseIdPendingEnrollment}
-          onClose={() => {
-            setShowSurveyModal(false);
-            setCourseIdPendingEnrollment(null);
-          }}
-        />
-      )}
+        {/* Unenrollment Confirmation Modal */}
+        {showUnenrollConfirm && courseToUnenroll && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div
+              className={`max-w-md w-full rounded-2xl border shadow-2xl overflow-hidden ${glassCardStyle}`}
+            >
+              <div className="p-6">
+                <div className="text-center">
+                  <div className="mx-auto w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
+                    <WifiOff className="w-8 h-8 text-red-500" />
+                  </div>
+
+                  <h3 className="text-xl font-bold mb-2 text-white">
+                    Confirm Unenrollment
+                  </h3>
+
+                  <p className="text-slate-600 dark:text-slate-400 mb-6">
+                    Are you sure you want to unenroll from{" "}
+                    <span className="font-semibold text-yellow-600 dark:text-yellow-400">
+                      {courseToUnenroll.courseName}
+                    </span>
+                    ? You will lose all your progress.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={() => {
+                        setShowUnenrollConfirm(false);
+                        setCourseToUnenroll(null);
+                      }}
+                      disabled={
+                        unenrollingCourseId === courseToUnenroll?.courseId
+                      }
+                      className="flex-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors font-medium"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await unEnroll(courseToUnenroll.courseId);
+                          setShowUnenrollConfirm(false);
+                          setCourseToUnenroll(null);
+                        } catch (error) {
+                          console.error("Failed to unenroll:", error);
+                        }
+                      }}
+                      disabled={
+                        unenrollingCourseId === courseToUnenroll?.courseId
+                      }
+                      className="flex-1 bg-gradient-to-r from-red-500 to-rose-500 text-white px-4 py-3 rounded-xl font-medium hover:shadow-lg hover:shadow-red-500/25 transition-all flex items-center justify-center gap-2"
+                    >
+                      {unenrollingCourseId === courseToUnenroll?.courseId ? (
+                        <>
+                          <Loader className="w-4 h-4 animate-spin" />
+                          Unenrolling...
+                        </>
+                      ) : (
+                        "Yes, Unenroll"
+                      )}
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-slate-500 mt-4">
+                    This action cannot be undone
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Survey Modal */}
+        {showSurveyModal && (
+          <CareerOnboardingForm
+            userAddress={account?.address}
+            isModal={true}
+            onFormComplete={handleSurveyComplete}
+            courseIdToEnroll={courseIdPendingEnrollment}
+            onClose={() => {
+              setShowSurveyModal(false);
+              setCourseIdPendingEnrollment(null);
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 };
