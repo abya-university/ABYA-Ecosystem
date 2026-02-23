@@ -14,7 +14,7 @@ const CONTRACT_ADDRESSES = {
         ProfileFacet: "0x14D5cF145676CaD0Bc293C4b19000Ec2d9ddBc6F",
         AmbassadorNetworkFacet: "0x8d5c8abCd18aa1bF789095d00a96479057eD31B2",
         RevenueSharingFacet: "0x519F9293bdEF30Ac6D1bb8Ae4480A0ab5ED4A3FE",
-        VestingFacet: "0x7Cf8f0C492dd56A687EA70ed3116133Bdb32D825"
+        VestingFacet: "0x68dA4d41B184325c5A2dc9f3E7545371e04cE8bb"
     },
     init: {
         DiamondInit: "0xfaab9f879C3ECC7C212Bf36c1145951ef0E6aaa5"
