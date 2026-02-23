@@ -11,7 +11,7 @@ import { extractHighlightedTerms } from "../utils/parseLessonContent";
  * [[term:definition]] - highlights the term with hover tooltip
  * 
  * @param {string} content - The lesson content with optional [[term:definition]] markup
- * @param {function} onTermClick - Callback when user clicks "Ask ABYA about this"
+ * @param {function} onTermClick - Callback when user clicks "Ask Dr. Kwame about this"
  *                                  Receives (term, definition) as params
  * @param {string} className - Optional CSS classes for the paragraph
  */

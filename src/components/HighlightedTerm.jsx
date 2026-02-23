@@ -7,11 +7,11 @@ import { HelpCircle, X } from "lucide-react";
  * Renders a highlighted term with:
  * - Subtle underline styling
  * - Hover tooltip with definition
- * - "Ask ABYA" button to open chatbot with term context
+ * - "Ask Dr. Kwame" button to open chatbot with term context
  * 
  * @param {string} term - The term to highlight
  * @param {string} definition - Brief definition of the term
- * @param {function} onAskAbout - Callback when user clicks "Ask ABYA about this"
+ * @param {function} onAskAbout - Callback when user clicks "Ask Dr. Kwame about this"
  */
 const HighlightedTerm = ({ term, definition, onAskAbout }) => {
   const [showTooltip, setShowTooltip] = useState(false);
@@ -75,7 +75,7 @@ const HighlightedTerm = ({ term, definition, onAskAbout }) => {
             {definition}
           </p>
 
-          {/* Ask ABYA button */}
+          {/* Ask Dr. Kwame button */}
           {onAskAbout && (
             <button
               onClick={() => {
@@ -86,7 +86,7 @@ const HighlightedTerm = ({ term, definition, onAskAbout }) => {
                          py-2 px-3 rounded transition-colors duration-150 text-sm flex items-center justify-center gap-2"
             >
               <HelpCircle className="w-4 h-4" />
-              Ask ABYA about this
+              Ask Dr. Kwame about this
             </button>
           )}
         </div>

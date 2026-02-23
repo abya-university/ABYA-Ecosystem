@@ -54,7 +54,7 @@ const AbyaChatbot = forwardRef(({
     {
       id: 1,
       type: "bot",
-      content: "Welcome to the ABYA Learning Assistant. I'm synced with your current course. How can I help you?",
+      content: "Welcome! I'm Dr. Kwame, your personal Learning Assistant. I'm fully synced with your current course and ready to help you master every concept. What would you like to learn about?",
     },
   ]);
   const [inputMessage, setInputMessage] = useState("");
@@ -238,14 +238,14 @@ const AbyaChatbot = forwardRef(({
             <div className="flex items-center space-x-2">
               <Sparkles className="w-6 h-6 text-yellow-500" />
               <div>
-                <h2 className="dark:text-white font-semibold text-yellow-600 leading-none">ABYA AI</h2>
+                <h2 className="dark:text-white font-semibold text-yellow-600 leading-none">Dr. Kwame</h2>
                 {highlightedTerm ? (
                   <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" />
                     Explaining: <span className="font-semibold text-blue-500">{highlightedTerm}</span>
                   </div>
                 ) : (
-                  <p className="text-[10px] text-gray-500 mt-1">{currentChapterTitle || "General Assistant"}</p>
+                  <p className="text-[10px] text-gray-500 mt-1">{currentChapterTitle || "Your Learning Guide"}</p>
                 )}
               </div>
             </div>
@@ -281,7 +281,7 @@ const AbyaChatbot = forwardRef(({
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value.slice(0, MAX_MESSAGE_LENGTH))}
               onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
-              placeholder="Ask about this chapter..."
+              placeholder="Ask Dr. Kwame anything..."
               disabled={isLoading}
               maxLength={MAX_MESSAGE_LENGTH}
               className="flex-1 dark:bg-gray-900 dark:text-white bg-white text-gray-900 px-4 py-2 rounded-full focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:opacity-50"
