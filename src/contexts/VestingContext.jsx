@@ -237,6 +237,8 @@ export const VestingProvider = ({ children }) => {
     setError(null);
 
     try {
+      console.log("Getting vesting info for:", ambassadorAddress);
+
       const contract = await getContract({
         address: DiamondAddress,
         abi: VestingFacet_ABI,
@@ -244,11 +246,29 @@ export const VestingProvider = ({ children }) => {
         chain: defineChain(11155111),
       });
 
+      console.log("Contract initialized for address:", DiamondAddress);
+
       const result = await readContract({
         contract,
         method: "getTokenBalance",
         params: [ambassadorAddress],
       });
+
+      console.log("Raw result from getTokenBalance:", result);
+      console.log("Result[0] (vested):", result[0], "Type:", typeof result[0]);
+      console.log(
+        "Result[1] (unvested):",
+        result[1],
+        "Type:",
+        typeof result[1],
+      );
+      console.log("Result[2] (claimed):", result[2], "Type:", typeof result[2]);
+      console.log(
+        "Result[3] (lifetime):",
+        result[3],
+        "Type:",
+        typeof result[3],
+      );
 
       setVestingData({
         vested: result[0],
@@ -257,11 +277,27 @@ export const VestingProvider = ({ children }) => {
         lifetime: result[3],
       });
 
-      console.log("Vesting info retrieved:", result);
+      console.log("Vesting data state updated with:", {
+        vested: result[0],
+        unvested: result[1],
+        claimed: result[2],
+        lifetime: result[3],
+      });
+
       return result;
     } catch (error) {
       const errorMessage = error.message || "Error getting vesting info";
-      console.error("Error getting vesting info:", error);
+      console.error(
+        "Error getting vesting info for",
+        ambassadorAddress,
+        ":",
+        error,
+      );
+      console.error("Error details:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+      });
       setError(errorMessage);
       setVestingData({
         vested: 0n,
@@ -269,7 +305,7 @@ export const VestingProvider = ({ children }) => {
         claimed: 0n,
         lifetime: 0n,
       });
-      toast.error(errorMessage);
+      // Don't show toast error here - let component handle it
     } finally {
       setLoadingVestingInfo(false);
     }
