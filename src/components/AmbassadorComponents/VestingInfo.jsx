@@ -41,7 +41,7 @@ export default function VestingInfo({
   useEffect(() => {
     if (targetAddress && !hasLoadedOnce) {
       setIsLoading(true);
-      Promise.all([
+      Promise.allSettled([
         getVestingInfo(targetAddress),
         getVestingSchedule(targetAddress),
       ]).finally(() => {
@@ -225,7 +225,7 @@ export default function VestingInfo({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <div className="text-xs">
                   <p className="text-slate-600 dark:text-slate-400">
                     Days Elapsed
@@ -241,6 +241,22 @@ export default function VestingInfo({
                   </p>
                   <p className="font-semibold text-slate-900 dark:text-white">
                     {Math.floor(Number(vestingSchedule.duration || 0) / 86400)}{" "}
+                    days
+                  </p>
+                </div>
+                <div className="text-xs">
+                  <p className="text-slate-600 dark:text-slate-400">
+                    Remaining
+                  </p>
+                  <p className="font-semibold text-slate-900 dark:text-white">
+                    {Math.max(
+                      0,
+                      Math.floor(
+                        (Number(vestingSchedule.duration || 0) -
+                          Number(vestingSchedule.elapsed || 0)) /
+                          86400,
+                      ),
+                    )}{" "}
                     days
                   </p>
                 </div>

@@ -263,6 +263,12 @@ export const VestingProvider = ({ children }) => {
       const errorMessage = error.message || "Error getting vesting info";
       console.error("Error getting vesting info:", error);
       setError(errorMessage);
+      setVestingData({
+        vested: 0n,
+        unvested: 0n,
+        claimed: 0n,
+        lifetime: 0n,
+      });
       toast.error(errorMessage);
     } finally {
       setLoadingVestingInfo(false);
@@ -306,6 +312,12 @@ export const VestingProvider = ({ children }) => {
       const errorMessage = error.message || "Error getting vesting schedule";
       console.error("Error getting vesting schedule:", error);
       setError(errorMessage);
+      setVestingScheduleState({
+        startTime: 0n,
+        duration: 0n,
+        elapsed: 0n,
+        percentVested: 0n,
+      });
       toast.error(errorMessage);
     } finally {
       setLoadingVestingScheduleLoad(false);

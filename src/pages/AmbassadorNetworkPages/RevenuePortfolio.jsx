@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowUpRight,
   Coins,
@@ -14,48 +14,56 @@ import {
   Zap,
   AlertCircle,
 } from "lucide-react";
+import { useActiveAccount } from "thirdweb/react";
 import { useDarkMode } from "../../contexts/themeContext";
 import { useAmbassadorNetwork } from "../../contexts/ambassadorNetworkContext";
 import { useUser } from "../../contexts/userContext";
+import { useRevenueSharing } from "../../contexts/RevenueSharingContext";
 import VestingInfo from "../../components/AmbassadorComponents/VestingInfo";
+import CommissionWithdrawal from "../../components/AmbassadorComponents/CommissionWithdrawal";
 
 export default function RevenuePortfolio() {
   const { darkMode } = useDarkMode();
   const { ambassadorDetails } = useAmbassadorNetwork();
   const { role } = useUser();
+  const account = useActiveAccount();
+  const { commissionsBalance, fetchCommissionsBalance } = useRevenueSharing();
   const [hoveredCard, setHoveredCard] = useState(null);
+
+  // Fetch user's commission balance on component mount
+  useEffect(() => {
+    if (account?.address) {
+      fetchCommissionsBalance(account.address);
+    }
+  }, [account?.address, fetchCommissionsBalance]);
 
   const ambassadorList = Array.isArray(ambassadorDetails)
     ? ambassadorDetails
     : [];
 
-  const totals = useMemo(() => {
-    return ambassadorList.reduce(
-      (accumulator, ambassador) => {
-        // Safely handle BigInt conversion
-        let commissions = 0;
-        try {
-          if (ambassador?.lifetimeCommissions) {
-            // Convert BigInt to Number, handling USDC decimals (6 decimals)
-            const commissionsRaw = BigInt(
-              ambassador.lifetimeCommissions.toString(),
-            );
-            commissions = Number(commissionsRaw) / 1e6; // Convert from wei to USDC
-          }
-        } catch (error) {
-          console.error("Error converting commissions:", error);
-          commissions = 0;
-        }
+  // Format USDC amounts (6 decimals)
+  const formatUSDC = (amount) => {
+    if (!amount) return "0.00";
+    try {
+      const num = Number(amount) / 1e6;
+      if (isNaN(num)) return "0.00";
+      return num.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    } catch (error) {
+      console.error("Error formatting USDC:", error);
+      return "0.00";
+    }
+  };
 
-        return {
-          totalCommissions:
-            accumulator.totalCommissions +
-            (Number.isNaN(commissions) ? 0 : commissions),
-        };
-      },
-      { totalCommissions: 0 },
-    );
-  }, [ambassadorList]);
+  const pendingAmount = commissionsBalance?.pending
+    ? formatUSDC(commissionsBalance.pending)
+    : "0.00";
+
+  const lifetimeAmount = commissionsBalance?.lifetime
+    ? formatUSDC(commissionsBalance.lifetime)
+    : "0.00";
 
   const cardStyle = darkMode
     ? "bg-gradient-to-br from-slate-900/90 to-slate-800/90 border-slate-700/50 hover:border-slate-600/50"
@@ -68,23 +76,13 @@ export default function RevenuePortfolio() {
   const statsCards = [
     {
       title: "Pending Payouts",
-      value: totals.totalCommissions
-        ? `$${totals.totalCommissions.toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}`
-        : "$0.00",
-      subtitle: totals.totalCommissions
-        ? `${totals.totalCommissions.toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })} USDC`
-        : "0.00 USDC",
+      value: `${pendingAmount} USDC`,
+      subtitle: `${pendingAmount} USDC`,
       icon: Coins,
       gradient: "from-yellow-500/20 to-amber-500/20",
       iconColor: "text-yellow-600 dark:text-yellow-400",
       bgColor: "bg-yellow-500/10",
-      trend: "+12.5%",
+      trend: pendingAmount !== "0.00" ? "Ready to withdraw" : "Coming soon",
     },
     {
       title: "Monthly Growth",
@@ -220,6 +218,9 @@ export default function RevenuePortfolio() {
           <VestingInfo showClaimButton={true} />
         </div>
       </div>
+
+      {/* Commission Withdrawal Section */}
+      <CommissionWithdrawal />
 
       {/* Stats Cards with modern design */}
       <div className="grid gap-6 md:grid-cols-3">
@@ -390,18 +391,10 @@ export default function RevenuePortfolio() {
                 </span>
                 <div className="text-right">
                   <span className="text-lg font-bold text-green-600 dark:text-green-400 block">
-                    $
-                    {totals.totalCommissions.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {lifetimeAmount} USDC
                   </span>
                   <span className="text-xs text-slate-400 dark:text-slate-500">
-                    {totals.totalCommissions.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}{" "}
-                    USDC
+                    {lifetimeAmount} USDC
                   </span>
                 </div>
               </div>
