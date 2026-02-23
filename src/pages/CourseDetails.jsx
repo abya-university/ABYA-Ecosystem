@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import ReviewModal from "../components/ReviewModal";
 import AbyaChatbot from "../components/chatbot";
+import LessonContentRenderer from "../components/LessonContentRenderer";
 import { useUser } from "../contexts/userContext";
 import PropTypes from "prop-types";
 import ProgressBar from "../components/progressBar";
@@ -731,6 +732,7 @@ const LessonContent = memo(
     currentCourse,
     address,
     courseId,
+    onTermClick,
   }) => {
     return (
       <div className="border-t border-gray-200 dark:border-gray-700 pt-6 first:border-0 first:pt-0">
@@ -738,9 +740,12 @@ const LessonContent = memo(
           {lesson.lessonName}
         </h3>
 
-        <p className="text-gray-700 dark:text-gray-300 mb-4">
-          {lesson.lessonContent}
-        </p>
+        {/* Use LessonContentRenderer to support highlighted terms */}
+        <LessonContentRenderer
+          content={lesson.lessonContent}
+          onTermClick={onTermClick}
+          className="text-gray-700 dark:text-gray-300 mb-4"
+        />
 
         {/* Additional Resources Section */}
         {lesson.additionalResources?.some((r) => r.url) && (
@@ -808,6 +813,7 @@ LessonContent.propTypes = {
   }),
   isQuizOpen: PropTypes.bool.isRequired,
   onToggleQuiz: PropTypes.func.isRequired,
+  onTermClick: PropTypes.func,
   role: PropTypes.string.isRequired,
   currentCourse: PropTypes.shape({
     approved: PropTypes.bool.isRequired,
@@ -823,6 +829,7 @@ const CourseDetails = memo(({ courseId }) => {
   const { chapters, fetchChapters, setChapters } = useContext(ChapterContext);
   const { lessons, fetchLessons } = useContext(LessonContext);
   const { quizzes, fetchQuizzes } = useContext(QuizContext);
+  const chatbotRef = useRef(null);
 
   // Debug: Log lessons and quizzes whenever they change
   useEffect(() => {
@@ -1243,6 +1250,11 @@ const CourseDetails = memo(({ courseId }) => {
                     )
                   }
                   onToggleQuiz={toggleQuiz}
+                  onTermClick={(term, definition) => {
+                    if (chatbotRef.current) {
+                      chatbotRef.current.askAboutTerm(term, definition);
+                    }
+                  }}
                   role={role}
                   currentCourse={currentCourse}
                   address={address}
@@ -2652,6 +2664,7 @@ const CourseDetails = memo(({ courseId }) => {
 
       {/* ABYA Chatbot - Course-Specific */}
       <AbyaChatbot
+        ref={chatbotRef}
         userAddress={address}
         currentCourseId={courseId}
         currentChapterTitle={currentChapter?.chapterName || null}
