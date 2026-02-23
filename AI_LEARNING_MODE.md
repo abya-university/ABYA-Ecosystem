@@ -1,371 +1,254 @@
-## 📋 Learning Mode Integration Plan
+## 📋 Dr. Kwame Learning Assistant - Hybrid Approach
 
-### **Context Analysis**
+### **System Overview**
 
-Our Current setup:
-- General chatbot (ABYA) that appears on all pages
-- Course details pages with chapters
-- Agent backend with dedicated learning-help endpoint
-- User profile tracking learning challenges and preferences
-
-### **Core Problem to Solve**
-
-How to provide contextual, personalized learning assistance when users are actively studying course content, without making it feel generic or disconnected from what they're learning.
+Dr. Kwame is a context-aware AI learning assistant integrated into the course learning experience. The hybrid approach combines:
+- **Context-aware chatbot** that understands current course/chapter content
+- **Inline term helpers** with definitions and quick context triggers
+- **Seamless interaction** between course content and Dr. Kwame's assistance
 
 ---
 
-## 🎯 **Recommended Approach: Multi-Modal Learning Assistant**
-
-### **Option 1: Context-Aware Chatbot (Recommended)**
-
-**Concept:** Transform your existing chatbot into a context-aware learning companion that adapts based on where the user is in their learning journey.
-
-**How it works:**
-
-1. **In-Course Mode**
-   - When user opens CourseDetails page, chatbot automatically switches to "Learning Mode"
-   - Chatbot UI changes to indicate it's now a "Learning Assistant"
-   - Avatar changes, different color scheme (maybe green for learning vs yellow for general)
-   - Automatically has access to current chapter context
-
-2. **Context Detection**
-   - Chatbot knows: current course, current chapter, chapter summary
-   - Can reference specific concepts from the chapter
-   - Tracks what questions user has asked about this chapter
-
-3. **Visual Indicators**
-   - Badge showing "Learning: [Chapter Name]"
-   - Quick action buttons: "Explain this concept", "Give me an example", "Quiz me"
-   - Shows user's learning progress in this chapter
-
-**Pros:**
-- Familiar interface (users already know the chatbot)
-- Context is automatically available
-- Seamless experience across pages
-- Can track conversation history per chapter
-
-**Cons:**
-- Chatbot might feel cluttered with too many modes
-- Users might not realize it has special learning features
+## 🎯 **The Hybrid Approach: Context-Aware Chatbot + Inline Helpers**
 
 ---
 
-### **Option 2: Dual Assistant System**
+## 🎨 **Implementation Status**
 
-**Concept:** Keep ABYA for general questions, add a separate "Chapter Assistant" that appears only in course pages.
+### **Phase 1: ✅ COMPLETED**
+- ✅ Dr. Kwame chatbot with learning mode
+- ✅ Context awareness (course/chapter detection)
+- ✅ Contextual messaging and UI
+- ✅ `/api/student/learning-mode` endpoint integration
 
-**How it works:**
+### **Phase 2: ✅ COMPLETED**
+- ✅ Inline helpers for content highlights
+- ✅ HighlightedTerm component with tooltips
+- ✅ LessonContentRenderer for marked terms
+- ✅ "Ask Dr. Kwame about this" button on every term
+- ✅ Term context passed to chatbot
 
-1. **ABYA Chatbot** (Bottom right)
-   - General questions, career advice, progress tracking
-   - Always available, all pages
-   - Yellow theme
-
-2. **Chapter Assistant** (Sidebar or inline)
-   - Only appears on CourseDetails page
-   - Embedded in the course content area
-   - Green/blue theme
-   - Focused solely on current chapter content
-
-**Pros:**
-- Clear separation of concerns
-- Learning assistant is highly contextual
-- Doesn't overload single chatbot with too many features
-- Can have different UI/UX optimized for learning
-
-**Cons:**
-- Two chat interfaces might confuse users
-- More complex implementation
-- Users might not know which to use when
+### **Phase 3: 🚀 IN PROGRESS**
+- Proactive assistance based on user behavior
+- Learning challenges tracking
+- Predictive difficulty detection
+- Personalized quiz generation
 
 ---
 
-### **Option 3: Inline Learning Assistant (Most Innovative)**
+## 📝 **How to Upload Lesson Content with Inline Helpers**
 
-**Concept:** Embed AI assistance directly into the course content, not as a separate chatbot.
+### **Syntax Guide**
 
-**How it works:**
-
-1. **Smart Tooltips**
-   - User can highlight any text in course content
-   - Tooltip appears: "Need help with this?"
-   - Click opens inline assistant focused on that concept
-
-2. **Section-Based Help**
-   - Each chapter section has a "?" icon
-   - Click opens a slide-out panel with AI help for that section
-   - Agent knows exact context
-
-3. **Floating Action Buttons**
-   - "Ask a question" button floats on course page
-   - "Stuck? Get a hint" button for exercises
-   - "Explain this concept" for complex topics
-
-**Pros:**
-- Most contextual and natural
-- Doesn't require switching between chat and content
-- Modern, innovative UX
-- Clear which content user needs help with
-
-**Cons:**
-- More complex UI implementation
-- Harder to maintain conversation history
-- Might interrupt reading flow
-
----
-
-### **Option 4: Hybrid Approach (My Top Recommendation)**
-
-**Concept:** Combine the best of all approaches - context-aware chatbot + inline helpers.
-
-**Implementation Plan:**
-
-#### **Phase 1: Enhance Existing Chatbot**
-
-**A. Automatic Context Detection:**
-```
-When user is on CourseDetails page:
-├─ Chatbot detects current course/chapter
-├─ UI transforms to "Learning Mode"
-├─ Shows badge: "📚 Learning: Smart Contracts Intro"
-└─ Provides quick actions relevant to learning
-```
-
-**B. Visual Transformation:**
-```
-Learning Mode UI:
-├─ Header: Different color (green accent)
-├─ Avatar: Changes to "professor" icon
-├─ Quick Actions Panel:
-│   ├─ "Explain a concept"
-│   ├─ "Give me an example"
-│   ├─ "Test my understanding"
-│   └─ "I'm stuck on something"
-└─ Context chip: Shows current chapter
-```
-
-**C. Smart Suggestions:**
-```
-Based on user behavior:
-├─ Time on page > 5min → "Need help understanding this?"
-├─ Scrolling back and forth → "Would you like me to clarify anything?"
-├─ Previous learning challenges → "This builds on [concept] - need a refresher?"
-└─ User profile → Adjust explanation depth automatically
-```
-
-#### **Phase 2: Add Inline Helpers**
-
-**A. Content Highlights:**
-```
-Course content with inline help:
-├─ Important terms have subtle underline
-├─ Hover shows brief definition
-├─ Click "Ask ABYA about this" opens chatbot with pre-filled context
-└─ Chatbot already knows what term user clicked
-```
-
-**B. Exercise Assistance:**
-```
-For exercises/quizzes:
-├─ "Get a hint" button (doesn't give answer)
-├─ "I don't understand" → Agent provides guided help
-├─ Tracks difficulty signals
-└─ Updates user's learning_challenges in profile
-```
-
-#### **Phase 3: Proactive Learning Support**
-
-**A. Predictive Assistance:**
-```
-Agent analyzes:
-├─ User's skill level
-├─ Common pain points in this chapter (from other learners)
-├─ User's previous learning challenges
-└─ Proactively offers help before user gets stuck
-```
-
-**B. Progress-Based Prompts:**
-```
-After chapter completion:
-├─ "Great job! Want me to quiz you on what you learned?"
-├─ "Let's review the key concepts together"
-└─ "Ready for the next chapter? Here's what to expect..."
-```
-
----
-
-## 🎨 **Detailed UX Flow: Hybrid Approach**
-
-### **Scenario: User starts learning a new chapter**
+Use the following syntax to mark important terms in lesson content:
 
 ```
-Step 1: User clicks on "Chapter 3: Smart Contracts"
-├─ CourseDetails component loads
-├─ Sends context to chatbot: {courseId, chapterId, chapterTitle, summary}
-└─ Chatbot state updates to "learning mode"
+[[term:definition]]
+```
 
-Step 2: Chatbot UI transforms
-├─ Background changes from yellow to green gradient
-├─ Header shows: "📚 Learning Assistant - Smart Contracts"
-├─ Quick action buttons appear:
-│   [Explain concept] [Example please] [Quiz me] [I'm stuck]
-└─ Greeting: "Ready to learn about Smart Contracts? I'm here to help!"
+### **Example**
 
-Step 3: User reads content
-├─ Sees complex term: "Gas fees"
-├─ Hovers → tooltip: "💡 Not sure what this means?"
-├─ Clicks → Chatbot opens with: "I see you're looking at Gas Fees. Let me explain..."
-└─ Agent uses learning-help endpoint with full chapter context
+Instead of plain text:
+```
+Understanding gas fees requires knowledge of smart contracts.
+```
 
-Step 4: User asks question
-├─ Types: "I don't understand how gas fees work"
-├─ Agent detects difficulty signal
-├─ Provides explanation at user's skill level
-├─ Updates learning_challenges: ["Gas fees"]
-└─ Offers follow-up: "Want to see a real-world example?"
+Use marked-up text with Dr. Kwame helpers:
+```
+Understanding [[Gas Fees:The cost to execute transactions on the blockchain]] requires 
+knowledge of [[Smart Contracts:Self-executing code deployed on blockchain that automates actions]].
+```
 
-Step 5: Proactive assistance
-├─ User spends 8 minutes on same section
-├─ Chatbot gently suggests: "This section can be tricky. Need help?"
-├─ User clicks "Yes"
-└─ Agent provides targeted help for that specific section
+### **Step-by-Step Guide**
 
-Step 6: Chapter completion
-├─ User finishes reading
-├─ Chatbot: "Great progress! Want me to quiz you to reinforce what you learned?"
-├─ User accepts
-└─ Agent generates personalized quiz based on chapter content
+#### **1. Create Lesson Content**
+
+When creating or editing lesson content, identify key terms that learners might struggle with:
+- Technical terminology
+- Concepts specific to the domain
+- Words with multiple meanings
+
+#### **2. Mark Terms with Syntax**
+
+Wrap each important term with `[[term:definition]]`:
+
+```markdown
+[[Cryptocurrency:Digital currency that uses cryptography for security and operates on blockchain]]
+[[Blockchain:Distributed ledger technology that records transactions in blocks]]
+[[Smart Contracts:Code that automatically executes when conditions are met]]
+```
+
+#### **3. Upload Lesson**
+
+When you create/update a lesson with marked terms:
+
+```javascript
+const lessonContent = `
+Learning about [[Consensus Mechanisms:Rules that help the network agree on transactions]] is crucial.
+Different blockchains use different mechanisms like [[Proof of Work:Solving complex puzzles to validate blocks]]
+or [[Proof of Stake:Validators chosen based on their stake in the network]].
+`;
+
+// Upload this content to your lesson
+```
+
+#### **4. Frontend Automatically Processes**
+
+The `LessonContentRenderer` component automatically:
+- Extracts all `[[term:definition]]` markers
+- Renders highlighted terms with blue dashed underline
+- Shows definition on hover
+- Displays "Ask Dr. Kwame about this" button
+- Passes term context to chatbot when clicked
+
+### **What Users See**
+
+1. **Normal Reading**
+   - They see: "Understanding Gas Fees requires knowledge of Smart Contracts."
+   - Important terms are highlighted with subtle blue underline
+
+2. **On Hover**
+   - Tooltip appears with definition
+   - "Ask Dr. Kwame about this" button visible
+   - They can close tooltip without asking
+
+3. **When They Click**
+   - Dr. Kwame chatbot opens automatically
+   - Chatbot knows exactly which term they need help with
+   - Input pre-filled: "Can you explain what [Term] means?"
+   - Context sent to `/api/student/learning-mode` endpoint
+
+### **Best Practices**
+
+✅ **DO:**
+- Mark 3-5 key terms per lesson section
+- Use concise definitions (one sentence max)
+- Focus on concepts students find difficult
+- Use consistent terminology
+
+❌ **DON'T:**
+- Over-mark (don't mark every technical word)
+- Use vague definitions
+- Mark common words
+- Leave definitions blank
+
+### **Example Full Lesson**
+
+```
+## Introduction to Blockchain
+
+[[Blockchain:A distributed ledger that records transactions in chronological blocks]] is a 
+revolutionary technology that enables secure, transparent, and decentralized transactions.
+
+### How it Works
+
+Each [[Block:A container of transactions linked to the previous block using cryptography]] contains:
+- Transaction data
+- Timestamp
+- Hash (unique identifier)
+- Hash of previous block
+
+This creates an immutable [[Chain:A series of blocks linked together chronologically]], hence the name blockchain.
+
+### Why It Matters
+
+[[Decentralization:Distribution of control among multiple participants instead of a single authority]] 
+means no single entity controls the network. [[Immutability:Property of data that cannot be altered after creation]] 
+ensures transaction history cannot be tampered with.
 ```
 
 ---
 
 ## 🛠️ **Technical Architecture**
 
-### **Frontend Components Needed:**
+### **Frontend Components**
 
-1. **Enhanced Chatbot Component**
-   - `mode` state: 'general' | 'learning' | 'career' | 'progress'
-   - `learningContext` state: { courseId, chapterId, chapterTitle, summary }
-   - Theme switching based on mode
-   - Quick action buttons component
+1. **Dr. Kwame Chatbot** (`src/components/chatbot.jsx`)
+   - ForwardRef support for parent control
+   - `askAboutTerm(term, definition)` method
+   - Sends learning context to backend
+   - Shows term context in header
 
-2. **Context Provider**
-   - Tracks current course/chapter globally
-   - Provides context to chatbot automatically
-   - Updates when user navigates between chapters
+2. **HighlightedTerm** (`src/components/HighlightedTerm.jsx`)
+   - Renders highlighted terms with tooltip
+   - Hover/touch support
+   - Position-aware tooltip
+   - "Ask Dr. Kwame about this" button
 
-3. **Inline Helper Components**
-   - HighlightedTerm component (for hoverable definitions)
-   - QuickHelpButton component (floats on course page)
-   - HintPanel component (for exercises)
+3. **LessonContentRenderer** (`src/components/LessonContentRenderer.jsx`)
+   - Parses [[term:definition]] syntax
+   - Splits content and injects HighlightedTerm components
+   - Handles term click callbacks
 
-### **Backend Endpoints to Use:**
+### **Utility Functions**
+
+`src/utils/parseLessonContent.js`:
+- `extractHighlightedTerms(content)` - Extracts all marked terms
+- `cleanLessonContent(content)` - Removes markup
+- `hasHighlightedTerms(content)` - Checks for marked terms
+
+### **Backend Integration**
 
 ```
-/api/student/learning-help
-├─ For in-context learning questions
-├─ Requires: courseId, chapterId, chapterTitle, summary
-└─ Tracks learning_challenges
-
-/api/student/chat
-├─ For general questions outside courses
-└─ Auto-detects mode if context provided
-
-/api/student/progress
-├─ For progress checks during learning
-└─ Shows how far in course/chapter
+POST /api/student/learning-mode
+├─ wallet_address: user's wallet ID
+├─ message: user's question
+├─ current_course_id: course ID
+└─ learning_context: {
+     current_course_id,
+     current_chapter_title,
+     current_chapter_summary,
+     completed_courses
+   }
 ```
 
 ---
 
-## 📊 **Personalization Strategy**
+## ✅ **Current Implementation Notes**
 
-### **Data to Track:**
+### **Rebranding to Dr. Kwame**
+- ✅ Chatbot header: "Dr. Kwame" (not "ABYA AI")
+- ✅ Subtitle: "Your Learning Guide"
+- ✅ Welcome message includes personality
+- ✅ Input placeholder: "Ask Dr. Kwame anything..."
+- ✅ Buttons say: "Ask Dr. Kwame about this"
 
-1. **Per Chapter:**
-   - Time spent
-   - Questions asked
-   - Concepts marked as difficult
-   - Completion status
-
-2. **Per User:**
-   - Preferred explanation style (visual, code examples, analogies)
-   - Skill level adjustments over time
-   - Topics they excel at vs struggle with
-
-3. **Agent Adaptations:**
-   - Explanation depth based on skill level
-   - Example complexity
-   - Encouragement tone (more for struggling users)
+### **Features Implemented**
+- ✅ Context-aware chatbot in CourseDetails
+- ✅ Inline highlighted terms with tooltips
+- ✅ Term definitions on hover
+- ✅ Quick access to Dr. Kwame from any term
+- ✅ Pre-filled chatbot input with term context
+- ✅ Term context indicator in chatbot header
 
 ---
 
-## 🎯 **My Final Recommendation**
+## 📊 **Next Steps (Phase 3)**
 
-**Implement the Hybrid Approach in 3 Phases:**
+1. **Proactive Assistance**
+   - Track time spent on sections
+   - Show "Need help?" hint after 6+ minutes
 
-### **Phase 1 (MVP - Week 1-2):**
-- Transform existing ABYA chatbot with learning mode detection
-- Add visual indicators when in learning mode
-- Connect to `/api/student/learning-help` endpoint
-- Quick action buttons for common learning tasks
+2. **Learning Challenges Tracking**
+   - Record which terms users ask about
+   - Store difficulty signals
 
-### **Phase 2 (Enhanced - Week 3-4):**
-- Add inline helpers on course content
-- Implement proactive assistance based on behavior
-- Add progress-based prompts after chapters
-- Track and display learning challenges
+3. **Predictive Support**
+   - Analyze user learning patterns
+   - Offer help before user gets stuck
 
-### **Phase 3 (Advanced - Week 5-6):**
-- Predictive difficulty detection
-- Personalized quiz generation
-- Learning style adaptation
-- Analytics dashboard for learning patterns
+4. **Personalized Content**
+   - Adjust explanation depth based on skill level
+   - Generate topic-specific quizzes
+   - Show related learning resources
 
 ---
 
-## 🆚 **Alternative Approaches to Consider**
+## 🎓 **Dr. Kwame's Personality**
 
-### **Alternative 1: Learning Sidebar**
-Instead of chatbot, permanent sidebar on course pages with:
-- AI assistant
-- Chapter outline
-- Quick notes
-- Resource links
-
-**Pros:** Always visible, doesn't block content
-**Cons:** Takes screen space, might be ignored
-
-### **Alternative 2: Voice Assistant**
-Audio-based learning companion:
-- User can ask questions while reading
-- Hands-free learning
-- Good for accessibility
-
-**Pros:** Novel, accessible
-**Cons:** Complex to implement, privacy concerns
-
-### **Alternative 3: Contextual Popups**
-AI assistance appears as smart popups:
-- Only when agent predicts user needs help
-- Less intrusive than always-visible chatbot
-
-**Pros:** Clean UI when not needed
-**Cons:** Might miss when user actually needs help
-
----
-
-## ✅ **Conclusion**
-
-**Best approach:** **Hybrid (Context-Aware Chatbot + Inline Helpers)**
-
-**Why:**
-- Leverages existing chatbot familiarity
-- Highly contextual and personalized
-- Non-intrusive but always available
-- Scalable and maintainable
-- Best balance of UX and implementation complexity
-
-**Start with:** Phase 1 of hybrid approach - enhance your existing chatbot to be context-aware when on course pages.
-
-Would you like me to proceed with the code implementation for Phase 1?
+Dr. Kwame is your AI learning companion with:
+- 🧑‍🏫 **Educational Focus** - Explains concepts at learner's level
+- 💡 **Supportive** - Encourages progress and celebrates achievements
+- 🎯 **Contextual** - Always aware of current chapter and learning path
+- 📚 **Knowledgeable** - Synced with all course content
+- 🤝 **Personalized** - Adapts to individual learning style
