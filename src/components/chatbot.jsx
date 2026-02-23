@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useContext } from "react";
-import { MessageCircle, Send, X, Sparkles, User, Bot, Loader2 } from "lucide-react";
+import React, { useState, useEffect, useRef, useContext, forwardRef, useImperativeHandle } from "react";
+import { MessageCircle, Send, X, Sparkles, User, Bot, Loader2, AlertCircle } from "lucide-react";
 import { useActiveAccount } from "thirdweb/react";
 import { CourseContext } from "../contexts/courseContext";
 
@@ -19,17 +19,19 @@ const fetchWithTimeout = (url, options = {}, timeoutMs = API_TIMEOUT) => {
   ]);
 };
 
-const AbyaChatbot = ({ 
+const AbyaChatbot = forwardRef(({ 
   userAddress, 
   currentCourseId, 
   currentChapterTitle, 
   currentChapterSummary,
   completedCourses = []
-}) => {
+}, ref) => {
   const [isOpen, setIsOpen] = useState(false);
   const account = useActiveAccount();
   const walletAddress = userAddress || account?.address;
   const { courses, latestReviews } = useContext(CourseContext);
+  const [highlightedTerm, setHighlightedTerm] = useState(null);
+  const [termDefinition, setTermDefinition] = useState(null);
   
   // Compute completed courses from context
   const computedCompletedCourses = completedCourses.length > 0 
@@ -58,6 +60,20 @@ const AbyaChatbot = ({
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
+
+  // Expose methods to parent component via ref
+  useImperativeHandle(ref, () => ({
+    askAboutTerm: (term, definition) => {
+      setHighlightedTerm(term);
+      setTermDefinition(definition);
+      setIsOpen(true);
+      // Pre-fill the input with a question about the term
+      setInputMessage(`Can you explain what ${term} means?`);
+    },
+    openChatbot: () => {
+      setIsOpen(true);
+    },
+  }));
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -200,7 +216,14 @@ const AbyaChatbot = ({
   return (
     <div className="fixed bottom-6 right-6 z-50">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen(!isOpen);
+          // Clear term context when closing
+          if (isOpen) {
+            setHighlightedTerm(null);
+            setTermDefinition(null);
+          }
+        }}
         className={`w-16 h-16 rounded-full shadow-2xl transition-all duration-300 flex items-center justify-center ${
             isOpen ? "bg-yellow-500 text-black" : "bg-gradient-to-br from-yellow-500 to-yellow-700 text-white hover:scale-105"
           }`}
@@ -210,14 +233,34 @@ const AbyaChatbot = ({
 
       {isOpen && (
         <div className="fixed bottom-24 right-6 w-96 h-[550px] dark:bg-gray-900 dark:text-gray-100 bg-white text-gray-900 rounded-xl shadow-2xl border dark:border-gray-800 border-yellow-500 flex flex-col overflow-hidden">
+          {/* Header with term context indicator */}
           <div className="dark:bg-gray-800 bg-gray-200 p-4 flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Sparkles className="w-6 h-6 text-yellow-500" />
               <div>
                 <h2 className="dark:text-white font-semibold text-yellow-600 leading-none">ABYA AI</h2>
-                <p className="text-[10px] text-gray-500 mt-1">{currentChapterTitle || "General Assistant"}</p>
+                {highlightedTerm ? (
+                  <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    Explaining: <span className="font-semibold text-blue-500">{highlightedTerm}</span>
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-gray-500 mt-1">{currentChapterTitle || "General Assistant"}</p>
+                )}
               </div>
             </div>
+            {highlightedTerm && (
+              <button
+                onClick={() => {
+                  setHighlightedTerm(null);
+                  setTermDefinition(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+                title="Clear term context"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-hide">
@@ -257,6 +300,8 @@ const AbyaChatbot = ({
       )}
     </div>
   );
-};
+});
+
+AbyaChatbot.displayName = "AbyaChatbot";
 
 export default AbyaChatbot;
