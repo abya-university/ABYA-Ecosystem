@@ -41,7 +41,6 @@ import { ChapterContext } from "../contexts/chapterContext";
 import { LessonContext } from "../contexts/lessonContext";
 import { QuizContext } from "../contexts/quizContext";
 import { useRevenueSharing } from "../contexts/RevenueSharingContext";
-import { useVesting } from "../contexts/VestingContext";
 import CareerOnboardingForm from "../components/ProfileSurveyForm";
 import Ecosystem1FacetABI from "../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
 import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
@@ -88,7 +87,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
   const { lessons } = useContext(LessonContext);
   const { quizzes } = useContext(QuizContext);
   const { purchaseCourse, purchaseLoading } = useRevenueSharing();
-  const { distributeVestedTokens } = useVesting();
   const [isLoading, setIsLoading] = useState(false);
   const [courseStats, setCourseStats] = useState({
     totalLessons: 0,
@@ -855,20 +853,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
           toast.dismiss(toastId);
           toastId = null;
         }
-
-        // Distribute vested tokens to ambassadors in the network using the actual purchaseId
-        try {
-          if (purchaseResult.purchaseId) {
-            await distributeVestedTokens(purchaseResult.purchaseId, address);
-            console.log(
-              "Vested tokens distributed for purchase ID:",
-              purchaseResult.purchaseId,
-            );
-          }
-        } catch (vestingError) {
-          console.error("Error distributing vested tokens:", vestingError);
-          // Don't fail the entire enrollment if vesting distribution fails
-        }
       }
 
       toastId = toast.loading("Processing enrollment...");
@@ -966,20 +950,6 @@ const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
         if (toastId) {
           toast.dismiss(toastId);
           toastId = null;
-        }
-
-        // Distribute vested tokens to ambassadors in the network using the actual purchaseId
-        try {
-          if (purchaseResult.purchaseId) {
-            await distributeVestedTokens(purchaseResult.purchaseId, address);
-            console.log(
-              "Vested tokens distributed for purchase ID:",
-              purchaseResult.purchaseId,
-            );
-          }
-        } catch (vestingError) {
-          console.error("Error distributing vested tokens:", vestingError);
-          // Don't fail the entire enrollment if vesting distribution fails
         }
       }
 
