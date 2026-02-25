@@ -83,13 +83,13 @@ const ContractUtils = {
   },
 
   // Get token balance with consistent formatting
-  getTokenBalance: async (contract, address) => {
+  getTokenBalance: async (contract, address, decimals = 18) => {
     const balance = await ContractUtils.readContractManual(
       contract,
       "balanceOf",
-      [address]
+      [address],
     );
-    return balance ? ethers.formatUnits(balance, 18) : "0.0";
+    return balance ? ethers.formatUnits(balance, decimals) : "0.0";
   },
 };
 
@@ -127,7 +127,7 @@ const PriceUtils = {
       suggestedToken1Amount: (amount0 * poolPrice).toFixed(6),
       suggestedToken0Amount: (amount1 / poolPrice).toFixed(6),
       priceDifference: (((currentRatio - poolPrice) / poolPrice) * 100).toFixed(
-        2
+        2,
       ),
     };
   },
@@ -179,27 +179,27 @@ export function TransactionHistoryProvider({ children }) {
     () =>
       ContractUtils.createContract(
         CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
-        CONTRACT_CONFIG.ABI.SWAP
+        CONTRACT_CONFIG.ABI.SWAP,
       ),
-    []
+    [],
   );
 
   const abytknContract = React.useMemo(
     () =>
       ContractUtils.createContract(
         CONTRACT_CONFIG.ADDRESSES.TOKEN0,
-        CONTRACT_CONFIG.ABI.ABYTKN
+        CONTRACT_CONFIG.ABI.ABYTKN,
       ),
-    []
+    [],
   );
 
   const usdcContract = React.useMemo(
     () =>
       ContractUtils.createContract(
         CONTRACT_CONFIG.ADDRESSES.TOKEN1,
-        CONTRACT_CONFIG.ABI.USDC
+        CONTRACT_CONFIG.ABI.USDC,
       ),
-    []
+    [],
   );
   console.log("contract configurations:", CONTRACT_CONFIG);
 
@@ -220,13 +220,13 @@ export function TransactionHistoryProvider({ children }) {
     try {
       const txHistoryData = await ContractUtils.readContractManual(
         swapContract,
-        "getUserTransactionHistory"
+        "getUserTransactionHistory",
       );
 
       console.log("Raw transaction history:", txHistoryData);
 
       const formattedTransactions = txHistoryData.map((tx, index) =>
-        ContractUtils.formatTransaction(tx, index)
+        ContractUtils.formatTransaction(tx, index),
       );
 
       console.log("Formatted transactions:", formattedTransactions);
@@ -246,8 +246,8 @@ export function TransactionHistoryProvider({ children }) {
 
     try {
       const [manualAbytknBalance, manualUsdcBalance] = await Promise.all([
-        ContractUtils.getTokenBalance(abytknContract, address),
-        ContractUtils.getTokenBalance(usdcContract, address),
+        ContractUtils.getTokenBalance(abytknContract, address, 18),
+        ContractUtils.getTokenBalance(usdcContract, address, 6),
       ]);
 
       console.log("Manual Balances:", {
@@ -275,7 +275,7 @@ export function TransactionHistoryProvider({ children }) {
       try {
         const tokenPrice = await ContractUtils.readContractManual(
           swapContract,
-          "getTokenPrice"
+          "getTokenPrice",
         );
 
         if (!tokenPrice) {
@@ -291,7 +291,7 @@ export function TransactionHistoryProvider({ children }) {
         const { impact, minReceived } = PriceUtils.calculatePriceImpact(
           inputAmount,
           output,
-          slippageTolerance
+          slippageTolerance,
         );
 
         return { output, impact, minReceived };
@@ -304,13 +304,13 @@ export function TransactionHistoryProvider({ children }) {
         const { impact, minReceived } = PriceUtils.calculatePriceImpact(
           inputAmount,
           output,
-          slippageTolerance
+          slippageTolerance,
         );
 
         return { output, impact, minReceived };
       }
     },
-    [swapContract, slippageTolerance]
+    [swapContract, slippageTolerance],
   );
 
   // Manual pool info loading
@@ -411,7 +411,7 @@ export function TransactionHistoryProvider({ children }) {
       // Try direct pool contract call using ethers for complex interactions
       try {
         const provider = new ethers.JsonRpcProvider(
-          import.meta.env.VITE_APP_SEPOLIA_RPC_URL
+          import.meta.env.VITE_APP_SEPOLIA_RPC_URL,
         );
 
         const poolInterface = new ethers.Interface([
@@ -424,7 +424,7 @@ export function TransactionHistoryProvider({ children }) {
         const poolContract = new ethers.Contract(
           poolAddress,
           poolInterface,
-          provider
+          provider,
         );
 
         const [slot0, poolToken0, poolToken1, liquidity] = await Promise.all([
@@ -445,12 +445,12 @@ export function TransactionHistoryProvider({ children }) {
         const token0Contract = new ethers.Contract(
           poolToken0,
           CONTRACT_CONFIG.ABI.USDC,
-          provider
+          provider,
         );
         const token1Contract = new ethers.Contract(
           poolToken1,
           CONTRACT_CONFIG.ABI.ABYTKN,
-          provider
+          provider,
         );
 
         const [token0Decimals, token1Decimals] = await Promise.all([
@@ -502,7 +502,7 @@ export function TransactionHistoryProvider({ children }) {
     try {
       const tokenPrice = await ContractUtils.readContractManual(
         swapContract,
-        "getTokenPrice"
+        "getTokenPrice",
       );
 
       if (tokenPrice) {
@@ -512,12 +512,12 @@ export function TransactionHistoryProvider({ children }) {
         const poolAddress = CONTRACT_CONFIG.ADDRESSES.UNISWAP_POOL;
         if (poolAddress) {
           const provider = new ethers.JsonRpcProvider(
-            import.meta.env.VITE_APP_SEPOLIA_RPC_URL
+            import.meta.env.VITE_APP_SEPOLIA_RPC_URL,
           );
           const poolContract = new ethers.Contract(
             poolAddress,
             ["function token0() view returns (address)"],
-            provider
+            provider,
           );
 
           const actualToken0 = await poolContract.token0();
@@ -668,7 +668,7 @@ export function TransactionHistoryProvider({ children }) {
       isInitialRatio,
       poolPrice,
       slippageTolerance,
-    ]
+    ],
   );
 
   return (
@@ -684,7 +684,7 @@ export function useTransactionHistory() {
 
   if (context === undefined) {
     throw new Error(
-      "useTransactionHistory must be used within a TransactionHistoryProvider"
+      "useTransactionHistory must be used within a TransactionHistoryProvider",
     );
   }
 

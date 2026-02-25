@@ -83,29 +83,6 @@ const Sidebar = ({
       ],
     },
     {
-      section: "Finance",
-      items: [
-        {
-          icon: <Coins size={24} />,
-          name: "Liquidity Pool",
-          path: "/liquidity",
-          section: "liquidity",
-        },
-        {
-          icon: <LineChart size={24} />,
-          name: "Analytics",
-          path: "/analytics",
-          section: "analytics",
-        },
-        {
-          icon: <Wallet size={24} />,
-          name: "Portfolio",
-          path: "/portfolio",
-          section: "portfolio",
-        },
-      ],
-    },
-    {
       section: "Community",
       items: [
         {
