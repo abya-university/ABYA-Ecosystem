@@ -18,6 +18,7 @@ import {
   Globe,
   Wallet,
   Sparkles,
+  ExternalLink,
 } from "lucide-react";
 import {
   LineChart,
@@ -35,10 +36,17 @@ import {
   ComposedChart,
 } from "recharts";
 import { useDarkMode } from "../../contexts/themeContext";
+import { useTransactionHistory } from "../../contexts/fake-liquidity-test-contexts/historyContext";
 import { toast } from "react-toastify";
 
 const AnalyticsPage = () => {
   const { darkMode } = useDarkMode();
+  const {
+    transactions,
+    allTransactions,
+    loading: historyLoading,
+    loadingAllTransactions,
+  } = useTransactionHistory();
   const [timeframe, setTimeframe] = useState("6m"); // '1w', '1m', '3m', '6m', '1y'
   const [refreshing, setRefreshing] = useState(false);
 
@@ -76,6 +84,8 @@ const AnalyticsPage = () => {
     { name: "ETH", value: 15, color: "#8B5CF6" },
     { name: "Others", value: 10, color: "#10B981" },
   ];
+
+  console.log("All Transactions: ", allTransactions);
 
   const stats = {
     tvl: {
@@ -622,25 +632,240 @@ const AnalyticsPage = () => {
             </div>
 
             <div className="space-y-4">
-              {[1, 2, 3, 4].map((_, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                    <div>
-                      <p className="text-sm font-medium">
-                        Swap • ABYTKN → USDC
-                      </p>
-                      <p className="text-xs text-slate-500">2 minutes ago</p>
+              {loadingAllTransactions ? (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <div className="relative">
+                    <div className="w-8 h-8 border-3 border-slate-200 dark:border-slate-700 border-t-green-500 rounded-full animate-spin" />
+                    <div className="absolute inset-0 w-8 h-8 border-3 border-transparent border-t-green-500/30 rounded-full animate-pulse" />
+                  </div>
+                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                    Loading all transactions...
+                  </p>
+                </div>
+              ) : allTransactions && allTransactions.length > 0 ? (
+                allTransactions
+                  .slice()
+                  .sort((a, b) => {
+                    // Handle timestamp that could be Date object or string
+                    const timeA = a.timestamp
+                      ? new Date(a.timestamp).getTime()
+                      : 0;
+                    const timeB = b.timestamp
+                      ? new Date(b.timestamp).getTime()
+                      : 0;
+                    return timeB - timeA;
+                  })
+                  .slice(0, 4)
+                  .map((tx, i) => {
+                    console.log("Rendering transaction:", tx); // Debug log
+
+                    // Safe amount formatting with fallback
+                    const formatAmount = (amount) => {
+                      if (amount === undefined || amount === null) return "0";
+                      try {
+                        const num =
+                          typeof amount === "string"
+                            ? parseFloat(amount)
+                            : amount;
+                        if (isNaN(num)) return "0";
+                        // Handle very small numbers (like 0.0000000000025)
+                        if (num < 0.000001 && num > 0)
+                          return num.toExponential(2);
+                        if (num >= 1000) return num.toFixed(0);
+                        return num.toFixed(4);
+                      } catch {
+                        return "0";
+                      }
+                    };
+
+                    // Safe timestamp formatting
+                    const formatTimeAgo = (timestamp) => {
+                      if (!timestamp) return "Unknown";
+                      try {
+                        const date =
+                          timestamp instanceof Date
+                            ? timestamp
+                            : new Date(timestamp);
+                        if (isNaN(date.getTime())) return "Invalid date";
+
+                        const seconds = Math.floor(
+                          (Date.now() - date.getTime()) / 1000,
+                        );
+                        if (seconds < 60) return "just now";
+                        if (seconds < 3600)
+                          return `${Math.floor(seconds / 60)}m ago`;
+                        if (seconds < 86400)
+                          return `${Math.floor(seconds / 3600)}h ago`;
+                        if (seconds < 604800)
+                          return `${Math.floor(seconds / 86400)}d ago`;
+                        return date.toLocaleDateString();
+                      } catch {
+                        return "Unknown";
+                      }
+                    };
+
+                    // Determine transaction color based on type
+                    const getTransactionColor = (type) => {
+                      switch (type?.toLowerCase()) {
+                        case "swap":
+                          return "from-yellow-500 to-amber-500";
+                        case "liquidity":
+                          return "from-green-500 to-emerald-500";
+                        default:
+                          return "from-purple-500 to-pink-500";
+                      }
+                    };
+
+                    // Determine pulse color based on type
+                    const getPulseColor = (type) => {
+                      switch (type?.toLowerCase()) {
+                        case "swap":
+                          return "bg-yellow-500";
+                        case "liquidity":
+                          return "bg-green-500";
+                        default:
+                          return "bg-purple-500";
+                      }
+                    };
+
+                    // Get display text based on transaction type
+                    const getTransactionDisplay = (tx) => {
+                      if (tx.type === "swap") {
+                        return (
+                          <>
+                            <span className="font-mono">
+                              {tx.fromToken || "Unknown"}
+                            </span>
+                            <span className="text-slate-400 mx-1">→</span>
+                            <span className="font-mono">
+                              {tx.toToken || "Unknown"}
+                            </span>
+                          </>
+                        );
+                      } else if (tx.type === "liquidity") {
+                        return (
+                          <>
+                            <span className="text-slate-500">Added</span>
+                            <span className="font-mono ml-1">
+                              {tx.fromToken || "Unknown"}
+                            </span>
+                            <span className="text-slate-400 mx-1">+</span>
+                            <span className="font-mono">
+                              {tx.toToken || "Unknown"}
+                            </span>
+                          </>
+                        );
+                      }
+                      return null;
+                    };
+
+                    return (
+                      <div
+                        key={tx.id || i}
+                        className="group relative overflow-hidden rounded-xl p-3 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700"
+                      >
+                        {/* Background gradient on hover */}
+                        <div
+                          className={`absolute inset-0 bg-gradient-to-r ${getTransactionColor(
+                            tx.type,
+                          )} opacity-0 group-hover:opacity-5 transition-opacity`}
+                        />
+
+                        <div className="relative flex items-center justify-between">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            {/* Animated indicator */}
+                            <div className="relative">
+                              <div
+                                className={`w-2 h-2 rounded-full ${getPulseColor(
+                                  tx.type,
+                                )} animate-pulse`}
+                              />
+                              <div
+                                className={`absolute inset-0 w-2 h-2 rounded-full ${getPulseColor(
+                                  tx.type,
+                                )} animate-ping opacity-75`}
+                              />
+                            </div>
+
+                            {/* Transaction details */}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">
+                                <span className="capitalize">
+                                  {tx.type || "Transaction"}
+                                </span>
+                                {" • "}
+                                {getTransactionDisplay(tx)}
+                              </p>
+                              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                                <span>{formatTimeAgo(tx.timestamp)}</span>
+                                {tx.hash && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="font-mono">
+                                      {typeof tx.hash === "string"
+                                        ? `${tx.hash.slice(
+                                            0,
+                                            6,
+                                          )}...${tx.hash.slice(-4)}`
+                                        : "Invalid hash"}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Amount and explorer link */}
+                          <div className="flex items-center gap-3 ml-4">
+                            <span className="text-sm font-mono font-medium whitespace-nowrap">
+                              {formatAmount(tx.fromAmount)} {tx.fromToken || ""}
+                            </span>
+
+                            {tx.hash && (
+                              <a
+                                href={`https://sepolia.etherscan.io/tx/${tx.hash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors group/link"
+                                title="View on Etherscan"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover/link:text-cyan-500 transition-colors" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Additional info for liquidity transactions */}
+                        {tx.type === "liquidity" && (
+                          <div className="mt-2 ml-7 text-xs text-slate-500 dark:text-slate-400">
+                            <span className="font-medium">Pool:</span>{" "}
+                            <span className="font-mono">
+                              {formatAmount(tx.fromAmount)} {tx.fromToken} +{" "}
+                              {formatAmount(tx.toAmount)} {tx.toToken}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <div className="relative inline-block">
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                      <Clock className="w-6 h-6 text-slate-400" />
+                    </div>
+                    <div className="absolute inset-0 animate-ping">
+                      <div className="w-12 h-12 mx-auto rounded-full bg-green-500/20" />
                     </div>
                   </div>
-                  <span className="text-sm font-semibold text-green-600">
-                    +$1,234
-                  </span>
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    No transactions yet
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Start swapping or adding liquidity to see your activity
+                  </p>
                 </div>
-              ))}
+              )}
             </div>
           </div>
 

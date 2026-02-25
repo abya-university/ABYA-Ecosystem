@@ -65,9 +65,16 @@ import {
   ComposedChart,
 } from "recharts";
 import { useDarkMode } from "../../contexts/themeContext";
+import { useTransactionHistory } from "../../contexts/fake-liquidity-test-contexts/historyContext";
 
 const FinanceDashboard = () => {
   const { darkMode, setDarkMode } = useDarkMode();
+  const {
+    transactions,
+    allTransactions,
+    loading: historyLoading,
+    loadingAllTransactions,
+  } = useTransactionHistory();
   const [timeframe, setTimeframe] = useState("1m");
   const [showBalances, setShowBalances] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -106,6 +113,34 @@ const FinanceDashboard = () => {
     { name: "Rewards", value: 15, amount: "$2,400", color: "#10B981" },
     { name: "Available", value: 10, amount: "$1,600", color: "#8B5CF6" },
   ];
+
+  const activityTransactions = (
+    allTransactions.length > 0 ? allTransactions : transactions
+  )
+    .slice()
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  const displayTransactions = activityTransactions.slice(0, 5);
+  const isActivityLoading = historyLoading || loadingAllTransactions;
+
+  const formatTransactionType = (tx) => {
+    if (tx.type === "swap") return "Swap";
+    if (tx.type === "liquidity") return "Liquidity";
+    return (
+      tx.type?.charAt(0).toUpperCase() + tx.type?.slice(1) || "Transaction"
+    );
+  };
+
+  const formatTimeAgo = (timestamp) => {
+    if (!timestamp) return "Unknown";
+    const seconds = Math.floor(
+      (Date.now() - new Date(timestamp).getTime()) / 1000,
+    );
+    if (seconds < 60) return "just now";
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
+  };
 
   const recentTransactions = [
     {
@@ -931,40 +966,58 @@ const FinanceDashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {recentTransactions.map((tx, index) => (
-                  <tr
-                    key={index}
-                    className="border-t border-slate-200 dark:border-slate-700 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                  >
-                    <td className="py-4">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          tx.type === "Commission"
-                            ? "bg-green-500/10 text-green-600"
-                            : tx.type === "Staking Reward"
-                            ? "bg-yellow-500/10 text-yellow-600"
-                            : tx.type === "Swap"
-                            ? "bg-blue-500/10 text-blue-600"
-                            : "bg-purple-500/10 text-purple-600"
-                        }`}
-                      >
-                        {tx.type}
-                      </span>
-                    </td>
-                    <td className="py-4 font-medium">{tx.asset}</td>
-                    <td className="py-4 font-mono">{tx.amount}</td>
-                    <td className="py-4 text-slate-500">
-                      {tx.from || tx.value || "-"}
-                    </td>
-                    <td className="py-4 text-slate-500">{tx.timestamp}</td>
-                    <td className="py-4">
-                      <span className="flex items-center gap-1 text-green-600">
-                        <CheckCircle className="w-3 h-3" />
-                        <span className="text-xs">{tx.status}</span>
-                      </span>
+                {isActivityLoading ? (
+                  <tr>
+                    <td colSpan="6" className="py-4 text-center text-slate-500">
+                      Loading transactions...
                     </td>
                   </tr>
-                ))}
+                ) : displayTransactions.length > 0 ? (
+                  displayTransactions.map((tx, index) => (
+                    <tr
+                      key={tx.id || index}
+                      className="border-t border-slate-200 dark:border-slate-700 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                    >
+                      <td className="py-4">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            tx.type === "swap"
+                              ? "bg-blue-500/10 text-blue-600"
+                              : "bg-purple-500/10 text-purple-600"
+                          }`}
+                        >
+                          {formatTransactionType(tx)}
+                        </span>
+                      </td>
+                      <td className="py-4 font-medium">
+                        {tx.fromToken}-{tx.toToken}
+                      </td>
+                      <td className="py-4 font-mono">
+                        {parseFloat(tx.fromAmount).toFixed(2)} →{" "}
+                        {parseFloat(tx.toAmount).toFixed(2)}
+                      </td>
+                      <td className="py-4 text-slate-500 font-mono text-xs">
+                        {tx.hash?.substring(0, 10)}...
+                      </td>
+                      <td className="py-4 text-slate-500">
+                        {formatTimeAgo(tx.timestamp)}
+                      </td>
+                      <td className="py-4">
+                        <span className="flex items-center gap-1 text-green-600">
+                          <CheckCircle className="w-3 h-3" />
+                          <span className="text-xs">Confirmed</span>
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" className="py-4 text-center text-slate-500">
+                      No transactions yet. Start by adding liquidity or swapping
+                      tokens.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

@@ -39,13 +39,30 @@ import {
   Legend,
 } from "recharts";
 import { useDarkMode } from "../../contexts/themeContext";
+import { useTransactionHistory } from "../../contexts/fake-liquidity-test-contexts/historyContext";
+import { useActiveAccount } from "thirdweb/react";
 
 const PortfolioPage = () => {
   const { darkMode } = useDarkMode();
+  const {
+    transactions,
+    allTransactions,
+    loading: historyLoading,
+    loadingAllTransactions,
+  } = useTransactionHistory();
   const [timeframe, setTimeframe] = useState("1m");
   const [showBalances, setShowBalances] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const account = useActiveAccount();
+  const address = account?.address || "";
+
+  const activityTransactions = (
+    allTransactions.length > 0 ? allTransactions : transactions
+  )
+    .slice()
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    .slice(0, 5);
 
   // Mock data - replace with actual data from your contract
   const portfolioHistory = [
@@ -184,6 +201,13 @@ const PortfolioPage = () => {
     return `$${value}`;
   };
 
+  // Truncate address with dots
+  const truncateAddress = (addr) => {
+    if (!addr) return "";
+    if (addr.length <= 10) return addr;
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-4 md:p-6 transition-colors duration-300 pt-20 md:pt-[100px]">
       {/* Background decorative elements */}
@@ -220,7 +244,9 @@ const PortfolioPage = () => {
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${glassCardStyle}`}
               >
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-sm font-mono">0x1234...5678</span>
+                <span className="text-sm font-mono">
+                  {truncateAddress(address)}
+                </span>
                 <button
                   onClick={copyAddress}
                   className="hover:text-yellow-500 transition-colors"
@@ -637,58 +663,94 @@ const PortfolioPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {recentTransactions.map((tx, index) => (
-                  <tr
-                    key={index}
-                    className="border-t border-slate-200 dark:border-slate-700 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                  >
-                    <td className="py-4">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          tx.type === "Stake"
-                            ? "bg-green-500/10 text-green-600"
-                            : tx.type === "Unstake"
-                            ? "bg-red-500/10 text-red-600"
-                            : tx.type === "Reward Claim"
-                            ? "bg-yellow-500/10 text-yellow-600"
-                            : "bg-blue-500/10 text-blue-600"
-                        }`}
-                      >
-                        {tx.type}
-                      </span>
-                    </td>
-                    <td className="py-4 font-medium">{tx.asset}</td>
-                    <td className="py-4 font-mono">{tx.amount}</td>
-                    <td className="py-4">{tx.value}</td>
-                    <td className="py-4 text-slate-500">{tx.timestamp}</td>
-                    <td className="py-4">
-                      <span className="flex items-center gap-1 text-green-600">
-                        <CheckCircle className="w-3 h-3" />
-                        <span className="text-xs">{tx.status}</span>
-                      </span>
-                    </td>
-                    <td className="py-4">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-slate-500">
-                          {tx.hash}
-                        </span>
-                        <a
-                          href="#"
-                          className="text-slate-400 hover:text-yellow-500 transition-colors"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </div>
+                {historyLoading || loadingAllTransactions ? (
+                  <tr>
+                    <td colSpan="7" className="py-4 text-center text-slate-500">
+                      Loading transactions...
                     </td>
                   </tr>
-                ))}
+                ) : activityTransactions.length > 0 ? (
+                  activityTransactions.map((tx, index) => {
+                    const formatTimeAgo = (timestamp) => {
+                      if (!timestamp) return "Unknown";
+                      const seconds = Math.floor(
+                        (Date.now() - new Date(timestamp).getTime()) / 1000,
+                      );
+                      if (seconds < 60) return "just now";
+                      if (seconds < 3600)
+                        return `${Math.floor(seconds / 60)}m ago`;
+                      if (seconds < 86400)
+                        return `${Math.floor(seconds / 3600)}h ago`;
+                      return `${Math.floor(seconds / 86400)}d ago`;
+                    };
+                    return (
+                      <tr
+                        key={tx.id || index}
+                        className="border-t border-slate-200 dark:border-slate-700 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                      >
+                        <td className="py-4">
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              tx.type === "swap"
+                                ? "bg-blue-500/10 text-blue-600"
+                                : "bg-purple-500/10 text-purple-600"
+                            }`}
+                          >
+                            {tx.type?.charAt(0).toUpperCase() +
+                              tx.type?.slice(1) || "Tx"}
+                          </span>
+                        </td>
+                        <td className="py-4 font-medium">
+                          {tx.fromToken}/{tx.toToken}
+                        </td>
+                        <td className="py-4 font-mono">
+                          {parseFloat(tx.fromAmount).toFixed(4)}
+                        </td>
+                        <td className="py-4 font-mono">
+                          {parseFloat(tx.toAmount).toFixed(4)}
+                        </td>
+                        <td className="py-4 text-slate-500">
+                          {formatTimeAgo(tx.timestamp)}
+                        </td>
+                        <td className="py-4">
+                          <span className="flex items-center gap-1 text-green-600">
+                            <CheckCircle className="w-3 h-3" />
+                            <span className="text-xs">Confirmed</span>
+                          </span>
+                        </td>
+                        <td className="py-4">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs text-slate-500 truncate w-24">
+                              {tx.hash?.substring(0, 10)}...
+                            </span>
+                            <a
+                              href={`https://sepolia.etherscan.io/tx/${tx.hash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-slate-400 hover:text-yellow-500 transition-colors"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan="7" className="py-4 text-center text-slate-500">
+                      No transactions yet. Start trading to see activity.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
 
           <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
             <p className="text-sm text-slate-500">
-              Showing 4 of 24 transactions
+              Showing {Math.min(5, transactions.length)} of{" "}
+              {transactions.length} transactions
             </p>
             <button className="text-sm text-yellow-600 hover:text-yellow-700 font-medium">
               View All →

@@ -29,6 +29,7 @@ import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
 import { toast } from "react-toastify";
 import { useDarkMode } from "../../contexts/themeContext";
+import CONTRACT_ADDRESSES from "../../constants/addresses";
 
 const contractAbi = CONTRACT_ABI.abi;
 const usdcAbi = USDC_ABI.abi;
@@ -37,10 +38,10 @@ const abyatknAbi = ABYTKN_ABI.abi;
 // Constants - Aligned with our configuration
 const CONTRACT_CONFIG = {
   ADDRESSES: {
-    ADD_SWAP_CONTRACT: import.meta.env.VITE_APP_SEPOLIA_ADD_SWAP_CONTRACT,
-    TOKEN0: import.meta.env.VITE_APP_SEPOLIA_ABYATKN_ADDRESS, // ABYTKN
-    TOKEN1: import.meta.env.VITE_APP_SEPOLIA_USDC_ADDRESS, // USDC
-    UNISWAP_POOL: import.meta.env.VITE_APP_SEPOLIA_ABYATKN_USDC_500,
+    ADD_SWAP_CONTRACT: CONTRACT_ADDRESSES.Liquidity,
+    TOKEN0: CONTRACT_ADDRESSES.ABYTKN, // ABYTKN
+    TOKEN1: CONTRACT_ADDRESSES.USDC, // USDC
+    UNISWAP_POOL: CONTRACT_ADDRESSES.ABYTKN_USDC_POOL,
   },
   CHAIN: defineChain(11155111), // Sepolia
 };

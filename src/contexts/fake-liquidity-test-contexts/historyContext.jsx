@@ -14,6 +14,7 @@ import { useActiveAccount, useReadContract } from "thirdweb/react";
 import { getContract, readContract } from "thirdweb";
 import { client } from "../../services/client";
 import { defineChain } from "thirdweb/chains";
+import CONTRACT_ADDRESSES from "../../constants/addresses";
 
 // Constants and Configuration
 const CONTRACT_CONFIG = {
@@ -23,10 +24,10 @@ const CONTRACT_CONFIG = {
     ABYTKN: ABYTKN_ABI.abi,
   },
   ADDRESSES: {
-    ADD_SWAP_CONTRACT: import.meta.env.VITE_APP_SEPOLIA_ADD_SWAP_CONTRACT,
-    TOKEN0: import.meta.env.VITE_APP_SEPOLIA_ABYATKN_ADDRESS, // ABYTKN
-    TOKEN1: import.meta.env.VITE_APP_SEPOLIA_USDC_ADDRESS, // USDC
-    UNISWAP_POOL: import.meta.env.VITE_APP_SEPOLIA_ABYATKN_USDC_500,
+    ADD_SWAP_CONTRACT: CONTRACT_ADDRESSES.Liquidity,
+    TOKEN0: CONTRACT_ADDRESSES.ABYTKN, // ABYTKN
+    TOKEN1: CONTRACT_ADDRESSES.USDC, // USDC
+    UNISWAP_POOL: CONTRACT_ADDRESSES.ABYTKN_USDC_POOL,
   },
   CHAIN: defineChain(11155111),
   METHODS: {
@@ -37,7 +38,7 @@ const CONTRACT_CONFIG = {
       "function getPoolBalances() view returns (uint256 bal0, uint256 bal1)",
     GET_TOKEN_PRICE: "function getTokenPrice() view returns (uint256 price)",
     GET_TX_HISTORY:
-      "function getUserTransactionHistory() view returns ((uint256 id, uint8 transactionType, string fromToken, string toToken, uint256 fromAmount, uint256 toAmount, uint256 timestamp, bytes32 hash, string status)[])",
+      "function getUserTransactionHistory(address _user) view returns ((uint256 id, uint8 transactionType, string fromToken, string toToken, uint256 fromAmount, uint256 toAmount, uint256 timestamp, bytes32 hash, string status)[])",
   },
 };
 
@@ -54,11 +55,12 @@ const ContractUtils = {
   },
 
   // Common contract read function (manual for complex cases)
-  readContractManual: async (contract, method, params = []) => {
+  readContractManual: async (contract, method, params = [], account) => {
     return readContract({
       contract,
       method,
       params,
+      account,
     });
   },
 
@@ -139,7 +141,9 @@ const TransactionHistoryContext = createContext();
 // Create a provider component
 export function TransactionHistoryProvider({ children }) {
   const [transactions, setTransactions] = useState([]);
+  const [allTransactions, setAllTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingAllTransactions, setLoadingAllTransactions] = useState(false);
   const [error, setError] = useState(null);
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const [isInitialRatio, setIsInitialRatio] = useState(true);
@@ -210,35 +214,126 @@ export function TransactionHistoryProvider({ children }) {
     return null;
   }, []);
 
-  // Function to fetch transaction history from the contract
+  // Fetch all transaction history (no wallet filter)
+  const fetchAllTransactionHistory = useCallback(async () => {
+    if (!client) {
+      setAllTransactions([]);
+      setLoadingAllTransactions(false);
+      return;
+    }
+
+    setLoadingAllTransactions(true);
+    setError(null);
+
+    try {
+      const contract = getContract({
+        address: CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
+        abi: CONTRACT_CONFIG.ABI.SWAP,
+        client,
+        chain: CONTRACT_CONFIG.CHAIN,
+      });
+
+      const txHistoryData = await readContract({
+        contract,
+        method: "getAllTransactionHistory",
+        params: [],
+      });
+
+      if (Array.isArray(txHistoryData) && txHistoryData.length > 0) {
+        const formattedTransactions = txHistoryData.map((tx, index) =>
+          ContractUtils.formatTransaction(tx, index),
+        );
+        setAllTransactions(formattedTransactions);
+      } else {
+        setAllTransactions([]);
+      }
+    } catch (err) {
+      console.error("Error fetching all transaction history:", err);
+      handleError("fetching all transaction history", err);
+      setAllTransactions([]);
+    } finally {
+      if (isMountedRef.current) {
+        setLoadingAllTransactions(false);
+      }
+    }
+  }, [client, handleError]);
+
+  // Function to fetch transaction history from the contract (using pattern from VestingContext)
   const fetchTransactionHistory = useCallback(async () => {
-    if (!isConnected || !address) return;
+    // Check conditions BEFORE setting loading state
+    if (!isConnected || !address || !client) {
+      console.log(
+        "Cannot fetch - isConnected:",
+        isConnected,
+        "address:",
+        address,
+        "client:",
+        !!client,
+      );
+      setTransactions([]);
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
+    // Create a timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Request timeout")), 10000); // 10 second timeout
+    });
+
     try {
-      const txHistoryData = await ContractUtils.readContractManual(
-        swapContract,
-        "getUserTransactionHistory",
-      );
+      console.log("Fetching transaction history for:", address);
+
+      // Create contract
+      const contract = getContract({
+        address: CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
+        abi: CONTRACT_CONFIG.ABI.SWAP,
+        client,
+        chain: CONTRACT_CONFIG.CHAIN,
+      });
+
+      // Race the contract call against the timeout
+      const txHistoryData = await Promise.race([
+        readContract({
+          contract,
+          method: "getUserTransactionHistory",
+          params: [address],
+        }),
+        timeoutPromise,
+      ]);
 
       console.log("Raw transaction history:", txHistoryData);
 
-      const formattedTransactions = txHistoryData.map((tx, index) =>
-        ContractUtils.formatTransaction(tx, index),
-      );
+      if (Array.isArray(txHistoryData) && txHistoryData.length > 0) {
+        const formattedTransactions = txHistoryData.map((tx, index) =>
+          ContractUtils.formatTransaction(tx, index),
+        );
 
-      console.log("Formatted transactions:", formattedTransactions);
-      setTransactions(formattedTransactions);
+        console.log("Formatted transactions:", formattedTransactions);
+        setTransactions(formattedTransactions);
+      } else {
+        console.log("No transactions found or empty array");
+        setTransactions([]);
+      }
     } catch (err) {
-      handleError("fetching transaction history", err);
+      console.error("Error fetching transaction history:", err);
+
+      // Handle timeout specifically
+      if (err.message === "Request timeout") {
+        setError("Request timed out. Please try again.");
+      } else {
+        handleError("fetching transaction history", err);
+      }
+
+      setTransactions([]); // Clear transactions on error
     } finally {
       if (isMountedRef.current) {
         setLoading(false);
       }
     }
-  }, [isConnected, address, swapContract, handleError]);
+  }, [isConnected, address, client, handleError]);
 
   // Manual balance loading
   const loadBalances = useCallback(async () => {
@@ -411,7 +506,8 @@ export function TransactionHistoryProvider({ children }) {
       // Try direct pool contract call using ethers for complex interactions
       try {
         const provider = new ethers.JsonRpcProvider(
-          import.meta.env.VITE_APP_SEPOLIA_RPC_URL,
+          import.meta.env.VITE_APP_SEPOLIA_RPC_URL ||
+            import.meta.env.VITE_APP_RPC_URL,
         );
 
         const poolInterface = new ethers.Interface([
@@ -543,13 +639,6 @@ export function TransactionHistoryProvider({ children }) {
     }
   }, [isConnected, swapContract, handleError]);
 
-  // Use reactive data from thirdweb hooks
-  const { data: txHistoryData, isLoading: historyLoading } = useReadContract({
-    contract: swapContract,
-    method: "getUserTransactionHistory",
-    params: [],
-  });
-
   const { data: abytknBalance } = useReadContract({
     contract: abytknContract,
     method: "balanceOf",
@@ -589,6 +678,10 @@ export function TransactionHistoryProvider({ children }) {
     }
   }, [isConnected, fetchTransactionHistory]);
 
+  useEffect(() => {
+    fetchAllTransactionHistory();
+  }, [fetchAllTransactionHistory]);
+
   // Update reactive data when hooks change - use proper dependencies
   useEffect(() => {
     if (abytknBalance && isMountedRef.current) {
@@ -603,7 +696,7 @@ export function TransactionHistoryProvider({ children }) {
     if (usdcBalance && isMountedRef.current) {
       setBalances((prev) => ({
         ...prev,
-        USDC: ethers.formatUnits(usdcBalance, 18),
+        USDC: ethers.formatUnits(usdcBalance, 6),
       }));
     }
   }, [usdcBalance]);
@@ -628,13 +721,20 @@ export function TransactionHistoryProvider({ children }) {
     fetchTransactionHistory();
   }, [fetchTransactionHistory]);
 
+  const refreshAllHistory = useCallback(() => {
+    fetchAllTransactionHistory();
+  }, [fetchAllTransactionHistory]);
+
   // Memoize the context value to prevent unnecessary re-renders
   const value = React.useMemo(
     () => ({
       transactions,
-      loading: loading || historyLoading,
+      allTransactions,
+      loading: loading,
+      loadingAllTransactions,
       error,
       refreshHistory,
+      refreshAllHistory,
       loadBalances,
       calculateOutputAmount,
       loadPoolInfo,
@@ -652,10 +752,12 @@ export function TransactionHistoryProvider({ children }) {
     }),
     [
       transactions,
+      allTransactions,
       loading,
-      historyLoading,
+      loadingAllTransactions,
       error,
       refreshHistory,
+      refreshAllHistory,
       loadBalances,
       calculateOutputAmount,
       loadPoolInfo,

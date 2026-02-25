@@ -35,6 +35,7 @@ import {
 } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
 import { useDarkMode } from "../../contexts/themeContext";
+import CONTRACT_ADDRESSES from "../../constants/addresses";
 
 const contractAbi = CONTRACT_ABI.abi;
 const usdcAbi = USDC_ABI.abi;
@@ -43,10 +44,10 @@ const abyatknAbi = ABYTKN_ABI.abi;
 // Constants - Aligned with our context configuration
 const CONTRACT_CONFIG = {
   ADDRESSES: {
-    ADD_SWAP_CONTRACT: import.meta.env.VITE_APP_SEPOLIA_ADD_SWAP_CONTRACT,
-    TOKEN0: import.meta.env.VITE_APP_SEPOLIA_ABYATKN_ADDRESS, // ABYTKN (token0)
-    TOKEN1: import.meta.env.VITE_APP_SEPOLIA_USDC_ADDRESS, // USDC (token1)
-    UNISWAP_POOL: import.meta.env.VITE_APP_SEPOLIA_ABYATKN_USDC_500,
+    ADD_SWAP_CONTRACT: CONTRACT_ADDRESSES.Liquidity,
+    TOKEN0: CONTRACT_ADDRESSES.ABYTKN, // ABYTKN (token0)
+    TOKEN1: CONTRACT_ADDRESSES.USDC, // USDC (token1)
+    UNISWAP_POOL: CONTRACT_ADDRESSES.ABYTKN_USDC_POOL,
   },
   CHAIN: defineChain(11155111), // Sepolia
 };
@@ -182,15 +183,33 @@ const AddLiquidity = () => {
         }),
       ]);
 
+      // Override decimals based on known token addresses
+      // (in case contract returns wrong values)
+      const finalAbytknDecimals =
+        abytknDecimals === 6 && usdcDecimals === 18
+          ? 18 // Standard case
+          : 18; // ABYTKN is always 18
+      const finalUsdcDecimals =
+        usdcDecimals === 18 && abytknDecimals === 6
+          ? 6 // Standard case - swap was needed
+          : 6; // USDC is always 6
+
+      console.log(
+        `Decimals Read - ABYTKN: ${abytknDecimals}, USDC: ${usdcDecimals}`,
+      );
+      console.log(
+        `Decimals Final - ABYTKN: ${finalAbytknDecimals}, USDC: ${finalUsdcDecimals}`,
+      );
+
       // Prepare amounts based on contract token order
       // Contract expects: token0 (ABYTKN), token1 (USDC)
       const amount0Desired = ethers.parseUnits(
         liquidityData.abytknAmount.toString(),
-        abytknDecimals,
+        finalAbytknDecimals,
       );
       const amount1Desired = ethers.parseUnits(
         liquidityData.usdcAmount.toString(),
-        usdcDecimals,
+        finalUsdcDecimals,
       );
 
       // Check balances
@@ -207,15 +226,25 @@ const AddLiquidity = () => {
         }),
       ]);
 
+      // Debug logging
+      console.log("ABYTKN Balance:", abytknBalance.toString());
+      console.log("Amount0Desired (ABYTKN):", amount0Desired.toString());
+      console.log("USDC Balance:", usdcBalance.toString());
+      console.log("Amount1Desired (USDC):", amount1Desired.toString());
+
       // Check if balances are sufficient
       if (abytknBalance < amount0Desired) {
-        toast.error("Insufficient ABYTKN balance");
+        toast.error(
+          `Insufficient ABYTKN balance. Have: ${abytknBalance.toString()}, Need: ${amount0Desired.toString()}`,
+        );
         setLoading(false);
         return;
       }
 
       if (usdcBalance < amount1Desired) {
-        toast.error("Insufficient USDC balance");
+        toast.error(
+          `Insufficient USDC balance. Have: ${usdcBalance.toString()}, Need: ${amount1Desired.toString()}`,
+        );
         setLoading(false);
         return;
       }
@@ -234,8 +263,16 @@ const AddLiquidity = () => {
         }),
       ]);
 
+      console.log(
+        "Allowances before approve - ABYTKN:",
+        allowanceABYTKN.toString(),
+        "USDC:",
+        allowanceUSDC.toString(),
+      );
+
       // Approve ABYTKN if needed
       if (allowanceABYTKN < amount0Desired) {
+        console.log("Approving ABYTKN...");
         const approveABYTKNTx = prepareContractCall({
           contract: abytknContract,
           method: "approve",
@@ -249,6 +286,7 @@ const AddLiquidity = () => {
 
       // Approve USDC if needed
       if (allowanceUSDC < amount1Desired) {
+        console.log("Approving USDC...");
         const approveUSDCTx = prepareContractCall({
           contract: usdcContract,
           method: "approve",
@@ -262,30 +300,25 @@ const AddLiquidity = () => {
 
       // Add liquidity
       try {
-        // Estimate gas
-        const gasEstimate = await prepareContractCall({
+        // Prepare the transaction
+        const addLiquidityTx = prepareContractCall({
           contract,
           method: "addLiquidity",
           params: [amount0Desired, amount1Desired],
-        }).then((tx) => tx.gasLimit);
+        });
 
-        // Add 20% buffer to gas estimate
-        const gasLimit = (gasEstimate * 120n) / 100n;
+        console.log("Sending addLiquidity transaction...");
 
-        const tx = await sendTransaction({
-          transaction: prepareContractCall({
-            contract,
-            method: "addLiquidity",
-            params: [amount0Desired, amount1Desired],
-            overrides: { gasLimit },
-          }),
+        const txResult = await sendTransaction({
+          transaction: addLiquidityTx,
           account,
         });
 
-        setTxHash(tx.transactionHash);
+        console.log("Transaction result:", txResult);
+        setTxHash(txResult.transactionHash);
 
-        const receipt = await tx.wait();
-        if (receipt.status === 1) {
+        // Check if transaction was successful
+        if (txResult.transactionHash) {
           toast.update(toastId, {
             render: "Liquidity added successfully!",
             type: "success",
@@ -309,42 +342,46 @@ const AddLiquidity = () => {
           });
         }
       } catch (gasError) {
-        // If gas estimation fails, try with fixed gas limit
-        const tx = await sendTransaction({
-          transaction: prepareContractCall({
-            contract,
-            method: "addLiquidity",
-            params: [amount0Desired, amount1Desired],
-            overrides: { gasLimit: 1500000n },
-          }),
-          account,
-        });
-
-        setTxHash(tx.transactionHash);
-
-        const receipt = await tx.wait();
-        if (receipt.status === 1) {
-          toast.update(toastId, {
-            render: "Liquidity added successfully!",
-            type: "success",
-            isLoading: false,
-            autoClose: 5000,
+        // If transaction fails, try again without gas estimation
+        console.log("Transaction failed, retrying...", gasError);
+        try {
+          const txResult = await sendTransaction({
+            transaction: prepareContractCall({
+              contract,
+              method: "addLiquidity",
+              params: [amount0Desired, amount1Desired],
+            }),
+            account,
           });
-          setLiquidityData({
-            usdcAmount: "",
-            abytknAmount: "",
-          });
-          loadBalances();
-          if (typeof refreshHistory === "function") {
-            refreshHistory();
+
+          console.log("Retry transaction result:", txResult);
+          setTxHash(txResult.transactionHash);
+
+          if (txResult.transactionHash) {
+            toast.update(toastId, {
+              render: "Liquidity added successfully!",
+              type: "success",
+              isLoading: false,
+              autoClose: 5000,
+            });
+            setLiquidityData({
+              usdcAmount: "",
+              abytknAmount: "",
+            });
+            loadBalances();
+            if (typeof refreshHistory === "function") {
+              refreshHistory();
+            }
+          } else {
+            toast.update(toastId, {
+              render: "Transaction failed",
+              type: "error",
+              isLoading: false,
+              autoClose: 5000,
+            });
           }
-        } else {
-          toast.update(toastId, {
-            render: "Transaction failed",
-            type: "error",
-            isLoading: false,
-            autoClose: 5000,
-          });
+        } catch (retryError) {
+          throw retryError;
         }
       }
     } catch (error) {
@@ -395,7 +432,7 @@ const AddLiquidity = () => {
     const newLiquidityData = {
       usdcAmount: value,
       abytknAmount:
-        value && poolPrice ? (parseFloat(value) / poolPrice).toFixed(6) : "",
+        value && poolPrice ? (parseFloat(value) * poolPrice).toFixed(18) : "",
     };
     setLiquidityData(newLiquidityData);
   };
@@ -406,7 +443,7 @@ const AddLiquidity = () => {
     const newLiquidityData = {
       abytknAmount: value,
       usdcAmount:
-        value && poolPrice ? (parseFloat(value) * poolPrice).toFixed(6) : "",
+        value && poolPrice ? (parseFloat(value) / poolPrice).toFixed(6) : "",
     };
     setLiquidityData(newLiquidityData);
   };
