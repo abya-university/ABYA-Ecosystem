@@ -663,13 +663,7 @@ const PortfolioPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {historyLoading || loadingAllTransactions ? (
-                  <tr>
-                    <td colSpan="7" className="py-4 text-center text-slate-500">
-                      Loading transactions...
-                    </td>
-                  </tr>
-                ) : activityTransactions.length > 0 ? (
+                {activityTransactions.length > 0 ? (
                   activityTransactions.map((tx, index) => {
                     const formatTimeAgo = (timestamp) => {
                       if (!timestamp) return "Unknown";
@@ -736,6 +730,12 @@ const PortfolioPage = () => {
                       </tr>
                     );
                   })
+                ) : historyLoading || loadingAllTransactions ? (
+                  <tr>
+                    <td colSpan="7" className="py-4 text-center text-slate-500">
+                      Loading transactions...
+                    </td>
+                  </tr>
                 ) : (
                   <tr>
                     <td colSpan="7" className="py-4 text-center text-slate-500">

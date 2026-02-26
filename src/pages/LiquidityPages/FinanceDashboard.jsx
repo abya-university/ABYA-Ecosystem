@@ -966,13 +966,7 @@ const FinanceDashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {isActivityLoading ? (
-                  <tr>
-                    <td colSpan="6" className="py-4 text-center text-slate-500">
-                      Loading transactions...
-                    </td>
-                  </tr>
-                ) : displayTransactions.length > 0 ? (
+                {displayTransactions.length > 0 ? (
                   displayTransactions.map((tx, index) => (
                     <tr
                       key={tx.id || index}
@@ -1010,6 +1004,12 @@ const FinanceDashboard = () => {
                       </td>
                     </tr>
                   ))
+                ) : isActivityLoading ? (
+                  <tr>
+                    <td colSpan="6" className="py-4 text-center text-slate-500">
+                      Loading transactions...
+                    </td>
+                  </tr>
                 ) : (
                   <tr>
                     <td colSpan="6" className="py-4 text-center text-slate-500">

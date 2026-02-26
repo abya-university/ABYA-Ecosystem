@@ -28,11 +28,26 @@ const LiquiditySidebar = () => {
   const [showDetails, setShowDetails] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const { balances, poolInfo, txHash, loadBalances, loadPoolInfo } =
-    useTransactionHistory();
+  const {
+    balances,
+    poolInfo,
+    txHash,
+    allTransactions,
+    loadingAllTransactions,
+    loadBalances,
+    loadPoolInfo,
+  } = useTransactionHistory();
   const account = useActiveAccount();
   const address = account?.address;
   const isConnected = !!account;
+
+  // Get the latest transaction (sorted by timestamp)
+  const latestTransaction =
+    allTransactions && allTransactions.length > 0
+      ? [...allTransactions].sort(
+          (a, b) => new Date(b.timestamp) - new Date(a.timestamp),
+        )[0]
+      : null;
 
   // Update useEffect to use stable references
   useEffect(() => {
@@ -295,20 +310,28 @@ const LiquiditySidebar = () => {
             <h3 className="font-semibold">Latest Transaction</h3>
           </div>
 
-          {txHash ? (
+          {latestTransaction || txHash ? (
             <div className="space-y-3">
               <div className="flex items-center gap-2 p-3 rounded-xl bg-green-500/10 border border-green-500/20">
                 <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-green-600">
-                    Transaction Successful
+                    {latestTransaction
+                      ? `${
+                          latestTransaction.type?.charAt(0).toUpperCase() +
+                          latestTransaction.type?.slice(1)
+                        } Transaction`
+                      : "Transaction Successful"}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded truncate">
-                      {txHash.slice(0, 10)}...{txHash.slice(-8)}
+                      {(latestTransaction?.hash || txHash).slice(0, 10)}...
+                      {(latestTransaction?.hash || txHash).slice(-8)}
                     </span>
                     <a
-                      href={`https://aware-fake-trim-testnet.explorer.testnet.skalenodes.com/tx/${txHash}`}
+                      href={`https://aware-fake-trim-testnet.explorer.testnet.skalenodes.com/tx/${
+                        latestTransaction?.hash || txHash
+                      }`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-1 hover:bg-white/20 rounded-lg transition-colors group"
@@ -337,19 +360,50 @@ const LiquiditySidebar = () => {
                   <div className="flex justify-between">
                     <span className="text-slate-500">Time</span>
                     <span className="font-medium">
-                      {new Date().toLocaleTimeString()}
+                      {latestTransaction?.timestamp
+                        ? new Date(
+                            latestTransaction.timestamp,
+                          ).toLocaleTimeString()
+                        : new Date().toLocaleTimeString()}
                     </span>
                   </div>
+                  {latestTransaction && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Type</span>
+                        <span className="font-medium capitalize">
+                          {latestTransaction.type}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Tokens</span>
+                        <span className="font-medium">
+                          {latestTransaction.fromToken} →{" "}
+                          {latestTransaction.toToken}
+                        </span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Block</span>
-                    <span className="font-medium">#19,234,567</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Gas Used</span>
-                    <span className="font-medium">~0.001 ETH</span>
+                    <span className="text-slate-500">Status</span>
+                    <span className="font-medium text-green-600">
+                      {latestTransaction?.status || "Confirmed"}
+                    </span>
                   </div>
                 </div>
               )}
+            </div>
+          ) : loadingAllTransactions ? (
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-slate-100/50 dark:bg-slate-800/50">
+              <div className="w-5 h-5 border-2 border-slate-300 border-t-green-500 rounded-full animate-spin" />
+              <div>
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                  Loading...
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+                  Fetching transaction history
+                </p>
+              </div>
             </div>
           ) : (
             <div className="flex items-center gap-3 p-4 rounded-xl bg-slate-100/50 dark:bg-slate-800/50">

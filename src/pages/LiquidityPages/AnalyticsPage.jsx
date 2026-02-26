@@ -85,8 +85,6 @@ const AnalyticsPage = () => {
     { name: "Others", value: 10, color: "#10B981" },
   ];
 
-  console.log("All Transactions: ", allTransactions);
-
   const stats = {
     tvl: {
       value: "$2.0M",
@@ -632,17 +630,7 @@ const AnalyticsPage = () => {
             </div>
 
             <div className="space-y-4">
-              {loadingAllTransactions ? (
-                <div className="flex flex-col items-center justify-center py-8">
-                  <div className="relative">
-                    <div className="w-8 h-8 border-3 border-slate-200 dark:border-slate-700 border-t-green-500 rounded-full animate-spin" />
-                    <div className="absolute inset-0 w-8 h-8 border-3 border-transparent border-t-green-500/30 rounded-full animate-pulse" />
-                  </div>
-                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-                    Loading all transactions...
-                  </p>
-                </div>
-              ) : allTransactions && allTransactions.length > 0 ? (
+              {allTransactions && allTransactions.length > 0 ? (
                 allTransactions
                   .slice()
                   .sort((a, b) => {
@@ -657,8 +645,6 @@ const AnalyticsPage = () => {
                   })
                   .slice(0, 4)
                   .map((tx, i) => {
-                    console.log("Rendering transaction:", tx); // Debug log
-
                     // Safe amount formatting with fallback
                     const formatAmount = (amount) => {
                       if (amount === undefined || amount === null) return "0";
@@ -848,6 +834,16 @@ const AnalyticsPage = () => {
                       </div>
                     );
                   })
+              ) : loadingAllTransactions ? (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <div className="relative">
+                    <div className="w-8 h-8 border-3 border-slate-200 dark:border-slate-700 border-t-green-500 rounded-full animate-spin" />
+                    <div className="absolute inset-0 w-8 h-8 border-3 border-transparent border-t-green-500/30 rounded-full animate-pulse" />
+                  </div>
+                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                    Loading transactions...
+                  </p>
+                </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <div className="relative inline-block">
