@@ -48,8 +48,19 @@ const RemoveLiquidity = () => {
 
   // Fetch positions on component mount
   useEffect(() => {
+    console.log("Remove Liquidity component mounted");
     refreshPositions();
   }, [refreshPositions]);
+
+  // Debug effect to track positions changes
+  useEffect(() => {
+    console.log("Positions updated:", {
+      count: positions.length,
+      loading,
+      error,
+      positions: positions,
+    });
+  }, [positions, loading, error]);
 
   // When a position is selected, get its details
   useEffect(() => {
@@ -173,47 +184,7 @@ const RemoveLiquidity = () => {
         </div>
       )}
 
-      {/* Loading State */}
-      {loading && (
-        <div className="flex flex-col items-center justify-center py-12">
-          <div className="relative">
-            <div className="w-12 h-12 border-4 border-slate-200 dark:border-slate-700 border-t-red-500 rounded-full animate-spin" />
-            <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-t-red-500/30 rounded-full animate-pulse" />
-          </div>
-          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-            Loading your positions...
-          </p>
-        </div>
-      )}
-
-      {/* No Positions State */}
-      {!loading && positions.length === 0 && (
-        <div
-          className={`text-center py-12 rounded-xl border ${glassCardStyle}`}
-        >
-          <div className="relative inline-block">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-              <Wallet className="w-8 h-8 text-slate-400" />
-            </div>
-            <div className="absolute inset-0 animate-ping">
-              <div className="w-16 h-16 mx-auto rounded-full bg-red-500/20" />
-            </div>
-          </div>
-          <h4 className="text-lg font-semibold mb-2">No Liquidity Positions</h4>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-            You haven't added any liquidity yet.
-          </p>
-          <button
-            onClick={refreshPositions}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-red-500/25 transition-all"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </button>
-        </div>
-      )}
-
-      {/* Position Selection */}
+      {/* Position Selection - Show if positions exist regardless of loading state */}
       {positions.length > 0 && !selectedPositionId && (
         <div className={`rounded-xl border p-4 ${glassCardStyle}`}>
           <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">
@@ -260,6 +231,46 @@ const RemoveLiquidity = () => {
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Loading State - Show only if no positions exist and loading is true */}
+      {positions.length === 0 && loading && (
+        <div className="flex flex-col items-center justify-center py-12">
+          <div className="relative">
+            <div className="w-12 h-12 border-4 border-slate-200 dark:border-slate-700 border-t-red-500 rounded-full animate-spin" />
+            <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-t-red-500/30 rounded-full animate-pulse" />
+          </div>
+          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+            Loading your positions...
+          </p>
+        </div>
+      )}
+
+      {/* No Positions State */}
+      {!loading && positions.length === 0 && (
+        <div
+          className={`text-center py-12 rounded-xl border ${glassCardStyle}`}
+        >
+          <div className="relative inline-block">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+              <Wallet className="w-8 h-8 text-slate-400" />
+            </div>
+            <div className="absolute inset-0 animate-ping">
+              <div className="w-16 h-16 mx-auto rounded-full bg-red-500/20" />
+            </div>
+          </div>
+          <h4 className="text-lg font-semibold mb-2">No Liquidity Positions</h4>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+            You haven't added any liquidity yet.
+          </p>
+          <button
+            onClick={refreshPositions}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-red-500/25 transition-all"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
         </div>
       )}
 
