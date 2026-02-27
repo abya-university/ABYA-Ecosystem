@@ -8,6 +8,7 @@ import {
   Sparkles,
   Home,
   BookOpen,
+  Coins,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useDarkMode } from "../../../contexts/themeContext";
@@ -101,6 +102,22 @@ export default function NetworkNavbar() {
               <span>LMS</span>
               {isActive("/mainpage") && (
                 <div className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-gradient-to-r from-yellow-500 to-amber-500" />
+              )}
+            </Link>
+            {/* link to finance page */}
+            <Link
+              to="/liquidityMainpage"
+              onClick={handleLinkClick}
+              className={`group relative flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-300 ${
+                isActive("/liquidityMainpage")
+                  ? "bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-700 dark:text-blue-300"
+                  : "text-slate-600 hover:bg-slate-100/80 dark:text-slate-300 dark:hover:bg-slate-800/50"
+              }`}
+            >
+              <Coins className="h-4 w-4" />
+              <span>Finance & Liquidity</span>
+              {isActive("/liquidityMainpage") && (
+                <div className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" />
               )}
             </Link>
           </div>

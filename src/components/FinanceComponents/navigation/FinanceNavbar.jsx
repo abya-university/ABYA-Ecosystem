@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Menu, Moon, Sun, X, Home, BookOpen } from "lucide-react";
+import { Menu, Moon, Sun, X, Home, BookOpen, UsersRound } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useDarkMode } from "../../../contexts/themeContext";
 import ErrorBoundary from "../../ErrorBoundary";
@@ -84,6 +84,22 @@ export default function FinanceNavbar() {
               <BookOpen className="h-4 w-4" />
               <span>LMS</span>
               {isActive("/mainpage") && (
+                <div className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" />
+              )}
+            </Link>
+            {/* //link to ambassador page */}
+            <Link
+              to="/networkMainpage"
+              onClick={handleLinkClick}
+              className={`group relative flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-300 ${
+                isActive("/networkMainpage")
+                  ? "bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-700 dark:text-blue-300"
+                  : "text-slate-600 hover:bg-slate-100/80 dark:text-slate-300 dark:hover:bg-slate-800/50"
+              }`}
+            >
+              <UsersRound className="h-4 w-4" />
+              <span>Ambassadors</span>
+              {isActive("/networkMainpage") && (
                 <div className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" />
               )}
             </Link>
