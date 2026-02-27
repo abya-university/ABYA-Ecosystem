@@ -1,7 +1,34 @@
 import React, { useState, useEffect } from "react";
+import {
+  Minus,
+  AlertCircle,
+  CheckCircle,
+  Loader,
+  RefreshCw,
+  Wallet,
+  Info,
+  ChevronDown,
+  ChevronUp,
+  X,
+  Trash2,
+  Percent,
+  DollarSign,
+  TrendingDown,
+  Clock,
+  Shield,
+  ArrowRight,
+  ExternalLink,
+} from "lucide-react";
 import { useUserPositions } from "../../contexts/fake-liquidity-test-contexts/userPositionContext";
+import { useDarkMode } from "../../contexts/themeContext";
+import { useActiveAccount } from "thirdweb/react";
+import { toast } from "react-toastify";
 
 const RemoveLiquidity = () => {
+  const { darkMode } = useDarkMode();
+  const account = useActiveAccount();
+  const address = account?.address;
+
   const {
     positions,
     loading,
@@ -17,23 +44,32 @@ const RemoveLiquidity = () => {
   const [selectedPositionId, setSelectedPositionId] = useState(null);
   const [removing, setRemoving] = useState(false);
   const [percentToRemove, setPercentToRemove] = useState(100);
+  const [showDetails, setShowDetails] = useState(false);
 
   // Fetch positions on component mount
   useEffect(() => {
+    console.log("Remove Liquidity component mounted");
     refreshPositions();
   }, [refreshPositions]);
+
+  // Debug effect to track positions changes
+  useEffect(() => {
+    console.log("Positions updated:", {
+      count: positions.length,
+      loading,
+      error,
+      positions: positions,
+    });
+  }, [positions, loading, error]);
 
   // When a position is selected, get its details
   useEffect(() => {
     const fetchPositionDetails = async () => {
       if (selectedPositionId) {
-        console.log(`Fetching details for position ${selectedPositionId}...`);
         const details = await getPositionDetails(selectedPositionId);
-        console.log("Position details:", details);
         setPositionDetails(details);
 
         const feesData = await getPositionFees(selectedPositionId);
-        console.log("Position fees:", feesData);
         setFees(feesData);
       } else {
         setPositionDetails(null);
@@ -46,8 +82,9 @@ const RemoveLiquidity = () => {
 
   // Handle position selection
   const handleSelectPosition = (tokenId) => {
-    console.log(`Selected position: ${tokenId}`);
     setSelectedPositionId(tokenId);
+    setPercentToRemove(100);
+    setShowDetails(true);
   };
 
   // Handle removing liquidity
@@ -55,6 +92,8 @@ const RemoveLiquidity = () => {
     if (!selectedPositionId) return;
 
     setRemoving(true);
+    const toastId = toast.loading("Removing liquidity...");
+
     try {
       // Convert percent to a decimal amount
       const liquidityAmount = (percentToRemove / 100).toString();
@@ -62,180 +101,373 @@ const RemoveLiquidity = () => {
       const result = await removeLiquidity(selectedPositionId, liquidityAmount);
 
       if (result.success) {
-        alert(
-          `Successfully removed ${percentToRemove}% liquidity. Transaction: ${result.hash}`
-        );
+        toast.update(toastId, {
+          render: `Successfully removed ${percentToRemove}% liquidity`,
+          type: "success",
+          isLoading: false,
+          autoClose: 5000,
+        });
         refreshPositions();
-        setSelectedPositionId(null);
+        setTimeout(() => {
+          setSelectedPositionId(null);
+        }, 5000);
       } else {
-        alert(`Failed to remove liquidity: ${result.error}`);
+        toast.update(toastId, {
+          render: result.error || "Failed to remove liquidity",
+          type: "error",
+          isLoading: false,
+          autoClose: 5000,
+        });
       }
     } catch (error) {
-      alert(`Error: ${error.message}`);
+      toast.update(toastId, {
+        render: error.message || "An error occurred",
+        type: "error",
+        isLoading: false,
+        autoClose: 5000,
+      });
     } finally {
       setRemoving(false);
     }
   };
 
-  console.log("User Positions:", positions);
-  console.log("Selected Position Details:", positionDetails);
-  console.log("Fees Data:", fees);
+  // Calculate estimated amounts
+  const estimatedToken0 = positionDetails
+    ? (parseFloat(positionDetails.token0 || "0") * percentToRemove) / 100
+    : 0;
+  const estimatedToken1 = positionDetails
+    ? (parseFloat(positionDetails.token1 || "0") * percentToRemove) / 100
+    : 0;
+
+  // Modern card styles
+  const cardStyle = darkMode
+    ? "bg-gradient-to-br from-slate-900/90 to-slate-800/90 border-slate-700/50"
+    : "bg-gradient-to-br from-white to-slate-50/90 border-slate-200/70";
+
+  const glassCardStyle = darkMode
+    ? "bg-slate-800/40 backdrop-blur-xl border-slate-700/30"
+    : "bg-white/70 backdrop-blur-xl border-slate-200/50";
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-6 max-w-3xl mx-auto">
-      <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-gray-100">
-        Remove Liquidity
-      </h2>
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-gradient-to-br from-red-500/20 to-rose-500/20">
+            <Minus className="w-5 h-5 text-red-600 dark:text-red-400" />
+          </div>
+          <div>
+            <h3 className="font-semibold">Remove Liquidity</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Withdraw your liquidity position and earned fees
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={refreshPositions}
+          className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+          title="Refresh positions"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
+      </div>
 
       {/* Error Display */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-400 p-4 rounded-lg mb-4 border border-red-200 dark:border-red-500/30">
-          Error: {error}
+        <div
+          className={`rounded-xl border p-4 bg-red-500/10 border-red-500/20 ${glassCardStyle}`}
+        >
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          </div>
         </div>
       )}
 
-      {/* Loading State */}
-      {loading && (
-        <div className="flex items-center justify-center p-8">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-500"></div>
-        </div>
-      )}
-
-      {/* No Positions State */}
-      {!loading && positions.length === 0 && (
-        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-          <p className="mb-2">You don't have any liquidity positions.</p>
-          <button
-            onClick={refreshPositions}
-            className="text-yellow-500 hover:text-yellow-600 dark:text-yellow-500 dark:hover:text-yellow-400"
-          >
-            Refresh
-          </button>
-        </div>
-      )}
-
-      {/* Position Selection */}
-      {positions.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-100">
-            Select Position
-          </h3>
-          <div className="grid gap-3">
+      {/* Position Selection - Show if positions exist regardless of loading state */}
+      {positions.length > 0 && !selectedPositionId && (
+        <div className={`rounded-xl border p-4 ${glassCardStyle}`}>
+          <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">
+            Select Position to Remove
+          </h4>
+          <div className="space-y-2">
             {positions.map((position) => (
-              <div
+              <button
                 key={position.tokenId}
                 onClick={() => handleSelectPosition(position.tokenId)}
-                className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                  selectedPositionId === position.tokenId
-                    ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-500"
-                    : "border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
-                }`}
+                className="w-full group relative overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 p-4 hover:border-red-500/30 hover:bg-red-500/5 transition-all text-left"
               >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-semibold text-gray-800 dark:text-gray-100">
-                      Position #{position.tokenId}
+                <div className="absolute inset-0 bg-gradient-to-r from-red-500/0 to-rose-500/0 group-hover:from-red-500/5 group-hover:to-rose-500/5 transition-opacity" />
+
+                <div className="relative flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    {/* Token Icons */}
+                    <div className="flex -space-x-2">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 border-2 border-white dark:border-slate-800" />
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-yellow-500 to-amber-500 border-2 border-white dark:border-slate-800" />
+                    </div>
+
+                    <div>
+                      <p className="font-semibold">
+                        Position #{position.tokenId}
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Liquidity:{" "}
+                        {parseFloat(position.liquidity).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-sm font-medium">
+                      {parseFloat(position.token0 || "0").toFixed(4)} /{" "}
+                      {parseFloat(position.token1 || "0").toFixed(4)}
                     </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Liquidity:{" "}
-                      {parseFloat(position.liquidity).toLocaleString()}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Tokens: {parseFloat(position.token0 || "0").toFixed(6)} /{" "}
-                      {parseFloat(position.token1 || "0").toFixed(6)}
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      ABYTKN / USDC
                     </p>
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
       )}
 
+      {/* Loading State - Show only if no positions exist and loading is true */}
+      {positions.length === 0 && loading && (
+        <div className="flex flex-col items-center justify-center py-12">
+          <div className="relative">
+            <div className="w-12 h-12 border-4 border-slate-200 dark:border-slate-700 border-t-red-500 rounded-full animate-spin" />
+            <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-t-red-500/30 rounded-full animate-pulse" />
+          </div>
+          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+            Loading your positions...
+          </p>
+        </div>
+      )}
+
+      {/* No Positions State */}
+      {!loading && positions.length === 0 && (
+        <div
+          className={`text-center py-12 rounded-xl border ${glassCardStyle}`}
+        >
+          <div className="relative inline-block">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+              <Wallet className="w-8 h-8 text-slate-400" />
+            </div>
+            <div className="absolute inset-0 animate-ping">
+              <div className="w-16 h-16 mx-auto rounded-full bg-red-500/20" />
+            </div>
+          </div>
+          <h4 className="text-lg font-semibold mb-2">No Liquidity Positions</h4>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+            You haven't added any liquidity yet.
+          </p>
+          <button
+            onClick={refreshPositions}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-red-500/25 transition-all"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
+        </div>
+      )}
+
       {/* Selected Position Details */}
-      {positionDetails && (
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-6">
-          <h3 className="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-100">
-            Position Details
-          </h3>
-
-          {/* Position Info */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Liquidity
-              </p>
-              <p className="font-medium text-gray-800 dark:text-gray-100">
-                {parseFloat(positionDetails.liquidity).toLocaleString()}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Token ID
-              </p>
-              <p className="font-medium text-gray-800 dark:text-gray-100">
-                {positionDetails.tokenId}
-              </p>
+      {positionDetails && selectedPositionId && (
+        <div className={`rounded-2xl border overflow-hidden ${cardStyle}`}>
+          {/* Position Header */}
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-red-500/5 to-rose-500/5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-red-500/20">
+                  <Minus className="w-4 h-4 text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <h4 className="font-semibold">
+                    Position #{positionDetails.tokenId}
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    ABYTKN / USDC • Fee Tier 0.05%
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedPositionId(null)}
+                className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
-          {/* Fees Info */}
-          <div className="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3">
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-              Collected Fees
-            </p>
+          <div className="p-4 space-y-4">
+            {/* Position Overview */}
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Token 0
+              <div className="p-3 rounded-xl bg-slate-100/50 dark:bg-slate-800/50">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                  Total Liquidity
                 </p>
-                <p className="font-medium text-gray-800 dark:text-gray-100">
-                  {parseFloat(fees.token0).toFixed(6)}
+                <p className="text-lg font-bold text-slate-900 dark:text-white">
+                  {parseFloat(positionDetails.liquidity).toLocaleString()}
                 </p>
               </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Token 1
+              <div className="p-3 rounded-xl bg-slate-100/50 dark:bg-slate-800/50">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                  Pool Share
                 </p>
-                <p className="font-medium text-gray-800 dark:text-gray-100">
-                  {parseFloat(fees.token1).toFixed(6)}
+                <p className="text-lg font-bold text-slate-900 dark:text-white">
+                  0.12%
                 </p>
               </div>
             </div>
-          </div>
 
-          {/* Liquidity Removal Controls */}
-          <div className="border-t border-gray-200 dark:border-gray-600 pt-4 mt-4">
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-              Amount to Remove
-            </p>
-            <div className="flex items-center space-x-2 mb-3">
+            {/* Current Holdings */}
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="p-3 bg-slate-100/50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  <Wallet className="w-4 h-4" />
+                  Current Holdings
+                </p>
+              </div>
+              <div className="p-3 space-y-2">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-gradient-to-r from-yellow-500 to-amber-500" />
+                    <span className="text-sm">ABYTKN</span>
+                  </div>
+                  <span className="font-mono text-sm font-semibold">
+                    {parseFloat(positionDetails.token0 || "0").toFixed(6)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" />
+                    <span className="text-sm">USDC</span>
+                  </div>
+                  <span className="font-mono text-sm font-semibold">
+                    {parseFloat(positionDetails.token1 || "0").toFixed(6)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Earned Fees */}
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="p-3 bg-slate-100/50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  <TrendingDown className="w-4 h-4 text-green-500" />
+                  Earned Fees
+                </p>
+              </div>
+              <div className="p-3 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-600 dark:text-slate-400">
+                    ABYTKN Fees
+                  </span>
+                  <span className="font-mono text-sm font-semibold text-green-600">
+                    {parseFloat(fees.token0).toFixed(6)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-600 dark:text-slate-400">
+                    USDC Fees
+                  </span>
+                  <span className="font-mono text-sm font-semibold text-green-600">
+                    {parseFloat(fees.token1).toFixed(6)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Removal Amount Slider */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Amount to Remove
+                </label>
+                <span className="text-2xl font-bold text-red-600 dark:text-red-400">
+                  {percentToRemove}%
+                </span>
+              </div>
+
               <input
                 type="range"
                 min="1"
                 max="100"
                 value={percentToRemove}
                 onChange={(e) => setPercentToRemove(parseInt(e.target.value))}
-                className="flex-1 accent-yellow-500"
+                className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-red-500"
               />
-              <span className="font-medium text-gray-800 dark:text-gray-100">
-                {percentToRemove}%
-              </span>
+
+              {/* Quick Percent Buttons */}
+              <div className="flex gap-2">
+                {[25, 50, 75, 100].map((percent) => (
+                  <button
+                    key={percent}
+                    onClick={() => setPercentToRemove(percent)}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                      percentToRemove === percent
+                        ? "bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg shadow-red-500/25"
+                        : "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700"
+                    }`}
+                  >
+                    {percent}%
+                  </button>
+                ))}
+              </div>
             </div>
 
+            {/* Estimated Returns */}
+            <div className={`rounded-xl border p-3 ${glassCardStyle}`}>
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
+                <DollarSign className="w-3 h-3" />
+                You will receive (estimated)
+              </p>
+              <div className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600 dark:text-slate-400">
+                    ABYTKN
+                  </span>
+                  <span className="font-mono font-semibold">
+                    {estimatedToken0.toFixed(6)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600 dark:text-slate-400">
+                    USDC
+                  </span>
+                  <span className="font-mono font-semibold">
+                    {estimatedToken1.toFixed(6)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Remove Button */}
             <button
-              // onClick={handleRemoveLiquidity}
-              onClick={() => alert("This feature is still under development.")}
+              onClick={handleRemoveLiquidity}
               disabled={removing}
-              className="w-full bg-yellow-500 dark:bg-yellow-600 text-white py-2 px-4 rounded-lg hover:bg-yellow-600 dark:hover:bg-yellow-700 disabled:bg-yellow-300 dark:disabled:bg-yellow-800 disabled:cursor-not-allowed transition-colors"
+              className="w-full bg-gradient-to-r from-red-500 to-rose-500 text-white py-4 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:shadow-lg hover:shadow-red-500/25 hover:-translate-y-0.5 flex items-center justify-center gap-2"
             >
-              {removing
-                ? "Processing..."
-                : `Remove ${percentToRemove}% Liquidity`}
+              {removing ? (
+                <>
+                  <Loader className="animate-spin" size={18} />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Trash2 size={18} />
+                  Remove {percentToRemove}% Liquidity
+                </>
+              )}
             </button>
           </div>
         </div>
       )}
+
+      {/* Notifications */}
     </div>
   );
 };

@@ -7,6 +7,7 @@ import NotFoundPage from "./pages/404Page";
 import CourseMetricsPage from "./pages/CourseMetricsPage";
 import { ToastContainer } from "react-toastify";
 import NetworkMainpage from "./pages/AmbassadorNetworkPages/NetworkMainpage";
+import FinanceMainpage from "./pages/LiquidityPages/FinanceMainpage";
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
         />
 
         <Route path="/networkMainpage" element={<NetworkMainpage />} />
+        <Route path="/liquidityMainpage" element={<FinanceMainpage />} />
 
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

@@ -9,9 +9,6 @@ import SettingsPage from "./Settings";
 import CoursesPage from "./CourseList";
 import DiscussionsPage from "./Discussions";
 import CourseDetails from "./CourseDetails";
-import LiquidityPage from "./LiquidityPage";
-import AnalyticsPage from "./AnalyticsPage";
-import PortfolioPage from "./PortfolioPage";
 import LearningPath from "./LearningPath";
 import { useSearchParams } from "react-router-dom";
 
@@ -102,12 +99,6 @@ const MasterPage = () => {
         );
       case "discussions":
         return <DiscussionsPage />;
-      case "liquidity":
-        return <LiquidityPage />;
-      case "analytics":
-        return <AnalyticsPage />;
-      case "portfolio":
-        return <PortfolioPage />;
       case "learning-path":
         return <LearningPath />;
       default:
