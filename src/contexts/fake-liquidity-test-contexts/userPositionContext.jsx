@@ -597,13 +597,38 @@ export function UserPositionProvider({ children }) {
       try {
         console.log("Removing liquidity:", { tokenId, liquidityAmount });
 
+        // First transaction: Approve position manager
+        console.log(`Approving position manager for token ID: ${tokenId}`);
+        toast.update(toastId, {
+          render: "Approving position manager...",
+          isLoading: true,
+        });
+
+        const approveTx = prepareContractCall({
+          contract: swapContract,
+          method: "approvePositionManager",
+          params: [tokenId],
+        });
+
+        const approveReceipt = await sendTransaction({
+          transaction: approveTx,
+          account,
+        });
+        console.log(
+          "Position manager approved successfully:",
+          approveReceipt.transactionHash,
+        );
+
+        // Second transaction: Remove liquidity
+        // Convert liquidity to uint128 (not uint256)
+        const liquidityBN = BigInt(
+          Math.floor(parseFloat(liquidityAmount) * 1e18),
+        );
+
         const removeLiquidityTx = prepareContractCall({
           contract: swapContract,
           method: "removeLiquidity",
-          params: [
-            BigInt(tokenId),
-            ethers.parseUnits(liquidityAmount.toString(), 18),
-          ],
+          params: [BigInt(tokenId), liquidityBN],
         });
 
         console.log("Sending removeLiquidity transaction...");
@@ -632,6 +657,7 @@ export function UserPositionProvider({ children }) {
         return {
           success: true,
           hash: txResult.transactionHash,
+          approveHash: approveReceipt.transactionHash,
         };
       } catch (error) {
         console.error(

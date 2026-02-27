@@ -69,6 +69,7 @@ const TOKENS = {
 const SwapComponent = () => {
   const { darkMode } = useDarkMode();
   const [loading, setLoading] = useState(false);
+  const [calculatingOutput, setCalculatingOutput] = useState(false);
   const [txHash, setTxHash] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [showTokenSelect, setShowTokenSelect] = useState(null); // 'from' or 'to'
@@ -108,6 +109,86 @@ const SwapComponent = () => {
     route: [],
   });
 
+  // Format raw balance for display (balances from context are already formatted)
+  const formatBalance = (balance, tokenSymbol) => {
+    if (!balance || balance === "0.0" || balance === "0") return "0";
+
+    try {
+      // Balances from context are already formatted (e.g., "2989000.000000000000007993")
+      const num = parseFloat(balance);
+      if (isNaN(num)) return "0";
+
+      if (num >= 1000) {
+        return num.toLocaleString(undefined, {
+          maximumFractionDigits: 4,
+          minimumFractionDigits: 0,
+        });
+      }
+      return num.toLocaleString(undefined, {
+        maximumFractionDigits: 6,
+        minimumFractionDigits: 0,
+      });
+    } catch (error) {
+      console.error("Error formatting balance:", error);
+      return "0";
+    }
+  };
+
+  // Format raw output amount for display (outputAmount is raw with decimals)
+  const formatRawOutput = (rawAmount, tokenSymbol) => {
+    if (!rawAmount || rawAmount === "0" || rawAmount === "0.0") return "0.0";
+
+    try {
+      const decimals = tokenSymbol === "ABYTKN" ? 18 : 6;
+      // Use ethers to format the raw amount
+      const formatted = ethers.formatUnits(rawAmount, decimals);
+      const num = parseFloat(formatted);
+
+      if (num >= 1000) {
+        return num.toLocaleString(undefined, {
+          maximumFractionDigits: 4,
+          minimumFractionDigits: 0,
+        });
+      }
+      if (num < 0.000001 && num > 0) {
+        return num.toExponential(4);
+      }
+      return num.toLocaleString(undefined, {
+        maximumFractionDigits: 6,
+        minimumFractionDigits: 0,
+      });
+    } catch (error) {
+      console.error("Error formatting raw output:", error);
+      return "0.0";
+    }
+  };
+
+  // Format amount for display (small numbers)
+  const formatDisplayAmount = (value) => {
+    if (!value || value === "0" || value === "0.0") return "0";
+
+    try {
+      const num = parseFloat(value);
+      if (isNaN(num)) return "0";
+
+      if (num > 0 && num < 0.000001) {
+        return num.toExponential(4);
+      }
+      if (num >= 1000) {
+        return num.toLocaleString(undefined, {
+          maximumFractionDigits: 4,
+          minimumFractionDigits: 0,
+        });
+      }
+      return num.toLocaleString(undefined, {
+        maximumFractionDigits: 6,
+        minimumFractionDigits: 0,
+      });
+    } catch {
+      return "0";
+    }
+  };
+
   // Update output amount when input changes
   useEffect(() => {
     const updateOutputAmount = async () => {
@@ -116,6 +197,7 @@ const SwapComponent = () => {
         parseFloat(swapData.inputAmount) > 0 &&
         swapData.inputToken.symbol !== swapData.outputToken.symbol
       ) {
+        setCalculatingOutput(true);
         try {
           const result = await calculateOutputAmount(
             swapData.inputAmount,
@@ -133,12 +215,15 @@ const SwapComponent = () => {
           }
         } catch (error) {
           console.error("Error calculating output amount:", error);
+          toast.error("Failed to calculate output amount");
           setSwapData((prev) => ({
             ...prev,
             outputAmount: "0",
             priceImpact: 0,
             minimumReceived: "0",
           }));
+        } finally {
+          setCalculatingOutput(false);
         }
       } else {
         setSwapData((prev) => ({
@@ -147,10 +232,12 @@ const SwapComponent = () => {
           priceImpact: 0,
           minimumReceived: "0",
         }));
+        setCalculatingOutput(false);
       }
     };
 
-    updateOutputAmount();
+    const debounceTimer = setTimeout(updateOutputAmount, 300);
+    return () => clearTimeout(debounceTimer);
   }, [
     swapData.inputAmount,
     swapData.inputToken,
@@ -181,18 +268,23 @@ const SwapComponent = () => {
       return;
     }
 
-    if (!swapData.outputAmount || parseFloat(swapData.outputAmount) <= 0) {
-      toast.error("Please wait for output amount calculation");
+    if (!swapData.outputAmount || swapData.outputAmount === "0") {
+      toast.error("Please wait for output amount calculation to complete");
+      return;
+    }
+
+    if (calculatingOutput) {
+      toast.warning("Still calculating output amount. Please wait...");
       return;
     }
 
     if (!address) {
-      toast.error("Wallet not connected");
+      toast.error("Please connect your wallet to continue");
       return;
     }
 
     setLoading(true);
-    const toastId = toast.loading("Executing swap...");
+    const toastId = toast.loading("Preparing swap transaction...");
 
     try {
       const inputTokenAddress = swapData.inputToken.address;
@@ -221,7 +313,12 @@ const SwapComponent = () => {
 
       if (balance < amountToSwap) {
         toast.update(toastId, {
-          render: `Insufficient ${swapData.inputToken.symbol} balance`,
+          render: `Insufficient ${
+            swapData.inputToken.symbol
+          } balance. You have ${ethers.formatUnits(
+            balance,
+            swapData.inputToken.decimals,
+          )} but need ${swapData.inputAmount}`,
           type: "error",
           isLoading: false,
           autoClose: 5000,
@@ -231,6 +328,13 @@ const SwapComponent = () => {
       }
 
       // Check and approve allowance
+      toast.update(toastId, {
+        render: "Checking token approval...",
+        type: "info",
+        isLoading: true,
+        autoClose: false,
+      });
+
       const allowance = await readContract({
         contract: inputTokenContract,
         method: "allowance",
@@ -239,11 +343,12 @@ const SwapComponent = () => {
 
       if (allowance < amountToSwap) {
         toast.update(toastId, {
-          render: "Approving token...",
+          render: "Approving token for swap...",
           type: "info",
           isLoading: true,
           autoClose: false,
         });
+
         const approveTx = prepareContractCall({
           contract: inputTokenContract,
           method: "approve",
@@ -253,7 +358,27 @@ const SwapComponent = () => {
           ],
         });
 
-        await sendTransaction({ transaction: approveTx, account });
+        const approveResult = await sendTransaction({
+          transaction: approveTx,
+          account,
+        });
+
+        toast.update(toastId, {
+          render: `Token approved! Hash: ${approveResult.transactionHash.slice(
+            0,
+            10,
+          )}...`,
+          type: "success",
+          isLoading: false,
+          autoClose: 3000,
+        });
+
+        toast.update(toastId, {
+          render: "Executing swap transaction...",
+          type: "info",
+          isLoading: true,
+          autoClose: false,
+        });
       }
 
       // Execute swap
@@ -264,17 +389,23 @@ const SwapComponent = () => {
         chain: CONTRACT_CONFIG.CHAIN,
       });
 
-      toast.update(toastId, {
-        render: "Processing swap transaction...",
-        type: "info",
-        isLoading: true,
-        autoClose: false,
-      });
-
       const swapTx = prepareContractCall({
         contract: swapContract,
         method: "swapExactInputSingle",
         params: [inputTokenAddress, outputTokenAddress, amountToSwap],
+      });
+
+      console.log("Swap details:", {
+        inputToken: swapData.inputToken.symbol,
+        inputAmount: swapData.inputAmount,
+        inputDecimals: swapData.inputToken.decimals,
+        parsedInputAmount: amountToSwap.toString(),
+        expectedOutputToken: swapData.outputToken.symbol,
+        expectedOutputRaw: swapData.outputAmount,
+        expectedOutputDisplay: ethers.formatUnits(
+          swapData.outputAmount,
+          swapData.outputToken.symbol === "ABYTKN" ? 18 : 6,
+        ),
       });
 
       const swapResult = await sendTransaction({
@@ -283,8 +414,31 @@ const SwapComponent = () => {
       });
       setTxHash(swapResult.transactionHash);
 
+      console.log("Swap result:", swapResult);
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      await loadBalances();
+      console.log("New balances:", balances);
+
       toast.update(toastId, {
-        render: `Successfully swapped ${swapData.inputAmount} ${swapData.inputToken.symbol}`,
+        render: (
+          <div className="space-y-2">
+            <p>
+              ✅ Successfully swapped {swapData.inputAmount}{" "}
+              {swapData.inputToken.symbol} for{" "}
+              {ethers.formatUnits(
+                swapData.outputAmount,
+                swapData.outputToken.symbol === "ABYTKN" ? 18 : 6,
+              )}{" "}
+              {swapData.outputToken.symbol}
+            </p>
+            <p className="text-xs opacity-75">
+              Hash: {swapResult.transactionHash.slice(0, 10)}...
+              {swapResult.transactionHash.slice(-8)}
+            </p>
+          </div>
+        ),
         type: "success",
         isLoading: false,
         autoClose: 5000,
@@ -299,30 +453,35 @@ const SwapComponent = () => {
         minimumReceived: "0",
       }));
 
-      // Refresh data
-      loadBalances();
+      await loadBalances();
+      await loadPoolInfo();
+      await fetchPoolPrice();
     } catch (error) {
       console.error("Swap failed:", error);
-      let errorMessage = "Swap failed";
+      let errorMessage = "Swap transaction failed";
 
       if (error.message.includes("user rejected")) {
-        errorMessage = "Transaction rejected by user";
+        errorMessage = "❌ Transaction rejected by user";
       } else if (error.message.includes("insufficient funds")) {
-        errorMessage = "Insufficient funds for gas";
+        errorMessage = "❌ Insufficient funds for gas";
+      } else if (error.message.includes("insufficient balance")) {
+        errorMessage = `❌ Insufficient ${swapData.inputToken.symbol} balance`;
       } else if (error.message.includes("execution reverted")) {
-        errorMessage = "Contract execution reverted";
+        errorMessage = "❌ Contract execution reverted";
         if (error.data) {
           errorMessage += `: ${error.data}`;
         }
+      } else if (error.message.includes("SlippageTolerance exceeded")) {
+        errorMessage = `❌ Slippage tolerance exceeded. Increase your slippage tolerance above ${slippageTolerance}%`;
       } else if (error.message) {
-        errorMessage += `: ${error.message}`;
+        errorMessage = `❌ ${error.message}`;
       }
 
       toast.update(toastId, {
         render: errorMessage,
         type: "error",
         isLoading: false,
-        autoClose: 5000,
+        autoClose: 6000,
       });
     } finally {
       setLoading(false);
@@ -331,13 +490,27 @@ const SwapComponent = () => {
 
   // Swap tokens
   const swapTokens = () => {
-    setSwapData((prev) => ({
-      ...prev,
-      inputToken: prev.outputToken,
-      outputToken: prev.inputToken,
-      inputAmount: prev.outputAmount,
-      outputAmount: prev.inputAmount,
-    }));
+    setSwapData((prev) => {
+      // When swapping, we need to convert the output amount back to input
+      // The output amount is raw, so we need to format it for the new input
+      let newInputAmount = "";
+      if (prev.outputAmount && prev.outputAmount !== "0") {
+        const decimals = prev.outputToken.symbol === "ABYTKN" ? 18 : 6;
+        newInputAmount = ethers.formatUnits(prev.outputAmount, decimals);
+      }
+
+      return {
+        ...prev,
+        inputToken: prev.outputToken,
+        outputToken: prev.inputToken,
+        inputAmount: newInputAmount,
+        outputAmount: prev.inputAmount
+          ? ethers
+              .parseUnits(prev.inputAmount, prev.inputToken.decimals)
+              .toString()
+          : "0",
+      };
+    });
   };
 
   // Set max balance
@@ -465,7 +638,11 @@ const SwapComponent = () => {
                 className="text-xs text-yellow-600 dark:text-yellow-400 hover:underline flex items-center gap-1"
               >
                 <Wallet className="w-3 h-3" />
-                Balance: {balances[swapData.inputToken.symbol] || "0.00"}
+                Balance:{" "}
+                {formatBalance(
+                  balances[swapData.inputToken.symbol],
+                  swapData.inputToken.symbol,
+                )}
               </button>
             )}
           </div>
@@ -528,7 +705,11 @@ const SwapComponent = () => {
             {isConnected && (
               <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
                 <Wallet className="w-3 h-3" />
-                Balance: {balances[swapData.outputToken.symbol] || "0.00"}
+                Balance:{" "}
+                {formatBalance(
+                  balances[swapData.outputToken.symbol],
+                  swapData.outputToken.symbol,
+                )}
               </span>
             )}
           </div>
@@ -537,10 +718,29 @@ const SwapComponent = () => {
             <input
               type="text"
               placeholder="0.0"
-              value={swapData.outputAmount}
+              value={
+                calculatingOutput
+                  ? "Calculating..."
+                  : swapData.outputAmount && swapData.outputAmount !== "0"
+                  ? formatRawOutput(
+                      swapData.outputAmount,
+                      swapData.outputToken.symbol,
+                    )
+                  : "0.0"
+              }
               readOnly
-              className="w-full px-4 py-4 bg-slate-100 dark:bg-slate-800 rounded-xl text-xl font-semibold text-slate-600 dark:text-slate-400 pr-36 cursor-not-allowed"
+              className={`w-full px-4 py-4 bg-slate-100 dark:bg-slate-800 rounded-xl text-xl font-semibold pr-36 cursor-not-allowed transition-colors ${
+                calculatingOutput
+                  ? "text-slate-400 dark:text-slate-500"
+                  : "text-slate-600 dark:text-slate-400"
+              }`}
             />
+
+            {calculatingOutput && (
+              <div className="absolute right-40 top-1/2 -translate-y-1/2">
+                <Loader className="w-5 h-5 animate-spin text-yellow-500" />
+              </div>
+            )}
 
             <button
               onClick={() => setShowTokenSelect("to")}
@@ -603,7 +803,14 @@ const SwapComponent = () => {
                     Minimum Received
                   </span>
                   <span className="font-medium">
-                    {swapData.minimumReceived} {swapData.outputToken.symbol}
+                    {swapData.minimumReceived &&
+                    swapData.minimumReceived !== "0"
+                      ? formatRawOutput(
+                          swapData.minimumReceived,
+                          swapData.outputToken.symbol,
+                        )
+                      : "0"}{" "}
+                    {swapData.outputToken.symbol}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -630,7 +837,13 @@ const SwapComponent = () => {
         {/* Swap Button */}
         <button
           onClick={handleSwap}
-          disabled={!isConnected || loading || !swapData.inputAmount}
+          disabled={
+            !isConnected ||
+            loading ||
+            calculatingOutput ||
+            !swapData.inputAmount ||
+            parseFloat(swapData.inputAmount) <= 0
+          }
           className="w-full mt-4 bg-gradient-to-r from-yellow-500 to-amber-500 text-white py-4 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:shadow-lg hover:shadow-yellow-500/25 hover:-translate-y-0.5 flex items-center justify-center gap-2"
         >
           {loading ? (
@@ -638,9 +851,14 @@ const SwapComponent = () => {
               <Loader className="animate-spin" size={18} />
               Swapping...
             </>
+          ) : calculatingOutput ? (
+            <>
+              <Loader className="animate-spin" size={18} />
+              Calculating Output...
+            </>
           ) : !isConnected ? (
             "Connect Wallet"
-          ) : !swapData.inputAmount ? (
+          ) : !swapData.inputAmount || parseFloat(swapData.inputAmount) <= 0 ? (
             "Enter Amount"
           ) : (
             <>
@@ -701,7 +919,7 @@ const SwapComponent = () => {
                   </div>
                   {isConnected && (
                     <span className="text-sm font-medium">
-                      {balances[token.symbol] || "0.00"}
+                      {formatBalance(balances[token.symbol], token.symbol)}
                     </span>
                   )}
                 </button>
