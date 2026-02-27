@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Clock,
   Minus,
@@ -21,11 +21,83 @@ import MintComponent from "../../components/Liquidity-Components/MintComponent";
 import LiquiditySidebar from "../../components/Liquidity-Components/LiquiditySidebar";
 import RemoveLiquidity from "../../components/Liquidity-Components/removeLiquidity";
 import { useDarkMode } from "../../contexts/themeContext";
+import { useTransactionHistory } from "../../contexts/fake-liquidity-test-contexts/historyContext";
+import { useUserPositions } from "../../contexts/fake-liquidity-test-contexts/userPositionContext";
 
 const LiquidityPage = () => {
   const { darkMode } = useDarkMode();
   const [activeTab, setActiveTab] = useState("swap");
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const { poolInfo, loadPoolInfo, balances } = useTransactionHistory();
+  const { positions, getUserPositions } = useUserPositions();
+
+  // Load pool info on mount
+  useEffect(() => {
+    loadPoolInfo();
+    getUserPositions();
+  }, []);
+
+  // Format number to display with appropriate units (K/M)
+  const formatNumber = (value) => {
+    if (!value || value === "N/A" || value === "0.0") return "N/A";
+    const num = parseFloat(value);
+    if (isNaN(num)) return "N/A";
+    if (num >= 1000000) return `$${(num / 1000000).toFixed(2)}M`;
+    if (num >= 1000) return `$${(num / 1000).toFixed(2)}K`;
+    return `$${num.toFixed(2)}`;
+  };
+
+  // Calculate total liquidity in USD
+  const calculateTotalLiquidity = () => {
+    if (!poolInfo.token0Balance || !poolInfo.token1Balance) return "N/A";
+    if (poolInfo.token0Balance === "N/A" || poolInfo.token1Balance === "N/A")
+      return "N/A";
+
+    const token0Bal = parseFloat(poolInfo.token0Balance);
+    const token1Bal = parseFloat(poolInfo.token1Balance);
+    const token0Price = parseFloat(poolInfo.token0Price) || 1000;
+
+    if (isNaN(token0Bal) || isNaN(token1Bal)) return "N/A";
+
+    // Calculate USD value: USDC is 1:1, ABYTKN uses token0Price
+    const totalUSD = token1Bal + token0Bal / token0Price;
+    return formatNumber(totalUSD.toString());
+  };
+
+  // Calculate user's pool share
+  const calculateUserPoolShare = () => {
+    if (!positions || positions.length === 0) return "0.00%";
+    const totalLiquidity = parseFloat(poolInfo.liquidity) || 0;
+    if (totalLiquidity === 0) return "0.00%";
+
+    const userLiquidity = positions.reduce((sum, pos) => {
+      return sum + parseFloat(pos.liquidity || 0);
+    }, 0);
+
+    const sharePercent = (userLiquidity / totalLiquidity) * 100;
+    return `${sharePercent.toFixed(2)}%`;
+  };
+
+  // Calculate user's LP tokens
+  const calculateUserLPTokens = () => {
+    if (!positions || positions.length === 0) return "0";
+    const totalLP = positions.reduce((sum, pos) => {
+      return sum + parseFloat(pos.liquidity || 0);
+    }, 0);
+    return totalLP.toFixed(2);
+  };
+
+  // Calculate user's earned fees
+  const calculateUserEarnedFees = () => {
+    if (!positions || positions.length === 0) return "$0.00";
+    // Sum up fees from all positions
+    const totalFees = positions.reduce((sum, pos) => {
+      const fee0 = parseFloat(pos.fees?.token0 || 0);
+      const fee1 = parseFloat(pos.fees?.token1 || 0);
+      return sum + fee0 + fee1; // Simplified - should convert to USD properly
+    }, 0);
+    return `$${totalFees.toFixed(2)}`;
+  };
 
   // Modern card styles
   const cardStyle = darkMode
@@ -117,7 +189,11 @@ const LiquidityPage = () => {
                   <div className="flex items-center gap-2">
                     <Activity className="w-4 h-4 text-yellow-500" />
                     <span className="text-xs font-medium">24h Volume</span>
-                    <span className="text-sm font-bold">$1.2M</span>
+                    <span className="text-sm font-bold">
+                      {poolInfo.volume24h !== "N/A"
+                        ? formatNumber(poolInfo.volume24h)
+                        : "N/A"}
+                    </span>
                   </div>
                 </div>
                 <div
@@ -126,7 +202,9 @@ const LiquidityPage = () => {
                   <div className="flex items-center gap-2">
                     <BarChart3 className="w-4 h-4 text-green-500" />
                     <span className="text-xs font-medium">TVL</span>
-                    <span className="text-sm font-bold">$5.8M</span>
+                    <span className="text-sm font-bold">
+                      {calculateTotalLiquidity()}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -311,21 +389,29 @@ const LiquidityPage = () => {
                       <span className="text-slate-500 dark:text-slate-400">
                         Total Liquidity
                       </span>
-                      <span className="font-semibold">$2.45M</span>
+                      <span className="font-semibold">
+                        {calculateTotalLiquidity()}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-500 dark:text-slate-400">
                         Volume (24h)
                       </span>
                       <span className="font-semibold text-green-600">
-                        $892K
+                        {poolInfo.volume24h !== "N/A"
+                          ? formatNumber(poolInfo.volume24h)
+                          : "N/A"}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-500 dark:text-slate-400">
                         Fees (24h)
                       </span>
-                      <span className="font-semibold">$2,450</span>
+                      <span className="font-semibold">
+                        {poolInfo.fees24h !== "N/A"
+                          ? formatNumber(poolInfo.fees24h)
+                          : "N/A"}
+                      </span>
                     </div>
                     <div className="h-px bg-slate-200 dark:bg-slate-700 my-2" />
                     <div className="flex justify-between text-sm">
@@ -333,7 +419,7 @@ const LiquidityPage = () => {
                         APY
                       </span>
                       <span className="font-semibold text-yellow-600">
-                        12.5%
+                        {poolInfo.apr !== "N/A" ? poolInfo.apr + "%" : "N/A"}
                       </span>
                     </div>
                   </div>
@@ -353,20 +439,24 @@ const LiquidityPage = () => {
                       <span className="text-slate-500 dark:text-slate-400">
                         LP Tokens
                       </span>
-                      <span className="font-semibold">1,234.56</span>
+                      <span className="font-semibold">
+                        {calculateUserLPTokens()}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-500 dark:text-slate-400">
                         Share of Pool
                       </span>
-                      <span className="font-semibold">0.12%</span>
+                      <span className="font-semibold">
+                        {calculateUserPoolShare()}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-500 dark:text-slate-400">
                         Earned Fees
                       </span>
                       <span className="font-semibold text-green-600">
-                        $45.67
+                        {calculateUserEarnedFees()}
                       </span>
                     </div>
                   </div>

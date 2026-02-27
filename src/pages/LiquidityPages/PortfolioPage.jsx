@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Wallet,
   TrendingUp,
@@ -41,6 +41,10 @@ import {
 import { useDarkMode } from "../../contexts/themeContext";
 import { useTransactionHistory } from "../../contexts/fake-liquidity-test-contexts/historyContext";
 import { useActiveAccount } from "thirdweb/react";
+import { useVesting } from "../../contexts/VestingContext";
+import { useRevenueSharing } from "../../contexts/RevenueSharingContext";
+import { useUserPositions } from "../../contexts/fake-liquidity-test-contexts/userPositionContext";
+import { ethers } from "ethers";
 
 const PortfolioPage = () => {
   const { darkMode } = useDarkMode();
@@ -49,7 +53,12 @@ const PortfolioPage = () => {
     allTransactions,
     loading: historyLoading,
     loadingAllTransactions,
+    balances,
+    poolInfo,
   } = useTransactionHistory();
+  const { vestingData, getVestingInfo } = useVesting();
+  const { commissionsBalance, fetchCommissionsBalance } = useRevenueSharing();
+  const { positions, getUserPositions } = useUserPositions();
   const [timeframe, setTimeframe] = useState("1m");
   const [showBalances, setShowBalances] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -57,12 +66,114 @@ const PortfolioPage = () => {
   const account = useActiveAccount();
   const address = account?.address || "";
 
+  // Load data on mount
+  useEffect(() => {
+    const loadData = async () => {
+      if (getVestingInfo && address) {
+        await getVestingInfo(address);
+      }
+      if (fetchCommissionsBalance) {
+        await fetchCommissionsBalance();
+      }
+      if (getUserPositions) {
+        await getUserPositions();
+      }
+    };
+    loadData();
+  }, [address]);
+
+  // Calculate actual asset allocation from balances
+  const calculateAssetAllocation = () => {
+    const abytknBal = parseFloat(balances.ABYTKN || 0);
+    const usdc = parseFloat(balances.USDC || 0);
+    const eth = parseFloat(balances.ETH || 0);
+
+    const abytknUSDPrice = parseFloat(poolInfo?.token0Price) || 1000;
+    const abytknUSD = abytknBal / abytknUSDPrice;
+    const usdcUSD = usdc;
+    const ethUSD = eth * 1600; // Simplified ETH price
+
+    const total = abytknUSD + usdcUSD + ethUSD;
+
+    if (total === 0) {
+      return [
+        {
+          name: "No Assets",
+          value: 100,
+          amount: "0",
+          usd: 0,
+          color: "#94A3B8",
+        },
+      ];
+    }
+
+    const allocation = [];
+    if (abytknUSD > 0) {
+      allocation.push({
+        name: "ABYTKN",
+        value: (abytknUSD / total) * 100,
+        amount: abytknBal.toFixed(2),
+        usd: abytknUSD,
+        color: "#EAB308",
+      });
+    }
+    if (usdcUSD > 0) {
+      allocation.push({
+        name: "USDC",
+        value: (usdcUSD / total) * 100,
+        amount: usdc.toFixed(2),
+        usd: usdcUSD,
+        color: "#2775CA",
+      });
+    }
+    if (ethUSD > 0) {
+      allocation.push({
+        name: "ETH",
+        value: (ethUSD / total) * 100,
+        amount: eth.toFixed(4),
+        usd: ethUSD,
+        color: "#627EEA",
+      });
+    }
+
+    return allocation;
+  };
+
+  const assetAllocation = calculateAssetAllocation();
+
+  // Calculate staking positions from actual user liquidity positions
+  const stakingPositions = positions.map((pos, index) => ({
+    pool: `Position #${pos.tokenId}`,
+    staked: `${parseFloat(pos.liquidity || 0).toFixed(2)} LP`,
+    value: `$${(parseFloat(pos.liquidity || 0) * 0.001).toFixed(2)}`, // Simplified conversion
+    apy: poolInfo.apr !== "N/A" ? `${poolInfo.apr}%` : "N/A",
+    rewards: `$${(
+      parseFloat(pos.fees?.token0 || 0) + parseFloat(pos.fees?.token1 || 0)
+    ).toFixed(2)}`,
+    lockTime: "Flexible",
+  }));
+
   const activityTransactions = (
     allTransactions.length > 0 ? allTransactions : transactions
   )
     .slice()
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
     .slice(0, 5);
+
+  // Calculate total value
+  const calculateTotalValue = () => {
+    const total = assetAllocation.reduce((sum, asset) => sum + asset.usd, 0);
+    return `$${total.toFixed(2)}`;
+  };
+
+  // Calculate total rewards from vesting
+  const calculateTotalRewards = () => {
+    if (!vestingData?.vested) return "$0";
+    const vested = parseFloat(ethers.formatEther(vestingData.vested));
+    const abytknUSDPrice = parseFloat(poolInfo?.token0Price) || 1000;
+    const vestedUSD = vested / abytknUSDPrice;
+    return `$${vestedUSD.toFixed(2)}`;
+  };
 
   // Mock data - replace with actual data from your contract
   const portfolioHistory = [
@@ -72,40 +183,6 @@ const PortfolioPage = () => {
     { date: "Apr", value: 13500, staked: 8100, liquidity: 5400 },
     { date: "May", value: 14800, staked: 8880, liquidity: 5920 },
     { date: "Jun", value: 16000, staked: 9600, liquidity: 6400 },
-  ];
-
-  const assetAllocation = [
-    { name: "ETH", value: 45, amount: "4.2", usd: 7200, color: "#627EEA" },
-    { name: "BTC", value: 30, amount: "0.35", usd: 4800, color: "#F7931A" },
-    { name: "USDC", value: 15, amount: "2400", usd: 2400, color: "#2775CA" },
-    { name: "ABYTKN", value: 10, amount: "850", usd: 1600, color: "#EAB308" },
-  ];
-
-  const stakingPositions = [
-    {
-      pool: "ETH Staking",
-      staked: "2.5 ETH",
-      value: "$4,000",
-      apy: "5.2%",
-      rewards: "0.12 ETH",
-      lockTime: "30 days",
-    },
-    {
-      pool: "BTC Liquidity",
-      staked: "0.15 BTC",
-      value: "$4,800",
-      apy: "8.5%",
-      rewards: "$124",
-      lockTime: "Flexible",
-    },
-    {
-      pool: "USDC/USDT Pool",
-      staked: "2,400 USDC",
-      value: "$2,400",
-      apy: "12.5%",
-      rewards: "$45",
-      lockTime: "15 days",
-    },
   ];
 
   const recentTransactions = [
@@ -149,25 +226,28 @@ const PortfolioPage = () => {
 
   const stats = {
     totalValue: {
-      value: "$16,000",
+      value: calculateTotalValue(),
       change: "+8.1%",
       isPositive: true,
-      breakdown: { staked: "$9,600", liquidity: "$6,400" },
+      breakdown: {
+        total: calculateTotalValue(),
+        positions: stakingPositions.length,
+      },
     },
     dailyReturn: {
-      value: "$320",
+      value: "$0.00",
       change: "+2.3%",
       isPositive: true,
-      breakdown: { staking: "$210", fees: "$110" },
+      breakdown: { staking: "$0.00", fees: "$0.00" },
     },
     totalRewards: {
-      value: "$1,250",
+      value: calculateTotalRewards(),
       change: "+15.5%",
       isPositive: true,
-      breakdown: { staking: "$850", trading: "$400" },
+      breakdown: { vested: calculateTotalRewards(), pending: "$0.00" },
     },
     averageAPY: {
-      value: "12.5%",
+      value: poolInfo.apr !== "N/A" ? `${poolInfo.apr}%` : "N/A",
       change: "-0.5%",
       isPositive: false,
       breakdown: { min: "5.2%", max: "18.5%" },

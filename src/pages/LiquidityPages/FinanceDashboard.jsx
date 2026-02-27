@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Wallet,
   TrendingUp,
@@ -66,6 +66,9 @@ import {
 } from "recharts";
 import { useDarkMode } from "../../contexts/themeContext";
 import { useTransactionHistory } from "../../contexts/fake-liquidity-test-contexts/historyContext";
+import { useRevenueSharing } from "../../contexts/RevenueSharingContext";
+import { useVesting } from "../../contexts/VestingContext";
+import { ethers } from "ethers";
 
 const FinanceDashboard = () => {
   const { darkMode, setDarkMode } = useDarkMode();
@@ -74,12 +77,116 @@ const FinanceDashboard = () => {
     allTransactions,
     loading: historyLoading,
     loadingAllTransactions,
+    balances,
+    poolInfo,
   } = useTransactionHistory();
+  const { commissionsBalance, fetchCommissionsBalance } = useRevenueSharing();
+  const { vestingData, getVestingInfo } = useVesting();
   const [timeframe, setTimeframe] = useState("1m");
   const [showBalances, setShowBalances] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeSection, setActiveSection] = useState("overview");
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+  // Load data on mount
+  useEffect(() => {
+    const loadData = async () => {
+      // Fetch revenue and vesting data if available
+      if (fetchCommissionsBalance) {
+        await fetchCommissionsBalance();
+      }
+      if (getVestingInfo) {
+        await getVestingInfo();
+      }
+    };
+    loadData();
+  }, []);
+
+  // Calculate actual asset allocation from balances
+  const calculateAssetAllocation = () => {
+    const abytknBal = parseFloat(balances.ABYTKN || 0);
+    const usdc = parseFloat(balances.USDC || 0);
+    const eth = parseFloat(balances.ETH || 0);
+
+    // Get vesting amounts (convert from wei to ether)
+    const vestedAmount = vestingData?.vested
+      ? parseFloat(ethers.formatEther(vestingData.vested))
+      : 0;
+    const unvestedAmount = vestingData?.unvested
+      ? parseFloat(ethers.formatEther(vestingData.unvested))
+      : 0;
+
+    // Calculate USD values (simplified - assuming ABYTKN price from poolInfo)
+    const abytknUSDPrice = parseFloat(poolInfo?.token0Price) || 1000;
+    const abytknUSD = abytknBal / abytknUSDPrice;
+    const usdcUSD = usdc; // 1:1
+    const ethUSD = eth * 1600; // Simplified ETH price
+    const vestedUSD = vestedAmount / abytknUSDPrice;
+
+    const total = abytknUSD + usdcUSD + ethUSD + vestedUSD;
+
+    if (total === 0) {
+      return [
+        { name: "No Assets", value: 100, amount: "$0", color: "#94A3B8" },
+      ];
+    }
+
+    const allocation = [];
+    if (abytknUSD > 0) {
+      allocation.push({
+        name: "ABYTKN",
+        value: (abytknUSD / total) * 100,
+        amount: `$${abytknUSD.toFixed(2)}`,
+        color: "#EAB308",
+      });
+    }
+    if (usdcUSD > 0) {
+      allocation.push({
+        name: "USDC",
+        value: (usdcUSD / total) * 100,
+        amount: `$${usdcUSD.toFixed(2)}`,
+        color: "#3B82F6",
+      });
+    }
+    if (vestedUSD > 0) {
+      allocation.push({
+        name: "Vested Rewards",
+        value: (vestedUSD / total) * 100,
+        amount: `$${vestedUSD.toFixed(2)}`,
+        color: "#10B981",
+      });
+    }
+    if (ethUSD > 0) {
+      allocation.push({
+        name: "ETH",
+        value: (ethUSD / total) * 100,
+        amount: `$${ethUSD.toFixed(2)}`,
+        color: "#8B5CF6",
+      });
+    }
+
+    return allocation;
+  };
+
+  const assetAllocation = calculateAssetAllocation();
+
+  // Calculate total portfolio value
+  const calculateTotalValue = () => {
+    const total = assetAllocation.reduce((sum, asset) => {
+      const value = parseFloat(asset.amount.replace("$", ""));
+      return sum + value;
+    }, 0);
+    return `$${total.toFixed(2)}`;
+  };
+
+  // Calculate commissions total
+  const calculateCommissionsTotal = () => {
+    if (!commissionsBalance) return "$0";
+    const pending = commissionsBalance.pending
+      ? parseFloat(ethers.formatUnits(commissionsBalance.pending, 6))
+      : 0;
+    return `$${pending.toFixed(2)}`;
+  };
 
   // Mock data - replace with actual data from your contracts
   const portfolioHistory = [
@@ -105,13 +212,6 @@ const FinanceDashboard = () => {
     { level: "Level 2", members: 12, volume: 48000, commissions: 2400 },
     { level: "Level 3", members: 28, volume: 95000, commissions: 4750 },
     { level: "Level 4", members: 45, volume: 156000, commissions: 7800 },
-  ];
-
-  const assetAllocation = [
-    { name: "Staked", value: 45, amount: "$7,200", color: "#EAB308" },
-    { name: "Liquidity", value: 30, amount: "$4,800", color: "#3B82F6" },
-    { name: "Rewards", value: 15, amount: "$2,400", color: "#10B981" },
-    { name: "Available", value: 10, amount: "$1,600", color: "#8B5CF6" },
   ];
 
   const activityTransactions = (
@@ -183,10 +283,18 @@ const FinanceDashboard = () => {
 
   const stats = {
     totalValue: {
-      value: "$16,000",
+      value: calculateTotalValue(),
       change: "+8.1%",
       isPositive: true,
-      breakdown: { staked: "$9,600", liquidity: "$4,800", rewards: "$1,600" },
+      breakdown: {
+        abytkn:
+          assetAllocation.find((a) => a.name === "ABYTKN")?.amount || "$0",
+        usdc: assetAllocation.find((a) => a.name === "USDC")?.amount || "$0",
+        vested:
+          assetAllocation.find((a) => a.name === "Vested Rewards")?.amount ||
+          "$0",
+        eth: assetAllocation.find((a) => a.name === "ETH")?.amount || "$0",
+      },
     },
     dailyEarnings: {
       value: "$45.20",
@@ -195,7 +303,7 @@ const FinanceDashboard = () => {
       breakdown: { commissions: "$23.50", staking: "$15.70", fees: "$6.00" },
     },
     totalCommissions: {
-      value: "$2,450",
+      value: calculateCommissionsTotal(),
       change: "+15.5%",
       isPositive: true,
       breakdown: { level1: "$450", level2: "$800", level3: "$1,200" },

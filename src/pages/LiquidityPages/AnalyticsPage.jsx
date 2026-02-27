@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   BarChart3,
   TrendingUp,
@@ -46,9 +46,41 @@ const AnalyticsPage = () => {
     allTransactions,
     loading: historyLoading,
     loadingAllTransactions,
+    poolInfo,
+    loadPoolInfo,
   } = useTransactionHistory();
   const [timeframe, setTimeframe] = useState("6m"); // '1w', '1m', '3m', '6m', '1y'
   const [refreshing, setRefreshing] = useState(false);
+
+  // Load pool data on mount
+  useEffect(() => {
+    loadPoolInfo();
+  }, []);
+
+  // Calculate TVL from pool balances
+  const calculateTVL = () => {
+    if (!poolInfo.token0Balance || !poolInfo.token1Balance) return "N/A";
+    if (poolInfo.token0Balance === "N/A" || poolInfo.token1Balance === "N/A")
+      return "N/A";
+
+    const token0Bal = parseFloat(poolInfo.token0Balance);
+    const token1Bal = parseFloat(poolInfo.token1Balance);
+    const token0Price = parseFloat(poolInfo.token0Price) || 1000;
+
+    if (isNaN(token0Bal) || isNaN(token1Bal)) return "N/A";
+
+    const totalUSD = token1Bal + token0Bal / token0Price;
+    if (totalUSD >= 1000000) return `$${(totalUSD / 1000000).toFixed(1)}M`;
+    if (totalUSD >= 1000) return `$${(totalUSD / 1000).toFixed(1)}K`;
+    return `$${totalUSD.toFixed(0)}`;
+  };
+
+  // Calculate transaction count
+  const getTotalTransactionCount = () => {
+    return allTransactions.length > 0
+      ? allTransactions.length.toString()
+      : transactions.length.toString();
+  };
 
   // Mock data - replace with actual data from your contract
   const tvlHistory = [
@@ -87,25 +119,30 @@ const AnalyticsPage = () => {
 
   const stats = {
     tvl: {
-      value: "$2.0M",
+      value: calculateTVL(),
       change: "+15.3%",
       isPositive: true,
       history: "+$265K",
     },
     volume24h: {
-      value: "$145.2K",
+      value:
+        poolInfo.volume24h !== "N/A"
+          ? parseFloat(poolInfo.volume24h) >= 1000
+            ? `$${(parseFloat(poolInfo.volume24h) / 1000).toFixed(1)}K`
+            : `$${parseFloat(poolInfo.volume24h).toFixed(0)}`
+          : "N/A",
       change: "-5.2%",
       isPositive: false,
       history: "-$7.9K",
     },
     activeStakers: {
-      value: "350",
+      value: getTotalTransactionCount(),
       change: "+12.5%",
       isPositive: true,
       history: "+39 users",
     },
     apy: {
-      value: "12.5%",
+      value: poolInfo.apr !== "N/A" ? `${poolInfo.apr}%` : "N/A",
       change: "+2.3%",
       isPositive: true,
       history: "+0.3%",
