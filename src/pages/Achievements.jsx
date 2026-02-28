@@ -2054,6 +2054,15 @@ const AchievementsPage = () => {
                           </p>
                         </div>
 
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Subject
+                          </p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            {selectedVC.subject}
+                          </p>
+                        </div>
+
                         <div className="text-right">
                           <p className="text-xs text-gray-500 dark:text-gray-400">
                             Issued

@@ -1,3 +1,4 @@
+// ABYA-Ecosystem/src/App.jsx
 import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import MasterPage from "./pages/MasterPage";
@@ -7,6 +8,7 @@ import NotFoundPage from "./pages/404Page";
 import CourseMetricsPage from "./pages/CourseMetricsPage";
 import { ToastContainer } from "react-toastify";
 import NetworkMainpage from "./pages/AmbassadorNetworkPages/NetworkMainpage";
+import SharePresentation from "./pages/SharePresentation";
 
 function App() {
   return (
@@ -29,6 +31,7 @@ function App() {
         />
 
         <Route path="/networkMainpage" element={<NetworkMainpage />} />
+        <Route path="/share/view/:token" element={<SharePresentation />} />
 
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
