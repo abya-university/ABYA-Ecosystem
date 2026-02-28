@@ -204,12 +204,12 @@ export default function SharePresentation() {
   const expiresAt = data.expiresAt ? new Date(data.expiresAt).toLocaleString() : "—";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-neutral-100 to-white dark:from-neutral-900 dark:to-neutral-800 p-6 flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-br from-gray-700 to-white dark:from-neutral-900 dark:to-gray-800 p-6 flex items-center justify-center">
       <div className="w-full max-w-7xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">Credential Authentication</h1>
+            <h1 className="text-5xl font-extrabold text-gray-900 dark:text-white">Credential Authentication</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Read-only verification page — confirm issuer & student details</p>
           </div>
 
@@ -233,7 +233,7 @@ export default function SharePresentation() {
         </div>
 
         {/* Card */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden border border-emerald-200 dark:border-gray-800">
+        <div className="bg-white/20 backdrop-blur-md rounded-2xl shadow-2xl overflow-hidden border border-emerald-200 dark:border-gray-800">
           <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
             {/* Left: big certificate UI */}
             <div className="mt-12 md:col-span-2 bg-gradient-to-b from-white to-amber-50 dark:from-gray-900 dark:to-gray-800 p-6 rounded-xl border border-gray-100 dark:border-gray-800 relative">
