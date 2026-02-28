@@ -14,6 +14,7 @@ import { useActiveAccount, useReadContract } from "thirdweb/react";
 import { getContract, readContract } from "thirdweb";
 import { client } from "../../services/client";
 import { defineChain } from "thirdweb/chains";
+import CONTRACT_ADDRESSES from "../../constants/addresses";
 
 // Constants and Configuration
 const CONTRACT_CONFIG = {
@@ -23,27 +24,16 @@ const CONTRACT_CONFIG = {
     ABYTKN: ABYTKN_ABI.abi,
   },
   ADDRESSES: {
-    ADD_SWAP_CONTRACT: import.meta.env.VITE_APP_SEPOLIA_ADD_SWAP_CONTRACT,
-    TOKEN0: import.meta.env.VITE_APP_SEPOLIA_ABYATKN_ADDRESS, // ABYTKN
-    TOKEN1: import.meta.env.VITE_APP_SEPOLIA_USDC_ADDRESS, // USDC
-    UNISWAP_POOL: import.meta.env.VITE_APP_SEPOLIA_ABYATKN_USDC_500,
+    ADD_SWAP_CONTRACT: CONTRACT_ADDRESSES.Liquidity,
+    TOKEN0: CONTRACT_ADDRESSES.ABYTKN, // ABYTKN
+    TOKEN1: CONTRACT_ADDRESSES.USDC, // USDC
+    UNISWAP_POOL: CONTRACT_ADDRESSES.ABYTKN_USDC_POOL,
   },
   CHAIN: defineChain(11155111),
-  METHODS: {
-    BALANCE_OF: "function balanceOf(address account) view returns (uint256)",
-    GET_POOL_INFO:
-      "function getPoolInfo() view returns (uint160 sqrtPriceX96, int24 tick, uint128 liquidity)",
-    GET_POOL_BALANCES:
-      "function getPoolBalances() view returns (uint256 bal0, uint256 bal1)",
-    GET_TOKEN_PRICE: "function getTokenPrice() view returns (uint256 price)",
-    GET_TX_HISTORY:
-      "function getUserTransactionHistory() view returns ((uint256 id, uint8 transactionType, string fromToken, string toToken, uint256 fromAmount, uint256 toAmount, uint256 timestamp, bytes32 hash, string status)[])",
-  },
 };
 
 // Utility Functions
 const ContractUtils = {
-  // Common contract creation function
   createContract: (address, abi) => {
     return getContract({
       client,
@@ -53,7 +43,6 @@ const ContractUtils = {
     });
   },
 
-  // Common contract read function (manual for complex cases)
   readContractManual: async (contract, method, params = []) => {
     return readContract({
       contract,
@@ -62,7 +51,6 @@ const ContractUtils = {
     });
   },
 
-  // Format transaction data consistently
   formatTransaction: (tx, index) => {
     const tokenMapping = {
       [CONTRACT_CONFIG.ADDRESSES.TOKEN0?.toLowerCase()]: "ABYTKN",
@@ -82,29 +70,48 @@ const ContractUtils = {
     };
   },
 
-  // Get token balance with consistent formatting
-  getTokenBalance: async (contract, address) => {
+  getTokenBalance: async (contract, address, decimals = 18) => {
     const balance = await ContractUtils.readContractManual(
       contract,
       "balanceOf",
-      [address]
+      [address],
     );
-    return balance ? ethers.formatUnits(balance, 18) : "0.0";
+    return balance ? ethers.formatUnits(balance, decimals) : "0.0";
   },
 };
 
 const PriceUtils = {
-  // Calculate price impact and minimum received
-  calculatePriceImpact: (inputAmount, output, slippageTolerance) => {
-    const impact = Math.min((parseFloat(inputAmount) / 1000) * 0.1, 5);
-    const minReceived = (
-      parseFloat(output) *
-      (1 - slippageTolerance / 100)
-    ).toFixed(6);
-    return { impact, minReceived };
+  getTokenDecimals: (symbol) => {
+    const decimalsMap = {
+      ABYTKN: 18,
+      USDC: 6,
+    };
+    return decimalsMap[symbol] || 18;
   },
 
-  // Calculate ratio validation
+  calculatePriceImpact: (
+    inputAmount,
+    outputRaw,
+    slippageTolerance,
+    outputTokenSymbol,
+  ) => {
+    const impact = Math.min((parseFloat(inputAmount) / 1000) * 0.1, 5);
+
+    // Use BigInt for precise calculations
+    const outputBigInt = BigInt(outputRaw);
+    const outputDecimals = outputTokenSymbol === "ABYTKN" ? 18 : 6;
+
+    // Calculate minimum received with slippage
+    const slippageFactor = (1 - slippageTolerance / 100) * 10000;
+    const minReceivedBigInt =
+      (outputBigInt * BigInt(Math.floor(slippageFactor))) / 10000n;
+
+    return {
+      impact,
+      minReceived: minReceivedBigInt.toString(),
+    };
+  },
+
   calculateRatioWithPoolPrice: (token0Amount, token1Amount, poolPrice) => {
     if (!token0Amount || !token1Amount || !poolPrice) return null;
 
@@ -127,7 +134,7 @@ const PriceUtils = {
       suggestedToken1Amount: (amount0 * poolPrice).toFixed(6),
       suggestedToken0Amount: (amount1 / poolPrice).toFixed(6),
       priceDifference: (((currentRatio - poolPrice) / poolPrice) * 100).toFixed(
-        2
+        2,
       ),
     };
   },
@@ -136,10 +143,11 @@ const PriceUtils = {
 // Create the context
 const TransactionHistoryContext = createContext();
 
-// Create a provider component
 export function TransactionHistoryProvider({ children }) {
   const [transactions, setTransactions] = useState([]);
+  const [allTransactions, setAllTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingAllTransactions, setLoadingAllTransactions] = useState(false);
   const [error, setError] = useState(null);
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const [isInitialRatio, setIsInitialRatio] = useState(true);
@@ -150,7 +158,6 @@ export function TransactionHistoryProvider({ children }) {
   const address = account?.address;
   const isConnected = !!account;
 
-  // Pool information
   const [poolInfo, setPoolInfo] = useState({
     liquidity: "0.0",
     volume24h: "0.0",
@@ -164,96 +171,154 @@ export function TransactionHistoryProvider({ children }) {
     token1Balance: "N/A",
   });
 
-  // Token balances
   const [balances, setBalances] = useState({
     ABYTKN: "0.0",
     USDC: "0.0",
     ETH: "0.0",
   });
 
-  // Use refs for values that don't need to trigger re-renders
   const isMountedRef = useRef(true);
 
-  // Initialize contracts - use useMemo to prevent recreation on every render
   const swapContract = React.useMemo(
     () =>
       ContractUtils.createContract(
         CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
-        CONTRACT_CONFIG.ABI.SWAP
+        CONTRACT_CONFIG.ABI.SWAP,
       ),
-    []
+    [],
   );
 
   const abytknContract = React.useMemo(
     () =>
       ContractUtils.createContract(
         CONTRACT_CONFIG.ADDRESSES.TOKEN0,
-        CONTRACT_CONFIG.ABI.ABYTKN
+        CONTRACT_CONFIG.ABI.ABYTKN,
       ),
-    []
+    [],
   );
 
   const usdcContract = React.useMemo(
     () =>
       ContractUtils.createContract(
         CONTRACT_CONFIG.ADDRESSES.TOKEN1,
-        CONTRACT_CONFIG.ABI.USDC
+        CONTRACT_CONFIG.ABI.USDC,
       ),
-    []
+    [],
   );
-  console.log("contract configurations:", CONTRACT_CONFIG);
 
-  // Common error handler - useCallback to prevent recreation
   const handleError = useCallback((operation, error, fallbackMessage) => {
     console.error(`Error ${operation}:`, error);
     setError(fallbackMessage || `Failed to ${operation}`);
     return null;
   }, []);
 
-  // Function to fetch transaction history from the contract
+  const fetchAllTransactionHistory = useCallback(async () => {
+    if (!client) {
+      setAllTransactions([]);
+      setLoadingAllTransactions(false);
+      return;
+    }
+
+    setLoadingAllTransactions(true);
+    setError(null);
+
+    try {
+      const contract = getContract({
+        address: CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
+        abi: CONTRACT_CONFIG.ABI.SWAP,
+        client,
+        chain: CONTRACT_CONFIG.CHAIN,
+      });
+
+      const txHistoryData = await readContract({
+        contract,
+        method: "getAllTransactionHistory",
+        params: [],
+      });
+
+      if (Array.isArray(txHistoryData) && txHistoryData.length > 0) {
+        const formattedTransactions = txHistoryData.map((tx, index) =>
+          ContractUtils.formatTransaction(tx, index),
+        );
+        setAllTransactions(formattedTransactions);
+      } else {
+        setAllTransactions([]);
+      }
+    } catch (err) {
+      console.error("Error fetching all transaction history:", err);
+      handleError("fetching all transaction history", err);
+      setAllTransactions([]);
+    } finally {
+      if (isMountedRef.current) {
+        setLoadingAllTransactions(false);
+      }
+    }
+  }, [client, handleError]);
+
   const fetchTransactionHistory = useCallback(async () => {
-    if (!isConnected || !address) return;
+    if (!isConnected || !address || !client) {
+      setTransactions([]);
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Request timeout")), 10000);
+    });
+
     try {
-      const txHistoryData = await ContractUtils.readContractManual(
-        swapContract,
-        "getUserTransactionHistory"
-      );
+      const contract = getContract({
+        address: CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
+        abi: CONTRACT_CONFIG.ABI.SWAP,
+        client,
+        chain: CONTRACT_CONFIG.CHAIN,
+      });
 
-      console.log("Raw transaction history:", txHistoryData);
+      const txHistoryData = await Promise.race([
+        readContract({
+          contract,
+          method: "getUserTransactionHistory",
+          params: [address],
+        }),
+        timeoutPromise,
+      ]);
 
-      const formattedTransactions = txHistoryData.map((tx, index) =>
-        ContractUtils.formatTransaction(tx, index)
-      );
-
-      console.log("Formatted transactions:", formattedTransactions);
-      setTransactions(formattedTransactions);
+      if (Array.isArray(txHistoryData) && txHistoryData.length > 0) {
+        const formattedTransactions = txHistoryData.map((tx, index) =>
+          ContractUtils.formatTransaction(tx, index),
+        );
+        setTransactions(formattedTransactions);
+      } else {
+        setTransactions([]);
+      }
     } catch (err) {
-      handleError("fetching transaction history", err);
+      console.error("Error fetching transaction history:", err);
+
+      if (err.message === "Request timeout") {
+        setError("Request timed out. Please try again.");
+      } else {
+        handleError("fetching transaction history", err);
+      }
+
+      setTransactions([]);
     } finally {
       if (isMountedRef.current) {
         setLoading(false);
       }
     }
-  }, [isConnected, address, swapContract, handleError]);
+  }, [isConnected, address, client, handleError]);
 
-  // Manual balance loading
   const loadBalances = useCallback(async () => {
     if (!isConnected || !address) return;
 
     try {
       const [manualAbytknBalance, manualUsdcBalance] = await Promise.all([
-        ContractUtils.getTokenBalance(abytknContract, address),
-        ContractUtils.getTokenBalance(usdcContract, address),
+        ContractUtils.getTokenBalance(abytknContract, address, 18),
+        ContractUtils.getTokenBalance(usdcContract, address, 6),
       ]);
-
-      console.log("Manual Balances:", {
-        manualAbytknBalance,
-        manualUsdcBalance,
-      });
 
       setBalances((prev) => ({
         ...prev,
@@ -265,7 +330,7 @@ export function TransactionHistoryProvider({ children }) {
     }
   }, [isConnected, address, abytknContract, usdcContract, handleError]);
 
-  // Function to calculate output amount
+  // FIXED: calculateOutputAmount using ethers for precise calculations
   const calculateOutputAmount = useCallback(
     async (inputAmount, inputTokenSymbol, outputTokenSymbol) => {
       if (!inputAmount || parseFloat(inputAmount) === 0) {
@@ -275,45 +340,90 @@ export function TransactionHistoryProvider({ children }) {
       try {
         const tokenPrice = await ContractUtils.readContractManual(
           swapContract,
-          "getTokenPrice"
+          "getTokenPrice",
         );
 
-        if (!tokenPrice) {
-          throw new Error("No contract available");
+        const basePrice = tokenPrice
+          ? parseFloat(ethers.formatUnits(tokenPrice, 18))
+          : 1000;
+
+        let outputInUnits;
+
+        if (inputTokenSymbol === "USDC" && outputTokenSymbol === "ABYTKN") {
+          outputInUnits = parseFloat(inputAmount) * basePrice;
+        } else if (
+          inputTokenSymbol === "ABYTKN" &&
+          outputTokenSymbol === "USDC"
+        ) {
+          outputInUnits = parseFloat(inputAmount) / basePrice;
+        } else {
+          outputInUnits = 0;
         }
 
-        const rate =
-          inputTokenSymbol === "ABYTKN"
-            ? parseFloat(ethers.formatUnits(tokenPrice, 18)) || 0
-            : 1 / (parseFloat(ethers.formatUnits(tokenPrice, 18)) || 1);
+        // Use ethers to handle the decimal conversion
+        const outputDecimals = outputTokenSymbol === "ABYTKN" ? 18 : 6;
 
-        const output = (parseFloat(inputAmount) * rate).toFixed(6);
+        // Convert to string with full precision
+        const outputInUnitsStr = outputInUnits.toFixed(18);
+
+        // Use ethers to parse units - this handles the decimal conversion correctly
+        const outputRaw = ethers.parseUnits(outputInUnitsStr, outputDecimals);
+
+        // Return as string
+        const outputStr = outputRaw.toString();
+
         const { impact, minReceived } = PriceUtils.calculatePriceImpact(
           inputAmount,
-          output,
-          slippageTolerance
+          outputStr,
+          slippageTolerance,
+          outputTokenSymbol,
         );
 
-        return { output, impact, minReceived };
+        return {
+          output: outputStr,
+          impact,
+          minReceived,
+        };
       } catch (error) {
         console.error("Price calculation error:", error);
 
         // Fallback calculation
-        const rate = inputTokenSymbol === "ABYTKN" ? 1.2345 : 0.8102;
-        const output = (parseFloat(inputAmount) * rate).toFixed(6);
+        const basePrice = 1000;
+        let outputInUnits;
+
+        if (inputTokenSymbol === "USDC" && outputTokenSymbol === "ABYTKN") {
+          outputInUnits = parseFloat(inputAmount) * basePrice;
+        } else if (
+          inputTokenSymbol === "ABYTKN" &&
+          outputTokenSymbol === "USDC"
+        ) {
+          outputInUnits = parseFloat(inputAmount) / basePrice;
+        } else {
+          outputInUnits = 0;
+        }
+
+        const outputDecimals = outputTokenSymbol === "ABYTKN" ? 18 : 6;
+        const outputInUnitsStr = outputInUnits.toFixed(18);
+        const outputRaw = ethers.parseUnits(outputInUnitsStr, outputDecimals);
+        const outputStr = outputRaw.toString();
+
         const { impact, minReceived } = PriceUtils.calculatePriceImpact(
           inputAmount,
-          output,
-          slippageTolerance
+          outputStr,
+          slippageTolerance,
+          outputTokenSymbol,
         );
 
-        return { output, impact, minReceived };
+        return {
+          output: outputStr,
+          impact,
+          minReceived,
+        };
       }
     },
-    [swapContract, slippageTolerance]
+    [swapContract, slippageTolerance],
   );
 
-  // Manual pool info loading
   const loadPoolInfo = useCallback(async () => {
     if (!isConnected) return;
 
@@ -381,22 +491,9 @@ export function TransactionHistoryProvider({ children }) {
       });
     } catch (error) {
       handleError("loading pool info", error, "Failed to load pool info");
-      setPoolInfo({
-        liquidity: "N/A",
-        sqrtPriceX96: "N/A",
-        tick: "N/A",
-        token0Balance: "N/A",
-        token1Balance: "N/A",
-        token0Price: "N/A",
-        token1Price: "N/A",
-        volume24h: "N/A",
-        fees24h: "N/A",
-        apr: "N/A",
-      });
     }
   }, [isConnected, swapContract, handleError]);
 
-  // Advanced pool price calculation
   const getCurrentPoolPrice = useCallback(async () => {
     try {
       const poolAddress = CONTRACT_CONFIG.ADDRESSES.UNISWAP_POOL;
@@ -408,10 +505,10 @@ export function TransactionHistoryProvider({ children }) {
         return { price: 1000, isInitialRatio: true };
       }
 
-      // Try direct pool contract call using ethers for complex interactions
       try {
         const provider = new ethers.JsonRpcProvider(
-          import.meta.env.VITE_APP_SEPOLIA_RPC_URL
+          import.meta.env.VITE_APP_SEPOLIA_RPC_URL ||
+            import.meta.env.VITE_APP_RPC_URL,
         );
 
         const poolInterface = new ethers.Interface([
@@ -424,7 +521,7 @@ export function TransactionHistoryProvider({ children }) {
         const poolContract = new ethers.Contract(
           poolAddress,
           poolInterface,
-          provider
+          provider,
         );
 
         const [slot0, poolToken0, poolToken1, liquidity] = await Promise.all([
@@ -441,16 +538,15 @@ export function TransactionHistoryProvider({ children }) {
         const tick = parseInt(slot0.tick.toString());
         let rawPrice = Math.pow(1.0001, tick);
 
-        // Get token decimals
         const token0Contract = new ethers.Contract(
           poolToken0,
           CONTRACT_CONFIG.ABI.USDC,
-          provider
+          provider,
         );
         const token1Contract = new ethers.Contract(
           poolToken1,
           CONTRACT_CONFIG.ABI.ABYTKN,
-          provider
+          provider,
         );
 
         const [token0Decimals, token1Decimals] = await Promise.all([
@@ -502,22 +598,21 @@ export function TransactionHistoryProvider({ children }) {
     try {
       const tokenPrice = await ContractUtils.readContractManual(
         swapContract,
-        "getTokenPrice"
+        "getTokenPrice",
       );
 
       if (tokenPrice) {
         let formattedPrice = parseFloat(ethers.formatUnits(tokenPrice, 18));
 
-        // Get actual token0 from the pool to verify order
         const poolAddress = CONTRACT_CONFIG.ADDRESSES.UNISWAP_POOL;
         if (poolAddress) {
           const provider = new ethers.JsonRpcProvider(
-            import.meta.env.VITE_APP_SEPOLIA_RPC_URL
+            import.meta.env.VITE_APP_SEPOLIA_RPC_URL,
           );
           const poolContract = new ethers.Contract(
             poolAddress,
             ["function token0() view returns (address)"],
-            provider
+            provider,
           );
 
           const actualToken0 = await poolContract.token0();
@@ -525,7 +620,6 @@ export function TransactionHistoryProvider({ children }) {
             actualToken0.toLowerCase() ===
             CONTRACT_CONFIG.ADDRESSES.TOKEN0.toLowerCase();
 
-          // If token0 is USDC (not ABYTKN), we need to invert the price
           if (!token0IsABYTKN && formattedPrice > 0) {
             formattedPrice = 1 / formattedPrice;
           }
@@ -542,13 +636,6 @@ export function TransactionHistoryProvider({ children }) {
       setIsLoadingPrice(false);
     }
   }, [isConnected, swapContract, handleError]);
-
-  // Use reactive data from thirdweb hooks
-  const { data: txHistoryData, isLoading: historyLoading } = useReadContract({
-    contract: swapContract,
-    method: "getUserTransactionHistory",
-    params: [],
-  });
 
   const { data: abytknBalance } = useReadContract({
     contract: abytknContract,
@@ -568,19 +655,6 @@ export function TransactionHistoryProvider({ children }) {
     params: [],
   });
 
-  const { data: poolInfoData } = useReadContract({
-    contract: swapContract,
-    method: "getPoolInfo",
-    params: [],
-  });
-
-  const { data: poolBalances } = useReadContract({
-    contract: swapContract,
-    method: "getPoolBalances",
-    params: [],
-  });
-
-  // Fetch transaction history when the user connects their wallet
   useEffect(() => {
     if (isConnected) {
       fetchTransactionHistory();
@@ -589,7 +663,10 @@ export function TransactionHistoryProvider({ children }) {
     }
   }, [isConnected, fetchTransactionHistory]);
 
-  // Update reactive data when hooks change - use proper dependencies
+  useEffect(() => {
+    fetchAllTransactionHistory();
+  }, [fetchAllTransactionHistory]);
+
   useEffect(() => {
     if (abytknBalance && isMountedRef.current) {
       setBalances((prev) => ({
@@ -603,7 +680,7 @@ export function TransactionHistoryProvider({ children }) {
     if (usdcBalance && isMountedRef.current) {
       setBalances((prev) => ({
         ...prev,
-        USDC: ethers.formatUnits(usdcBalance, 18),
+        USDC: ethers.formatUnits(usdcBalance, 6),
       }));
     }
   }, [usdcBalance]);
@@ -616,25 +693,29 @@ export function TransactionHistoryProvider({ children }) {
     }
   }, [tokenPrice]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
     };
   }, []);
 
-  // Function to refresh transaction history
   const refreshHistory = useCallback(() => {
     fetchTransactionHistory();
   }, [fetchTransactionHistory]);
 
-  // Memoize the context value to prevent unnecessary re-renders
+  const refreshAllHistory = useCallback(() => {
+    fetchAllTransactionHistory();
+  }, [fetchAllTransactionHistory]);
+
   const value = React.useMemo(
     () => ({
       transactions,
-      loading: loading || historyLoading,
+      allTransactions,
+      loading,
+      loadingAllTransactions,
       error,
       refreshHistory,
+      refreshAllHistory,
       loadBalances,
       calculateOutputAmount,
       loadPoolInfo,
@@ -652,10 +733,12 @@ export function TransactionHistoryProvider({ children }) {
     }),
     [
       transactions,
+      allTransactions,
       loading,
-      historyLoading,
+      loadingAllTransactions,
       error,
       refreshHistory,
+      refreshAllHistory,
       loadBalances,
       calculateOutputAmount,
       loadPoolInfo,
@@ -668,7 +751,7 @@ export function TransactionHistoryProvider({ children }) {
       isInitialRatio,
       poolPrice,
       slippageTolerance,
-    ]
+    ],
   );
 
   return (
@@ -678,13 +761,12 @@ export function TransactionHistoryProvider({ children }) {
   );
 }
 
-// Custom hook for using the transaction history context
 export function useTransactionHistory() {
   const context = useContext(TransactionHistoryContext);
 
   if (context === undefined) {
     throw new Error(
-      "useTransactionHistory must be used within a TransactionHistoryProvider"
+      "useTransactionHistory must be used within a TransactionHistoryProvider",
     );
   }
 
