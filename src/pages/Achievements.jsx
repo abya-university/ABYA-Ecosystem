@@ -49,7 +49,8 @@ import { useActiveAccount } from "thirdweb/react";
 const BADGE_DISPLAY_MAP = {
   0: {
     name: "Newcomer",
-    icon: <Medal className="w-5 h-5" />,
+    // icon: <Medal className="w-5 h-5" />,
+    icon: <img src="/newcomer.jpg" className="" />,
     color: "from-gray-400 to-gray-500",
     border: "border-gray-200",
     lightBg: "bg-gray-50",
@@ -57,7 +58,8 @@ const BADGE_DISPLAY_MAP = {
   },
   1: {
     name: "Participant",
-    icon: <Star className="w-5 h-5" />,
+    // icon: <Star className="w-5 h-5" />,
+    icon: <img src="/participant.jpg" className="" />,
     color: "from-amber-400 to-amber-500",
     border: "border-amber-100",
     lightBg: "bg-amber-50",
@@ -65,7 +67,8 @@ const BADGE_DISPLAY_MAP = {
   },
   2: {
     name: "Contributor",
-    icon: <Award className="w-5 h-5" />,
+    // icon: <Award className="w-5 h-5" />,
+    icon: <img src="/contributor.jpg" className="" />,
     color: "from-blue-400 to-blue-500",
     border: "border-blue-100",
     lightBg: "bg-blue-50",
@@ -73,7 +76,8 @@ const BADGE_DISPLAY_MAP = {
   },
   3: {
     name: "Leader",
-    icon: <Trophy className="w-5 h-5" />,
+    // icon: <Trophy className="w-5 h-5" />,
+    icon: <img src="/leader.jpg" className="" />,
     color: "from-yellow-400 to-yellow-500",
     border: "border-yellow-100",
     lightBg: "bg-yellow-50",
@@ -81,7 +85,8 @@ const BADGE_DISPLAY_MAP = {
   },
   4: {
     name: "Champion",
-    icon: <Crown className="w-5 h-5" />,
+    // icon: <Crown className="w-5 h-5" />,
+    icon: <img src="/champion.jpg" className="" />,
     color: "from-purple-400 to-purple-500",
     border: "border-purple-100",
     lightBg: "bg-purple-50",

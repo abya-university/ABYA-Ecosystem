@@ -1,15 +1,13 @@
+// utils/certificateGenerator.js
 import html2canvas from 'html2canvas';
 
 const waitForFonts = () => {
     return new Promise((resolve) => {
-        // Check if Inter font is already loaded
         if (document.fonts?.check('1em Inter')) {
             resolve();
         } else {
-            // Wait for fonts to load
             document.fonts?.ready?.then(resolve);
-            // Fallback timeout
-            setTimeout(resolve, 1000);
+            setTimeout(resolve, 1500);
         }
     });
 };
@@ -17,29 +15,53 @@ const waitForFonts = () => {
 export const generateCertificateImage = async (profile, course, account) => {
     return new Promise(async (resolve, reject) => {
         try {
-            // Handle both string address and account object
             const accountAddress = typeof account === 'string' ? account : account?.address;
 
             if (!accountAddress) {
                 throw new Error('Account address is required');
             }
 
-            // Generate the HTML content
+            const certificateId = `CERT-${Date.now().toString().slice(-8)}-${course.courseId}`;
+            const issueDate = new Date().toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            // Get difficulty level text and gradient
+            const getDifficultyText = (level) => {
+                const num = Number(level);
+                if (num === 0) return 'Beginner';
+                if (num === 1) return 'Intermediate';
+                if (num === 2) return 'Advanced';
+                return 'Professional';
+            };
+
+            const getDifficultyGradient = (level) => {
+                const num = Number(level);
+                if (num === 2) return 'linear-gradient(135deg, #fbbf24, #d97706, #92400e)'; // Gold for advanced
+                if (num === 1) return 'linear-gradient(135deg, #94a3b8, #64748b, #475569)'; // Silver for intermediate
+                return 'linear-gradient(135deg, #cd7f32, #b45309, #854d0e)'; // Bronze for beginner
+            };
+
+            const difficultyText = getDifficultyText(course.difficulty_level);
+            const borderGradient = getDifficultyGradient(course.difficulty_level);
+
+            // Generate the HTML content - NFT-style portrait certificate
             const htmlContent = `
 <!DOCTYPE html>
 <html>
 <head>
     <title>Certificate of Completion - ${course.courseName}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body { 
             font-family: 'Inter', sans-serif; 
             margin: 0; 
             padding: 0; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: transparent;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -47,294 +69,517 @@ export const generateCertificateImage = async (profile, course, account) => {
         }
         
         .certificate-container {
+            width: 800px;
+            height: 1000px;
             background: white;
-            width: 1200px;
-            height: 800px;
-            margin: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            border: 20px solid transparent;
-            border-image: linear-gradient(45deg, #d4af37, #ffd700, #d4af37) 1;
+            border-radius: 24px;
+            overflow: hidden;
             position: relative;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            margin: 0;
         }
         
-        .certificate-content {
-            padding: 80px 60px;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            text-align: center;
-            position: relative;
-        }
-        
-        .watermark {
+        /* Animated background pattern */
+        .bg-pattern {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-45deg);
-            font-size: 100px;
-            font-weight: bold;
-            color: rgba(0, 0, 0, 0.03);
-            z-index: 0;
-            white-space: nowrap;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 20% 30%, rgba(255, 215, 0, 0.03) 0%, transparent 30%),
+                        radial-gradient(circle at 80% 70%, rgba(255, 215, 0, 0.03) 0%, transparent 30%);
             pointer-events: none;
         }
         
-        .header { 
-            color: #1e40af; 
-            font-size: 42px; 
-            font-weight: 700; 
-            margin-bottom: 20px;
-            letter-spacing: 3px;
-            text-transform: uppercase;
+        /* Decorative border with gradient based on difficulty */
+        .border-gradient {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            bottom: 20px;
+            border: 3px solid transparent;
+            border-radius: 16px;
+            background: ${borderGradient} border-box;
+            -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+            opacity: 0.8;
         }
         
-        .subtitle {
-            color: #6b7280;
+        /* Corner decorations */
+        .corner {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            border: 3px solid #fbbf24;
+            opacity: 0.3;
+        }
+        
+        .corner-tl {
+            top: 40px;
+            left: 40px;
+            border-right: none;
+            border-bottom: none;
+            border-radius: 16px 0 0 0;
+        }
+        
+        .corner-tr {
+            top: 40px;
+            right: 40px;
+            border-left: none;
+            border-bottom: none;
+            border-radius: 0 16px 0 0;
+        }
+        
+        .corner-bl {
+            bottom: 40px;
+            left: 40px;
+            border-right: none;
+            border-top: none;
+            border-radius: 0 0 0 16px;
+        }
+        
+        .corner-br {
+            bottom: 40px;
+            right: 40px;
+            border-left: none;
+            border-top: none;
+            border-radius: 0 0 16px 0;
+        }
+        
+        .certificate-content {
+            padding: 50px 60px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 2;
+        }
+        
+        /* NFT Badge */
+        .nft-badge {
+            position: absolute;
+            top: 40px;
+            right: 40px;
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            padding: 8px 20px;
+            border-radius: 40px;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+            letter-spacing: 1px;
+            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .nft-badge::before {
+            content: "✦";
+            font-size: 16px;
+        }
+        
+        /* Main header */
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            margin-top: 20px;
+        }
+        
+        .header-top {
+            font-size: 16px;
+            font-weight: 500;
+            color: #fbbf24;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        
+        .header-title {
+            font-size: 52px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1.2;
+        }
+        
+        .header-subtitle {
             font-size: 18px;
-            margin-bottom: 40px;
+            color: #64748b;
+            margin-top: 10px;
             font-weight: 300;
         }
         
-        .student-name { 
-            font-size: 48px; 
-            font-weight: bold; 
-            margin: 40px 0; 
-            color: #1f2937;
-            background: linear-gradient(135deg, #1e40af, #3730a3);
+        /* Recipient section */
+        .recipient-section {
+            text-align: center;
+            margin: 15px 0 20px;
+        }
+        
+        .recipient-name {
+            font-size: 48px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fbbf24, #d97706);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            background-clip: text;
+            line-height: 1.2;
+            margin-bottom: 15px;
+            word-break: break-word;
         }
         
         .achievement-text {
-            font-size: 20px;
-            color: #4b5563;
+            font-size: 18px;
+            color: #334155;
+            font-weight: 400;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .course-name {
+            font-size: 28px;
+            font-weight: 700;
+            color: #0f172a;
             margin: 20px 0;
-            line-height: 1.6;
+            padding: 15px 25px;
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+            display: inline-block;
+            border-radius: 60px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            max-width: 90%;
+            word-break: break-word;
         }
         
-        .course-title { 
-            font-size: 32px; 
-            color: #1e40af;
+        /* Difficulty badge */
+        .difficulty-badge {
+            display: inline-block;
+            padding: 8px 24px;
+            background: ${Number(course.difficulty_level) === 2 ? 'linear-gradient(135deg, #fbbf24, #d97706)' :
+                    Number(course.difficulty_level) === 1 ? 'linear-gradient(135deg, #94a3b8, #64748b)' :
+                        'linear-gradient(135deg, #cd7f32, #b45309)'};
+            color: white;
             font-weight: 600;
-            margin: 30px 0;
+            font-size: 16px;
+            border-radius: 40px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
         }
         
+        /* Details grid */
         .details-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 40px;
-            margin: 50px 0;
-            text-align: left;
+            gap: 20px;
+            margin: 20px 0;
+            background: #f8fafc;
+            padding: 25px;
+            border-radius: 20px;
+            border: 1px solid #e2e8f0;
         }
         
-        .detail-section h4 {
-            font-size: 16px;
-            color: #374151;
+        .detail-column h4 {
+            font-size: 14px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
             margin-bottom: 15px;
-            font-weight: 600;
-            border-bottom: 2px solid #e5e7eb;
-            padding-bottom: 8px;
         }
         
         .detail-item {
-            margin: 12px 0;
-            font-size: 14px;
-            color: #6b7280;
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px dashed #e2e8f0;
         }
         
-        .detail-item strong {
-            color: #374151;
+        .detail-item:last-child {
+            border-bottom: none;
+        }
+        
+        .detail-label {
+            color: #64748b;
+            font-size: 13px;
+        }
+        
+        .detail-value {
             font-weight: 600;
+            color: #0f172a;
+            font-size: 13px;
+            text-align: right;
+            max-width: 60%;
+            word-break: break-word;
         }
         
-        .badge {
-            display: inline-block;
-            background: linear-gradient(135deg, #10b981, #059669);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 25px;
-            font-size: 16px;
-            font-weight: 600;
-            margin: 20px 0;
+        .detail-value.highlight {
+            background: linear-gradient(135deg, #059669, #10b981);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
         }
         
+        .address-value {
+            font-family: monospace;
+            background: #e2e8f0;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+        }
+        
+        /* Signatures section */
         .signatures {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 40px;
-            margin-top: 60px;
-            padding-top: 40px;
-            border-top: 2px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #e2e8f0;
+        }
+        
+        .signature-item {
+            text-align: center;
+            flex: 1;
         }
         
         .signature-line {
-            border-bottom: 2px solid #9ca3af;
-            width: 200px;
-            margin: 0 auto 10px auto;
+            width: 150px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #94a3b8, #64748b, #94a3b8, transparent);
+            margin: 0 auto 12px;
         }
         
-        .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #e5e7eb;
+        .signature-title {
+            font-weight: 700;
+            color: #0f172a;
+            font-size: 14px;
+        }
+        
+        .signature-subtitle {
+            color: #64748b;
             font-size: 12px;
-            color: #9ca3af;
+            margin-top: 5px;
         }
         
-        .seal {
-            position: absolute;
-            top: 30px;
-            right: 30px;
-            width: 100px;
-            height: 100px;
-            background: linear-gradient(135deg, #f59e0b, #d97706);
+        /* Verification seal */
+        .verification-seal {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #059669, #10b981);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-weight: bold;
-            font-size: 14px;
+            font-weight: 600;
+            font-size: 10px;
             text-align: center;
             padding: 15px;
-            box-shadow: 0 8px 20px rgba(245, 158, 11, 0.4);
+            box-shadow: 0 10px 30px rgba(5, 150, 105, 0.3);
+            border: 3px solid white;
+            margin: 0 auto;
+        }
+        
+        .verification-seal span {
+            transform: rotate(-10deg);
+        }
+        
+        /* Footer */
+        .footer {
+            margin-top: auto;
+            text-align: center;
+            color: #94a3b8;
+            font-size: 11px;
+            padding-top: 15px;
+        }
+        
+        .footer .cert-id {
+            font-family: monospace;
+            background: #f1f5f9;
+            padding: 4px 12px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 8px;
+            font-size: 10px;
+        }
+        
+        /* Watermark */
+        .watermark {
+            position: absolute;
+            bottom: 80px;
+            right: 80px;
+            font-size: 100px;
+            font-weight: 800;
+            color: rgba(0, 0, 0, 0.02);
+            transform: rotate(-15deg);
+            z-index: 1;
+            pointer-events: none;
+            white-space: nowrap;
         }
     </style>
 </head>
 <body>
     <div class="certificate-container">
-        <div class="seal">BLOCKCHAIN VERIFIED</div>
-        <div class="watermark">CODEPINNACLE</div>
+        <!-- Background pattern -->
+        <div class="bg-pattern"></div>
+        
+        <!-- Gradient border based on difficulty -->
+        <div class="border-gradient"></div>
+        
+        <!-- Corner decorations -->
+        <div class="corner corner-tl"></div>
+        <div class="corner corner-tr"></div>
+        <div class="corner corner-bl"></div>
+        <div class="corner corner-br"></div>
+        
+        <!-- NFT Badge -->
+        <div class="nft-badge">
+            SOULBOUND TOKEN
+        </div>
+        
         <div class="certificate-content">
-            <div class="header">Certificate of Completion</div>
-            <div class="subtitle">This is to certify that</div>
-            
-            <div class="student-name">${profile.fname} ${profile.lname}</div>
-            
-            <div class="achievement-text">
-                has successfully completed all requirements and demonstrated exceptional proficiency in
+            <!-- Header -->
+            <div class="header">
+                <div class="header-top">BLOCKCHAIN VERIFIED</div>
+                <div class="header-title">CERTIFICATE</div>
+                <div class="header-title" style="font-size: 42px; margin-top: -10px;">OF ACHIEVEMENT</div>
+                <div class="header-subtitle">This certifies that</div>
             </div>
             
-            <div class="course-title">${course.courseName}</div>
+            <!-- Recipient -->
+            <div class="recipient-section">
+                <div class="recipient-name">${profile.fname} ${profile.lname}</div>
+                <div class="achievement-text">has successfully completed all requirements and demonstrated exceptional proficiency in</div>
+            </div>
             
-            <div class="badge">Blockchain Verified Certificate</div>
+            <!-- Course & Difficulty -->
+            <div style="text-align: center;">
+                <div class="course-name">${course.courseName}</div>
+                <div class="difficulty-badge">${difficultyText} LEVEL</div>
+            </div>
             
+            <!-- Details Grid -->
             <div class="details-grid">
-                <div class="detail-section">
+                <div class="detail-column">
                     <h4>Course Details</h4>
                     <div class="detail-item">
-                        <strong>Certificate ID:</strong> #${Date.now().toString().slice(-8)}
+                        <span class="detail-label">Certificate ID</span>
+                        <span class="detail-value">${certificateId}</span>
                     </div>
                     <div class="detail-item">
-                        <strong>Course ID:</strong> #${course.id}
+                        <span class="detail-label">Course ID</span>
+                        <span class="detail-value">#${course.courseId}</span>
                     </div>
                     <div class="detail-item">
-                        <strong>Level:</strong> ${course.difficulty_level}
-                    </div>
-                    <div class="detail-item">
-                        <strong>Enrollment Date:</strong> ${new Date().toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            })}
+                        <span class="detail-label">Difficulty</span>
+                        <span class="detail-value highlight">${difficultyText}</span>
                     </div>
                 </div>
                 
-                <div class="detail-section">
-                    <h4>Issuance Details</h4>
+                <div class="detail-column">
+                    <h4>Blockchain Details</h4>
                     <div class="detail-item">
-                        <strong>Date Issued:</strong> ${new Date().toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            })}
+                        <span class="detail-label">Issue Date</span>
+                        <span class="detail-value">${issueDate}</span>
                     </div>
                     <div class="detail-item">
-                        <strong>Student ID:</strong> ${accountAddress.substring(0, 10)}...${accountAddress.substring(accountAddress.length - 6)}
+                        <span class="detail-label">Student ID</span>
+                        <span class="detail-value address-value">${accountAddress.substring(0, 10)}...${accountAddress.substring(accountAddress.length - 6)}</span>
                     </div>
                     <div class="detail-item">
-                        <strong>Instructor:</strong> Platform Director
-                    </div>
-                    <div class="detail-item">
-                        <strong>Status:</strong> <span style="color: #10b981; font-weight: 600;">Verified & Permanent</span>
+                        <span class="detail-label">Token Type</span>
+                        <span class="detail-value highlight">Soulbound (SBT)</span>
                     </div>
                 </div>
             </div>
             
+            <!-- Signatures and Seal -->
             <div class="signatures">
-                <div class="signature-section">
+                <div class="signature-item">
                     <div class="signature-line"></div>
-                    <div style="font-weight: 600; color: #374151; margin-top: 8px;">Platform Director</div>
-                    <div style="font-size: 14px; color: #6b7280;">CodePinnacle Academy</div>
+                    <div class="signature-title">Platform Director</div>
+                    <div class="signature-subtitle">CodePinnacle Academy</div>
                 </div>
                 
-                <div class="signature-section">
+                <div class="signature-item">
+                    <div class="verification-seal">
+                        <span>BLOCKCHAIN<br>VERIFIED</span>
+                    </div>
+                </div>
+                
+                <div class="signature-item">
                     <div class="signature-line"></div>
-                    <div style="font-weight: 600; color: #374151; margin-top: 8px;">Blockchain Seal</div>
-                    <div style="font-size: 14px; color: #6b7280;">Immutable Record</div>
+                    <div class="signature-title">Digital Seal</div>
+                    <div class="signature-subtitle">Immutable Record</div>
                 </div>
             </div>
             
+            <!-- Footer -->
             <div class="footer">
-                <div>Issued by CodePinnacle Academy • This certificate is permanently recorded on the blockchain</div>
-                <div>Verification ID: ${Date.now().toString().slice(-12)} • ${new Date().getFullYear()}</div>
+                <div>This certificate is permanently recorded on the Sepolia blockchain as a Soulbound Token (non-transferable)</div>
+                <div class="cert-id">Verification ID: ${certificateId}</div>
             </div>
         </div>
+        
+        <!-- Watermark -->
+        <div class="watermark">CODEPINNACLE</div>
     </div>
 </body>
 </html>`;
 
-            // Create a temporary container
+            // Create temporary container
             const container = document.createElement('div');
             container.style.position = 'absolute';
             container.style.left = '-9999px';
             container.style.top = '-9999px';
-            container.style.width = '1200px';
-            container.style.height = '800px';
+            container.style.width = '800px';
+            container.style.height = '1000px';
             container.innerHTML = htmlContent;
 
             document.body.appendChild(container);
 
-            // Wait for fonts and images to load
-            await Promise.all([
-                waitForFonts(),
-                new Promise(resolve => setTimeout(resolve, 500))
-            ]);
+            // Wait for fonts to load
+            await waitForFonts();
 
-            // Convert to canvas
-            const canvas = await html2canvas(container, {
-                scale: 2, // Higher resolution
+            // Find the certificate container element
+            const certificateElement = container.querySelector('.certificate-container');
+
+            // Convert to canvas with high quality
+            const canvas = await html2canvas(certificateElement, {
+                scale: 3, // Very high resolution for print quality
                 useCORS: true,
                 allowTaint: false,
-                backgroundColor: '#ffffff',
-                width: 1200,
-                height: 800,
+                backgroundColor: null, // Transparent background
+                width: 800,
+                height: 1000,
                 logging: false,
                 onclone: (clonedDoc) => {
-                    // Ensure fonts are loaded in cloned document
                     const style = clonedDoc.createElement('style');
                     style.textContent = `
-                        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+                        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
                     `;
                     clonedDoc.head.appendChild(style);
                 }
             });
 
+            // Clean up
+            document.body.removeChild(container);
+
             // Convert to blob
             canvas.toBlob((blob) => {
-                document.body.removeChild(container);
-
                 if (blob) {
-                    const file = new File([blob], `certificate-${course.id}-${account.address}.png`, {
-                        type: 'image/png'
-                    });
+                    const file = new File(
+                        [blob],
+                        `certificate-${course.courseId}-${accountAddress.substring(0, 6)}.png`,
+                        { type: 'image/png' }
+                    );
                     resolve(file);
                 } else {
                     reject(new Error('Failed to create image blob'));
                 }
-            }, 'image/png', 0.95);
+            }, 'image/png', 1.0);
 
         } catch (error) {
             console.error('Error generating certificate image:', error);
@@ -344,8 +589,8 @@ export const generateCertificateImage = async (profile, course, account) => {
 };
 
 export const generateCertificateHTML = (profile, course, account) => {
-    // Handle both string address and account object
     const accountAddress = typeof account === 'string' ? account : account?.address;
+    const certificateId = `CERT-${Date.now().toString().slice(-8)}-${course.courseId}`;
 
     return `
 <!DOCTYPE html>
@@ -353,36 +598,41 @@ export const generateCertificateHTML = (profile, course, account) => {
 <head>
     <title>Certificate of Completion - ${course.courseName}</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 40px; background: #f8f9fa; }
-        .certificate { background: white; border: 8px solid #2563eb; padding: 60px; text-align: center; max-width: 800px; margin: 0 auto; }
-        .header { color: #2563eb; font-size: 36px; font-weight: bold; margin-bottom: 20px; }
-        .student-name { font-size: 32px; font-weight: bold; margin: 30px 0; color: #1f2937; }
-        .course-title { font-size: 24px; color: #4b5563; margin: 20px 0; }
-        .details { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 40px 0; text-align: left; }
-        .detail-item { margin: 10px 0; }
-        .issued-date { color: #6b7280; margin-top: 40px; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: #0f172a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .certificate { 
+            width: 800px;
+            background: white; 
+            border-radius: 24px; 
+            overflow: hidden;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.3);
+        }
+        .content { padding: 60px; }
+        h1 { font-size: 48px; background: linear-gradient(135deg, #fbbf24, #d97706); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .name { font-size: 42px; font-weight: 800; color: #0f172a; }
+        .course { font-size: 32px; color: #334155; }
     </style>
 </head>
 <body>
     <div class="certificate">
-        <div class="header">CERTIFICATE OF COMPLETION</div>
-        <p>This is to certify that</p>
-        <div class="student-name">${profile.fname} ${profile.lname}</div>
-        <p>has successfully completed the course</p>
-        <div class="course-title">${course.courseName}</div>
-        <div class="details">
-            <div>
-                <div class="detail-item"><strong>Certificate ID:</strong> #${Date.now()}</div>
-                <div class="detail-item"><strong>Course ID:</strong> #${course.id}</div>
-                <div class="detail-item"><strong>Level:</strong> ${course.difficulty_level}</div>
-            </div>
-            <div>
-                <div class="detail-item"><strong>Student Address:</strong> ${accountAddress ? accountAddress.substring(0, 8) + '...' : 'N/A'}</div>
-                <div class="detail-item"><strong>Issued On:</strong> ${new Date().toLocaleDateString()}</div>
-                <div class="detail-item"><strong>Status:</strong> Verified</div>
-            </div>
+        <div class="content">
+            <h1>CERTIFICATE OF ACHIEVEMENT</h1>
+            <p>Presented to</p>
+            <div class="name">${profile.fname} ${profile.lname}</div>
+            <p>for completing</p>
+            <div class="course">${course.courseName}</div>
+            <p style="margin-top: 40px;">Certificate ID: ${certificateId}</p>
+            <p>Student: ${accountAddress ? accountAddress.substring(0, 10) + '...' : 'N/A'}</p>
+            <p>Issued: ${new Date().toLocaleDateString()}</p>
         </div>
-        <div class="issued-date">Issued by CodePinnacle Academy - Blockchain Verified</div>
     </div>
 </body>
 </html>`;
