@@ -1,25 +1,12 @@
 import { AlertCircle, CheckCircle, Plus } from "lucide-react";
-import Ecosystem1FacetABI from "../../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
-import Ecosystem2FacetABI from "../../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
-import CONTRACT_ADDRESSES from "../../constants/addresses";
 import { useState } from "react";
-import { defineChain } from "thirdweb/chains";
-import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
 import { toast } from "react-toastify";
 import { useActiveAccount } from "thirdweb/react";
-import { client } from "../../services/client";
 import { useContext, useMemo } from "react";
 import { LessonContext } from "../../contexts/lessonContext";
 import { CourseContext } from "../../contexts/courseContext";
 import { ChapterContext } from "../../contexts/chapterContext";
-import {
-  uploadFileToPinata,
-  uploadMetadataToIPFS,
-} from "../../services/pinata";
-
-const DiamondAddress = CONTRACT_ADDRESSES.diamond;
-const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
-const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
+import { QuizContext } from "../../contexts/quizContext";
 
 const ResourcesCreation = () => {
   const [resourceName, setResourceName] = useState("");
@@ -30,6 +17,7 @@ const ResourcesCreation = () => {
   const { lessons } = useContext(LessonContext);
   const { courses } = useContext(CourseContext);
   const { chapters } = useContext(ChapterContext);
+  const { addLessonResource } = useContext(QuizContext);
   const [lessonId, setLessonId] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [success, setSuccess] = useState("");
@@ -77,13 +65,6 @@ const ResourcesCreation = () => {
     return filteredLessons;
   }, [address, courses, chapters, lessons]);
 
-  // Enum mapping matching the contract
-  const ContentTypeEnum = {
-    Video: 0,
-    Image: 1,
-    Document: 2,
-  };
-
   const addResource = async () => {
     try {
       if (!lessonId || !contentType || !resourceName) {
@@ -111,63 +92,18 @@ const ResourcesCreation = () => {
       setIsUploading(true);
       const toastId = toast.loading("Adding resource...");
 
-      let finalLink = "";
-
-      // Handle file upload for Image/Document
-      if (contentType !== "Video") {
-        toast.update(toastId, {
-          render: `Uploading ${contentType}...`,
-          isLoading: true,
-        });
-        // Upload to Pinata
-        const fileCid = await uploadFileToPinata(file);
-        console.log("File uploaded to Pinata with CID:", fileCid);
-
-        toast.update(toastId, {
-          render: "Creating metadata...",
-          isLoading: true,
-        });
-        // Create and upload metadata
-        const metadata = {
-          type: contentType.toLowerCase(),
-          file: fileCid,
-        };
-        finalLink = await uploadMetadataToIPFS(metadata);
-      } else {
-        finalLink = resourceLink;
-      }
-
       toast.update(toastId, {
         render: "Processing transaction...",
         isLoading: true,
       });
 
-      // Create resource object matching contract structure
-      const newResource = {
-        contentType: ContentTypeEnum[contentType],
-        url: finalLink,
-        name: resourceName,
-      };
-
-      const diamondContract = await getContract({
-        address: DiamondAddress,
-        abi: Ecosystem2Facet_ABI,
-        client,
-        chain: defineChain(11155111),
+      const { finalLink } = await addLessonResource({
+        lessonId,
+        contentType,
+        resourceName,
+        resourceLink,
+        file,
       });
-
-      const tx = await prepareContractCall({
-        contract: diamondContract,
-        method: "addResourcesToLesson",
-        params: [lessonId, ContentTypeEnum[contentType], [newResource]],
-      });
-
-      toast.update(toastId, {
-        render: "Waiting for transaction confirmation...",
-        isLoading: true,
-      });
-
-      await sendTransaction({ transaction: tx, account });
 
       // Update local state
       setResources([

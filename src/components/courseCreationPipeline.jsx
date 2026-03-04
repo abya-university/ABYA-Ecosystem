@@ -8,6 +8,7 @@ import {
   Lock,
 } from "lucide-react";
 import PreviewCourse from "../pages/PreviewCourse";
+import BulkCourseUpload from "./Course Creation Components/BulkCourseUpload";
 // import { toast, ToastContainer } from "react-toastify";
 import CourseBasicInfo from "./Course Creation Components/CourseBasicInfo";
 import ChapterCreation from "./Course Creation Components/ChapterCreation";
@@ -31,7 +32,7 @@ const CourseCreationPipeline = () => {
     ];
 
     return (
-      <div className="flex flex-col md:flex-row md:flex-wrap lg:flex-nowrap justify-between items-center mb-8 gap-4 md:gap-2">
+      <div className="flex flex-col md:flex-row md:flex-wrap justify-between items-center mb-8 gap-3 md:gap-2">
         {steps.map((step, index) => (
           <div
             key={index}
@@ -45,12 +46,12 @@ const CourseCreationPipeline = () => {
           >
             {index > 0 && (
               <div
-                className={`w-8 md:w-16 h-1 mr-2 md:mr-4 transition-all duration-300 ${
+                className={`w-6 md:w-10 lg:w-12 h-1 mr-2 md:mr-3 transition-all duration-300 ${
                   currentStep >= index ? "bg-green-500" : "bg-gray-300"
                 }`}
               />
             )}
-            <div className="flex items-center space-x-2 min-w-0">
+            <div className="flex items-center space-x-2 min-w-0 max-w-[130px] md:max-w-[160px]">
               {currentStep > index ? (
                 <CheckCircle
                   size={20}
@@ -67,7 +68,7 @@ const CourseCreationPipeline = () => {
                   <Book size={18} className="md:w-5 md:h-5 flex-shrink-0" />
                 </div>
               )}
-              <span className="text-sm md:text-base whitespace-nowrap truncate">
+              <span className="text-xs md:text-sm leading-tight break-words text-center">
                 {step}
               </span>
             </div>
@@ -132,43 +133,40 @@ const CourseCreationPipeline = () => {
         </div>
 
         {/* JSON Upload Method */}
-        <div className="p-6 md:p-8 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 relative overflow-hidden cursor-not-allowed">
-          {/* Coming Soon Overlay */}
-          <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/40  flex items-center justify-center z-10">
-            <div className="text-center">
-              <Lock className="h-12 w-12 text-yellow-300 mx-auto mb-3" />
-              <span className="bg-yellow-200 dark:bg-yellow-500 text-gray-600 dark:text-gray-50 px-4 py-2 rounded-full text-sm font-medium">
-                Coming Soon
-              </span>
-            </div>
+        <div
+          onClick={() => setSelectedMethod("json")}
+          className={`p-6 md:p-8 rounded-xl border-2 cursor-pointer transition-all duration-300 transform hover:scale-105 ${
+            selectedMethod === "json"
+              ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 shadow-lg"
+              : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-yellow-300 hover:shadow-md"
+          }`}
+        >
+          <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+            <FileText className="h-8 w-8 text-blue-600 dark:text-blue-400" />
           </div>
-
-          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
-            <FileText className="h-8 w-8 text-gray-400" />
-          </div>
-          <h3 className="text-xl font-semibold text-gray-400 mb-3">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
             JSON Upload
           </h3>
-          <p className="text-gray-400 text-sm md:text-base mb-4">
+          <p className="text-gray-600 dark:text-gray-400 text-sm md:text-base mb-4">
             Upload your entire course structure in a single JSON file. Fast and
             efficient for bulk course creation.
           </p>
-          <ul className="text-left text-sm text-gray-400 space-y-2 mb-6">
+          <ul className="text-left text-sm text-gray-500 dark:text-gray-400 space-y-2 mb-6">
             <li className="flex items-center">
-              <FileText className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
+              <CheckCircle className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
               Single file upload
             </li>
             <li className="flex items-center">
-              <FileText className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
+              <CheckCircle className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
               Bulk course creation
             </li>
             <li className="flex items-center">
-              <FileText className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
+              <CheckCircle className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
               JSON format support
             </li>
           </ul>
-          <div className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-400 text-sm font-medium">
-            Unavailable
+          <div className="px-4 py-2 rounded-lg bg-blue-100 dark:bg-blue-600 text-blue-600 dark:text-white text-sm font-medium">
+            Open Bulk Upload
           </div>
         </div>
       </div>
@@ -207,6 +205,16 @@ const CourseCreationPipeline = () => {
 
       {showPreview ? (
         <PreviewCourse />
+      ) : selectedMethod === "json" ? (
+        <div className="mb-8">
+          <BulkCourseUpload
+            onBack={() => {
+              setSelectedMethod(null);
+              setCurrentStep(0);
+              setShowPreview(false);
+            }}
+          />
+        </div>
       ) : (
         <div className="mb-8">
           {currentStep === 0 && <MethodSelection />}
@@ -218,8 +226,8 @@ const CourseCreationPipeline = () => {
         </div>
       )}
 
-      {/* Navigation Buttons - Only show when not in method selection */}
-      {currentStep > 0 && !showPreview && (
+      {/* Navigation Buttons - Only show when not in method selection and not using JSON upload */}
+      {currentStep > 0 && !showPreview && selectedMethod === "pipeline" && (
         <div className="flex justify-between items-center pt-6 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={prevStep}
