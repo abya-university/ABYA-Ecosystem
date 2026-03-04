@@ -36,8 +36,7 @@ const QuizProvider = ({ children }) => {
 
         const quizzesData = await readContract({
           contract,
-          method:
-            "function getAllQuizzes() view returns ((uint256 lessonId, uint256 quizId, string quizTitle, (uint256 quizId, uint256 questionId, string questionText, (string option, bool isCorrect)[] choices)[] questions, bool exists, uint256 lockTime)[])",
+          method: "getAllQuizzes",
           params: [],
         });
 
@@ -94,8 +93,39 @@ const QuizProvider = ({ children }) => {
     });
 
     const receipt = await sendTransaction({ transaction: tx, account });
+
+    // Fetch all quizzes and filter by lessonId to get the newly created quiz ID
+    const contract = getContract({
+      address: DiamondAddress,
+      abi: Ecosystem2Facet_ABI,
+      client,
+      chain: defineChain(11155111),
+    });
+
+    const allQuizzesData = await readContract({
+      contract,
+      method: "getAllQuizzes",
+      params: [],
+    });
+
+    // Filter quizzes by lessonId and get the latest one
+    const lessonQuizzes = allQuizzesData.filter(
+      (quiz) => Number(quiz.lessonId) === Number(lessonId),
+    );
+    if (!lessonQuizzes.length) {
+      throw new Error(
+        "Quiz was created but could not be resolved for this lesson",
+      );
+    }
+    const latestQuiz = lessonQuizzes[lessonQuizzes.length - 1];
+    const quizId = latestQuiz.quizId.toString();
+
     await fetchQuizzes();
-    return receipt;
+
+    return {
+      receipt,
+      quizId,
+    };
   };
 
   const createQuestionWithChoices = async (

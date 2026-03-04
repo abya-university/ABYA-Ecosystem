@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import MasterPage from "./pages/MasterPage";
 import CourseCreationPipeline from "./components/courseCreationPipeline";
+import BulkCourseUpload from "./components/Course Creation Components/BulkCourseUpload";
 import ProfileDash from "./pages/ProfileDash";
 import NotFoundPage from "./pages/404Page";
 import CourseMetricsPage from "./pages/CourseMetricsPage";
@@ -23,6 +24,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/mainpage" element={<MasterPage />} />
         <Route path="create-course" element={<CourseCreationPipeline />} />
+        <Route path="/bulk-course-upload" element={<BulkCourseUpload />} />
         <Route path="/ProfileDash" element={<ProfileDash />} />
         {/* <Route path="/settings" element={<SettingsPage />} /> */}
 

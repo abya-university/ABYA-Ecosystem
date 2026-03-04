@@ -91,8 +91,39 @@ const LessonProvider = ({ children }) => {
     });
 
     const receipt = await sendTransaction({ transaction: tx, account });
+
+    // Fetch all lessons and filter by chapterId to get the newly created lesson ID
+    const contract = getContract({
+      address: DiamondAddress,
+      abi: Ecosystem2Facet_ABI,
+      client,
+      chain: defineChain(11155111),
+    });
+
+    const allLessonsData = await readContract({
+      contract,
+      method: "getAllLessons",
+      params: [],
+    });
+
+    // Filter lessons by chapterId and get the latest one
+    const chapterLessons = allLessonsData.filter(
+      (lesson) => Number(lesson.chapterId) === Number(chapterId),
+    );
+    if (!chapterLessons.length) {
+      throw new Error(
+        "Lesson was created but could not be resolved for this chapter",
+      );
+    }
+    const latestLesson = chapterLessons[chapterLessons.length - 1];
+    const lessonId = latestLesson.lessonId.toString();
+
     await fetchLessons();
-    return receipt;
+
+    return {
+      receipt,
+      lessonId,
+    };
   };
 
   useEffect(() => {

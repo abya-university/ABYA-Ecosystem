@@ -2,7 +2,12 @@ import React, { createContext, useEffect, useState } from "react";
 import Ecosystem1FacetABI from "../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
 import { defineChain } from "thirdweb/chains";
 import { useActiveAccount } from "thirdweb/react";
-import { getContract, prepareContractCall, readContract, sendTransaction } from "thirdweb";
+import {
+  getContract,
+  prepareContractCall,
+  readContract,
+  sendTransaction,
+} from "thirdweb";
 import { client } from "../services/client";
 import CONTRACT_ADDRESSES from "../constants/addresses";
 import { uploadFileToPinata } from "../services/pinata";
@@ -146,11 +151,30 @@ const CourseProvider = ({ children }) => {
 
     const receipt = await sendTransaction({ transaction: tx, account });
 
+    // Fetch courses to get the newly created course ID
+    const contract = getContract({
+      address: DiamondAddress,
+      abi: Ecosystem1Facet_ABI,
+      client,
+      chain: defineChain(11155111),
+    });
+
+    const coursesData = await readContract({
+      contract,
+      method: "getAllCourses",
+      params: [],
+    });
+
+    // Get the latest course (last in array)
+    const latestCourse = coursesData[coursesData.length - 1];
+    const courseId = latestCourse.courseId.toString();
+
     await fetchCourses();
 
     return {
       receipt,
       imageIpfsHash,
+      courseId,
     };
   };
 
