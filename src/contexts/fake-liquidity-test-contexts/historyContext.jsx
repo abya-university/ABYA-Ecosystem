@@ -151,7 +151,7 @@ export function TransactionHistoryProvider({ children }) {
   const [error, setError] = useState(null);
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const [isInitialRatio, setIsInitialRatio] = useState(true);
-  const [poolPrice, setPoolPrice] = useState(1000);
+  const [poolPrice, setPoolPrice] = useState(0.001); // 1 ABYTKN = 0.001 USDC
   const [slippageTolerance, setSlippageTolerance] = useState(0.5);
 
   const account = useActiveAccount();
@@ -334,28 +334,59 @@ export function TransactionHistoryProvider({ children }) {
   const calculateOutputAmount = useCallback(
     async (inputAmount, inputTokenSymbol, outputTokenSymbol) => {
       if (!inputAmount || parseFloat(inputAmount) === 0) {
+        console.warn(
+          "[calculateOutputAmount] Early return - empty or zero input",
+          { inputAmount, inputTokenSymbol },
+        );
         return { output: "0", impact: 0, minReceived: "0" };
       }
 
       try {
+        console.log(
+          `[calculateOutputAmount] Starting calculation: ${inputAmount} ${inputTokenSymbol} -> ${outputTokenSymbol}`,
+        );
+
         const tokenPrice = await ContractUtils.readContractManual(
           swapContract,
           "getTokenPrice",
         );
 
-        const basePrice = tokenPrice
-          ? parseFloat(ethers.formatUnits(tokenPrice, 18))
-          : 1000;
+        // Get raw price from contract (this is token1/token0 in smallest units)
+        const priceRaw = tokenPrice
+          ? parseFloat(ethers.formatUnits(tokenPrice, 0))
+          : 1e-15;
+
+        // Adjust for decimal difference between tokens
+        // token0 = ABYTKN (18 decimals), token1 = USDC (6 decimals)
+        const decimalsToken0 = 18; // ABYTKN
+        const decimalsToken1 = 6; // USDC
+
+        // Convert raw price to human-readable: price of 1 ABYTKN in USDC
+        const adjustmentFactor = Math.pow(10, decimalsToken0 - decimalsToken1);
+        const basePrice = priceRaw * adjustmentFactor; // This gives price of 1 ABYTKN in USDC (e.g., 0.001)
+
+        console.log(
+          `[calculateOutputAmount] Token price - raw: ${priceRaw}, adjusted: ${basePrice} (1 ABYTKN = ${basePrice} USDC)`,
+        );
+
+        // inputAmount comes from form and is in DECIMAL units (e.g., "1" for 1 USDC, "1000" for 1000 ABYTKN)
+        const inputAsNumber = parseFloat(inputAmount);
+
+        console.log(
+          `[calculateOutputAmount] Input as decimal: inputAmount="${inputAmount}", parsed=${inputAsNumber}`,
+        );
 
         let outputInUnits;
 
         if (inputTokenSymbol === "USDC" && outputTokenSymbol === "ABYTKN") {
-          outputInUnits = parseFloat(inputAmount) * basePrice;
+          // How many ABYTKN can I buy with X USDC?
+          outputInUnits = inputAsNumber / basePrice;
         } else if (
           inputTokenSymbol === "ABYTKN" &&
           outputTokenSymbol === "USDC"
         ) {
-          outputInUnits = parseFloat(inputAmount) / basePrice;
+          // How many USDC do I get for X ABYTKN?
+          outputInUnits = inputAsNumber * basePrice;
         } else {
           outputInUnits = 0;
         }
@@ -372,6 +403,16 @@ export function TransactionHistoryProvider({ children }) {
         // Return as string
         const outputStr = outputRaw.toString();
 
+        console.log(`[calculateOutputAmount] Calculation complete:`, {
+          inputAmount,
+          inputAsNumber,
+          basePrice,
+          outputInUnits,
+          outputInUnitsStr,
+          outputRaw: outputRaw.toString(),
+          outputStr,
+        });
+
         const { impact, minReceived } = PriceUtils.calculatePriceImpact(
           inputAmount,
           outputStr,
@@ -385,19 +426,27 @@ export function TransactionHistoryProvider({ children }) {
           minReceived,
         };
       } catch (error) {
-        console.error("Price calculation error:", error);
+        console.error(
+          "[calculateOutputAmount] Error during calculation:",
+          error,
+        );
 
-        // Fallback calculation
-        const basePrice = 1000;
+        // Fallback calculation - use the correct price representation
+        // 1 ABYTKN = 0.001 USDC (or 1 USDC = 1000 ABYTKN)
+        const basePrice = 0.001; // Price of 1 ABYTKN in USDC
+
+        // inputAmount is in human-readable decimal units
+        const inputInUnits = parseFloat(inputAmount);
+
         let outputInUnits;
 
         if (inputTokenSymbol === "USDC" && outputTokenSymbol === "ABYTKN") {
-          outputInUnits = parseFloat(inputAmount) * basePrice;
+          outputInUnits = inputInUnits / basePrice; // USDC / (ABYTKN price in USDC) = ABYTKN amount
         } else if (
           inputTokenSymbol === "ABYTKN" &&
           outputTokenSymbol === "USDC"
         ) {
-          outputInUnits = parseFloat(inputAmount) / basePrice;
+          outputInUnits = inputInUnits * basePrice; // ABYTKN * (ABYTKN price in USDC) = USDC amount
         } else {
           outputInUnits = 0;
         }
@@ -406,6 +455,13 @@ export function TransactionHistoryProvider({ children }) {
         const outputInUnitsStr = outputInUnits.toFixed(18);
         const outputRaw = ethers.parseUnits(outputInUnitsStr, outputDecimals);
         const outputStr = outputRaw.toString();
+
+        console.log(`[calculateOutputAmount] Fallback calculation:`, {
+          inputAmount,
+          basePrice,
+          outputInUnits,
+          outputStr,
+        });
 
         const { impact, minReceived } = PriceUtils.calculatePriceImpact(
           inputAmount,
@@ -469,7 +525,10 @@ export function TransactionHistoryProvider({ children }) {
         token0Price:
           tokenPriceData.status === "fulfilled" &&
           tokenPriceData.value !== undefined
-            ? ethers.formatUnits(tokenPriceData.value, 18)
+            ? (
+                parseFloat(ethers.formatUnits(tokenPriceData.value, 0)) *
+                Math.pow(10, 12)
+              ).toString()
             : "N/A",
       };
 
@@ -502,7 +561,7 @@ export function TransactionHistoryProvider({ children }) {
         !poolAddress ||
         poolAddress === "0x0000000000000000000000000000000000000000"
       ) {
-        return { price: 1000, isInitialRatio: true };
+        return { price: 0.001, isInitialRatio: true }; // 1 ABYTKN = 0.001 USDC
       }
 
       try {
@@ -532,7 +591,7 @@ export function TransactionHistoryProvider({ children }) {
         ]);
 
         if (liquidity.toString() === "0" && !slot0.tick) {
-          return { price: 1000, isInitialRatio: true };
+          return { price: 0.001, isInitialRatio: true }; // 1 ABYTKN = 0.001 USDC
         }
 
         const tick = parseInt(slot0.tick.toString());
@@ -569,10 +628,10 @@ export function TransactionHistoryProvider({ children }) {
         console.log("Direct pool call failed:", directError.message);
       }
 
-      return { price: 1000, isInitialRatio: true };
+      return { price: 0.001, isInitialRatio: true }; // 1 ABYTKN = 0.001 USDC
     } catch (error) {
       console.error("Error fetching pool price:", error);
-      return { price: 1000, isInitialRatio: true };
+      return { price: 0.001, isInitialRatio: true }; // 1 ABYTKN = 0.001 USDC
     }
   }, []);
 
@@ -602,7 +661,12 @@ export function TransactionHistoryProvider({ children }) {
       );
 
       if (tokenPrice) {
-        let formattedPrice = parseFloat(ethers.formatUnits(tokenPrice, 18));
+        // Get raw price and adjust for decimal differences
+        const priceRaw = parseFloat(ethers.formatUnits(tokenPrice, 0));
+        const decimalsToken0 = 18; // ABYTKN
+        const decimalsToken1 = 6; // USDC
+        const adjustmentFactor = Math.pow(10, decimalsToken0 - decimalsToken1);
+        let formattedPrice = priceRaw * adjustmentFactor; // Price of 1 ABYTKN in USDC
 
         const poolAddress = CONTRACT_CONFIG.ADDRESSES.UNISWAP_POOL;
         if (poolAddress) {
@@ -630,7 +694,7 @@ export function TransactionHistoryProvider({ children }) {
       }
     } catch (error) {
       handleError("refreshing pool price", error);
-      setPoolPrice(1000);
+      setPoolPrice(0.001); // Fallback: 1 ABYTKN = 0.001 USDC
       setIsInitialRatio(true);
     } finally {
       setIsLoadingPrice(false);
@@ -687,7 +751,8 @@ export function TransactionHistoryProvider({ children }) {
 
   useEffect(() => {
     if (tokenPrice && isMountedRef.current) {
-      const formattedPrice = parseFloat(ethers.formatUnits(tokenPrice, 18));
+      const priceRaw = parseFloat(ethers.formatUnits(tokenPrice, 0));
+      const formattedPrice = priceRaw * Math.pow(10, 12); // 1 ABYTKN in USDC
       setPoolPrice(formattedPrice);
       setIsInitialRatio(false);
     }

@@ -189,8 +189,29 @@ const SwapComponent = () => {
     }
   };
 
+  const getDisplayRate = () => {
+    if (!poolPrice || poolPrice <= 0) return "0.00";
+
+    if (
+      swapData.inputToken.symbol === "USDC" &&
+      swapData.outputToken.symbol === "ABYTKN"
+    ) {
+      return formatDisplayAmount((1 / poolPrice).toString());
+    }
+
+    if (
+      swapData.inputToken.symbol === "ABYTKN" &&
+      swapData.outputToken.symbol === "USDC"
+    ) {
+      return formatDisplayAmount(poolPrice.toString());
+    }
+
+    return "0.00";
+  };
+
   // Update output amount when input changes
   useEffect(() => {
+    let isMounted = true;
     const updateOutputAmount = async () => {
       if (
         swapData.inputAmount &&
@@ -199,31 +220,56 @@ const SwapComponent = () => {
       ) {
         setCalculatingOutput(true);
         try {
+          console.log(
+            `[SwapComponent] Calculating output for: ${swapData.inputAmount} ${swapData.inputToken.symbol} -> ${swapData.outputToken.symbol}`,
+          );
+
           const result = await calculateOutputAmount(
             swapData.inputAmount,
             swapData.inputToken.symbol,
             swapData.outputToken.symbol,
           );
 
-          if (result) {
+          if (isMounted && result && result.output !== undefined) {
+            console.log(`[SwapComponent] Calculation result:`, result);
             setSwapData((prev) => ({
               ...prev,
-              outputAmount: result.output,
-              priceImpact: result.impact,
-              minimumReceived: result.minReceived,
+              outputAmount: result.output || "0",
+              priceImpact: result.impact || 0,
+              minimumReceived: result.minReceived || "0",
             }));
+          } else {
+            console.warn(
+              `[SwapComponent] Invalid result or component unmounted:`,
+              { result, isMounted },
+            );
+            if (isMounted) {
+              setSwapData((prev) => ({
+                ...prev,
+                outputAmount: "0",
+                priceImpact: 0,
+                minimumReceived: "0",
+              }));
+            }
           }
         } catch (error) {
-          console.error("Error calculating output amount:", error);
-          toast.error("Failed to calculate output amount");
-          setSwapData((prev) => ({
-            ...prev,
-            outputAmount: "0",
-            priceImpact: 0,
-            minimumReceived: "0",
-          }));
+          console.error(
+            "[SwapComponent] Error calculating output amount:",
+            error,
+          );
+          if (isMounted) {
+            toast.error("Failed to calculate output amount");
+            setSwapData((prev) => ({
+              ...prev,
+              outputAmount: "0",
+              priceImpact: 0,
+              minimumReceived: "0",
+            }));
+          }
         } finally {
-          setCalculatingOutput(false);
+          if (isMounted) {
+            setCalculatingOutput(false);
+          }
         }
       } else {
         setSwapData((prev) => ({
@@ -232,12 +278,17 @@ const SwapComponent = () => {
           priceImpact: 0,
           minimumReceived: "0",
         }));
-        setCalculatingOutput(false);
+        if (isMounted) {
+          setCalculatingOutput(false);
+        }
       }
     };
 
     const debounceTimer = setTimeout(updateOutputAmount, 300);
-    return () => clearTimeout(debounceTimer);
+    return () => {
+      isMounted = false;
+      clearTimeout(debounceTimer);
+    };
   }, [
     swapData.inputAmount,
     swapData.inputToken,
@@ -782,7 +833,7 @@ const SwapComponent = () => {
                     Rate
                   </span>
                   <span className="font-medium">
-                    1 {swapData.inputToken.symbol} = {poolPrice || "0.00"}{" "}
+                    1 {swapData.inputToken.symbol} = {getDisplayRate()}{" "}
                     {swapData.outputToken.symbol}
                   </span>
                 </div>
