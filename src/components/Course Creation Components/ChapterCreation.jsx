@@ -1,19 +1,10 @@
 import { AlertCircle, CheckCircle, Plus } from "lucide-react";
-import Ecosystem1FacetABI from "../../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
-import Ecosystem2FacetABI from "../../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
-import CONTRACT_ADDRESSES from "../../constants/addresses";
 import { useState } from "react";
-import { defineChain } from "thirdweb/chains";
-import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
 import { toast } from "react-toastify";
 import { useActiveAccount } from "thirdweb/react";
-import { client } from "../../services/client";
 import { useContext } from "react";
 import { CourseContext } from "../../contexts/courseContext";
-
-const DiamondAddress = CONTRACT_ADDRESSES.diamond;
-const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
-const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
+import { ChapterContext } from "../../contexts/chapterContext";
 
 const ChapterCreation = () => {
   const [chapterName, setChapterName] = useState("");
@@ -29,6 +20,7 @@ const ChapterCreation = () => {
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const { courses } = useContext(CourseContext);
+  const { createChapters } = useContext(ChapterContext);
 
   console.log("Coursess: ", courses);
 
@@ -56,36 +48,12 @@ const ChapterCreation = () => {
     setLoading(true);
     const toastId = toast.loading("Creating chapters...");
     try {
-      if (!client) {
-        throw new Error("Client is required to access the contract.");
-      }
-
-      const parsedCourseId = Number(courseId);
-
-      const diamondContract = await getContract({
-        address: DiamondAddress,
-        abi: Ecosystem2Facet_ABI,
-        client,
-        chain: defineChain(11155111),
-      });
-
       toast.update(toastId, {
         render: "Processing transaction...",
         isLoading: true,
       });
 
-      const tx = await prepareContractCall({
-        contract: diamondContract,
-        method: "addChapters",
-        params: [parsedCourseId, chapters, durations],
-      });
-
-      toast.update(toastId, {
-        render: "Waiting for transaction confirmation...",
-        isLoading: true,
-      });
-
-      await sendTransaction({ transaction: tx, account });
+      await createChapters(courseId, chapters, durations);
 
       toast.update(toastId, {
         render: "Chapters created successfully!",
@@ -195,7 +163,7 @@ const ChapterCreation = () => {
                 <option key={course.courseId} value={course.courseId}>
                   {course.courseName}
                 </option>
-              )
+              ),
           )}
         </select>
       </div>

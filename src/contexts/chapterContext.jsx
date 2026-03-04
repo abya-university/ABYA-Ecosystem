@@ -1,7 +1,13 @@
 import { createContext, useEffect, useState } from "react";
 import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import { defineChain } from "thirdweb/chains";
-import { getContract, readContract } from "thirdweb";
+import { useActiveAccount } from "thirdweb/react";
+import {
+  getContract,
+  prepareContractCall,
+  readContract,
+  sendTransaction,
+} from "thirdweb";
 import { client } from "../services/client";
 import CONTRACT_ADDRESSES from "../constants/addresses";
 
@@ -11,6 +17,7 @@ const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 const ChapterContext = createContext();
 
 const ChapterProvider = ({ children }) => {
+  const account = useActiveAccount();
   const [chapters, setChapters] = useState([]);
 
   const fetchChapters = async () => {
@@ -52,13 +59,47 @@ const ChapterProvider = ({ children }) => {
     }
   };
 
+  const createChapters = async (courseId, chapterNames, chapterDurations) => {
+    if (!account?.address) {
+      throw new Error("Please connect your wallet");
+    }
+
+    if (!client) {
+      throw new Error("Client is required to access the contract");
+    }
+
+    const diamondContract = getContract({
+      address: DiamondAddress,
+      abi: Ecosystem2Facet_ABI,
+      client,
+      chain: defineChain(11155111),
+    });
+
+    const tx = await prepareContractCall({
+      contract: diamondContract,
+      method: "addChapters",
+      params: [Number(courseId), chapterNames, chapterDurations],
+    });
+
+    const receipt = await sendTransaction({ transaction: tx, account });
+    await fetchChapters();
+    return receipt;
+  };
+
   // Optional: Add useEffect to fetch chapters on component mount
   useEffect(() => {
     fetchChapters();
   }, []);
 
   return (
-    <ChapterContext.Provider value={{ chapters, fetchChapters, setChapters }}>
+    <ChapterContext.Provider
+      value={{
+        chapters,
+        fetchChapters,
+        setChapters,
+        createChapters,
+      }}
+    >
       {children}
     </ChapterContext.Provider>
   );

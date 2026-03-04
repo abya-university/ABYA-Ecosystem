@@ -3,7 +3,12 @@ import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosy
 import { defineChain } from "thirdweb/chains";
 import { client } from "../services/client";
 import { useActiveAccount } from "thirdweb/react";
-import { getContract, readContract } from "thirdweb";
+import {
+  getContract,
+  prepareContractCall,
+  readContract,
+  sendTransaction,
+} from "thirdweb";
 import CONTRACT_ADDRESSES from "../constants/addresses";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
@@ -63,6 +68,33 @@ const LessonProvider = ({ children }) => {
     }
   };
 
+  const createLesson = async (chapterId, lessonName, lessonContent) => {
+    if (!account?.address) {
+      throw new Error("Please connect your wallet");
+    }
+
+    if (!client) {
+      throw new Error("Client is required to access the contract");
+    }
+
+    const diamondContract = getContract({
+      address: DiamondAddress,
+      abi: Ecosystem2Facet_ABI,
+      client,
+      chain: defineChain(11155111),
+    });
+
+    const tx = await prepareContractCall({
+      contract: diamondContract,
+      method: "addLesson",
+      params: [chapterId.toString(), lessonName, lessonContent],
+    });
+
+    const receipt = await sendTransaction({ transaction: tx, account });
+    await fetchLessons();
+    return receipt;
+  };
+
   useEffect(() => {
     if (client) {
       fetchLessons();
@@ -70,7 +102,14 @@ const LessonProvider = ({ children }) => {
   }, [client]);
 
   return (
-    <LessonContext.Provider value={{ lessons, fetchLessons, setLessons }}>
+    <LessonContext.Provider
+      value={{
+        lessons,
+        fetchLessons,
+        setLessons,
+        createLesson,
+      }}
+    >
       {children}
     </LessonContext.Provider>
   );

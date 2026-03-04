@@ -1,19 +1,10 @@
-import Ecosystem1FacetABI from "../../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
-import Ecosystem2FacetABI from "../../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
-import CONTRACT_ADDRESSES from "../../constants/addresses";
 import { useState } from "react";
-import { defineChain } from "thirdweb/chains";
-import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
 import { toast } from "react-toastify";
 import { useActiveAccount } from "thirdweb/react";
-import { client } from "../../services/client";
 import { useContext, useEffect } from "react";
 import { ChapterContext } from "../../contexts/chapterContext";
 import { CourseContext } from "../../contexts/courseContext";
-
-const DiamondAddress = CONTRACT_ADDRESSES.diamond;
-const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
-const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
+import { LessonContext } from "../../contexts/lessonContext";
 
 const LessonCreation = () => {
   const [lessonName, setLessonName] = useState("");
@@ -24,6 +15,7 @@ const LessonCreation = () => {
   const [filteredChapters, setFilteredChapters] = useState([]);
   const { chapters } = useContext(ChapterContext);
   const { courses } = useContext(CourseContext);
+  const { createLesson: createLessonInContext } = useContext(LessonContext);
   const account = useActiveAccount();
   const address = account?.address;
   const isConnected = !!account;
@@ -52,38 +44,15 @@ const LessonCreation = () => {
       return;
     }
 
-    if (!client) {
-      toast.error("Client is required to access the contract");
-      return;
-    }
-
     setLoading(true);
     const toastId = toast.loading("Creating lesson...");
     try {
-      const diamondContract = await getContract({
-        address: DiamondAddress,
-        abi: Ecosystem2Facet_ABI,
-        client,
-        chain: defineChain(11155111),
-      });
-
       toast.update(toastId, {
         render: "Processing transaction...",
         isLoading: true,
       });
 
-      const tx = await prepareContractCall({
-        contract: diamondContract,
-        method: "addLesson",
-        params: [chapterId.toString(), lessonName, lessonContent],
-      });
-
-      toast.update(toastId, {
-        render: "Waiting for transaction confirmation...",
-        isLoading: true,
-      });
-
-      await sendTransaction({ transaction: tx, account });
+      await createLessonInContext(chapterId, lessonName, lessonContent);
 
       toast.update(toastId, {
         render: `${lessonName} lesson created successfully!`,

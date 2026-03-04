@@ -1,16 +1,8 @@
 import { AlertCircle, CheckCircle, Image, Upload } from "lucide-react";
-import Ecosystem1FacetABI from "../../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
-import CONTRACT_ADDRESSES from "../../constants/addresses";
-import { useState } from "react";
-import { defineChain } from "thirdweb/chains";
-import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
+import { useContext, useState } from "react";
 import { toast } from "react-toastify";
 import { useActiveAccount } from "thirdweb/react";
-import { client } from "../../services/client";
-import { uploadFileToPinata } from "../../services/pinata";
-
-const DiamondAddress = CONTRACT_ADDRESSES.diamond;
-const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
+import { CourseContext } from "../../contexts/courseContext";
 
 const parsePriceToUSDCUnits = (value) => {
   const normalized = String(value || "").trim();
@@ -39,6 +31,7 @@ const CourseBasicInfo = () => {
   const account = useActiveAccount();
   const address = account?.address || "";
   const isConnected = !!address;
+  const { createCourse: createCourseInContext } = useContext(CourseContext);
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
@@ -92,47 +85,25 @@ const CourseBasicInfo = () => {
     setError("");
     const toastId = toast.loading("Creating course...");
     try {
-      const diamondContract = await getContract({
-        address: DiamondAddress,
-        abi: Ecosystem1Facet_ABI,
-        client,
-        chain: defineChain(11155111),
-      });
-
       toast.update(toastId, {
         render: "Uploading course image...",
         isLoading: true,
       });
-
-      const imageIpfsHash = await uploadFileToPinata(
-        courseData.basicInfo.image,
-      );
 
       toast.update(toastId, {
         render: "Processing transaction...",
         isLoading: true,
       });
 
-      const tx = await prepareContractCall({
-        contract: diamondContract,
-        method: "createCourse",
-        params: [
-          courseData.basicInfo.name,
-          courseData.basicInfo.description,
-          courseData.basicInfo.difficulty_level,
-          courseData.basicInfo.isFree ? 0 : priceUSDCUnits,
-          imageIpfsHash,
-        ],
+      const { receipt } = await createCourseInContext({
+        name: courseData.basicInfo.name,
+        description: courseData.basicInfo.description,
+        difficultyLevel: courseData.basicInfo.difficulty_level,
+        priceUSDCUnits: courseData.basicInfo.isFree ? 0 : priceUSDCUnits,
+        imageFile: courseData.basicInfo.image,
       });
 
-      toast.update(toastId, {
-        render: "Waiting for transaction confirmation...",
-        isLoading: true,
-      });
-
-      console.log("Transaction sent:", tx.hash);
-      const receipt = await sendTransaction({ transaction: tx, account });
-      console.log("Transaction confirmed:", receipt.transactionHash);
+      console.log("Transaction confirmed:", receipt?.transactionHash);
 
       toast.update(toastId, {
         render: "Course created successfully!",
@@ -157,14 +128,6 @@ const CourseBasicInfo = () => {
         resources: [],
       });
       setImagePreview(null);
-
-      // Note: You'll need to import readContract if you want to use this
-      // const hasRole = await readContract({
-      //   contract: diamondContract,
-      //   method: "function hasCourseOwnerRole(address account) view returns (bool)",
-      //   params: [account],
-      // });
-      // console.log("Has COURSE_OWNER_ROLE:", hasRole);
     } catch (err) {
       const message = err?.message || "Unknown error";
       toast.update(toastId, {

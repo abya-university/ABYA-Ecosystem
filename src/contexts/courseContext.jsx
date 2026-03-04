@@ -2,9 +2,10 @@ import React, { createContext, useEffect, useState } from "react";
 import Ecosystem1FacetABI from "../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
 import { defineChain } from "thirdweb/chains";
 import { useActiveAccount } from "thirdweb/react";
-import { getContract, readContract } from "thirdweb";
+import { getContract, prepareContractCall, readContract, sendTransaction } from "thirdweb";
 import { client } from "../services/client";
 import CONTRACT_ADDRESSES from "../constants/addresses";
+import { uploadFileToPinata } from "../services/pinata";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
@@ -13,100 +14,146 @@ const CourseContext = createContext();
 
 const CourseProvider = ({ children }) => {
   const account = useActiveAccount();
-  const address = account?.address || null;
   const [courses, setCourses] = useState([]);
   const [courseReviews, setCourseReviews] = useState({});
   const [latestReviews, setLatestReviews] = useState({});
   const [courseFeedback, setCourseFeedback] = useState({});
 
-  useEffect(() => {
-    const fetchCourses = async () => {
-      console.log("🔍 fetchCourses called, client:", client);
-      console.log("🔍 DiamondAddress:", DiamondAddress);
+  const fetchCourses = async () => {
+    console.log("🔍 fetchCourses called, client:", client);
+    console.log("🔍 DiamondAddress:", DiamondAddress);
 
-      if (!client) {
-        console.error(
-          "❌ Client is not available. Check VITE_APP_THIRDWEB_CLIENT_ID",
-        );
-        return;
-      }
+    if (!client) {
+      console.error(
+        "❌ Client is not available. Check VITE_APP_THIRDWEB_CLIENT_ID",
+      );
+      return;
+    }
 
-      if (!DiamondAddress) {
-        console.error("❌ Diamond contract address is not configured");
-        return;
-      }
+    if (!DiamondAddress) {
+      console.error("❌ Diamond contract address is not configured");
+      return;
+    }
+
+    try {
+      const contract = getContract({
+        address: DiamondAddress,
+        abi: Ecosystem1Facet_ABI,
+        client,
+        chain: defineChain(11155111),
+      });
+
+      console.log("✅ Contract instance created:", contract);
 
       try {
-        const contract = getContract({
-          address: DiamondAddress,
-          abi: Ecosystem1Facet_ABI,
-          client,
-          chain: defineChain(11155111), // Sepolia
+        const coursesData = await readContract({
+          contract,
+          method: "getAllCourses",
+          params: [],
         });
 
-        console.log("✅ Contract instance created:", contract);
+        console.log("✅ Raw Courses Data:", coursesData);
 
-        try {
-          // Use readContract directly
-          const coursesData = await readContract({
-            contract,
-            method: "getAllCourses",
-            params: [],
-          });
+        const formattedCourses = Array.isArray(coursesData)
+          ? coursesData.map((course) => {
+              const enrolledStudents = Array.isArray(course.enrolledStudents)
+                ? course.enrolledStudents
+                : [];
 
-          console.log("✅ Raw Courses Data:", coursesData);
+              return {
+                courseId: course.courseId.toString(),
+                courseName: course.courseName,
+                description: course.description,
+                approved: course.approved,
+                score: course.score.toString(),
+                creator: course.creator,
+                enrolledStudents: enrolledStudents.map((student) =>
+                  student.toString(),
+                ),
+                difficulty_level: Number(course.difficultyLevel),
+                creationTime: course.creationTime.toString(),
+                priceUSDC: course?.priceUSDC?.toString?.() ?? "0",
+                imageURL: course?.imageURL || "",
+              };
+            })
+          : [];
 
-          const formattedCourses = Array.isArray(coursesData)
-            ? coursesData.map((course) => {
-                const enrolledStudents = Array.isArray(course.enrolledStudents)
-                  ? course.enrolledStudents
-                  : [];
+        console.log("✅ Formatted Courses:", formattedCourses);
+        setCourses(formattedCourses);
 
-                return {
-                  courseId: course.courseId.toString(),
-                  courseName: course.courseName,
-                  description: course.description,
-                  approved: course.approved,
-                  score: course.score.toString(),
-                  creator: course.creator,
-                  enrolledStudents: enrolledStudents.map((student) =>
-                    student.toString(),
-                  ),
-                  difficulty_level: Number(course.difficultyLevel),
-                  creationTime: course.creationTime.toString(),
-                  priceUSDC: course?.priceUSDC?.toString?.() ?? "0",
-                  imageURL: course?.imageURL || "",
-                };
-              })
-            : [];
-
-          console.log("✅ Formatted Courses:", formattedCourses);
-          setCourses(formattedCourses);
-
-          // Fetch reviews and feedback for each course
-          for (const course of formattedCourses) {
-            await fetchCourseReviews(contract, course.courseId);
-            await fetchLatestReview(contract, course.courseId);
-            await fetchCourseFeedback(contract, course.courseId);
-          }
-        } catch (fetchError) {
-          console.error("❌ Error fetching courses:", fetchError);
-          console.error(
-            "❌ Error details:",
-            fetchError.message,
-            fetchError.stack,
-          );
+        for (const course of formattedCourses) {
+          await fetchCourseReviews(contract, course.courseId);
+          await fetchLatestReview(contract, course.courseId);
+          await fetchCourseFeedback(contract, course.courseId);
         }
-      } catch (contractError) {
-        console.error("❌ Error creating contract instance:", contractError);
-        console.error("❌ Contract error details:", contractError.message);
+      } catch (fetchError) {
+        console.error("❌ Error fetching courses:", fetchError);
+        console.error(
+          "❌ Error details:",
+          fetchError.message,
+          fetchError.stack,
+        );
       }
-    };
+    } catch (contractError) {
+      console.error("❌ Error creating contract instance:", contractError);
+      console.error("❌ Contract error details:", contractError.message);
+    }
+  };
 
+  useEffect(() => {
     fetchCourses();
   }, []);
 
-  // Function to fetch all reviews for a course
+  const createCourse = async ({
+    name,
+    description,
+    difficultyLevel,
+    priceUSDCUnits,
+    imageFile,
+  }) => {
+    if (!account?.address) {
+      throw new Error("Please connect your wallet");
+    }
+
+    if (!client) {
+      throw new Error("Client is required to access the contract");
+    }
+
+    if (!imageFile) {
+      throw new Error("Course image is required");
+    }
+
+    const diamondContract = getContract({
+      address: DiamondAddress,
+      abi: Ecosystem1Facet_ABI,
+      client,
+      chain: defineChain(11155111),
+    });
+
+    const imageIpfsHash = await uploadFileToPinata(imageFile);
+
+    const tx = await prepareContractCall({
+      contract: diamondContract,
+      method: "createCourse",
+      params: [
+        name,
+        description,
+        difficultyLevel,
+        Number(priceUSDCUnits || 0),
+        imageIpfsHash,
+      ],
+    });
+
+    const receipt = await sendTransaction({ transaction: tx, account });
+
+    await fetchCourses();
+
+    return {
+      receipt,
+      imageIpfsHash,
+    };
+  };
+
   const fetchCourseReviews = async (contract, courseId) => {
     if (!courseId) {
       console.warn("Invalid courseId passed to fetchCourseReviews");
@@ -116,7 +163,6 @@ const CourseProvider = ({ children }) => {
     try {
       console.log(`Fetching all reviews for course ${courseId}`);
 
-      // Use readContract directly
       const reviews = await readContract({
         contract,
         method: "getAllCourseReviews",
@@ -164,7 +210,6 @@ const CourseProvider = ({ children }) => {
     }
   };
 
-  // Function to fetch latest review for a course
   const fetchLatestReview = async (contract, courseId) => {
     if (!courseId) {
       console.warn("Invalid courseId passed to fetchLatestReview");
@@ -174,7 +219,6 @@ const CourseProvider = ({ children }) => {
     try {
       console.log(`Fetching latest review for course ${courseId}`);
 
-      // Use readContract directly
       const latestReview = await readContract({
         contract,
         method:
@@ -219,7 +263,6 @@ const CourseProvider = ({ children }) => {
     }
   };
 
-  // Function to fetch feedback for a course
   const fetchCourseFeedback = async (contract, courseId) => {
     if (!courseId) {
       console.warn("Invalid courseId passed to fetchCourseFeedback");
@@ -227,7 +270,6 @@ const CourseProvider = ({ children }) => {
     }
 
     try {
-      // Use readContract directly
       const feedback = await readContract({
         contract,
         method:
@@ -246,7 +288,6 @@ const CourseProvider = ({ children }) => {
     }
   };
 
-  // Function to fetch on demand for a specific course
   const getCourseData = async (courseId) => {
     if (!courseId || !client) return;
 
@@ -255,7 +296,7 @@ const CourseProvider = ({ children }) => {
         address: DiamondAddress,
         abi: Ecosystem1Facet_ABI,
         client,
-        chain: defineChain(11155111), // Sepolia
+        chain: defineChain(11155111),
       });
 
       await Promise.all([
@@ -281,6 +322,8 @@ const CourseProvider = ({ children }) => {
         setCourseFeedback,
         setLatestReviews,
         getCourseData,
+        fetchCourses,
+        createCourse,
       }}
     >
       {children}
