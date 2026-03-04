@@ -26,6 +26,7 @@
         "ethr-did-resolver": "^11.0.3",
         "fast-equals": "^5.2.2",
         "file-saver": "^2.0.5",
+        "framer-motion": "^12.34.5",
         "html2canvas": "^1.4.1",
         "html2pdf.js": "^0.10.3",
         "ipfs-http-client": "^57.0.3",

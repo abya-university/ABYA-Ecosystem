@@ -1,20 +1,18 @@
-// src/pages/SharePresentation.jsx
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { CheckCircle, XCircle, Loader2, Copy, Printer, Download, QrCode } from "lucide-react";
+import {
+  CheckCircle,
+  XCircle,
+  Loader2,
+  Copy,
+  Printer,
+  Download,
+  QrCode,
+  /* using lucide icons already present */
+} from "lucide-react";
+import VantaNetBG from "../components/Homepage Components/VantaJS";
 
-/**
- * Bold, modern "authentication" viewer for a shared VP.
- * - verifies the presentation when user clicks "Verify"
- * - large badge with clear valid/invalid state
- * - printable / download JSON
- * - copy link / QR code
- *
- * Expects GET http://localhost:3000/share/view/:token
- * and POST http://localhost:3000/presentation/verify
- */
-
-// base64url decode helper
+// base64url decode helper (unchanged)
 function b64UrlDecode(input = "") {
   try {
     input = input.replace(/-/g, "+").replace(/_/g, "/");
@@ -36,10 +34,6 @@ function decodeJwtPayloadSafe(jwt) {
   }
 }
 
-function Skeleton({ className = "h-5 rounded bg-gradient-to-r from-gray-200 to-gray-300 animate-pulse" }) {
-  return <div className={className} />;
-}
-
 export default function SharePresentation() {
   const { token } = useParams();
 
@@ -51,7 +45,40 @@ export default function SharePresentation() {
   // verification state
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState(null); // null | true | false
-  const [verifyDetails, setVerifyDetails] = useState(null);
+  const [verifyMessage, setVerifyMessage] = useState(null);
+
+  // darkMode detector
+  const [darkMode, setDarkMode] = useState(
+    () => typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+  );
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = (e) => setDarkMode(e.matches);
+    mq.addEventListener ? mq.addEventListener("change", onChange) : mq.addListener(onChange);
+    return () => {
+      mq.removeEventListener ? mq.removeEventListener("change", onChange) : mq.removeListener(onChange);
+    };
+  }, []);
+
+  // UI: mobile menu + QR modal + snackbar
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [snack, setSnack] = useState(null); // { msg, timeoutId }
+
+  const navList = [
+    { name: "Explore", href: "/" },
+    { name: "Courses", href: "#" },
+    { name: "Community", href: "#" },
+    { name: "About", href: "#" },
+  ];
+
+  // helper to show transient snack
+  function showSnack(msg = "Done", ms = 2200) {
+    if (snack?.timeoutId) clearTimeout(snack.timeoutId);
+    const timeoutId = setTimeout(() => setSnack(null), ms);
+    setSnack({ msg, timeoutId });
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -84,12 +111,17 @@ export default function SharePresentation() {
         // pick VC
         let vcCandidate = null;
         if (presentation?.verifiableCredential) {
-          if (Array.isArray(presentation.verifiableCredential)) vcCandidate = presentation.verifiableCredential[0];
-          else vcCandidate = presentation.verifiableCredential;
+          vcCandidate = Array.isArray(presentation.verifiableCredential)
+            ? presentation.verifiableCredential[0]
+            : presentation.verifiableCredential;
         } else if (json.rawVerifiableCredentials?.length) {
           vcCandidate = json.rawVerifiableCredentials[0];
         } else if (json.verifiableCredentials?.length) {
-          try { vcCandidate = JSON.parse(json.verifiableCredentials[0]); } catch { vcCandidate = json.verifiableCredentials[0]; }
+          try {
+            vcCandidate = JSON.parse(json.verifiableCredentials[0]);
+          } catch {
+            vcCandidate = json.verifiableCredentials[0];
+          }
         }
 
         if (typeof vcCandidate === "string" && vcCandidate.split(".").length === 3) {
@@ -109,7 +141,11 @@ export default function SharePresentation() {
               owner: vcCandidate.owner,
             },
             issuer: vcCandidate.issuerDID ? { id: vcCandidate.issuerDID } : (vcCandidate.issuer ? { id: vcCandidate.issuer } : undefined),
-            issuanceDate: vcCandidate.issuanceDate ? (String(vcCandidate.issuanceDate).length > 12 ? new Date(Number(vcCandidate.issuanceDate)).toISOString() : new Date(Number(vcCandidate.issuanceDate) * 1000).toISOString()) : undefined,
+            issuanceDate: vcCandidate.issuanceDate
+              ? (String(vcCandidate.issuanceDate).length > 12
+                ? new Date(Number(vcCandidate.issuanceDate)).toISOString()
+                : new Date(Number(vcCandidate.issuanceDate) * 1000).toISOString())
+              : undefined,
           };
         }
 
@@ -137,13 +173,11 @@ export default function SharePresentation() {
     };
   }, [token]);
 
-  const handleCopy = (text) => navigator.clipboard?.writeText(text);
-
   async function handleVerifyPresentation() {
     if (!data?.presentation) return;
     setVerifying(true);
     setVerified(null);
-    setVerifyDetails(null);
+    setVerifyMessage(null);
     try {
       const res = await fetch(`http://localhost:3000/presentation/verify`, {
         method: "POST",
@@ -151,27 +185,77 @@ export default function SharePresentation() {
         body: JSON.stringify({ presentation: data.presentation }),
       });
       const j = await res.json();
-      // store raw result + set verified flag heuristically
-      setVerifyDetails(j);
-      const ok = res.ok && j?.verification && (!j.verification.errors || j.verification.errors.length === 0);
-      setVerified(Boolean(ok));
+
+      // set a concise, non-sensitive message only
+      const success = res.ok && j?.verification && (!j.verification.errors || j.verification.errors.length === 0);
+      setVerified(Boolean(success));
+
+      if (success) setVerifyMessage("Signature, issuer and structure validated");
+      else if (j?.verification?.errors && j.verification.errors.length) setVerifyMessage(j.verification.errors[0].message || "Verification failed");
+      else if (j?.error) setVerifyMessage(j.error);
+      else setVerifyMessage("Verification could not confirm the credential");
+      showSnack(success ? "Verification completed" : "Verification finished");
     } catch (e) {
       setVerified(false);
-      setVerifyDetails({ error: e.message });
+      setVerifyMessage(e.message || "Verification failed");
+      showSnack("Verification failed");
     } finally {
       setVerifying(false);
     }
   }
 
+  function copyPublicSnapshot() {
+    if (!data) return;
+    const snapshot = {
+      presentationId: data.presentationId || null,
+      holderDid: data.holderDid || null,
+      issuerDid: data.issuerDid || null,
+      course: data.vc?.credentialSubject?.course || null,
+      ownerName: data.vc?.credentialSubject?.name || null,
+      verified: verified === null ? "unknown" : verified,
+      timestamp: new Date().toISOString(),
+    };
+    navigator.clipboard?.writeText(JSON.stringify(snapshot, null, 2));
+    showSnack("Snapshot copied");
+  }
+
+  function downloadProof() {
+    if (!data) return;
+    const proof = {
+      presentationId: data.presentationId || null,
+      verified: verified === null ? "unknown" : verified,
+      message: verifyMessage || null,
+      timestamp: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(proof, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `abya-proof-${data.presentationId || "snapshot"}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showSnack("Proof downloaded");
+  }
+
+  // Build QR image URL (quick integration using a public chart API)
+  // NOTE: you can swap to an in-app generator (qrcode.react or 'qrcode' library) if you prefer
+  function qrImageUrl(text) {
+    const t = encodeURIComponent(text || window.location.href);
+    // Google Chart API (lightweight, no additional dependencies)
+    return `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${t}&chld=L|1`;
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-neutral-900 p-6">
-        <div className="rounded-2xl bg-white/6 backdrop-blur-md p-8 max-w-xl w-full text-center border border-white/6">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-tr from-amber-400 to-rose-500 mb-4 shadow-lg">
-            <QrCode className="w-10 h-10 text-white" />
+        <div className="rounded-3xl bg-gradient-to-tr from-violet-800/40 to-cyan-800/30 backdrop-blur-md p-10 max-w-lg w-full text-center border border-white/6">
+          <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-tr from-emerald-400 to-rose-500 mb-4 shadow-2xl">
+            <QrCode className="w-12 h-12 text-white" />
           </div>
-          <h2 className="text-white text-2xl font-bold">Loading credential snapshot</h2>
-          <p className="mt-2 text-sm text-slate-300">Retrieving and preparing the presentation for verification…</p>
+          <h2 className="text-white text-3xl font-extrabold tracking-tight">Preparing credential</h2>
+          <p className="mt-2 text-sm text-slate-300">Securely fetching and normalizing the presentation…</p>
         </div>
       </div>
     );
@@ -180,9 +264,9 @@ export default function SharePresentation() {
   if (error || !data) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-neutral-900 p-6">
-        <div className="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-md w-full text-center border">
-          <h3 className="text-lg font-semibold text-red-500">Unable to load credential</h3>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">{error || "Unknown error"}</p>
+        <div className="bg-white/3 rounded-2xl p-8 max-w-md w-full text-center border border-red-600/20">
+          <h3 className="text-lg font-semibold text-red-400">Unable to load credential</h3>
+          <p className="mt-2 text-sm text-gray-300">{error || "Unknown error"}</p>
           <div className="mt-4">
             <Link to="/" className="px-4 py-2 bg-amber-500 text-white rounded-md">Return home</Link>
           </div>
@@ -191,7 +275,7 @@ export default function SharePresentation() {
     );
   }
 
-  // present values
+  // present values (minimal, non-sensitive)
   const vc = data.vc || {};
   const subject = vc.credentialSubject || {};
   const course = subject.course || "—";
@@ -204,160 +288,274 @@ export default function SharePresentation() {
   const expiresAt = data.expiresAt ? new Date(data.expiresAt).toLocaleString() : "—";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-700 to-white dark:from-neutral-900 dark:to-gray-800 p-6 flex items-center justify-center">
-      <div className="w-full max-w-7xl">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-5xl font-extrabold text-gray-900 dark:text-white">Credential Authentication</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Read-only verification page — confirm issuer & student details</p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => handleCopy(window.location.href)}
-              className="flex items-center gap-2 px-3 py-2 rounded-md bg-white dark:bg-gray-800 border hover:brightness-95"
-              title="Copy share URL"
-            >
-              <Copy className="w-4 h-4" /><span className="text-xs">Copy link</span>
-            </button>
-
-            <button
-              onClick={() => window.print()}
-              className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-500 text-white hover:brightness-95"
-              title="Print credential"
-            >
-              <Printer className="w-4 h-4" /><span className="text-xs">Print</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Card */}
-        <div className="bg-white/20 backdrop-blur-md rounded-2xl shadow-2xl overflow-hidden border border-emerald-200 dark:border-gray-800">
-          <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-            {/* Left: big certificate UI */}
-            <div className="mt-12 md:col-span-2 bg-gradient-to-b from-white to-amber-50 dark:from-gray-900 dark:to-gray-800 p-6 rounded-xl border border-gray-100 dark:border-gray-800 relative">
-              {/* ribbon / seal */}
-              <div className="absolute -top-5 left-6 flex items-center gap-3">
-                <div className="bg-amber-500 text-white font-semibold px-3 py-1 rounded-full shadow-md">ABYA</div>
-                <div className="text-xs text-gray-500 hidden sm:block">Official Certificate</div>
+    <VantaNetBG>
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="w-full max-w-7xl">
+          {/* Desktop nav (centered) */}
+          <nav className="hidden lg:flex space-x-8 fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-[90%] lg:w-[70%]" aria-label="Primary">
+            <div className="backdrop-blur-md rounded-2xl border bg-white/10 border-white/10 shadow-2xl w-full px-6 py-2 flex items-center justify-center space-x-10">
+              {/* Logo */}
+              <div className="flex items-center space-x-3">
+                <img
+                  src="/abya_logo.jpg"
+                  alt="ABYA Logo"
+                  className="w-24 h-10 rounded-lg"
+                />
               </div>
 
-              {/* verification badge */}
-              <div className="flex items-center justify-end">
-                <div className="flex items-center gap-3">
-                  <div className={`flex items-center gap-2 px-3 py-2 rounded-full ${verified === true ? "bg-emerald-100 text-emerald-700" : verified === false ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"}`}>
-                    {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : verified === true ? <CheckCircle className="w-5 h-5" /> : verified === false ? <XCircle className="w-5 h-5" /> : <svg className="w-5 h-5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/></svg>}
-                    <div className="text-xs font-medium">
-                      {verifying ? "Verifying…" : verified === true ? "Verified" : verified === false ? "Not verified" : "Verification"}
+              <div className="hidden lg:flex space-x-8">
+                {navList.map((item) => (
+                  <Link key={item.name} to={item.href} className="font-medium transition-all duration-300 hover:text-yellow-500">
+                    {item.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </nav>
+
+          {/* Mobile header with hamburger */}
+          <div className="flex items-center justify-between mb-6 lg:mt-6">
+            <div>
+              <h1 className="text-3xl lg:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400">
+                Credential Authentication
+              </h1>
+              <p className="text-md font-bold text-gray-500 mt-1">Read-only verification view — minimal public snapshot</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex items-center gap-3">
+                <button
+                  onClick={copyPublicSnapshot}
+                  className="flex items-center gap-2 px-3 py-2 rounded-md bg-white/5 border border-white/6 hover:brightness-110"
+                  title="Copy public snapshot"
+                >
+                  <Copy className="w-4 h-4" /><span className="text-xs">Snapshot</span>
+                </button>
+
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-2 px-3 py-2 rounded-md bg-gradient-to-r from-amber-500 to-rose-500 text-white hover:brightness-105"
+                  title="Print credential"
+                >
+                  <Printer className="w-4 h-4" /><span className="text-xs font-bold">Print</span>
+                </button>
+              </div>
+
+              {/* hamburger for mobile */}
+              <button
+                onClick={() => setMenuOpen((s) => !s)}
+                aria-expanded={menuOpen}
+                aria-label="Open navigation"
+                className="inline-flex items-center justify-center p-2 rounded-md bg-white/6 hover:bg-white/8 sm:hidden"
+              >
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+                  {menuOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                  )}
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile drawer */}
+          {menuOpen && (
+            <div className="sm:hidden fixed inset-0 z-40">
+              <div className="absolute inset-0 bg-black/40" onClick={() => setMenuOpen(false)} />
+              <div className="absolute top-16 left-4 right-4 bg-slate-900/80 backdrop-blur-md rounded-xl p-4 border border-white/6 shadow-xl">
+                <div className="flex flex-col gap-3">
+                  {navList.map((item) => (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      onClick={() => setMenuOpen(false)}
+                      className="px-3 py-2 rounded-md font-medium hover:bg-white/5"
+                    >
+                      {item.name}
+                    </Link>
+                  ))}
+                  <div className="pt-2 border-t border-white/6 mt-2 flex gap-2">
+                    <button onClick={() => { copyPublicSnapshot(); setMenuOpen(false); }} className="flex-1 px-3 py-2 rounded-md bg-white/5">Copy snapshot</button>
+                    <button onClick={() => { setQrOpen(true); setMenuOpen(false); }} className="flex-1 px-3 py-2 rounded-md bg-white/5">QR</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Card */}
+          <div className="mt-6 bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl overflow-hidden border border-amber-600/20">
+            <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+              {/* Left / main */}
+              <div className="md:col-span-2 relative p-6 rounded-2xl border border-gray-800/10 mt-6">
+                <div className="absolute -top-6 left-6 flex items-center gap-3">
+                  <div className="bg-gradient-to-tr from-amber-400 to-rose-500 text-white font-semibold px-3 py-1 rounded-full shadow-xl">ABYA</div>
+                  <div className="text-xs text-slate-500 hidden sm:block">Official Certificate</div>
+                </div>
+
+                {/* verification badge */}
+                <div className="flex items-center justify-end">
+                  <div className={`flex items-center gap-3 px-4 py-2 rounded-full ring-1 ${verified === true ? "ring-emerald-300 bg-emerald-600/40 text-green-600" : verified === false ? "ring-rose-500 bg-rose-900/20 text-rose-200" : "ring-slate-500 bg-slate-900/20 text-slate-300"}`}>
+                    <div className="relative w-12 h-12 rounded-full flex items-center justify-center bg-white border border-white/5">
+                      {verifying ? <Loader2 className="w-6 h-6 animate-spin" aria-hidden /> : verified === true ? <CheckCircle className="w-6 h-6" aria-hidden /> : verified === false ? <XCircle className="w-6 h-6" aria-hidden /> : <svg className="w-5 h-5 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" /></svg>}
+                      <span className={`absolute inset-0 rounded-full ${verified === true ? "animate-pulse" : ""}`} />
+                    </div>
+
+                    <div className="text-left">
+                      <div className="text-xs uppercase tracking-wide">Status</div>
+                      <div className="text-sm font-semibold">{verifying ? "Verifying…" : verified === true ? "Verified" : verified === false ? "Not verified" : "Unknown"}</div>
                     </div>
                   </div>
                 </div>
+
+                <div className="mt-6">
+                  <h2 className="text-3xl font-bold text-gray-800">{course}</h2>
+                  <p className="text-sm text-slate-500 mt-1">Course Completion Credential</p>
+
+                  <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-xs text-slate-500">Credential ID</div>
+                      <div className="text-sm font-mono text-gray-800 truncate">{credId}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-slate-500">Issued</div>
+                      <div className="text-sm text-gray-800">{issued}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-8 flex items-center gap-14 text-gray-800 overflow-x-auto">
+                    <div>
+                      <div className="text-xs text-slate-500">Owner</div>
+                      <div className="text-sm font-semibold">{ownerName}</div>
+                      <div className="text-xs font-mono text-slate-500 truncate max-w-xs">{ownerDid}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-slate-500">Issuer</div>
+                      <div className="text-sm font-semibold">{issuerDid}</div>
+                      <div className="text-xs text-slate-500">ABYA University</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex items-center gap-3">
+                    <button
+                      onClick={handleVerifyPresentation}
+                      disabled={verifying}
+                      className="px-5 py-2 bg-gradient-to-r from-emerald-400 to-cyan-400 text-white rounded-full font-semibold shadow-lg hover:brightness-105"
+                      title="Verify cryptographic signature and VC"
+                    >
+                      {verifying ? "Verifying…" : "Verify credential"}
+                    </button>
+
+                    <button onClick={copyPublicSnapshot} className="px-4 py-2 border rounded-full bg-white/5 hover:bg-gray-500/10" title="Copy public snapshot">
+                      <span className="inline-flex items-center gap-2"><Copy className="w-4 h-4" />Snapshot</span>
+                    </button>
+
+                    <button onClick={downloadProof} className="px-4 py-2 border rounded-full bg-white/5 hover:bg-gray-500/10" title="Download verification proof (minimal)">
+                      <span className="inline-flex items-center gap-2"><Download className="w-4 h-4" />Proof</span>
+                    </button>
+
+                    <button onClick={() => setQrOpen(true)} className="px-3 py-2 border rounded-full bg-white/5 hover:bg-gray-500/10" title="Open QR / link">
+                      <QrCode className="w-4 h-4 inline-block mr-1" /> Link
+                    </button>
+                  </div>
+
+                  {verifyMessage && (
+                    <div className={`mt-5 p-3 rounded-full text-center ${verified ? "bg-emerald-500/80 text-emerald-100" : "bg-rose-900/40 text-rose-200"}`}>
+                      <div className="text-sm font-medium">{verifyMessage}</div>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="mt-4">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{course}</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Course Completion Credential</p>
-
-                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <div className="text-xs text-gray-500">Credential ID</div>
-                    <div className="text-sm font-mono text-gray-800 dark:text-gray-200">{credId}</div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="text-xs text-gray-500">Issued</div>
-                    <div className="text-sm text-gray-700 dark:text-gray-300">{issued}</div>
-                  </div>
-                </div>
-
-                <div className="mt-6 flex items-center gap-6">
+              {/* Right metadata */}
+              <aside className="p-6 mt-6 rounded-2xl border border-cyan-600/10 shadow-lg backdrop-blur-md">
+                <div className="text-md font-bold text-amber-500 mb-3">Snapshot</div>
+                <div className="space-y-4 text-slate-200">
                   <div>
-                    <div className="text-xs text-gray-500">Owner</div>
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white">{ownerName}</div>
-                    <div className="text-xs font-mono text-gray-500 break-all">{ownerDid}</div>
+                    <div className="text-xs text-slate-500">Presentation ID</div>
+                    <div className="font-mono text-sm text-gray-900 truncate">{presentationId}</div>
                   </div>
 
                   <div>
-                    <div className="text-xs text-gray-500">Issuer</div>
-                    <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">{issuerDid}</div>
-                    <div className="text-xs text-gray-400">ABYA University</div>
+                    <div className="text-xs text-slate-500">Holder DID</div>
+                    <div className="font-mono text-sm text-gray-900 truncate">{data.holderDid || "—"}</div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-slate-500">Expires</div>
+                    <div className="text-sm font-mono text-gray-900">{expiresAt}</div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-slate-500">Last action</div>
+                    <div className="text-sm text-gray-900">{verified === null ? 'No verification performed' : verified ? 'Last verification: success' : 'Last verification: failed'}</div>
                   </div>
                 </div>
-
-                <div className="mt-6 flex items-center gap-3">
-                  <button
-                    onClick={handleVerifyPresentation}
-                    disabled={verifying}
-                    className="px-4 py-2 bg-emerald-600 text-white rounded-md shadow hover:brightness-95"
-                    title="Verify cryptographic signature and VC"
-                  >
-                    {verifying ? "Verifying…" : "Verify credential"}
-                  </button>
-
-                  <button
-                    onClick={() => handleCopy(JSON.stringify(data.raw || {}, null, 2))}
-                    className="px-3 py-2 border rounded-md bg-white dark:bg-gray-800"
-                    title="Copy JSON"
-                  >
-                    <span className="inline-flex items-center gap-2"><Download className="w-4 h-4" />JSON</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      // open small popup with QR
-                      const q = window.open("", "_blank", "width=360,height=420");
-                      q.document.write(`<html><body style="display:flex;align-items:center;justify-content:center;height:100vh">${window.location.href}</body></html>`);
-                    }}
-                    className="px-3 py-2 border rounded-md bg-white dark:bg-gray-800"
-                    title="Open QR / link"
-                  >
-                    <QrCode className="w-4 h-4 inline-block mr-1" /> Link
-                  </button>
-                </div>
-
-                {/* verification details */}
-                {verified !== null && verifyDetails && (
-                  <div className={`mt-4 p-3 rounded-md ${verified ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"}`}>
-                    <div className="text-xs font-medium">{verified ? "Signature & structure verified" : "Verification failed"}</div>
-                    <pre className="mt-2 text-xs max-h-32 overflow-auto whitespace-pre-wrap">{JSON.stringify(verifyDetails, null, 2)}</pre>
-                  </div>
-                )}
-              </div>
+              </aside>
             </div>
 
-            {/* Right: metadata & raw preview */}
-            <aside className="mt-12 p-4 rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
-              <div className="text-xs text-gray-500 mb-2">Snapshot</div>
-              <div className="space-y-3">
-                <div>
-                  <div className="text-xs text-gray-400">Presentation ID</div>
-                  <div className="font-mono text-sm break-all">{presentationId}</div>
-                </div>
-
-                <div>
-                  <div className="text-xs text-gray-400">Holder DID</div>
-                  <div className="font-mono text-sm break-all">{data.holderDid || "—"}</div>
-                </div>
-
-                <div>
-                  <div className="text-xs text-gray-400">Expires</div>
-                  <div className="text-sm font-mono">{expiresAt}</div>
-                </div>
-
-                <details className="mt-2 text-xs text-gray-500">
-                  <summary className="cursor-pointer">Raw JSON</summary>
-                  <pre className="mt-2 max-h-48 overflow-auto p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs">{JSON.stringify(data.raw || {}, null, 2)}</pre>
-                </details>
-              </div>
-            </aside>
+            <footer className="px-6 py-4 bg-black/20 border-t border-cyan-600/5 text-xs text-slate-900 flex items-center justify-between">
+              <div>Rendered by <strong>ABYA Passport</strong></div>
+              <div className="font-mono">{presentationId} • {expiresAt}</div>
+            </footer>
           </div>
-
-          <footer className="px-6 py-4 bg-white/50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-500">
-            Rendered by <strong>ABYA Veramo Viewer</strong> • {presentationId} • {expiresAt}
-          </footer>
         </div>
+
+        {/* QR Modal */}
+        {qrOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setQrOpen(false)} />
+            <div className="relative bg-white/30 backdrop-blur-lg rounded-2xl p-6 w-[92%] max-w-md border border-white/10">
+              <div className="flex items-start justify-between">
+                <h3 className="text-lg font-semibold text-white">Share link</h3>
+                <button aria-label="Close QR" onClick={() => setQrOpen(false)} className="text-white/80">✕</button>
+              </div>
+
+              <div className="mt-4 flex flex-col items-center gap-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 1200 1200"><path fill="#fff" d="M0 0v1200h1200V573.486l-196.875 208.739v220.898h-806.25v-806.25h396.68V0zm857.861 0v225.977c-205.254.005-579.542 2.254-579.542 641.895c42.436-427.736 237.375-430.415 579.542-430.42v246.776L1200 342.09z" /></svg>
+                <div className="text-xs text-slate-300 text-center break-words overflow-hidden">{window.location.href}</div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { navigator.clipboard?.writeText(window.location.href); showSnack("Link copied"); }}
+                    className="px-4 py-2 rounded-md bg-white/5 hover:bg-white/10 flex items-center gap-2"
+                  >
+                    <Copy className="inline w-4 h-4 mr-2" />Copy link
+                  </button>
+
+                  <button
+                    onClick={() => { /* optionally trigger native share if available */
+                      if (navigator.share) {
+                        navigator.share({ title: "ABYA Credential", text: course, url: window.location.href }).catch(() => { });
+                      } else {
+                        navigator.clipboard?.writeText(window.location.href);
+                        showSnack("Link copied");
+                      }
+                    }}
+                    className="px-4 py-2 rounded-md bg-white/5 hover:bg-white/10 flex items-center gap-2"
+                  >
+                    Share
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Snackbar */}
+        {snack && (
+          <div className="fixed left-1/2 transform -translate-x-1/2 bottom-8 z-60">
+            <div className="bg-black/80 text-white px-4 py-2 rounded-md shadow-lg">{snack.msg}</div>
+          </div>
+        )}
       </div>
-    </div>
+      <footer className="px-6 py-4 bg-black/20 border-t border-cyan-600/5 text-sm text-slate-900 flex items-center justify-between">
+        <div>powered by <strong>ABYA University</strong></div>
+        <div className="font-mono">Support • Email: support@abyauniversity.edu • Call: +254 700 000 000</div>
+      </footer>
+    </VantaNetBG>
   );
 }
