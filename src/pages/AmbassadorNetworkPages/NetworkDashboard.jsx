@@ -18,6 +18,20 @@ import {
   GraduationCap,
   ArrowRight,
   ExternalLink,
+  Crown,
+  Medal,
+  Star,
+  Zap,
+  Clock,
+  RefreshCw,
+  MoreVertical,
+  Settings,
+  Bell,
+  HelpCircle,
+  BarChart3,
+  PieChart,
+  Layers,
+  Network,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -51,6 +65,7 @@ export default function NetworkDashboard() {
   } = useAmbassadorNetwork();
   const { enrolledCourses, role, refreshRole } = useUser();
   const account = useActiveAccount();
+  const address = account?.address;
   const { did } = useDid();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -62,6 +77,7 @@ export default function NetworkDashboard() {
   const [userAmbassadorDetails, setUserAmbassadorDetails] = useState(null);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
   const [hoveredCard, setHoveredCard] = useState(null);
+  const [showBadgeDetails, setShowBadgeDetails] = useState(false);
 
   // USDC configuration
   const USDC_ADDRESS = import.meta.env.VITE_APP_SEPOLIA_USDC_ADDRESS;
@@ -83,13 +99,9 @@ export default function NetworkDashboard() {
     });
   }, [account?.address, fetchAmbassadors]);
 
-  // Refetch ambassadors when role changes (after registration)
+  // Fetch current user ambassador details directly from contract
   useEffect(() => {
-    if (
-      role &&
-      (role === "Founding Ambassador" || role === "General Ambassador") &&
-      account?.address
-    ) {
+    if (account?.address) {
       const fetchUserDetails = async () => {
         try {
           const diamondContract = await getContract({
@@ -102,7 +114,7 @@ export default function NetworkDashboard() {
           const details = await readContract({
             contract: diamondContract,
             method:
-              "function getAmbassadorDetails(address _ambassador) view returns (bytes32 did, uint8 tier, uint8 level, address sponsor, address leftLeg, address rightLeg, uint256 totalDownlineSales, uint256 lifetimeCommissions, bool isActive)",
+              "function getAmbassadorDetails(address _ambassador) view returns (string did, uint8 tier, uint8 level, address sponsor, address leftLeg, address rightLeg, uint256 totalDownlineSales, uint256 lifetimeCommissions, bool isActive)",
             params: [account.address],
           });
 
@@ -119,15 +131,25 @@ export default function NetworkDashboard() {
             isActive: details[8],
           };
 
-          setUserAmbassadorDetails(ambassadorData);
+          const hasValidDid =
+            typeof ambassadorData.did === "string" &&
+            ambassadorData.did.trim() !== "";
+          const hasValidTier = Number(ambassadorData.tier) > 0;
+
+          if (hasValidDid && hasValidTier) {
+            setUserAmbassadorDetails(ambassadorData);
+          } else {
+            setUserAmbassadorDetails(null);
+          }
         } catch (error) {
           console.error("Error fetching user ambassador details:", error);
+          setUserAmbassadorDetails(null);
         }
       };
 
       fetchUserDetails();
     }
-  }, [role, account?.address]);
+  }, [account?.address]);
 
   // Memoized check for subordinates - only recalculates when userAmbassadorDetails changes
   const hasSubordinates = useMemo(() => {
@@ -147,8 +169,6 @@ export default function NetworkDashboard() {
 
   // Memoized refund percentage calculation
   const refundPercentage = useMemo(() => {
-    // Since we don't have entry timestamp from contract, provide general refund info
-    // You can add entry timestamp to contract response if needed
     return {
       threeDay: 80,
       tenDay: 50,
@@ -205,7 +225,7 @@ export default function NetworkDashboard() {
         });
 
         // Send approve transaction
-        const approveResult = await sendTransaction({
+        await sendTransaction({
           account,
           transaction: approveTx,
         });
@@ -221,17 +241,7 @@ export default function NetworkDashboard() {
       }
 
       // Step 3: Register as founding ambassador
-      const registerToastId = toast.loading(
-        "Registering as founding ambassador...",
-      );
-      await registerFoundingAmbassador(account.address, did);
-
-      toast.update(registerToastId, {
-        render: "Successfully registered as founding ambassador!",
-        type: "success",
-        isLoading: false,
-        autoClose: 4000,
-      });
+      await registerFoundingAmbassador(did);
       setStatusMessage("Founding ambassador registration successful!");
 
       // Step 4: Refresh ambassador list to update UI
@@ -244,10 +254,182 @@ export default function NetworkDashboard() {
       const errorMsg =
         error.message || "Registration failed. Please try again.";
       setStatusMessage(errorMsg);
-      toast.error(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Render ambassador badge with enhanced design
+  const renderAmbassadorBadge = () => {
+    if (role === "Founding Ambassador") {
+      return (
+        <div className="relative group">
+          {/* Animated glow effect */}
+          <div className="absolute inset-0 rounded-full bg-yellow-500/30 blur-xl group-hover:bg-yellow-500/40 transition-all duration-500" />
+
+          {/* Badge container */}
+          <div className="relative flex items-center gap-3">
+            {/* Badge image with ring */}
+            <div className="relative">
+              <div className="absolute inset-0 rounded-full bg-gradient-to-r from-yellow-500 to-amber-500 animate-pulse" />
+              <img
+                src="/founding_ambassador.jpg"
+                alt="Founding Ambassador Badge"
+                className="relative h-12 w-12 rounded-full object-cover border-2 border-yellow-500 shadow-lg ring-2 ring-yellow-500/50 ring-offset-2 ring-offset-slate-900"
+              />
+              {/* Crown indicator */}
+              <div className="absolute -top-1 -right-1 bg-gradient-to-r from-yellow-500 to-amber-500 rounded-full p-1 shadow-lg">
+                <Crown className="h-3 w-3 text-white" />
+              </div>
+            </div>
+
+            {/* Badge info */}
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold bg-gradient-to-r from-yellow-500 to-amber-500 bg-clip-text text-transparent">
+                  Founding Ambassador
+                </span>
+                <CheckCircle className="h-4 w-4 text-yellow-500" />
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+                <span>Level {userAmbassadorDetails?.level || 1}</span>
+                <span>•</span>
+                <span>Active</span>
+              </div>
+            </div>
+
+            {/* Badge details tooltip */}
+            <button
+              onClick={() => setShowBadgeDetails(!showBadgeDetails)}
+              className="ml-2 p-1 rounded-full hover:bg-slate-700/50 transition-colors"
+            >
+              <HelpCircle className="h-4 w-4 text-slate-400" />
+            </button>
+          </div>
+
+          {/* Badge details dropdown */}
+          {showBadgeDetails && (
+            <div className="absolute top-full right-0 mt-2 w-64 rounded-xl border border-slate-700 bg-slate-800/95 backdrop-blur-xl shadow-2xl z-50 overflow-hidden">
+              <div className="p-3 border-b border-slate-700">
+                <p className="text-xs font-semibold text-slate-400">
+                  BADGE DETAILS
+                </p>
+              </div>
+              <div className="p-3 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Tier</span>
+                  <span className="font-semibold text-yellow-500">
+                    Founding
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Level</span>
+                  <span className="font-semibold">
+                    {userAmbassadorDetails?.level || 1}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Status</span>
+                  <span className="flex items-center gap-1 text-green-500">
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                    Active
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Commission Rate</span>
+                  <span className="font-semibold text-green-500">15%</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    } else if (role === "General Ambassador") {
+      return (
+        <div className="relative group">
+          {/* Animated glow effect */}
+          <div className="absolute inset-0 rounded-full bg-green-500/30 blur-xl group-hover:bg-green-500/40 transition-all duration-500" />
+
+          {/* Badge container */}
+          <div className="relative flex items-center gap-3">
+            {/* Badge image with ring */}
+            <div className="relative">
+              <div className="absolute inset-0 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 animate-pulse" />
+              <img
+                src="/general_ambassador.jpg"
+                alt="General Ambassador Badge"
+                className="relative h-12 w-12 rounded-full object-cover border-2 border-green-500 shadow-lg ring-2 ring-green-500/50 ring-offset-2 ring-offset-slate-900"
+              />
+              {/* Medal indicator */}
+              <div className="absolute -top-1 -right-1 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full p-1 shadow-lg">
+                <Medal className="h-3 w-3 text-white" />
+              </div>
+            </div>
+
+            {/* Badge info */}
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold bg-gradient-to-r from-green-500 to-emerald-500 bg-clip-text text-transparent">
+                  General Ambassador
+                </span>
+                <CheckCircle className="h-4 w-4 text-green-500" />
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <Star className="h-3 w-3 fill-green-500 text-green-500" />
+                <span>Level {userAmbassadorDetails?.level || 1}</span>
+                <span>•</span>
+                <span>Active</span>
+              </div>
+            </div>
+
+            {/* Badge details tooltip */}
+            <button
+              onClick={() => setShowBadgeDetails(!showBadgeDetails)}
+              className="ml-2 p-1 rounded-full hover:bg-slate-700/50 transition-colors"
+            >
+              <HelpCircle className="h-4 w-4 text-slate-400" />
+            </button>
+          </div>
+
+          {/* Badge details dropdown */}
+          {showBadgeDetails && (
+            <div className="absolute top-full right-0 mt-2 w-64 rounded-xl border border-slate-700 bg-slate-800/95 backdrop-blur-xl shadow-2xl z-50 overflow-hidden">
+              <div className="p-3 border-b border-slate-700">
+                <p className="text-xs font-semibold text-slate-400">
+                  BADGE DETAILS
+                </p>
+              </div>
+              <div className="p-3 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Tier</span>
+                  <span className="font-semibold text-green-500">General</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Level</span>
+                  <span className="font-semibold">
+                    {userAmbassadorDetails?.level || 1}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Status</span>
+                  <span className="flex items-center gap-1 text-green-500">
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                    Active
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Commission Rate</span>
+                  <span className="font-semibold text-green-500">10%</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return null;
   };
 
   const handleGeneralRegister = () => {
@@ -284,7 +466,6 @@ export default function NetworkDashboard() {
     }
 
     setIsSubmittingGeneral(true);
-    const toastId = toast.loading("Registering as general ambassador...");
     try {
       // Get the first enrolled course ID for registration
       const firstCourse = enrolledCourses[0];
@@ -297,12 +478,6 @@ export default function NetworkDashboard() {
       }
 
       await registerGeneralAmbassador(sponsorAddress, did, firstCourseId);
-      toast.update(toastId, {
-        render: "Successfully registered as general ambassador!",
-        type: "success",
-        isLoading: false,
-        autoClose: 4000,
-      });
       setStatusMessage("General ambassador registration successful!");
       // Refresh ambassador list to update UI
       await fetchAmbassadors();
@@ -314,12 +489,6 @@ export default function NetworkDashboard() {
       const errorMsg =
         error.message || "Registration failed. Please try again.";
       setStatusMessage(errorMsg);
-      toast.update(toastId, {
-        render: errorMsg,
-        type: "error",
-        isLoading: false,
-        autoClose: 4000,
-      });
     } finally {
       setIsSubmittingGeneral(false);
     }
@@ -351,6 +520,9 @@ export default function NetworkDashboard() {
 
     return userAmbassador;
   }, [ambassadorList, account?.address]);
+
+  const effectiveAmbassadorStatus =
+    userAmbassadorStatus || userAmbassadorDetails;
 
   const isFoundingAmbassador = !!userAmbassadorStatus;
   const isGeneralAmbassador = !!userAmbassadorStatus;
@@ -414,7 +586,7 @@ export default function NetworkDashboard() {
         <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-yellow-500/20 blur-3xl" />
         <div className="absolute bottom-0 left-0 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
 
-        <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="relative flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.3em] text-yellow-600 dark:text-yellow-400">
               <Sparkles className="h-4 w-4" />
@@ -429,20 +601,11 @@ export default function NetworkDashboard() {
             </p>
           </div>
 
+          {/* Ambassador Badge - Enhanced */}
           {role &&
             (role === "Founding Ambassador" ||
               role === "General Ambassador") && (
-              <div
-                className={`group relative inline-flex items-center gap-3 rounded-2xl px-6 py-3 ${
-                  role === "Founding Ambassador"
-                    ? "bg-gradient-to-r from-yellow-500/20 to-amber-500/20 text-yellow-700 dark:text-yellow-300 border border-yellow-500/30"
-                    : "bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-700 dark:text-green-300 border border-green-500/30"
-                }`}
-              >
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <CheckCircle className="h-5 w-5" />
-                <span className="font-semibold">{role}</span>
-              </div>
+              <div className="relative">{renderAmbassadorBadge()}</div>
             )}
         </div>
       </header>
@@ -703,7 +866,7 @@ export default function NetworkDashboard() {
 
               <div className="rounded-xl bg-slate-100/50 p-4 dark:bg-slate-800/50 backdrop-blur-sm">
                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                  DID Hash
+                  DID
                 </p>
                 <p
                   className="font-mono text-xs truncate"
@@ -776,7 +939,7 @@ export default function NetworkDashboard() {
             </p>
           </div>
 
-          {userAmbassadorStatus ? (
+          {effectiveAmbassadorStatus ? (
             /* Already Registered - Show warning with de-register button */
             <div className="space-y-4">
               <div className="rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-6 border border-amber-500/20">
@@ -786,7 +949,7 @@ export default function NetworkDashboard() {
                     <div>
                       <p className="font-semibold text-amber-700 dark:text-amber-300">
                         Already registered as{" "}
-                        {userAmbassadorStatus.tier === 2
+                        {effectiveAmbassadorStatus.tier === 2
                           ? "Founding"
                           : "General"}{" "}
                         Ambassador
@@ -809,7 +972,7 @@ export default function NetworkDashboard() {
                 </div>
 
                 {/* Check if has subordinates */}
-                {hasSubordinates || userAmbassadorStatus.isActive ? (
+                {hasSubordinates || effectiveAmbassadorStatus.isActive ? (
                   /* Has subordinates - Cannot de-register */
                   <div className="space-y-3">
                     <div className="rounded-xl bg-red-50 dark:bg-red-900/20 p-4 border border-red-200 dark:border-red-800">
@@ -829,7 +992,7 @@ export default function NetworkDashboard() {
                                 (left or right leg)
                               </li>
                             )}
-                            {userAmbassadorStatus.isActive && (
+                            {effectiveAmbassadorStatus.isActive && (
                               <li>
                                 Your account is active with direct recruits
                               </li>
@@ -854,7 +1017,7 @@ export default function NetworkDashboard() {
                   /* Can de-register */
                   <div className="space-y-4">
                     {/* Refund Information for Founding Ambassadors */}
-                    {userAmbassadorStatus.tier === 2 && (
+                    {effectiveAmbassadorStatus.tier === 2 && (
                       <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 p-4 border border-blue-200 dark:border-blue-700">
                         <div className="flex items-start gap-3">
                           <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
@@ -890,7 +1053,7 @@ export default function NetworkDashboard() {
                     )}
 
                     {/* General Ambassador - No Refund */}
-                    {userAmbassadorStatus.tier === 1 && (
+                    {effectiveAmbassadorStatus.tier === 1 && (
                       <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 p-4 border border-amber-200 dark:border-amber-700">
                         <div className="flex items-start gap-3">
                           <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
@@ -929,7 +1092,7 @@ export default function NetworkDashboard() {
                       onClick={async () => {
                         const confirmed = window.confirm(
                           `Are you absolutely sure you want to de-register as a ${
-                            userAmbassadorStatus.tier === 2
+                            effectiveAmbassadorStatus.tier === 2
                               ? "Founding"
                               : "General"
                           } Ambassador? This action cannot be undone.`,
@@ -938,7 +1101,7 @@ export default function NetworkDashboard() {
                         if (!confirmed) return;
 
                         try {
-                          if (userAmbassadorStatus.tier === 2) {
+                          if (effectiveAmbassadorStatus.tier === 2) {
                             await deregisterFoundingAmbassador();
                             toast.success(
                               "Successfully de-registered as Founding Ambassador!",
@@ -968,7 +1131,7 @@ export default function NetworkDashboard() {
             </div>
           ) : null}
 
-          {!userAmbassadorStatus && statusMessage && (
+          {!effectiveAmbassadorStatus && statusMessage && (
             <div
               className={`rounded-xl p-4 flex gap-3 ${
                 statusMessage.includes("successful")
@@ -985,7 +1148,7 @@ export default function NetworkDashboard() {
             </div>
           )}
 
-          {!userAmbassadorStatus && (
+          {!effectiveAmbassadorStatus && (
             <div className="grid gap-6 lg:grid-cols-2">
               {/* Founding Ambassador Section */}
               <div className="group relative overflow-hidden rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-transparent p-6 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/10">
@@ -1063,8 +1226,8 @@ export default function NetworkDashboard() {
                       </span>
                     </p>
                     <p className="text-xs text-center text-slate-500 dark:text-slate-400">
-                      Note: First founder has no sponsor. Subsequent founders
-                      require one.
+                      Note: Founding ambassadors self-sponsor as the root of the
+                      tree.
                     </p>
                   </div>
                 </div>

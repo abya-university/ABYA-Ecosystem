@@ -8,7 +8,6 @@ import {
   sendTransaction,
 } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
-import { ethers } from "ethers";
 import { client } from "../services/client";
 import AmbassadorNetworkFacetABI from "../artifacts/contracts/AmbassadorNetworkFacet.sol/AmbassadorNetworkFacet.json";
 import CONTRACT_ADDRESSES from "../constants/addresses";
@@ -17,17 +16,6 @@ const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const AmbassadorNetworkContext_ABI = AmbassadorNetworkFacetABI.abi;
 
 const AmbassadorNetworkContext = createContext();
-
-// Helper function to convert DID string to bytes32 hash
-const hashDID = (didString) => {
-  if (!didString) {
-    throw new Error("DID is required");
-  }
-  // Hash the DID string using keccak256 to get bytes32
-  const hashedDID = ethers.keccak256(ethers.toUtf8Bytes(didString));
-  console.log(`DID: ${didString} -> Hashed: ${hashedDID}`);
-  return hashedDID;
-};
 
 export const useAmbassadorNetwork = () => {
   return useContext(AmbassadorNetworkContext);
@@ -51,7 +39,7 @@ export const AmbassadorNetworkProvider = ({ children }) => {
   */
 
   //function to register a new founding ambassador
-  const registerFoundingAmbassador = async (sponsorAddress, did) => {
+  const registerFoundingAmbassador = async (did) => {
     if (!address) {
       const errorMsg = "No connected wallet found";
       toast.error(errorMsg);
@@ -59,22 +47,8 @@ export const AmbassadorNetworkProvider = ({ children }) => {
       return;
     }
 
-    // For first ambassador, sponsor is address(0). For subsequent ambassadors, sponsor must be provided.
-    let resolvedSponsorAddress = sponsorAddress;
-    if (!resolvedSponsorAddress || resolvedSponsorAddress.trim() === "") {
-      resolvedSponsorAddress = "0x0000000000000000000000000000000000000000"; // address(0)
-    }
-
     if (!did) {
       const errorMsg = "Missing DID";
-      toast.error(errorMsg);
-      setError(errorMsg);
-      return;
-    }
-
-    // Validate sponsor address format
-    if (!/^0x[a-fA-F0-9]{40}$/.test(resolvedSponsorAddress)) {
-      const errorMsg = "Invalid sponsor address format";
       toast.error(errorMsg);
       setError(errorMsg);
       return;
@@ -85,18 +59,6 @@ export const AmbassadorNetworkProvider = ({ children }) => {
     const toastId = toast.loading("Registering as founding ambassador...");
 
     try {
-      // Hash the DID string to bytes32
-      let hashedDID;
-      try {
-        hashedDID = hashDID(did);
-      } catch (hashError) {
-        const errorMsg = `Failed to hash DID: ${hashError.message}`;
-        toast.error(errorMsg);
-        setError(errorMsg);
-        setLoadingRegisterFounding(false);
-        return;
-      }
-
       const contract = getContract({
         address: DiamondAddress,
         abi: AmbassadorNetworkContext_ABI,
@@ -105,15 +67,13 @@ export const AmbassadorNetworkProvider = ({ children }) => {
       });
 
       console.log("Calling registerFoundingAmbassador with:", {
-        sponsor: resolvedSponsorAddress,
         did: did,
-        hashedDID: hashedDID,
       });
 
       const transaction = prepareContractCall({
         contract,
-        method: "registerFoundingAmbassador",
-        params: [resolvedSponsorAddress, hashedDID],
+        method: "function registerFoundingAmbassador(string _DID)",
+        params: [did],
       });
 
       const tx = await sendTransaction({ transaction, account });
@@ -141,6 +101,7 @@ export const AmbassadorNetworkProvider = ({ children }) => {
         isLoading: false,
         autoClose: 4000,
       });
+      throw error;
     } finally {
       setLoadingRegisterFounding(false);
     }
@@ -170,6 +131,14 @@ export const AmbassadorNetworkProvider = ({ children }) => {
       return;
     }
 
+    if (sponsorAddress.toLowerCase() === address.toLowerCase()) {
+      const errorMsg =
+        "Invalid sponsor: you cannot use your own wallet as sponsor";
+      toast.error(errorMsg);
+      setError(errorMsg);
+      return;
+    }
+
     // Check for missing DID or courseId (handle BigInt courseId properly)
     if (!did || courseId === undefined || courseId === null) {
       const errorMsg = `Missing DID or courseId. DID: ${did}, courseId: ${courseId}`;
@@ -184,18 +153,6 @@ export const AmbassadorNetworkProvider = ({ children }) => {
     const toastId = toast.loading("Registering as general ambassador...");
 
     try {
-      // Hash the DID string to bytes32
-      let hashedDID;
-      try {
-        hashedDID = hashDID(did);
-      } catch (hashError) {
-        const errorMsg = `Failed to hash DID: ${hashError.message}`;
-        toast.error(errorMsg);
-        setError(errorMsg);
-        setLoadingRegisterGeneral(false);
-        return;
-      }
-
       const contract = getContract({
         address: DiamondAddress,
         abi: AmbassadorNetworkContext_ABI,
@@ -206,14 +163,14 @@ export const AmbassadorNetworkProvider = ({ children }) => {
       console.log("Calling registerGeneralAmbassador with:", {
         sponsor: sponsorAddress,
         did: did,
-        hashedDID: hashedDID,
         courseId: courseId,
       });
 
       const transaction = prepareContractCall({
         contract,
-        method: "registerGeneralAmbassador",
-        params: [sponsorAddress, hashedDID, courseId],
+        method:
+          "function registerGeneralAmbassador(address _sponsor, string _DID, uint256 _courseId)",
+        params: [sponsorAddress, did, courseId],
       });
 
       const tx = await sendTransaction({ transaction, account });
@@ -244,6 +201,7 @@ export const AmbassadorNetworkProvider = ({ children }) => {
         isLoading: false,
         autoClose: 4000,
       });
+      throw error;
     } finally {
       setLoadingRegisterGeneral(false);
     }
@@ -470,28 +428,40 @@ export const AmbassadorNetworkProvider = ({ children }) => {
           readContract({
             contract,
             method:
-              "function getAmbassadorDetails(address _ambassador) view returns (bytes32 did, uint8 tier, uint8 level, address sponsor, address leftLeg, address rightLeg, uint256 totalDownlineSales, uint256 lifetimeCommissions, bool isActive)",
+              "function getAmbassadorDetails(address _ambassador) view returns (string did, uint8 tier, uint8 level, address sponsor, address leftLeg, address rightLeg, uint256 totalDownlineSales, uint256 lifetimeCommissions, bool isActive)",
             params: [addr],
           }),
         );
 
-        const ambassadorsRawData = await Promise.all(ambassadorsDataPromises);
-
-        // Process the raw data into a more usable format
-        const ambassadorDetails = ambassadorsRawData.map(
-          (ambassador, index) => ({
-            address: validAddresses[index],
-            did: ambassador[0],
-            tier: ambassador[1],
-            level: ambassador[2],
-            sponsor: ambassador[3],
-            leftLeg: ambassador[4],
-            rightLeg: ambassador[5],
-            totalDownlineSales: ambassador[6],
-            lifetimeCommissions: ambassador[7],
-            isActive: ambassador[8],
-          }),
+        const ambassadorsRawData = await Promise.allSettled(
+          ambassadorsDataPromises,
         );
+
+        const successfulAmbassadors = ambassadorsRawData
+          .map((result, index) => ({ result, index }))
+          .filter(({ result }) => result.status === "fulfilled")
+          .map(({ result, index }) => ({
+            address: validAddresses[index],
+            did: result.value[0],
+            tier: result.value[1],
+            level: result.value[2],
+            sponsor: result.value[3],
+            leftLeg: result.value[4],
+            rightLeg: result.value[5],
+            totalDownlineSales: result.value[6],
+            lifetimeCommissions: result.value[7],
+            isActive: result.value[8],
+          }));
+
+        const failedCount =
+          ambassadorsRawData.length - successfulAmbassadors.length;
+        if (failedCount > 0) {
+          console.warn(
+            `Skipped ${failedCount} ambassador detail records due to decode/read failures`,
+          );
+        }
+
+        const ambassadorDetails = successfulAmbassadors;
 
         console.log("Processed ambassadors details:", ambassadorDetails);
         setAmbassadorDetails(ambassadorDetails);
@@ -549,26 +519,37 @@ export const AmbassadorNetworkProvider = ({ children }) => {
           readContract({
             contract,
             method:
-              "function getAmbassadorDetails(address _ambassador) view returns (bytes32 did, uint8 tier, uint8 level, address sponsor, address leftLeg, address rightLeg, uint256 totalDownlineSales, uint256 lifetimeCommissions, bool isActive)",
+              "function getAmbassadorDetails(address _ambassador) view returns (string did, uint8 tier, uint8 level, address sponsor, address leftLeg, address rightLeg, uint256 totalDownlineSales, uint256 lifetimeCommissions, bool isActive)",
             params: [addr],
           }),
         );
 
-        const ambassadorsRawData = await Promise.all(ambassadorsDataPromises);
+        const ambassadorsRawData = await Promise.allSettled(
+          ambassadorsDataPromises,
+        );
 
-        // Process the raw data into a more usable format
-        const allAmbassadors = ambassadorsRawData.map((ambassador, index) => ({
-          address: validAddresses[index],
-          did: ambassador[0],
-          tier: ambassador[1],
-          level: ambassador[2],
-          sponsor: ambassador[3],
-          leftLeg: ambassador[4],
-          rightLeg: ambassador[5],
-          totalDownlineSales: ambassador[6],
-          lifetimeCommissions: ambassador[7],
-          isActive: ambassador[8],
-        }));
+        const allAmbassadors = ambassadorsRawData
+          .map((result, index) => ({ result, index }))
+          .filter(({ result }) => result.status === "fulfilled")
+          .map(({ result, index }) => ({
+            address: validAddresses[index],
+            did: result.value[0],
+            tier: result.value[1],
+            level: result.value[2],
+            sponsor: result.value[3],
+            leftLeg: result.value[4],
+            rightLeg: result.value[5],
+            totalDownlineSales: result.value[6],
+            lifetimeCommissions: result.value[7],
+            isActive: result.value[8],
+          }));
+
+        const failedCount = ambassadorsRawData.length - allAmbassadors.length;
+        if (failedCount > 0) {
+          console.warn(
+            `Skipped ${failedCount} ambassador detail records due to decode/read failures`,
+          );
+        }
 
         console.log("All ambassadors details:", allAmbassadors);
         return allAmbassadors;
@@ -694,26 +675,37 @@ export const AmbassadorNetworkProvider = ({ children }) => {
           readContract({
             contract,
             method:
-              "function getAmbassadorDetails(address _ambassador) view returns (bytes32 did, uint8 tier, uint8 level, address sponsor, address leftLeg, address rightLeg, uint256 totalDownlineSales, uint256 lifetimeCommissions, bool isActive)",
+              "function getAmbassadorDetails(address _ambassador) view returns (string did, uint8 tier, uint8 level, address sponsor, address leftLeg, address rightLeg, uint256 totalDownlineSales, uint256 lifetimeCommissions, bool isActive)",
             params: [addr],
           }),
         );
 
-        const ambassadorsRawData = await Promise.all(ambassadorsDataPromises);
+        const ambassadorsRawData = await Promise.allSettled(
+          ambassadorsDataPromises,
+        );
 
-        // Process the raw data into a more usable format
-        const rootAmbassadors = ambassadorsRawData.map((ambassador, index) => ({
-          address: rootAddresses[index],
-          did: ambassador[0],
-          tier: ambassador[1],
-          level: ambassador[2],
-          sponsor: ambassador[3],
-          leftLeg: ambassador[4],
-          rightLeg: ambassador[5],
-          totalDownlineSales: ambassador[6],
-          lifetimeCommissions: ambassador[7],
-          isActive: ambassador[8],
-        }));
+        const rootAmbassadors = ambassadorsRawData
+          .map((result, index) => ({ result, index }))
+          .filter(({ result }) => result.status === "fulfilled")
+          .map(({ result, index }) => ({
+            address: rootAddresses[index],
+            did: result.value[0],
+            tier: result.value[1],
+            level: result.value[2],
+            sponsor: result.value[3],
+            leftLeg: result.value[4],
+            rightLeg: result.value[5],
+            totalDownlineSales: result.value[6],
+            lifetimeCommissions: result.value[7],
+            isActive: result.value[8],
+          }));
+
+        const failedCount = ambassadorsRawData.length - rootAmbassadors.length;
+        if (failedCount > 0) {
+          console.warn(
+            `Skipped ${failedCount} root ambassador detail records due to decode/read failures`,
+          );
+        }
 
         console.log("Processed root ambassadors details:", rootAmbassadors);
         return rootAmbassadors;

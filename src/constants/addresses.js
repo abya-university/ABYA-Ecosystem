@@ -12,7 +12,7 @@ const CONTRACT_ADDRESSES = {
         CommunityGovernanceFacet: "0x7F673F7ca3F8c86e378A45456787f870f4611777",
         CommunityBadgesFacet: "0x226506541C7F77e4B7A96ad98A4D8B873B922EC9",
         ProfileFacet: "0x14D5cF145676CaD0Bc293C4b19000Ec2d9ddBc6F",
-        AmbassadorNetworkFacet: "0x8d5c8abCd18aa1bF789095d00a96479057eD31B2",
+        AmbassadorNetworkFacet: "0x7b3f8f4fEf4fddb0940FF5a605EAFD5c16Df9Af9",
         RevenueSharingFacet: "0x519F9293bdEF30Ac6D1bb8Ae4480A0ab5ED4A3FE",
         VestingFacet: "0x68dA4d41B184325c5A2dc9f3E7545371e04cE8bb"
     },
