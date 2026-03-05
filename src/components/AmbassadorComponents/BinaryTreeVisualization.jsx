@@ -330,7 +330,7 @@ const TreeNode = ({
 
 // Main component with pan and zoom
 export default function BinaryTreeVisualization({ darkMode }) {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [ambassadorData, setAmbassadorData] = useState({});
   const [rootAddress, setRootAddress] = useState(null);
