@@ -15,6 +15,8 @@ import {
   Settings,
 } from "lucide-react";
 import { useProfile } from "../contexts/ProfileContext";
+import {useUser} from "../contexts/userContext";
+import {useDid} from "../contexts/DidContext";
 import { AbyaConnectButton } from "../providers/Providers";
 import {
   useActiveAccount,
@@ -40,6 +42,8 @@ const WalletConnection = () => {
   const toggleRef = useRef(null);
   const { clearProfile, profile, hasProfile } = useProfile();
   const { darkMode } = useDarkMode();
+  const { did } = useDid();
+  //console.log("User DID:", did);
 
   const { data: balanceData, isLoading: balanceLoading } = useWalletBalance({
     account,
@@ -255,7 +259,25 @@ const WalletConnection = () => {
                   <span>Address</span>
                 </button>
                 <span className="font-mono text-sm text-gray-900 dark:text-white">
-                  {address.slice(0, 6)}...{address.slice(-4)}
+                  {address?.slice(0, 6)}...{address?.slice(-4)}
+                </span>
+              </div>
+
+              {/* Copy Did */}
+              <div className="flex justify-between items-center">
+                <button
+                  onClick={() => copyText(did, setIsCopied)}
+                  className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 hover:underline"
+                >
+                  {isCopied ? (
+                    <CopyCheckIcon className="w-4 h-4 text-yellow-500" />
+                  ) : (
+                    <CopyIcon className="w-4 h-4" />
+                  )}
+                  <span>DID</span>
+                </button>
+                <span className="font-mono text-sm text-gray-900 dark:text-white truncate max-w-[110px]">
+                  {did?.slice(0, 5)}...{did?.slice(-5)}
                 </span>
               </div>
 

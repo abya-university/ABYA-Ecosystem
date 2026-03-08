@@ -25,6 +25,7 @@ import {
   Loader,
 } from "lucide-react";
 import ReviewModal from "../components/ReviewModal";
+import AbyaChatbot from "../components/chatbot";
 import { useUser } from "../contexts/userContext";
 import PropTypes from "prop-types";
 import ProgressBar from "../components/progressBar";
@@ -47,6 +48,9 @@ import CONTRACT_ADDRESSES from "../constants/addresses";
 import { toast } from "react-toastify";
 import { useProgress } from "../contexts/progressContext";
 import { useNavigate } from "react-router-dom";
+import { generateCertificateImage } from "../services/certificateGenerator";
+import { uploadFileToPinata, uploadMetadataToIPFS } from "../services/pinata";
+import { useDid } from "../contexts/DidContext";
 
 const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
@@ -138,7 +142,7 @@ const Resource = memo(({ resource }) => {
       setLoading(true);
       try {
         const response = await fetch(
-          `https://gateway.pinata.cloud/ipfs/${resource.url}`
+          `https://gateway.pinata.cloud/ipfs/${resource.url}`,
         );
         if (!response.ok) {
           throw new Error("Failed to fetch resource");
@@ -302,12 +306,12 @@ const Quiz = memo(({ quiz, courseId }) => {
   const validateQuizSubmission = () => {
     // Check if all questions are answered
     const unansweredQuestions = quiz.questions.filter(
-      (q) => selectedAnswers[q.questionId] === undefined
+      (q) => selectedAnswers[q.questionId] === undefined,
     );
 
     if (unansweredQuestions.length > 0) {
       toast.error(
-        `Please answer all ${unansweredQuestions.length} remaining questions`
+        `Please answer all ${unansweredQuestions.length} remaining questions`,
       );
       return false;
     }
@@ -387,7 +391,7 @@ const Quiz = memo(({ quiz, courseId }) => {
 
         console.log("Quiz submitted successfully:", result);
         toast.success(
-          `Quiz submitted successfully! Score: ${calculatedScore.toFixed(1)}%`
+          `Quiz submitted successfully! Score: ${calculatedScore.toFixed(1)}%`,
         );
 
         // Add to completed quizzes if score is passing
@@ -418,8 +422,8 @@ const Quiz = memo(({ quiz, courseId }) => {
         // Score below 75% - just show message, no contract call
         toast.warning(
           `Score ${calculatedScore.toFixed(
-            1
-          )}% is below passing grade (75%). Please try again.`
+            1,
+          )}% is below passing grade (75%). Please try again.`,
         );
 
         // Still lock if max attempts reached
@@ -512,7 +516,7 @@ const Quiz = memo(({ quiz, courseId }) => {
         }));
       }
     },
-    [quizSubmitted]
+    [quizSubmitted],
   );
 
   if (isLocked) {
@@ -589,7 +593,7 @@ const Quiz = memo(({ quiz, courseId }) => {
           {quiz.questions.map((question, index) => {
             const selectedAnswer = selectedAnswers[question.questionId];
             const correctAnswer = question.choices.findIndex(
-              (choice) => choice.isCorrect
+              (choice) => choice.isCorrect,
             );
 
             return (
@@ -603,7 +607,7 @@ const Quiz = memo(({ quiz, courseId }) => {
                 <div className="mt-2 space-y-2">
                   {question.choices.map((choice, choiceIndex) => (
                     <div
-                      key={choiceIndex}
+                      key={`result-${question.questionId}-choice-${choiceIndex}`}
                       className={`p-2 rounded ${
                         choiceIndex === correctAnswer
                           ? "bg-green-100 dark:bg-green-900/20"
@@ -641,7 +645,7 @@ const Quiz = memo(({ quiz, courseId }) => {
         <div className="space-y-3">
           {currentQuestion.choices.map((choice, index) => (
             <div
-              key={index}
+              key={`question-${currentQuestion.questionId}-choice-${index}`}
               className={`flex items-center space-x-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer ${
                 selectedAnswers[currentQuestion.questionId] === index
                   ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-500"
@@ -748,7 +752,9 @@ const LessonContent = memo(
               {lesson.additionalResources
                 .filter((r) => r.url)
                 .map((resource, index) => (
-                  <div key={index}>
+                  <div
+                    key={`resource-${lesson.lessonId}-${index}-${resource.url}`}
+                  >
                     <Resource resource={resource} />
                   </div>
                 ))}
@@ -776,7 +782,7 @@ const LessonContent = memo(
         )}
       </div>
     );
-  }
+  },
 );
 
 LessonContent.displayName = "LessonContent";
@@ -793,7 +799,7 @@ LessonContent.propTypes = {
         url: PropTypes.string,
         name: PropTypes.string,
         contentType: PropTypes.number,
-      })
+      }),
     ),
   }).isRequired,
   quiz: PropTypes.shape({
@@ -815,8 +821,19 @@ LessonContent.propTypes = {
 const CourseDetails = memo(({ courseId }) => {
   const { courses } = useContext(CourseContext);
   const { chapters, fetchChapters, setChapters } = useContext(ChapterContext);
-  const { lessons } = useContext(LessonContext);
-  const { quizzes } = useContext(QuizContext);
+  const { lessons, fetchLessons } = useContext(LessonContext);
+  const { quizzes, fetchQuizzes } = useContext(QuizContext);
+
+  // Debug: Log lessons and quizzes whenever they change
+  useEffect(() => {
+    console.log("=== DATA STATUS DEBUG ===", {
+      lessonsCount: lessons.length,
+      quizzesCount: quizzes.length,
+      chaptersCount: chapters.length,
+      coursesCount: courses.length,
+      lessons: lessons.slice(0, 3), // Show first 3 lessons
+    });
+  }, [lessons, quizzes, chapters, courses]);
   const [openQuizIds, setOpenQuizIds] = useState(new Set());
   const [activeChapterId, setActiveChapterId] = useState(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
@@ -846,6 +863,19 @@ const CourseDetails = memo(({ courseId }) => {
   const [showMobileNav, setShowMobileNav] = useState(false);
   const navigate = useNavigate();
   const [isIssuingCertificate, setIsIssuingCertificate] = useState(false);
+
+  const PROGRESS_STAGES = {
+    INITIAL: 0,
+    GENERATING_CERTIFICATE: 1,
+    CONVERTING_TO_IMAGE: 2,
+    UPLOADING_TO_IPFS: 3,
+    ISSUEING_VC_LOCALLY: 4,
+    STORE_VC_ON_CHAIN_: 5,
+    MINTING_SBT: 6,
+    COMPLETED: 7,
+  };
+
+  const [currentStage, setCurrentStage] = useState(PROGRESS_STAGES.INITIAL);
 
   useEffect(() => {
     if (courseId) {
@@ -926,7 +956,7 @@ const CourseDetails = memo(({ courseId }) => {
         "Missing data - enrolledStudents:",
         enrolledStudents,
         "userAddress:",
-        userAddress
+        userAddress,
       );
       return false;
     }
@@ -934,7 +964,7 @@ const CourseDetails = memo(({ courseId }) => {
     // If it's an array, check if it includes the address
     if (Array.isArray(enrolledStudents)) {
       const isEnrolled = enrolledStudents.some(
-        (addr) => addr.toLowerCase() === userAddress.toLowerCase()
+        (addr) => addr.toLowerCase() === userAddress.toLowerCase(),
       );
       console.log(
         "Array check - enrolledStudents:",
@@ -942,7 +972,7 @@ const CourseDetails = memo(({ courseId }) => {
         "userAddress:",
         userAddress,
         "isEnrolled:",
-        isEnrolled
+        isEnrolled,
       );
       return isEnrolled;
     }
@@ -960,7 +990,7 @@ const CourseDetails = memo(({ courseId }) => {
         "userAddress:",
         userAddress,
         "isEnrolled:",
-        isEnrolled
+        isEnrolled,
       );
       return isEnrolled;
     }
@@ -976,7 +1006,7 @@ const CourseDetails = memo(({ courseId }) => {
       "userAddress:",
       userAddress,
       "isEnrolled:",
-      isEnrolled
+      isEnrolled,
     );
     return isEnrolled;
   };
@@ -988,13 +1018,13 @@ const CourseDetails = memo(({ courseId }) => {
   // Memoize current course
   const currentCourse = useMemo(
     () => courses.find((course) => course.courseId === courseId),
-    [courses, courseId]
+    [courses, courseId],
   );
 
   // Memoize filtered chapters
   const filteredChapters = useMemo(() => {
     const filtered = chapters.filter(
-      (chapter) => chapter.courseId?.toString() === courseId?.toString()
+      (chapter) => chapter.courseId?.toString() === courseId?.toString(),
     );
 
     console.log("=== CHAPTER FILTERING DEBUG ===", {
@@ -1021,8 +1051,8 @@ const CourseDetails = memo(({ courseId }) => {
     return lessons.filter((lesson) =>
       filteredChapters.some(
         (chapter) =>
-          chapter.chapterId?.toString() === lesson.chapterId?.toString()
-      )
+          chapter.chapterId?.toString() === lesson.chapterId?.toString(),
+      ),
     ).length;
   }, [lessons, filteredChapters]);
 
@@ -1033,14 +1063,14 @@ const CourseDetails = memo(({ courseId }) => {
       .filter((lesson) =>
         filteredChapters.some(
           (chapter) =>
-            chapter.chapterId?.toString() === lesson.chapterId?.toString()
-        )
+            chapter.chapterId?.toString() === lesson.chapterId?.toString(),
+        ),
       )
       .map((lesson) => lesson.lessonId.toString());
 
     // Count quizzes that are linked to these lessons
     return quizzes.filter((quiz) =>
-      lessonIds.includes(quiz.lessonId.toString())
+      lessonIds.includes(quiz.lessonId.toString()),
     ).length;
 
     // console.log("Total quizzes:", totalQuizzes2);
@@ -1050,7 +1080,7 @@ const CourseDetails = memo(({ courseId }) => {
     const hasCertificate = certificates.some(
       (cert) =>
         cert.courseId === currentCourse.courseId.toString() &&
-        cert.owner.toLowerCase() === address.toLowerCase()
+        cert.owner.toLowerCase() === address.toLowerCase(),
     );
 
     console.log("Checking for certificate:", hasCertificate);
@@ -1064,6 +1094,34 @@ const CourseDetails = memo(({ courseId }) => {
       // Don't automatically show popup here - only show when course is completed
     }
   }, [certificates, currentCourse.courseId, address]);
+
+  // Fetch lessons when component mounts - force fetch
+  useEffect(() => {
+    console.log("=== LESSON FETCH CHECK ===", {
+      hasFetchLessons: !!fetchLessons,
+      lessonsCount: lessons.length,
+      willFetch: fetchLessons && lessons.length === 0,
+    });
+
+    if (fetchLessons) {
+      console.log("Triggering fetchLessons()...");
+      fetchLessons();
+    }
+  }, [fetchLessons]);
+
+  // Fetch quizzes when component mounts - force fetch
+  useEffect(() => {
+    console.log("=== QUIZ FETCH CHECK ===", {
+      hasFetchQuizzes: !!fetchQuizzes,
+      quizzesCount: quizzes.length,
+      willFetch: fetchQuizzes && quizzes.length === 0,
+    });
+
+    if (fetchQuizzes) {
+      console.log("Triggering fetchQuizzes()...");
+      fetchQuizzes();
+    }
+  }, [fetchQuizzes]);
 
   // Fetch chapters only when courseId changes or when chapters are empty
   useEffect(() => {
@@ -1103,14 +1161,14 @@ const CourseDetails = memo(({ courseId }) => {
   const getLessonsForChapter = useCallback(
     (chapterId) =>
       lessons.filter((lesson) => lesson.chapterId.toString() === chapterId),
-    [lessons]
+    [lessons],
   );
 
   // Memoize quiz finding function
   const getQuizForLesson = useCallback(
     (lessonId) =>
       quizzes.find((quiz) => quiz.lessonId.toString() === lessonId.toString()),
-    [quizzes]
+    [quizzes],
   );
 
   const toggleQuiz = useCallback((lessonId) => {
@@ -1125,6 +1183,8 @@ const CourseDetails = memo(({ courseId }) => {
     });
   }, []);
 
+  const { issueVC, did } = useDid();
+
   const handleSubmitReview = useCallback((courseId, ratings) => {
     submitReview(
       courseId,
@@ -1137,7 +1197,7 @@ const CourseDetails = memo(({ courseId }) => {
       ratings.technologyIntegration,
       ratings.learnerSupport,
       ratings.assessmentForLearning,
-      ratings.engagementAndMotivation
+      ratings.engagementAndMotivation,
     );
   }, []);
 
@@ -1203,7 +1263,7 @@ const CourseDetails = memo(({ courseId }) => {
       role,
       currentCourse,
       address,
-    ]
+    ],
   );
 
   //issueCertificate section - only show congratulations popup when course is 100% complete AND user doesn't have certificate
@@ -1239,95 +1299,356 @@ const CourseDetails = memo(({ courseId }) => {
     setShowCongratsPopup(false);
   };
 
-  //handle claim certificate
-  //Leave it for now
+  // Handle claim certificate with stage-based error handling
   const handleClaimCertificate = async () => {
     setIsIssuingCertificate(true);
+    setCurrentStage(PROGRESS_STAGES.INITIAL);
+
     try {
+      // Pre-flight checks
       if (!client) {
-        throw new Error("No client available");
+        throw new Error("Client not initialized. Please refresh the page.");
       }
 
-      // Check if profile is missing
-      if (!profile || profile.fname === null) {
-        alert("Profile not found. Please connect your profile first.");
-        return;
+      if (!profile || !profile.fname) {
+        throw new Error("Profile not found. Please create your profile first.");
       }
 
-      // Set learner name from profile
+      if (!address) {
+        throw new Error("Wallet not connected. Please connect your wallet.");
+      }
+
       const fullName = `${profile.fname} ${profile.lname}`;
-      setLearnerName(fullName);
+      const learner = fullName.trim();
 
-      // Optional: update learnerName local variable directly if needed
-      const learner = fullName;
-
-      // Ensure learner name is provided
-      if (!learner.trim()) {
-        alert("Profile not found. Please connect your profile first.");
-        return;
+      if (!learner) {
+        throw new Error("Invalid profile name. Please update your profile.");
       }
 
-      const contract = await getContract({
-        address: DiamondAddress,
-        abi: Ecosystem3Facet_ABI,
-        client,
-        chain: defineChain(11155111),
-      });
+      // Declare variables at function scope so they're accessible across all stages
+      let imageFile;
+      let imageUpload;
+      let metadataHash;
 
-      const cert_issuer = "ABYA UNIVERSITY";
-      const issue_date = new Date().toISOString();
+      // ============================================================
+      // Stage 1: Generating Certificate Image
+      // ============================================================
+      try {
+        setCurrentStage(PROGRESS_STAGES.GENERATING_CERTIFICATE);
+        console.log("Stage 1: Generating certificate image...");
 
-      // Create certificate data object
-      const newCertificateData = {
+        imageFile = await generateCertificateImage(
+          profile,
+          currentCourse,
+          address,
+        );
+
+        if (!imageFile) {
+          throw new Error("Certificate image generation returned null");
+        }
+
+        console.log("✓ Stage 1 completed: Certificate image generated");
+      } catch (err) {
+        throw new Error(
+          `Stage 1 Failed (Generating Certificate): ${err.message}`,
+        );
+      }
+
+      // ============================================================
+      // Stage 2: Converting to Image (UI delay)
+      // ============================================================
+      try {
+        setCurrentStage(PROGRESS_STAGES.CONVERTING_TO_IMAGE);
+        console.log("Stage 2: Converting to image format...");
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        console.log("✓ Stage 2 completed: Image conversion done");
+      } catch (err) {
+        throw new Error(`Stage 2 Failed (Converting to Image): ${err.message}`);
+      }
+
+      // ============================================================
+      // Stage 3: Uploading to IPFS
+      // ============================================================
+      try {
+        setCurrentStage(PROGRESS_STAGES.UPLOADING_TO_IPFS);
+        console.log("Stage 3: Uploading certificate to IPFS...");
+        console.log("Image file details:", {
+          type: imageFile?.type,
+          size: imageFile?.size,
+          name: imageFile?.name,
+        });
+
+        if (!imageFile) {
+          throw new Error("Image file is missing or invalid");
+        }
+
+        imageUpload = await uploadFileToPinata(imageFile);
+
+        console.log("Pinata response:", imageUpload);
+
+        if (!imageUpload) {
+          throw new Error(
+            "IPFS upload returned empty hash - Pinata service may be unavailable",
+          );
+        }
+
+        // Validate hash format (IPFS hashes start with Qm)
+        if (typeof imageUpload !== "string" || !imageUpload.startsWith("Qm")) {
+          throw new Error(
+            `Invalid IPFS hash format: ${imageUpload} (expected Qm...)`,
+          );
+        }
+
+        console.log(
+          "✓ Stage 3 completed: Certificate uploaded to IPFS",
+          imageUpload,
+        );
+      } catch (err) {
+        console.error("Stage 3 detailed error:", {
+          message: err.message,
+          stack: err.stack,
+          uploadResult: imageUpload,
+        });
+        throw new Error(
+          `Stage 3 Failed (Uploading to IPFS): ${err.message}. Check console for details.`,
+        );
+      }
+
+      // ============================================================
+      // Stage 3b: Upload Metadata to IPFS
+      // ============================================================
+      try {
+        console.log("Stage 3b: Uploading metadata to IPFS...");
+
+        const metadata = {
+          name: `Certificate - ${currentCourse.courseName}`,
+          description: `Certificate of Completion awarded to ${learner}`,
+          image: `ipfs://${imageUpload}`,
+          attributes: [
+            {
+              trait_type: "Course Name",
+              value: currentCourse.courseName,
+            },
+            {
+              trait_type: "Student",
+              value: learner,
+            },
+            {
+              trait_type: "Issue Date",
+              value: new Date().toISOString(),
+            },
+            {
+              trait_type: "Certificate Type",
+              value: "Course Completion",
+            },
+            {
+              trait_type: "Blockchain",
+              value: "Sepolia",
+            },
+          ],
+        };
+
+        metadataHash = await uploadMetadataToIPFS(metadata);
+
+        if (!metadataHash) {
+          throw new Error("Metadata upload returned empty hash");
+        }
+
+        console.log(
+          "✓ Stage 3b completed: Metadata uploaded to IPFS",
+          metadataHash,
+        );
+      } catch (err) {
+        throw new Error(`Stage 3b Failed (Uploading Metadata): ${err.message}`);
+      }
+
+      // ============================================================
+      // Stage 4: Issuing Verifiable Credential Locally
+      // ============================================================
+      let issuedVC;
+      try {
+        setCurrentStage(PROGRESS_STAGES.ISSUEING_VC_LOCALLY);
+        console.log("Stage 4: Issuing Verifiable Credential...");
+
+        const newCertificateData = {
+          learner,
+          courseName: currentCourse.courseName,
+          issuer: "ABYA UNIVERSITY",
+          issueDate: new Date().toISOString(),
+          courseId: currentCourse.courseId,
+          tokenURI: metadataHash,
+        };
+
+        const vcResponse = await issueVC(newCertificateData);
+        issuedVC =
+          vcResponse?.verifiableCredential ||
+          vcResponse?.credential ||
+          vcResponse?.data?.verifiableCredential ||
+          vcResponse?.data?.credential;
+
+        if (!issuedVC) {
+          throw new Error("VC not returned from issuance");
+        }
+
+        console.log("✓ Stage 4 completed: Verifiable Credential issued");
+      } catch (err) {
+        throw new Error(
+          `Stage 4 Failed (Issuing Verifiable Credential): ${err.message}`,
+        );
+      }
+
+      // ============================================================
+      // Stage 5: Storing Verifiable Credential on Chain
+      // ============================================================
+      try {
+        setCurrentStage(PROGRESS_STAGES.STORE_VC_ON_CHAIN_);
+        console.log("Stage 5: Storing Verifiable Credential on-chain...");
+
+        const contract = await getContract({
+          address: DiamondAddress,
+          abi: Ecosystem3Facet_ABI,
+          client,
+          chain: defineChain(11155111),
+        });
+
+        if (!contract) {
+          throw new Error("Failed to initialize contract");
+        }
+
+        const credentialSubject = issuedVC?.credentialSubject || {};
+        const issuerDidValue = issuedVC?.issuer?.id || issuedVC?.issuer;
+        const subjectDidValue =
+          credentialSubject?.id || issuedVC?.credentialSubject?.id || did;
+        const issuerName =
+          credentialSubject?.university ||
+          issuedVC?.issuer ||
+          "ABYA UNIVERSITY";
+        const subjectName = credentialSubject?.name || learner;
+        const credentialTypeValue = Array.isArray(issuedVC?.type)
+          ? issuedVC.type.find((t) => t !== "VerifiableCredential") ||
+            issuedVC.type[0]
+          : issuedVC?.type || "CourseCompletionCredential";
+        const issueDateValue =
+          issuedVC?.issuanceDate ||
+          credentialSubject?.issueDate ||
+          new Date().toISOString();
+        const issueDateSeconds =
+          Math.floor(new Date(issueDateValue).getTime() / 1000) ||
+          Math.floor(Date.now() / 1000);
+        const courseValue =
+          credentialSubject?.course || currentCourse.courseName;
+
+        const transaction = await prepareContractCall({
+          contract,
+          method: "issueVerifiableCredential",
+          params: [
+            address,
+            issuerName,
+            issuerDidValue,
+            subjectName,
+            subjectDidValue,
+            credentialTypeValue,
+            BigInt(issueDateSeconds),
+            courseValue,
+          ],
+        });
+
+        if (!transaction) {
+          throw new Error("Transaction preparation failed");
+        }
+
+        const txResult = await sendTransaction({ transaction, account });
+
+        if (!txResult) {
+          throw new Error("Transaction execution failed");
+        }
+
+        console.log("✓ Stage 5 completed: VC stored on-chain", txResult);
+      } catch (err) {
+        throw new Error(`Stage 5 Failed (Storing VC on-chain): ${err.message}`);
+      }
+
+      // ============================================================
+      // Stage 6: Minting SBT (Soul-Bound Token)
+      // ============================================================
+      try {
+        setCurrentStage(PROGRESS_STAGES.MINTING_SBT);
+        console.log("Stage 5: Minting certificate as SBT...");
+
+        const contract = await getContract({
+          address: DiamondAddress,
+          abi: Ecosystem3Facet_ABI,
+          client,
+          chain: defineChain(11155111),
+        });
+
+        if (!contract) {
+          throw new Error("Failed to initialize contract");
+        }
+
+        const transaction = await prepareContractCall({
+          contract,
+          method: "issueCertificate",
+          params: [
+            BigInt(currentCourse.courseId),
+            learner,
+            currentCourse.courseName,
+            "ABYA UNIVERSITY",
+            BigInt(Math.floor(Date.now() / 1000)),
+            metadataHash,
+          ],
+        });
+
+        if (!transaction) {
+          throw new Error("Transaction preparation failed");
+        }
+
+        const txResult = await sendTransaction({ transaction, account });
+
+        if (!txResult) {
+          throw new Error("Transaction execution failed");
+        }
+
+        console.log("✓ Stage 5 completed: SBT minted successfully", txResult);
+      } catch (err) {
+        throw new Error(`Stage 5 Failed (Minting SBT): ${err.message}`);
+      }
+
+      // ============================================================
+      // Stage 6: Completed
+      // ============================================================
+      setCurrentStage(PROGRESS_STAGES.COMPLETED);
+      console.log("✓ All stages completed successfully");
+
+      toast.success("🎉 Certificate issued successfully!");
+
+      // Update UI state
+      setCertificateData({
         learner,
         courseName: currentCourse.courseName,
-        issuer: cert_issuer,
-        issueDate: issue_date,
+        issuer: "ABYA UNIVERSITY",
+        issueDate: new Date().toISOString(),
         courseId: currentCourse.courseId,
-      };
-
-      // const tx = await contract.issueCertificate(
-      //   currentCourse.courseId,
-      //   learner,
-      //   currentCourse.courseName,
-      //   cert_issuer,
-      //   Math.floor(Date.now() / 1000),
-      //   { gasLimit: 500000 }
-      // );
-
-      const transaction = await prepareContractCall({
-        contract,
-        method: "issueCertificate",
-        params: [
-          BigInt(currentCourse.courseId),
-          learner,
-          currentCourse.courseName,
-          cert_issuer,
-          BigInt(Math.floor(Date.now() / 1000)),
-        ],
+        tokenURI: metadataHash,
       });
 
-      await sendTransaction({ transaction, account });
-
-      toast.success("Certificate issued successfully!");
-
-      // Set certificate data, close congrats popup and show certificate popup
-      setCertificateData(newCertificateData);
       setShowCongratsPopup(false);
       setShowCertificate(true);
     } catch (err) {
-      console.error("Error issuing certificate:", err);
-      // Extract more error information if possible
-      toast.error(
-        `Failed to issue certificate: ${
-          err.message || "Please try again later."
-        }`
-      );
-      if (err.error && err.error.message) {
-        console.error("Contract error message:", err.error.message);
-      }
-      if (err.receipt) {
-        console.error("Transaction receipt:", err.receipt);
+      // Error handler - stops process and displays error
+      console.error("Certificate issuance failed:", err);
+      setCurrentStage(PROGRESS_STAGES.INITIAL);
+
+      const errorMessage = err.message || "Unknown error occurred";
+      const displayMessage = `${errorMessage} Please try again.`;
+
+      toast.error(displayMessage);
+
+      // Log additional debugging info
+      if (err.error?.message) {
+        console.error("Details:", err.error.message);
       }
     } finally {
       setIsIssuingCertificate(false);
@@ -1338,6 +1659,46 @@ const CourseDetails = memo(({ courseId }) => {
     navigate(path);
     setShowCongratsPopup(false);
   };
+
+  // Early return if course not found
+  if (!currentCourse) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-4 sm:py-8 lg:py-12 px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 lg:pt-[100px]">
+        <div className="max-w-7xl mx-auto text-center">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-8 border border-gray-200 dark:border-gray-700">
+            <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-yellow-500" />
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+              Loading Course Details...
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              Please wait while we fetch the course information.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Compute current chapter info for chatbot
+  const currentChapter = useMemo(
+    () => filteredChapters?.find((ch) => ch.chapterId?.toString() === activeChapterId),
+    [filteredChapters, activeChapterId],
+  );
+
+  // Get current chapter summary from lessons
+  const currentChapterSummary = useMemo(() => {
+    if (!activeChapterId) return null;
+    const chapterLessons = lessons.filter(
+      (lesson) => lesson.chapterId.toString() === activeChapterId,
+    );
+    if (chapterLessons.length === 0) return null;
+    // Combine first 2 lesson contents as summary
+    return chapterLessons
+      .slice(0, 2)
+      .map((lesson) => lesson.lessonContent)
+      .join(" ")
+      .substring(0, 200);
+  }, [lessons, activeChapterId]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-4 sm:py-8 lg:py-12 px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 lg:pt-[100px]">
@@ -1381,6 +1742,27 @@ const CourseDetails = memo(({ courseId }) => {
                 if (
                   chapter.chapterId?.toString() === activeChapterId?.toString()
                 ) {
+                  const chapterLessons = lessons.filter(
+                    (lesson) =>
+                      lesson.chapterId?.toString() ===
+                      chapter.chapterId?.toString(),
+                  );
+
+                  console.log("=== LESSON FILTERING DEBUG ===", {
+                    chapterId: chapter.chapterId,
+                    totalLessons: lessons.length,
+                    filteredLessons: chapterLessons.length,
+                    lessons: lessons.map((l) => ({
+                      lessonId: l.lessonId,
+                      chapterId: l.chapterId,
+                      lessonName: l.lessonName,
+                    })),
+                    chapterLessons: chapterLessons.map((l) => ({
+                      lessonId: l.lessonId,
+                      lessonName: l.lessonName,
+                    })),
+                  });
+
                   return (
                     <div key={chapter.chapterId} className="p-4 sm:p-6">
                       <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-900 dark:text-white mb-4 sm:mb-6 flex items-center gap-2">
@@ -1389,158 +1771,175 @@ const CourseDetails = memo(({ courseId }) => {
                       </h2>
 
                       <div className="space-y-4 sm:space-y-6">
-                        {lessons
-                          .filter(
-                            (lesson) =>
-                              lesson.chapterId?.toString() ===
-                              chapter.chapterId?.toString()
-                          )
-                          .map((lesson) => {
-                            const lessonQuiz = quizzes.find(
-                              (quiz) =>
-                                quiz.lessonId.toString() ===
-                                lesson.lessonId.toString()
-                            );
+                        {chapterLessons.length === 0 ? (
+                          <div className="text-center py-8 text-gray-500 dark:text-gray-400 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                            <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                            <p className="font-medium text-lg mb-2">
+                              No lessons found for this module
+                            </p>
+                            <p className="text-sm mb-4">
+                              Total lessons in context: {lessons.length}
+                              <br />
+                              Chapter ID: {chapter.chapterId}
+                            </p>
+                            <button
+                              onClick={() => {
+                                console.log("Manual refetch triggered");
+                                if (fetchLessons) fetchLessons();
+                                if (fetchQuizzes) fetchQuizzes();
+                              }}
+                              className="mt-2 px-4 py-2 bg-yellow-500 text-gray-900 rounded-lg hover:bg-yellow-600"
+                            >
+                              Retry Loading Lessons
+                            </button>
+                          </div>
+                        ) : null}
+                        {chapterLessons.map((lesson) => {
+                          const lessonQuiz = quizzes.find(
+                            (quiz) =>
+                              quiz.lessonId.toString() ===
+                              lesson.lessonId.toString(),
+                          );
 
-                            return (
-                              <div
-                                key={lesson.lessonId}
-                                className="border-t border-gray-200 dark:border-gray-700 pt-4 sm:pt-6 first:border-0 first:pt-0"
-                              >
-                                <h3 className="text-lg sm:text-xl font-medium text-gray-900 dark:text-white mb-2 sm:mb-3">
-                                  {lesson.lessonName}
-                                </h3>
-                                <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 mb-3 sm:mb-4">
-                                  {lesson.lessonContent}
-                                </p>
+                          return (
+                            <div
+                              key={lesson.lessonId}
+                              className="border-t border-gray-200 dark:border-gray-700 pt-4 sm:pt-6 first:border-0 first:pt-0"
+                            >
+                              <h3 className="text-lg sm:text-xl font-medium text-gray-900 dark:text-white mb-2 sm:mb-3">
+                                {lesson.lessonName}
+                              </h3>
+                              <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 mb-3 sm:mb-4">
+                                {lesson.lessonContent}
+                              </p>
 
-                                {lesson?.additionalResources?.some(
-                                  (r) => r.url
-                                ) && (
-                                  <div className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
-                                    <h4 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-1 sm:mb-2">
-                                      Additional Resources
-                                    </h4>
-                                    <div className="grid gap-3 sm:gap-4">
-                                      {lesson?.additionalResources
-                                        ?.filter((r) => r.url)
-                                        .map((resource, index) => (
-                                          <div key={index}>
-                                            <Resource resource={resource} />
-                                          </div>
-                                        ))}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Mark as read button */}
-                                {currentCourse.approved && address && (
-                                  <>
-                                    {(() => {
-                                      const userEnrolled = isUserEnrolled(
-                                        currentCourse.enrolledStudents,
-                                        address
-                                      );
-                                      return userEnrolled;
-                                    })() ? (
-                                      <div className="flex justify-between items-center mt-3 sm:mt-4">
-                                        <button
-                                          className={`bg-yellow-500 text-gray-900 p-2 sm:p-3 my-2 sm:my-3 rounded-lg font-normal flex items-center gap-2 text-sm sm:text-base ${
-                                            completedLessonIds.has(
-                                              lesson.lessonId.toString()
-                                            ) ||
-                                            markingAsReadIds.has(
-                                              lesson.lessonId.toString()
-                                            )
-                                              ? "opacity-50 cursor-not-allowed"
-                                              : "hover:bg-yellow-600"
-                                          }`}
-                                          onClick={async () => {
-                                            if (
-                                              !completedLessonIds.has(
-                                                lesson.lessonId.toString()
-                                              ) &&
-                                              !markingAsReadIds.has(
-                                                lesson.lessonId.toString()
-                                              )
-                                            ) {
-                                              try {
-                                                await markAsRead(
-                                                  currentCourse.courseId,
-                                                  chapter.chapterId,
-                                                  lesson.lessonId
-                                                );
-                                              } catch (error) {
-                                                console.error(
-                                                  "Failed to mark lesson as read:",
-                                                  error
-                                                );
-                                              }
-                                            }
-                                          }}
-                                          disabled={
-                                            completedLessonIds.has(
-                                              lesson.lessonId.toString()
-                                            ) ||
-                                            markingAsReadIds.has(
-                                              lesson.lessonId.toString()
-                                            )
-                                          }
+                              {lesson?.additionalResources?.some(
+                                (r) => r.url,
+                              ) && (
+                                <div className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
+                                  <h4 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-1 sm:mb-2">
+                                    Additional Resources
+                                  </h4>
+                                  <div className="grid gap-3 sm:gap-4">
+                                    {lesson?.additionalResources
+                                      ?.filter((r) => r.url)
+                                      .map((resource, index) => (
+                                        <div
+                                          key={`mobile-resource-${lesson.lessonId}-${index}-${resource.url}`}
                                         >
-                                          {markingAsReadIds.has(
-                                            lesson.lessonId.toString()
-                                          ) ? (
-                                            <>
-                                              <Loader2 className="w-4 h-4 animate-spin" />
-                                              <span className="hidden sm:inline">
-                                                Marking...
-                                              </span>
-                                            </>
-                                          ) : completedLessonIds.has(
-                                              lesson.lessonId.toString()
-                                            ) ? (
-                                            "Completed"
-                                          ) : (
-                                            "Mark as Read"
-                                          )}
-                                        </button>
-                                      </div>
-                                    ) : null}
-                                  </>
-                                )}
-
-                                {lessonQuiz && (
-                                  <div className="mt-4 sm:mt-6 p-4 sm:p-6 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg dark:text-gray-300">
-                                    <div
-                                      className="w-full flex justify-between items-center cursor-pointer"
-                                      onClick={() =>
-                                        toggleQuiz(lesson.lessonId)
-                                      }
-                                    >
-                                      <span className="dark:text-gray-300 text-sm sm:text-base">
-                                        {lessonQuiz.quizTitle}
-                                      </span>
-                                      <ChevronRight
-                                        className={`w-4 h-4 dark:text-yellow-500 transform transition-transform ${
-                                          openQuizIds.has(lesson.lessonId)
-                                            ? "rotate-90"
-                                            : ""
-                                        }`}
-                                      />
-                                    </div>
-                                    <div>
-                                      {openQuizIds.has(lesson.lessonId) && (
-                                        <Quiz
-                                          quiz={lessonQuiz}
-                                          courseId={courseId}
-                                        />
-                                      )}
-                                    </div>
+                                          <Resource resource={resource} />
+                                        </div>
+                                      ))}
                                   </div>
-                                )}
-                              </div>
-                            );
-                          })}
+                                </div>
+                              )}
+
+                              {/* Mark as read button */}
+                              {currentCourse.approved && address && (
+                                <>
+                                  {(() => {
+                                    const userEnrolled = isUserEnrolled(
+                                      currentCourse.enrolledStudents,
+                                      address,
+                                    );
+                                    return userEnrolled;
+                                  })() ? (
+                                    <div className="flex justify-between items-center mt-3 sm:mt-4">
+                                      <button
+                                        className={`bg-yellow-500 text-gray-900 p-2 sm:p-3 my-2 sm:my-3 rounded-lg font-normal flex items-center gap-2 text-sm sm:text-base ${
+                                          completedLessonIds.has(
+                                            lesson.lessonId.toString(),
+                                          ) ||
+                                          markingAsReadIds.has(
+                                            lesson.lessonId.toString(),
+                                          )
+                                            ? "opacity-50 cursor-not-allowed"
+                                            : "hover:bg-yellow-600"
+                                        }`}
+                                        onClick={async () => {
+                                          if (
+                                            !completedLessonIds.has(
+                                              lesson.lessonId.toString(),
+                                            ) &&
+                                            !markingAsReadIds.has(
+                                              lesson.lessonId.toString(),
+                                            )
+                                          ) {
+                                            try {
+                                              await markAsRead(
+                                                currentCourse.courseId,
+                                                chapter.chapterId,
+                                                lesson.lessonId,
+                                              );
+                                            } catch (error) {
+                                              console.error(
+                                                "Failed to mark lesson as read:",
+                                                error,
+                                              );
+                                            }
+                                          }
+                                        }}
+                                        disabled={
+                                          completedLessonIds.has(
+                                            lesson.lessonId.toString(),
+                                          ) ||
+                                          markingAsReadIds.has(
+                                            lesson.lessonId.toString(),
+                                          )
+                                        }
+                                      >
+                                        {markingAsReadIds.has(
+                                          lesson.lessonId.toString(),
+                                        ) ? (
+                                          <>
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            <span className="hidden sm:inline">
+                                              Marking...
+                                            </span>
+                                          </>
+                                        ) : completedLessonIds.has(
+                                            lesson.lessonId.toString(),
+                                          ) ? (
+                                          "Completed"
+                                        ) : (
+                                          "Mark as Read"
+                                        )}
+                                      </button>
+                                    </div>
+                                  ) : null}
+                                </>
+                              )}
+
+                              {lessonQuiz && (
+                                <div className="mt-4 sm:mt-6 p-4 sm:p-6 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg dark:text-gray-300">
+                                  <div
+                                    className="w-full flex justify-between items-center cursor-pointer"
+                                    onClick={() => toggleQuiz(lesson.lessonId)}
+                                  >
+                                    <span className="dark:text-gray-300 text-sm sm:text-base">
+                                      {lessonQuiz.quizTitle}
+                                    </span>
+                                    <ChevronRight
+                                      className={`w-4 h-4 dark:text-yellow-500 transform transition-transform ${
+                                        openQuizIds.has(lesson.lessonId)
+                                          ? "rotate-90"
+                                          : ""
+                                      }`}
+                                    />
+                                  </div>
+                                  <div>
+                                    {openQuizIds.has(lesson.lessonId) && (
+                                      <Quiz
+                                        quiz={lessonQuiz}
+                                        courseId={courseId}
+                                      />
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -1566,7 +1965,7 @@ const CourseDetails = memo(({ courseId }) => {
                   {Math.round(
                     ((completedLessonIds.size + completedQuizIds.size) /
                       (totalLessons + totalQuizzes || 1)) *
-                      100
+                      100,
                   )}
                   %
                 </span>
@@ -1653,7 +2052,7 @@ const CourseDetails = memo(({ courseId }) => {
             {certificates.some(
               (cert) =>
                 cert.courseId === currentCourse.courseId.toString() &&
-                cert.owner.toLowerCase() === address.toLowerCase()
+                cert.owner.toLowerCase() === address.toLowerCase(),
             ) && (
               <div className="relative bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 dark:from-emerald-900/30 dark:via-green-900/20 dark:to-teal-900/20 border-b border-emerald-200 dark:border-emerald-700/50">
                 <div className="absolute inset-0 opacity-10 dark:opacity-5">
@@ -1742,7 +2141,7 @@ const CourseDetails = memo(({ courseId }) => {
                             setShowCertificate(true); // open the certificate modal used below
                           } else {
                             console.warn(
-                              "No certificate found for current user/course"
+                              "No certificate found for current user/course",
                             );
                           }
                         }}
@@ -1786,7 +2185,7 @@ const CourseDetails = memo(({ courseId }) => {
                     {Math.round(
                       ((completedLessonIds.size + completedQuizIds.size) /
                         (totalLessons + totalQuizzes)) *
-                        100
+                        100,
                     )}
                     %
                   </span>
@@ -1944,122 +2343,320 @@ const CourseDetails = memo(({ courseId }) => {
               </div>
             </div>
 
-            <div className="pt-10 sm:pt-12 lg:pt-14 pb-6 sm:pb-8 px-4 sm:px-6 lg:px-8">
-              <div className="text-center space-y-4 sm:space-y-6">
-                <div>
+            <div className="pt-8 sm:pt-10 lg:pt-12 pb-4 sm:pb-6 px-3 sm:px-5 lg:px-6">
+              <div className="space-y-4 sm:space-y-5">
+                {/* Title */}
+                <div className="text-center">
                   <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                     🎉 Congratulations!
                   </h2>
-                  <div className="w-12 sm:w-14 lg:w-16 h-0.5 sm:h-1 bg-gradient-to-r from-yellow-400 to-yellow-600 mx-auto rounded-full"></div>
-                </div>
-
-                <div className="space-y-3 sm:space-y-4">
-                  <p className="text-sm sm:text-base lg:text-lg text-gray-700 dark:text-gray-300 leading-relaxed">
-                    You have successfully completed the{" "}
-                    <span className="font-semibold text-yellow-600 dark:text-yellow-400 px-2 py-1 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg text-xs sm:text-sm">
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">
+                    You've completed the{" "}
+                    <span className="font-semibold text-yellow-600 dark:text-yellow-400">
                       {currentCourse?.courseName}
                     </span>{" "}
-                    course.
+                    course
                   </p>
+                </div>
 
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-3 sm:p-4 rounded-xl border border-blue-200 dark:border-blue-800">
-                    <div className="flex items-start space-x-2 sm:space-x-3">
-                      <div className="bg-blue-500 p-1 rounded-full flex-shrink-0 mt-0.5">
+                {/* Terminal-Style Progress Display (Only shows when in progress) */}
+                {isIssuingCertificate && (
+                  <div className="bg-black rounded-lg border border-gray-800 p-4 sm:p-5 font-mono h-48 sm:h-56 overflow-y-auto">
+                    {/* Terminal Header */}
+                    <div className="flex items-center gap-2 mb-3 sticky top-0 bg-black z-10 pb-2 border-b border-gray-800">
+                      <div className="flex gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                      </div>
+                      <span className="text-xs text-gray-400">
+                        Certificate Generation Terminal
+                      </span>
+                    </div>
+
+                    {/* Progress Output with auto-scroll container */}
+                    <div className="space-y-3 text-sm" id="terminal-output">
+                      <div className="text-green-400">
+                        $ Starting certificate generation...
+                      </div>
+
+                      {[
+                        {
+                          stage: PROGRESS_STAGES.GENERATING_CERTIFICATE,
+                          label: "Generating certificate document",
+                          command: "generate_certificate",
+                        },
+                        {
+                          stage: PROGRESS_STAGES.CONVERTING_TO_IMAGE,
+                          label: "Converting to image format",
+                          command: "convert_to_image",
+                        },
+                        {
+                          stage: PROGRESS_STAGES.UPLOADING_TO_IPFS,
+                          label: "Uploading to IPFS storage",
+                          command: "upload_to_ipfs",
+                        },
+                        {
+                          stage: PROGRESS_STAGES.ISSUEING_VC_LOCALLY,
+                          label: "Issuing verifiable credential",
+                          command: "issue_verifiable_credential",
+                        },
+                        {
+                          stage: PROGRESS_STAGES.STORE_VC_ON_CHAIN_,
+                          label: "Storing on blockchain",
+                          command: "store_on_chain",
+                        },
+                        {
+                          stage: PROGRESS_STAGES.MINTING_SBT,
+                          label: "Minting certificate NFT",
+                          command: "mint_sbt",
+                        },
+                        {
+                          stage: PROGRESS_STAGES.COMPLETED,
+                          label: "Certificate ready!",
+                          command: "complete",
+                        },
+                      ].map(({ stage, label, command }, index) => {
+                        const isCurrent = currentStage === stage;
+                        const isCompleted = currentStage > stage;
+                        const isNext = currentStage === stage + 1;
+
+                        return (
+                          <div
+                            key={stage}
+                            className="pl-2 transition-opacity duration-300"
+                            id={`stage-${stage}`}
+                          >
+                            {/* Command Line */}
+                            <div className="flex items-start gap-2">
+                              <span
+                                className={`${
+                                  isCompleted
+                                    ? "text-green-400"
+                                    : isCurrent
+                                    ? "text-yellow-400"
+                                    : "text-gray-600"
+                                }`}
+                              >
+                                {isCompleted ? "✔" : isCurrent ? "▶" : ">"}
+                              </span>
+                              <div className="flex-1">
+                                <span
+                                  className={`${
+                                    isCompleted
+                                      ? "text-green-400"
+                                      : isCurrent
+                                      ? "text-yellow-400"
+                                      : "text-gray-500"
+                                  }`}
+                                >
+                                  {command}
+                                </span>
+                                {isCurrent && (
+                                  <div className="mt-1 flex items-center gap-2">
+                                    <div className="flex gap-1">
+                                      <div className="w-1 h-3 bg-yellow-400 animate-bounce"></div>
+                                      <div
+                                        className="w-1 h-3 bg-yellow-400 animate-bounce"
+                                        style={{ animationDelay: "150ms" }}
+                                      ></div>
+                                      <div
+                                        className="w-1 h-3 bg-yellow-400 animate-bounce"
+                                        style={{ animationDelay: "300ms" }}
+                                      ></div>
+                                    </div>
+                                    <span className="text-gray-400 text-xs">
+                                      {label}...
+                                    </span>
+                                  </div>
+                                )}
+                                {isCompleted && (
+                                  <div className="text-green-300 text-xs mt-1">
+                                    ✓ Completed
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Auto-scroll marker - invisible element for scrolling to */}
+                            {isCurrent && (
+                              <div id="current-stage-marker" className="h-0" />
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {/* Completion Message */}
+                      {currentStage === PROGRESS_STAGES.COMPLETED && (
+                        <div className="mt-4 pt-3 border-t border-gray-800">
+                          <div className="text-green-400">
+                            $ Process completed successfully!
+                          </div>
+                          <div className="text-cyan-300 text-xs mt-1">
+                            Certificate generated and stored securely.
+                          </div>
+                          <div className="text-green-300 text-xs mt-2 animate-pulse">
+                            ⚡ Ready for download!
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Auto-scroll Script (Inline for simplicity) */}
+                    <script
+                      dangerouslySetInnerHTML={{
+                        __html: `
+        // Auto-scroll to current stage
+        function scrollToCurrentStage() {
+          const marker = document.getElementById('current-stage-marker');
+          const terminal = document.querySelector('.overflow-y-auto');
+          const completed = document.querySelector('#stage-${PROGRESS_STAGES.COMPLETED}');
+          
+          if (marker) {
+            marker.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          } else if (completed) {
+            completed.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+        
+        // Scroll when component updates
+        if (typeof window !== 'undefined') {
+          setTimeout(scrollToCurrentStage, 100);
+        }
+      `,
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* User Info */}
+                <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-blue-500 p-1.5 rounded-full">
+                      <svg
+                        className="w-4 h-4 text-white"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                        Certificate will be issued to:
+                      </p>
+                      <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
+                        <span className="font-semibold">
+                          {profile?.fname} {profile?.lname}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Profile Warning */}
+                {!hasProfile && (
+                  <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 rounded-xl p-4 border border-red-200 dark:border-red-800">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-red-500 p-1.5 rounded-full">
                         <svg
-                          className="w-3 h-3 sm:w-4 sm:h-4 text-white"
+                          className="w-4 h-4 text-white"
                           fill="currentColor"
                           viewBox="0 0 20 20"
                         >
                           <path
                             fillRule="evenodd"
-                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
                             clipRule="evenodd"
                           />
                         </svg>
                       </div>
-                      <div className="text-left">
-                        <p className="text-xs sm:text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-                          Certificate Information
+                      <div>
+                        <p className="text-sm font-medium text-red-900 dark:text-red-100">
+                          Profile Required
                         </p>
-                        <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
-                          Certificate will be issued to:
-                          <span className="font-semibold text-blue-900 dark:text-blue-100 ml-1">
-                            {profile?.fname} {profile?.lname}
-                          </span>
+                        <p className="text-sm text-red-800 dark:text-red-200 mt-1">
+                          Please create your profile to claim certificate
                         </p>
+                        <button
+                          onClick={() =>
+                            navigateTo("/mainpage?section=settings")
+                          }
+                          className="text-red-600 dark:text-red-400 underline text-sm font-medium mt-2"
+                        >
+                          Create Profile Now
+                        </button>
                       </div>
                     </div>
                   </div>
+                )}
 
-                  {!hasProfile && (
-                    <button
-                      type="button"
-                      onClick={() => navigateTo("/mainpage?section=settings")}
-                      className="text-red-300 dark:text-purple-500 underline items-center justify-center text-md italic sm:text-sm font-medium mt-10"
-                    >
-                      Create Profile now!
-                    </button>
-                  )}
-
-                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                    Click the button below to claim your certificate.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-6 sm:mt-8">
-                <button
-                  onClick={
-                    hasProfile && !isIssuingCertificate
-                      ? handleClaimCertificate
-                      : undefined
-                  }
-                  disabled={!hasProfile || isIssuingCertificate}
-                  aria-disabled={!hasProfile || isIssuingCertificate}
-                  aria-busy={isIssuingCertificate}
-                  tabIndex={!hasProfile || isIssuingCertificate ? -1 : 0}
-                  className={`flex-1 font-semibold py-2 sm:py-3 px-4 sm:px-6 rounded-xl flex items-center justify-center space-x-2 text-sm sm:text-base transition-all duration-200 ${
-                    hasProfile && !isIssuingCertificate
-                      ? "bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
-                      : "bg-gray-200 text-gray-400 opacity-60 cursor-not-allowed"
-                  }`}
-                >
-                  <svg
-                    className="w-4 h-4 sm:w-5 sm:h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4">
+                  {/* Claim Certificate Button (Original Styling) */}
+                  <button
+                    onClick={
+                      hasProfile && !isIssuingCertificate
+                        ? handleClaimCertificate
+                        : undefined
+                    }
+                    disabled={!hasProfile || isIssuingCertificate}
+                    className={`flex-1 font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 ${
+                      hasProfile && !isIssuingCertificate
+                        ? "bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
+                        : "bg-gray-200 text-gray-400 opacity-60 cursor-not-allowed"
+                    }`}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  <span>
-                    {!isIssuingCertificate ? (
-                      "Claim Certificate"
+                    {isIssuingCertificate ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <span>Issuing Certificate...</span>
+                      </>
                     ) : (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span className="hidden sm:inline">Issuing...</span>
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          />
+                        </svg>
+                        <span>Claim Certificate</span>
                       </>
                     )}
-                  </span>
-                </button>
+                  </button>
 
-                <button
-                  onClick={handleClosePopup}
-                  className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium py-2 sm:py-3 px-4 sm:px-6 rounded-xl transition-all duration-200 border border-gray-300 dark:border-gray-600 text-sm sm:text-base"
-                >
-                  Close
-                </button>
+                  {/* Close Button */}
+                  <button
+                    onClick={handleClosePopup}
+                    className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium py-3 px-6 rounded-xl transition-all duration-200 border border-gray-300 dark:border-gray-600"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* ABYA Chatbot - Course-Specific */}
+      <AbyaChatbot
+        userAddress={address}
+        currentCourseId={courseId}
+        currentChapterTitle={currentChapter?.chapterName || null}
+        currentChapterSummary={currentChapterSummary}
+      />
 
       {/* Certificate Modal - Responsive */}
       {showCertificate && certificateData && (

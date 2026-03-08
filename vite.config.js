@@ -1,17 +1,25 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import nodePolyfills from 'vite-plugin-node-stdlib-browser';
+
 
 export default defineConfig({
-  plugins: [react(), nodePolyfills()],
+  plugins: [react()],
   resolve: {
     alias: {
       process: 'process/browser',
       buffer: 'buffer',
       util: 'util',
+      hardhat: false,
+      "@nomicfoundation/hardhat-toolbox": false,
+      "@nomicfoundation/edr": false,
     },
   },
   optimizeDeps: {
+    exclude: [
+      "hardhat",
+      "@nomicfoundation/hardhat-toolbox",
+      "@nomicfoundation/edr",
+    ],
     esbuildOptions: {
       target: 'es2020',
       define: {

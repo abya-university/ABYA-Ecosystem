@@ -6,6 +6,11 @@
     {
       "inputs": [
         {
+          "internalType": "enum LibDiamond.PoolId",
+          "name": "pool",
+          "type": "uint8"
+        },
+        {
           "internalType": "address",
           "name": "to",
           "type": "address"
@@ -21,7 +26,7 @@
           "type": "string"
         }
       ],
-      "name": "mintTokens",
+      "name": "mintFromPool",
       "outputs": [
         {
           "internalType": "bool",

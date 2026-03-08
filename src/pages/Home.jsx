@@ -14,6 +14,15 @@ const Home = () => {
   const { darkMode, setDarkMode } = useDarkMode();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const navList = [
+    { name: "Explore", href: "#" },
+    { name: "Ambassadors", href: "/networkMainpage" },
+    { name: "Finance & Liquidity", href: "/liquidityMainpage" },
+    { name: "Courses", href: "#" },
+    { name: "Community", href: "#" },
+    { name: "About", href: "#" },
+  ];
+
   return (
     <VantaNetBG darkMode={darkMode}>
       <div className="min-h-screen bg-transparent">
@@ -45,16 +54,16 @@ const Home = () => {
 
               {/* Desktop Navigation */}
               <div className="hidden lg:flex space-x-8">
-                {["Explore", "Courses", "Community", "About"].map((item) => (
-                  <a
-                    key={item}
-                    href="#"
+                {navList.map((item) => (
+                  <Link
+                    key={item.name}
+                    to={item.href}
                     className={`font-medium transition-all duration-300 hover:text-yellow-500 ${
                       darkMode ? "text-gray-300" : "text-gray-700"
                     }`}
                   >
-                    {item}
-                  </a>
+                    {item.name}
+                  </Link>
                 ))}
               </div>
 
@@ -106,10 +115,10 @@ const Home = () => {
                 } p-4`}
               >
                 <div className="flex flex-col space-y-4">
-                  {["Explore", "Courses", "Community", "About"].map((item) => (
-                    <a
-                      key={item}
-                      href="#"
+                  {navList.map((item) => (
+                    <Link
+                      key={item.name}
+                      to={item.href}
                       className={`py-3 px-4 rounded-xl transition-all duration-300 ${
                         darkMode
                           ? "text-gray-300 hover:bg-gray-800 hover:text-yellow-500"
@@ -117,8 +126,8 @@ const Home = () => {
                       }`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      {item}
-                    </a>
+                      {item.name}
+                    </Link>
                   ))}
                   <div className="pt-4 border-t border-white/10">
                     <AbyaConnectButton />

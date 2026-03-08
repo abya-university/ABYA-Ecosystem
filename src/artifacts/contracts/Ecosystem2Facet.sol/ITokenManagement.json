@@ -6,6 +6,11 @@
     {
       "inputs": [
         {
+          "internalType": "enum LibDiamond.PoolId",
+          "name": "pool",
+          "type": "uint8"
+        },
+        {
           "internalType": "address",
           "name": "from",
           "type": "address"
@@ -21,7 +26,41 @@
           "type": "string"
         }
       ],
-      "name": "burnTokens",
+      "name": "burnFromPool",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "enum LibDiamond.PoolId",
+          "name": "pool",
+          "type": "uint8"
+        },
+        {
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "name": "mintFromPool",
       "outputs": [
         {
           "internalType": "bool",
@@ -51,35 +90,6 @@
         }
       ],
       "name": "mintReward",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        },
-        {
-          "internalType": "string",
-          "name": "reason",
-          "type": "string"
-        }
-      ],
-      "name": "mintTokens",
       "outputs": [
         {
           "internalType": "bool",

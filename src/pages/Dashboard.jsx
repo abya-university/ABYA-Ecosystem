@@ -1,4 +1,5 @@
 import { useState, useContext, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Wallet,
   LineChart,
@@ -12,6 +13,7 @@ import {
   CheckCircle,
   ClipboardListIcon,
   RefreshCw,
+  X,
 } from "lucide-react";
 import { CourseContext } from "../contexts/courseContext";
 import { useProfile } from "../contexts/ProfileContext";
@@ -23,6 +25,10 @@ import { useCertificates } from "../contexts/certificatesContext";
 import { useUser } from "../contexts/userContext";
 import { useProgress } from "../contexts/progressContext";
 import { useActiveAccount } from "thirdweb/react";
+import CareerOnboardingForm from "../components/ProfileSurveyForm";
+
+const FALLBACK_COURSE_IMAGE = "/Vision.jpg";
+const IPFS_GATEWAY_BASE = "https://ipfs.io/ipfs/";
 
 const Dashboard = ({ onCourseSelect }) => {
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -36,6 +42,7 @@ const Dashboard = ({ onCourseSelect }) => {
   const { lessons } = useContext(LessonContext);
   const { quizzes } = useContext(QuizContext);
   const { certificates } = useCertificates();
+  const [isShowProfileSurveyForm, setShowProfileSurveyForm] = useState(false);
 
   // Use the progress context
   const {
@@ -57,7 +64,7 @@ const Dashboard = ({ onCourseSelect }) => {
 
     if (Array.isArray(enrolledStudents)) {
       return enrolledStudents.some(
-        (addr) => addr.toLowerCase() === userAddress.toLowerCase()
+        (addr) => addr.toLowerCase() === userAddress.toLowerCase(),
       );
     }
 
@@ -75,7 +82,7 @@ const Dashboard = ({ onCourseSelect }) => {
 
   // Get enrolled courses count
   const enrolledCoursesCount = courses.filter((course) =>
-    isUserEnrolled(course.enrolledStudents, address)
+    isUserEnrolled(course.enrolledStudents, address),
   ).length;
 
   // Stats data using progress context
@@ -106,35 +113,12 @@ const Dashboard = ({ onCourseSelect }) => {
     },
   ];
 
-  const recentActivity = [
-    {
-      course: "Blockchain Basics",
-      progress: 75,
-      status: "In Progress",
-    },
-    {
-      course: "Smart Contract Development",
-      progress: 100,
-      status: "Completed",
-    },
-    {
-      course: "Web3 Security",
-      progress: 30,
-      status: "Started",
-    },
-  ];
-
-  const getEnrolledStudentsCount = (enrolledStudents) => {
-    if (!enrolledStudents || enrolledStudents.length === 0) return 0;
-    return enrolledStudents.length;
-  };
-
   // Helper function to check if user has claimed certificate for a course
   const hasCertificateForCourse = (courseId) => {
     return certificates.some(
       (cert) =>
         cert.courseId.toString() === courseId.toString() &&
-        cert.owner.toLowerCase() === address.toLowerCase()
+        cert.owner.toLowerCase() === address.toLowerCase(),
     );
   };
 
@@ -148,20 +132,25 @@ const Dashboard = ({ onCourseSelect }) => {
   };
 
   const enrolledCourses = courses.filter((course) =>
-    isUserEnrolled(course.enrolledStudents, address)
+    isUserEnrolled(course.enrolledStudents, address),
   );
+
+  const getEnrolledStudentsCount = (enrolledStudents) => {
+    if (!enrolledStudents || enrolledStudents.length === 0) return 0;
+    return enrolledStudents.length;
+  };
 
   // Helper function to get lessons for a specific course (via chapters)
   const getLessonsForCourse = (courseId) => {
     const courseChapters = chapters.filter(
-      (chapter) => chapter.courseId.toString() === courseId.toString()
+      (chapter) => chapter.courseId.toString() === courseId.toString(),
     );
 
     const courseLessons = lessons.filter((lesson) =>
       courseChapters.some(
         (chapter) =>
-          chapter.chapterId.toString() === lesson.chapterId.toString()
-      )
+          chapter.chapterId.toString() === lesson.chapterId.toString(),
+      ),
     );
 
     return courseLessons;
@@ -173,8 +162,8 @@ const Dashboard = ({ onCourseSelect }) => {
 
     const courseQuizzes = quizzes.filter((quiz) =>
       courseLessons.some(
-        (lesson) => lesson.lessonId.toString() === quiz.lessonId.toString()
-      )
+        (lesson) => lesson.lessonId.toString() === quiz.lessonId.toString(),
+      ),
     );
 
     return courseQuizzes;
@@ -189,11 +178,11 @@ const Dashboard = ({ onCourseSelect }) => {
     const totalQuizzes = courseQuizzes.length;
 
     const completedLessons = courseLessons.filter((lesson) =>
-      completedLessonIds.has(lesson.lessonId.toString())
+      completedLessonIds.has(lesson.lessonId.toString()),
     ).length;
 
     const completedQuizzes = courseQuizzes.filter((quiz) =>
-      completedQuizIds.has(quiz.quizId.toString())
+      completedQuizIds.has(quiz.quizId.toString()),
     ).length;
 
     return {
@@ -203,6 +192,71 @@ const Dashboard = ({ onCourseSelect }) => {
       totalQuizzes,
     };
   };
+
+  const handleTakeSurvey = () => {
+    setShowProfileSurveyForm(true);
+  };
+  const handleCloseSurvey = () => {
+    setShowProfileSurveyForm(false);
+  };
+
+  const formatPriceUSDC = (value) => {
+    if (value === null || value === undefined) {
+      return "Free";
+    }
+
+    const numeric = Number(value) / 1_000_000;
+    if (!Number.isFinite(numeric) || numeric === 0) {
+      return "Free";
+    }
+
+    const formatted = numeric.toLocaleString(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+    return `${formatted} USDC`;
+  };
+
+  const getCourseImage = (course) => {
+    const imageUrl = course?.imageURL?.trim();
+    if (!imageUrl) {
+      return FALLBACK_COURSE_IMAGE;
+    }
+
+    if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+      return imageUrl;
+    }
+
+    const normalizedHash = imageUrl.startsWith("ipfs://")
+      ? imageUrl.slice("ipfs://".length)
+      : imageUrl;
+    return `${IPFS_GATEWAY_BASE}${normalizedHash}`;
+  };
+  // Generate recent activity from enrolled courses (limited to 3)
+  const recentActivity = enrolledCourses
+    .map((course) => {
+      const completionData = getCourseCompletionData(course.courseId);
+      const totalItems =
+        completionData.totalLessons + completionData.totalQuizzes;
+      const completedItems =
+        completionData.completedLessons + completionData.completedQuizzes;
+      const progress =
+        totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+      let status = "Started";
+      if (progress === 100) {
+        status = "Completed";
+      } else if (progress > 0) {
+        status = "In Progress";
+      }
+
+      return {
+        course: course.courseName,
+        progress,
+        status,
+      };
+    })
+    .slice(0, 3);
 
   // Improved refresh function with proper loading state
   const handleRefreshProgress = async () => {
@@ -248,7 +302,7 @@ const Dashboard = ({ onCourseSelect }) => {
   useEffect(() => {
     if (address && enrolledCourses.length > 0) {
       console.log(
-        "Address changed, refreshing progress for all enrolled courses"
+        "Address changed, refreshing progress for all enrolled courses",
       );
       handleRefreshProgress();
     }
@@ -275,11 +329,9 @@ const Dashboard = ({ onCourseSelect }) => {
           </div>
           <div className="lg:flex lg:items-center lg:gap-4 hidden md:flex">
             <button
-              onClick={() =>
-                alert("This feature is under development. Stay tuned!")
-              }
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-cyan-900 
-                       text-white rounded-lg hover:from-cyan-900 hover:to-yellow-700 
+              onClick={handleTakeSurvey}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-cyan-900
+                       text-white rounded-lg hover:from-cyan-900 hover:to-yellow-700
                        transition-all duration-300 transform hover:scale-105 shadow-lg"
             >
               <ClipboardListIcon className="w-4 h-4" />
@@ -288,7 +340,7 @@ const Dashboard = ({ onCourseSelect }) => {
             <button
               onClick={handleRefreshProgress}
               disabled={showLoading || enrolledCourses.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600
              text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {showLoading ? (
@@ -368,7 +420,7 @@ const Dashboard = ({ onCourseSelect }) => {
                       {/* Small course image in top-right corner */}
                       <div className="absolute top-2 right-2 w-16 h-16 rounded-lg overflow-hidden shadow-lg border-2 border-white dark:border-gray-600">
                         <img
-                          src="/Vision.jpg"
+                          src={getCourseImage(course)}
                           alt={course.courseName}
                           className="w-full h-full object-cover"
                         />
@@ -384,6 +436,9 @@ const Dashboard = ({ onCourseSelect }) => {
                       <p className="text-sm dark:text-gray-300 text-gray-600 mb-3 line-clamp-2">
                         {course.description}
                       </p>
+                      <div className="text-sm font-semibold text-yellow-500 mb-3">
+                        {formatPriceUSDC(course.priceUSDC)}
+                      </div>
                       <div className="flex items-center gap-2 text-sm dark:text-gray-400 text-gray-500 mb-3">
                         <Users className="w-4 h-4" />
                         <span>
@@ -532,6 +587,25 @@ const Dashboard = ({ onCourseSelect }) => {
             ))}
           </div>
         </div>
+
+        {isShowProfileSurveyForm && (
+          <div className="relative z-50">
+            {/* Explicit Close Button */}
+            <button
+              onClick={handleCloseSurvey}
+              className="fixed lg:top-24 lg:right-64 top-16 right-4 z-[70] p-3 rounded-full bg-red-500 hover:bg-red-600 text-white shadow-2xl transition-all duration-200 hover:scale-110 flex items-center gap-2 font-medium"
+              aria-label="Close survey"
+            >
+              <X className="w-5 h-5 font-bold" />
+            </button>
+
+            <CareerOnboardingForm
+              userAddress={address}
+              isModal={true}
+              onClose={handleCloseSurvey}
+            />
+          </div>
+        )}
 
         {showLoading && (
           <div className="text-center py-4">

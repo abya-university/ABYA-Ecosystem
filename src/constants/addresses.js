@@ -1,20 +1,29 @@
 const CONTRACT_ADDRESSES = {
-    diamond: "0x444b1073c5Ee679245EcCFE0E9cc481c4fC6C17a",
+    diamond: "0xc53530FD812F84B0d0bBEd140D962978FE21C720",
     facets: {
-        DiamondCutFacet: "0x39dde033dff03e9a743a5c89E5b49263e6135c5D",
-        DiamondLoupeFacet: "0xaAe3a6cBe8D46d94f141a56743B3725F0E102d29",
-        OwnershipFacet: "0x2dB66322344D3981b7Aca9EbC3e08A4CFebBD146",
-        TokenManagementFacet: "0x17E1066e84F83F135A454Dd2AaBf4d42ABb48ac8",
-        Ecosystem1Facet: "0xABDcaa5903c1f7438d8A059520fA716f06Cf44f9",
-        Ecosystem2Facet: "0x5b48ae9790E441450ff6B25dA0C872e721e4FeCF",
-        Ecosystem3Facet: "0x06b8E08f78917e4e34ce866fB5b57f40c857B536",
-        CommunityEngagementFacet: "0x1579A3684456A32Bd8cCafbAA0C240E21b96Bd6F",
-        CommunityGovernanceFacet: "0xf67bcb315902f027c510AE822840AdECD93eA9d6",
-        CommunityBadgesFacet: "0x280ADE357306Ccf6f0324CAB47e7272Dd7DA0837"
+        DiamondCutFacet: "0xCA6b5FFBB864099d727609C799a867cfA937910E",
+        DiamondLoupeFacet: "0x15c457a5D2A494EaF93CfD58339A8ed11c7341d9",
+        OwnershipFacet: "0x3334ef19D6de796261fD3b8D77A8Ca2da59c5550",
+        TokenManagementFacet: "0x4f5057D276D86145Fde1eD17FF3b8eab9Ae43eed",
+        Ecosystem1Facet: "0x97E3D94613F5820F4458C8d2a14590B9862EA371",
+        Ecosystem2Facet: "0x7fF74Cc6bF18055ED0e61264d89C267B938b6Df0",
+        Ecosystem3Facet: "0x697184e1f9A61E2744a384FD28E1eb8418d36Bca",
+        CommunityEngagementFacet: "0x1bbFA7Aa74Ea67ceF5c0635f932C45830FAC9f27",
+        CommunityGovernanceFacet: "0x7F673F7ca3F8c86e378A45456787f870f4611777",
+        CommunityBadgesFacet: "0x226506541C7F77e4B7A96ad98A4D8B873B922EC9",
+        ProfileFacet: "0x14D5cF145676CaD0Bc293C4b19000Ec2d9ddBc6F",
+        AmbassadorNetworkFacet: "0x7b3f8f4fEf4fddb0940FF5a605EAFD5c16Df9Af9",
+        RevenueSharingFacet: "0x519F9293bdEF30Ac6D1bb8Ae4480A0ab5ED4A3FE",
+        VestingFacet: "0x68dA4d41B184325c5A2dc9f3E7545371e04cE8bb"
     },
     init: {
-        DiamondInit: "0x5D7e037a8E89020614892c21f3fADD28C073378d"
-    }
+        DiamondInit: "0xfaab9f879C3ECC7C212Bf36c1145951ef0E6aaa5"
+    },
+    ABYTKN: "0x5393FA2bf4B5923BFBe33620faB40BB8Eb0497FF",
+    USDC: "0xC77298df061BE9B1aCA1a8AB377Be6c39B2Bc85B",
+    WBTC: "0x79B4cFDE8956E39B85795CE6e3CaE943E60b46D8",
+    ABYTKN_USDC_POOL: "0x4167f81c94D231C1454D5f210bC4F59076d7cbB3",
+    Liquidity: "0x36e1c41Ce99f2B06Ec4Dda3F4dd7B943e7cbe416"
 };
 
 export default CONTRACT_ADDRESSES;

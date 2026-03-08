@@ -1,3 +1,4 @@
+// ABYA-Ecosystem/src/main.jsx
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
@@ -20,6 +21,10 @@ import { TransactionHistoryProvider } from "./contexts/fake-liquidity-test-conte
 import { ThirdwebProvider } from "thirdweb/react";
 import { ThemeProvider } from "./contexts/themeContext.jsx";
 import { ProgressProvider } from "./contexts/progressContext.jsx";
+import { DidProvider } from "./contexts/DidContext.jsx";
+import { AmbassadorNetworkProvider } from "./contexts/ambassadorNetworkContext.jsx";
+import { RevenueSharingProvider } from "./contexts/RevenueSharingContext.jsx";
+import { VestingProvider } from "./contexts/VestingContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -42,7 +47,15 @@ createRoot(document.getElementById("root")).render(
                                 <TransactionHistoryProvider>
                                   <UserPositionProvider>
                                     <ProgressProvider>
-                                      <App />
+                                      <DidProvider>
+                                        <AmbassadorNetworkProvider>
+                                          <RevenueSharingProvider>
+                                            <VestingProvider>
+                                              <App />
+                                            </VestingProvider>
+                                          </RevenueSharingProvider>
+                                        </AmbassadorNetworkProvider>
+                                      </DidProvider>
                                     </ProgressProvider>
                                   </UserPositionProvider>
                                 </TransactionHistoryProvider>
@@ -61,5 +74,5 @@ createRoot(document.getElementById("root")).render(
         </ThemeProvider>
       </ProfileProvider>
     </ThirdwebProvider>
-  </StrictMode>
+  </StrictMode>,
 );

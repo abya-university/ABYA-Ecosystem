@@ -6,13 +6,18 @@
     {
       "inputs": [
         {
+          "internalType": "enum LibDiamond.PoolId",
+          "name": "pool",
+          "type": "uint8"
+        },
+        {
           "internalType": "address",
           "name": "to",
           "type": "address"
         },
         {
           "internalType": "uint256",
-          "name": "rewardType",
+          "name": "amount",
           "type": "uint256"
         },
         {
@@ -21,7 +26,7 @@
           "type": "string"
         }
       ],
-      "name": "mintReward",
+      "name": "mintFromPool",
       "outputs": [
         {
           "internalType": "bool",
@@ -41,7 +46,7 @@
         },
         {
           "internalType": "uint256",
-          "name": "amount",
+          "name": "rewardType",
           "type": "uint256"
         },
         {
@@ -50,7 +55,7 @@
           "type": "string"
         }
       ],
-      "name": "mintTokens",
+      "name": "mintReward",
       "outputs": [
         {
           "internalType": "bool",

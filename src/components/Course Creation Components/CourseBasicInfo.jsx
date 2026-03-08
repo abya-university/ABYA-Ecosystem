@@ -1,23 +1,37 @@
 import { AlertCircle, CheckCircle, Image, Upload } from "lucide-react";
-import Ecosystem1FacetABI from "../../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
-import Ecosystem2FacetABI from "../../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
-import CONTRACT_ADDRESSES from "../../constants/addresses";
-import { useState } from "react";
-import { defineChain } from "thirdweb/chains";
-import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
+import { useContext, useState } from "react";
 import { toast } from "react-toastify";
 import { useActiveAccount } from "thirdweb/react";
-import { client } from "../../services/client";
+import { CourseContext } from "../../contexts/courseContext";
 
-const DiamondAddress = CONTRACT_ADDRESSES.diamond;
-const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
-const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
+const parsePriceToUSDCUnits = (value) => {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return 0;
+  }
+
+  if (!/^\d+(\.\d+)?$/.test(normalized)) {
+    return null;
+  }
+
+  const [wholePart, fractionalPart = ""] = normalized.split(".");
+  const dollars = Number.parseInt(wholePart, 10);
+  const cents = Number.parseInt(`${fractionalPart}00`.slice(0, 2), 10);
+
+  if (!Number.isFinite(dollars) || !Number.isFinite(cents)) {
+    return null;
+  }
+
+  const totalCents = dollars * 100 + cents;
+  return totalCents * 10000;
+};
 
 const CourseBasicInfo = () => {
   const [imagePreview, setImagePreview] = useState(null);
   const account = useActiveAccount();
   const address = account?.address || "";
   const isConnected = !!address;
+  const { createCourse: createCourseInContext } = useContext(CourseContext);
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
@@ -27,6 +41,8 @@ const CourseBasicInfo = () => {
       name: "",
       description: "",
       difficulty_level: 0,
+      isFree: false,
+      priceUSDC: "",
       image: null,
     },
     chapters: [],
@@ -34,59 +50,93 @@ const CourseBasicInfo = () => {
     quizzes: [],
     resources: [],
   });
+  const priceUSDCUnits = parsePriceToUSDCUnits(courseData.basicInfo.priceUSDC);
+  const isPriceInvalid =
+    !courseData.basicInfo.isFree &&
+    courseData.basicInfo.priceUSDC !== "" &&
+    priceUSDCUnits === null;
 
   const createCourse = async () => {
     if (
       !courseData.basicInfo.name.trim() ||
       !courseData.basicInfo.description.trim()
     ) {
-      toast.error("Please fill in all required fields");
+      toast.warning("Please fill in all required fields");
+      return;
+    }
+
+    if (!isConnected) {
+      toast.error("Please connect your wallet");
+      return;
+    }
+
+    if (!courseData.basicInfo.image) {
+      toast.warning("Please upload a course image");
+      return;
+    }
+
+    if (!courseData.basicInfo.isFree && priceUSDCUnits === null) {
+      toast.warning("Please enter a valid course price");
       return;
     }
 
     setLoading(true);
+    setSuccess("");
+    setError("");
+    const toastId = toast.loading("Creating course...");
     try {
-      const diamondContract = await getContract({
-        address: DiamondAddress,
-        abi: Ecosystem1Facet_ABI,
-        client,
-        chain: defineChain(11155111),
+      toast.update(toastId, {
+        render: "Uploading course image...",
+        isLoading: true,
       });
 
-      const tx = await prepareContractCall({
-        contract: diamondContract,
-        method: "createCourse",
-        params: [
-          courseData.basicInfo.name,
-          courseData.basicInfo.description,
-          courseData.basicInfo.difficulty_level,
-        ],
+      toast.update(toastId, {
+        render: "Processing transaction...",
+        isLoading: true,
       });
 
-      console.log("Transaction sent:", tx.hash);
-      const receipt = await sendTransaction({ transaction: tx, account });
-      console.log("Transaction confirmed:", receipt.transactionHash);
+      const { receipt } = await createCourseInContext({
+        name: courseData.basicInfo.name,
+        description: courseData.basicInfo.description,
+        difficultyLevel: courseData.basicInfo.difficulty_level,
+        priceUSDCUnits: courseData.basicInfo.isFree ? 0 : priceUSDCUnits,
+        imageFile: courseData.basicInfo.image,
+      });
 
-      toast.success("Course created successfully!");
+      console.log("Transaction confirmed:", receipt?.transactionHash);
+
+      toast.update(toastId, {
+        render: "Course created successfully!",
+        type: "success",
+        isLoading: false,
+        autoClose: 5000,
+      });
+
+      setSuccess("Course created successfully!");
       setCourseData({
         basicInfo: {
           name: "",
           description: "",
           difficulty_level: 0,
+          isFree: false,
+          priceUSDC: "",
           image: null,
         },
+        chapters: [],
+        lessons: [],
+        quizzes: [],
+        resources: [],
       });
       setImagePreview(null);
-
-      // Note: You'll need to import readContract if you want to use this
-      // const hasRole = await readContract({
-      //   contract: diamondContract,
-      //   method: "function hasCourseOwnerRole(address account) view returns (bool)",
-      //   params: [account],
-      // });
-      // console.log("Has COURSE_OWNER_ROLE:", hasRole);
     } catch (err) {
-      toast.error(`Failed to create course: ${err.message}`);
+      const message = err?.message || "Unknown error";
+      toast.update(toastId, {
+        render: `Failed to create course: ${message}`,
+        type: "error",
+        isLoading: false,
+        autoClose: 5000,
+      });
+      setError(`Failed to create course: ${message}`);
     } finally {
       setLoading(false);
     }
@@ -202,6 +252,75 @@ const CourseBasicInfo = () => {
                 </select>
               </div>
 
+              {/* Pricing */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Pricing
+                </label>
+                <div className="flex flex-wrap gap-4">
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input
+                      type="radio"
+                      name="course-price-type"
+                      checked={courseData.basicInfo.isFree}
+                      onChange={() =>
+                        setCourseData((prev) => ({
+                          ...prev,
+                          basicInfo: {
+                            ...prev.basicInfo,
+                            isFree: true,
+                            priceUSDC: "",
+                          },
+                        }))
+                      }
+                    />
+                    Free
+                  </label>
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input
+                      type="radio"
+                      name="course-price-type"
+                      checked={!courseData.basicInfo.isFree}
+                      onChange={() =>
+                        setCourseData((prev) => ({
+                          ...prev,
+                          basicInfo: {
+                            ...prev.basicInfo,
+                            isFree: false,
+                          },
+                        }))
+                      }
+                    />
+                    Paid
+                  </label>
+                </div>
+              </div>
+
+              {/* priceUSDC */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Course Price (USDC)
+                </label>
+                <input
+                  type="number"
+                  // min="0"
+                  // step="0.01"
+                  placeholder="Price in USDC (e.g., 19.99)"
+                  className="w-full p-4 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-base transition-colors"
+                  value={courseData.basicInfo.priceUSDC}
+                  disabled={courseData.basicInfo.isFree}
+                  onChange={(e) =>
+                    setCourseData((prev) => ({
+                      ...prev,
+                      basicInfo: {
+                        ...prev.basicInfo,
+                        priceUSDC: e.target.value,
+                      },
+                    }))
+                  }
+                />
+              </div>
+
               {/* Description */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -282,7 +401,8 @@ const CourseBasicInfo = () => {
                 disabled={
                   loading ||
                   !courseData.basicInfo.name.trim() ||
-                  !courseData.basicInfo.description.trim()
+                  !courseData.basicInfo.description.trim() ||
+                  isPriceInvalid
                 }
                 className={`w-full py-4 px-6 rounded-lg font-semibold text-base transition-all duration-200 flex items-center justify-center gap-3 ${
                   loading ||

@@ -1,0 +1,274 @@
+{
+    "course": 
+    {
+        "name": "Introduction to Blockchain Development",
+        "description": "Learn the fundamentals of blockchain technology and smart contract development from scratch",
+        "difficultyLevel": 0,
+        "priceUSDCUnits": 25,
+        "imageUrl": "https://example.com/blockchain-course.jpg",
+        "chapters": 
+        [
+            {
+                "name": "Blockchain Basics",
+                "duration": "2 hours",
+                "lessons": 
+                [
+                    {
+                        "name": "What is Blockchain?",
+                        "content": "Blockchain is a distributed ledger technology that maintains a continuously growing list of records called blocks. Each block contains a cryptographic hash of the previous block, a timestamp, and transaction data...",
+                        "quizzes": 
+                        [
+                            {
+                                "title": "Blockchain Fundamentals Quiz",
+                                "questions": 
+                                [
+                                    {
+                                        "question": "What is a blockchain?",
+                                        "options": 
+                                        [
+                                            "A distributed database",
+                                            "A centralized server",
+                                            "A programming language",
+                                            "An operating system"
+                                        ],
+                                        "correctIndex": 0
+                                    },
+                                    {
+                                        "question": "What does each block contain?",
+                                        "options": 
+                                        [
+                                            "Only transaction data",
+                                            "Hash of previous block, timestamp, and transaction data",
+                                            "Only a timestamp",
+                                            "User passwords"
+                                        ],
+                                        "correctIndex": 1
+                                    }
+                                ]
+                            }
+                        ],
+                        "resources": 
+                        [
+                            {
+                                "name": "Blockchain Whitepaper",
+                                "contentType": "Document",
+                                "link": "https://bitcoin.org/bitcoin.pdf"
+                            },
+                            {
+                                "name": "Introduction Video",
+                                "contentType": "Video",
+                                "link": "https://youtube.com/example-video"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Cryptography Essentials",
+                        "content": "Understanding cryptographic hash functions, digital signatures, and public-key cryptography is essential for blockchain development. These concepts form the security backbone of blockchain technology...",
+                        "quizzes": 
+                        [
+                            {
+                                "title": "Cryptography Quiz",
+                                "questions": 
+                                [
+                                    {
+                                        "question": "What is a hash function?",
+                                        "options": 
+                                        [
+                                            "A reversible encryption method",
+                                            "A one-way mathematical function",
+                                            "A database query",
+                                            "A network protocol"
+                                        ],
+                                        "correctIndex": 1
+                                    }
+                                ]
+                            }
+                        ],
+                        "resources": 
+                        [
+                            {
+                                "name": "Cryptography Diagram",
+                                "contentType": "Image",
+                                "link": "https://example.com/crypto-diagram.png"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "Smart Contracts",
+                "duration": "3 hours",
+                "lessons": 
+                [
+                    {
+                        "name": "Introduction to Smart Contracts",
+                        "content": "Smart contracts are self-executing contracts with the terms directly written into code. They automatically execute when predetermined conditions are met, eliminating the need for intermediaries...",
+                        "quizzes": 
+                        [
+                            {
+                                "title": "Smart Contracts Basics",
+                                "questions": 
+                                [
+                                    {
+                                        "question": "What is a smart contract?",
+                                        "options": 
+                                        [
+                                            "A paper contract",
+                                            "A self-executing program on blockchain",
+                                            "A legal document",
+                                            "A mobile app"
+                                        ],
+                                        "correctIndex": 1
+                                    },
+                                    {
+                                        "question": "Which language is commonly used for Ethereum smart contracts?",
+                                        "options": 
+                                        [
+                                            "Python",
+                                            "JavaScript",
+                                            "Solidity",
+                                            "Ruby"
+                                        ],
+                                        "correctIndex": 2
+                                    }
+                                ]
+                            }
+                        ],
+                        "resources": 
+                        [
+                            {
+                                "name": "Smart Contract Example Code",
+                                "contentType": "Document",
+                                "link": "https://github.com/example/smart-contract"
+                            },
+                            {
+                                "name": "Smart Contract Tutorial Video",
+                                "contentType": "Video",
+                                "link": "https://youtube.com/smart-contract-tutorial"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Writing Your First Contract",
+                        "content": "In this lesson, you'll write your first smart contract using Solidity. We'll start with a simple storage contract that allows you to store and retrieve a number on the blockchain...",
+                        "quizzes": 
+                        [
+                            {
+                                "title": "First Contract Quiz",
+                                "questions": 
+                                [
+                                    {
+                                        "question": "What keyword is used to define a contract in Solidity?",
+                                        "options": 
+                                        [
+                                            "class",
+                                            "contract",
+                                            "function",
+                                            "struct"
+                                        ],
+                                        "correctIndex": 1
+                                    }
+                                ]
+                            }
+                        ],
+                        "resources": 
+                        [
+                            {
+                                "name": "Solidity Documentation",
+                                "contentType": "Document",
+                                "link": "https://docs.soliditylang.org"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "Testing and Deployment",
+                "duration": "2.5 hours",
+                "lessons": 
+                [
+                    {
+                        "name": "Testing Smart Contracts",
+                        "content": "Testing is crucial for smart contracts since they handle real value and are immutable once deployed. Learn how to write comprehensive tests using frameworks like Hardhat and Truffle...",
+                        "quizzes": 
+                        [
+                            {
+                                "title": "Testing Best Practices",
+                                "questions": 
+                                [
+                                    {
+                                        "question": "Why is testing important for smart contracts?",
+                                        "options": 
+                                        [
+                                            "It's optional",
+                                            "Contracts are immutable and handle real value",
+                                            "It makes code slower",
+                                            "It's only for beginners"
+                                        ],
+                                        "correctIndex": 1
+                                    }
+                                ]
+                            }
+                        ],
+                        "resources": 
+                        [
+                            {
+                                "name": "Hardhat Testing Guide",
+                                "contentType": "Document",
+                                "link": "https://hardhat.org/tutorial/testing-contracts"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Deploying to Mainnet",
+                        "content": "Learn the process of deploying your smart contracts to Ethereum mainnet and other networks. Understand gas optimization, deployment strategies, and post-deployment verification...",
+                        "quizzes": 
+                        [
+                            {
+                                "title": "Deployment Quiz",
+                                "questions": 
+                                [
+                                    {
+                                        "question": "What should you do before deploying to mainnet?",
+                                        "options": 
+                                        [
+                                            "Deploy immediately",
+                                            "Test thoroughly on testnets",
+                                            "Skip testing",
+                                            "Only check syntax"
+                                        ],
+                                        "correctIndex": 1
+                                    },
+                                    {
+                                        "question": "What is gas in Ethereum?",
+                                        "options": 
+                                        [
+                                            "A physical fuel",
+                                            "A programming error",
+                                            "The fee for computational operations",
+                                            "A type of cryptocurrency"
+                                        ],
+                                        "correctIndex": 2
+                                    }
+                                ]
+                            }
+                        ],
+                        "resources": 
+                        [
+                            {
+                                "name": "Deployment Checklist",
+                                "contentType": "Document",
+                                "link": "https://example.com/deployment-checklist.pdf"
+                            },
+                            {
+                                "name": "Gas Optimization Tutorial",
+                                "contentType": "Video",
+                                "link": "https://youtube.com/gas-optimization"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+}

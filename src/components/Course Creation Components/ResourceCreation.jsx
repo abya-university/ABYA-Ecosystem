@@ -1,23 +1,12 @@
 import { AlertCircle, CheckCircle, Plus } from "lucide-react";
-import Ecosystem1FacetABI from "../../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
-import Ecosystem2FacetABI from "../../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
-import CONTRACT_ADDRESSES from "../../constants/addresses";
 import { useState } from "react";
-import { defineChain } from "thirdweb/chains";
-import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
 import { toast } from "react-toastify";
 import { useActiveAccount } from "thirdweb/react";
-import { client } from "../../services/client";
-import { useContext } from "react";
+import { useContext, useMemo } from "react";
 import { LessonContext } from "../../contexts/lessonContext";
-import {
-  uploadFileToPinata,
-  uploadMetadataToIPFS,
-} from "../../components/pinata";
-
-const DiamondAddress = CONTRACT_ADDRESSES.diamond;
-const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
-const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
+import { CourseContext } from "../../contexts/courseContext";
+import { ChapterContext } from "../../contexts/chapterContext";
+import { QuizContext } from "../../contexts/quizContext";
 
 const ResourcesCreation = () => {
   const [resourceName, setResourceName] = useState("");
@@ -26,6 +15,9 @@ const ResourcesCreation = () => {
   const [file, setFile] = useState(null);
   const [resources, setResources] = useState([]);
   const { lessons } = useContext(LessonContext);
+  const { courses } = useContext(CourseContext);
+  const { chapters } = useContext(ChapterContext);
+  const { addLessonResource } = useContext(QuizContext);
   const [lessonId, setLessonId] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [success, setSuccess] = useState("");
@@ -34,68 +26,85 @@ const ResourcesCreation = () => {
   const address = account?.address || "";
   const isConnected = !!address;
 
-  // Enum mapping matching the contract
-  const ContentTypeEnum = {
-    Video: 0,
-    Image: 1,
-    Document: 2,
-  };
+  // Filter lessons to only show those from courses created by the current user
+  const userLessons = useMemo(() => {
+    if (!address || !courses?.length || !chapters?.length || !lessons?.length) {
+      return [];
+    }
+
+    // Helper function to normalize IDs
+    const normalizeId = (id) => {
+      if (typeof id === "bigint") return id.toString();
+      if (typeof id === "number") return id.toString();
+      return String(id);
+    };
+
+    // Get course IDs created by current user
+    const userCourses = courses.filter(
+      (course) => course.creator?.toLowerCase() === address.toLowerCase(),
+    );
+
+    const userCourseIds = userCourses.map((course) =>
+      normalizeId(course.courseId),
+    );
+
+    // Get chapter IDs from those courses
+    const userChapters = chapters.filter((chapter) =>
+      userCourseIds.includes(normalizeId(chapter.courseId)),
+    );
+
+    const userChapterIds = userChapters.map((chapter) =>
+      normalizeId(chapter.chapterId),
+    );
+
+    // Filter lessons from those chapters
+    const filteredLessons = lessons.filter((lesson) =>
+      userChapterIds.includes(normalizeId(lesson.chapterId)),
+    );
+
+    return filteredLessons;
+  }, [address, courses, chapters, lessons]);
 
   const addResource = async () => {
     try {
       if (!lessonId || !contentType || !resourceName) {
-        alert("Please fill in all required fields");
+        toast.warning(
+          "Please fill in all required fields: lesson, content type, and resource name",
+        );
         return;
       }
 
       if (!isConnected || !address) {
-        setError("Wallet is not connected");
+        toast.error("Please connect your wallet");
+        return;
+      }
+
+      if (contentType !== "Video" && !file) {
+        toast.warning("Please upload a file");
+        return;
+      }
+
+      if (contentType === "Video" && !resourceLink) {
+        toast.warning("Please provide a video URL");
         return;
       }
 
       setIsUploading(true);
-      let finalLink = "";
+      const toastId = toast.loading("Adding resource...");
 
-      // Handle file upload for Image/Document
-      if (contentType !== "Video") {
-        if (!file) {
-          alert("Please upload a file");
-          return;
-        }
-        // Upload to Pinata
-        const fileCid = await uploadFileToPinata(file);
-        console.log("File uploaded to Pinata with CID:", fileCid);
-
-        // Create and upload metadata
-        const metadata = {
-          type: contentType.toLowerCase(),
-          file: fileCid,
-        };
-        finalLink = await uploadMetadataToIPFS(metadata);
-      } else {
-        finalLink = resourceLink;
-      }
-
-      // Create resource object matching contract structure
-      const newResource = {
-        contentType: ContentTypeEnum[contentType],
-        url: finalLink,
-        name: resourceName,
-      };
-
-      const diamondContract = await getContract({
-        address: DiamondAddress,
-        abi: Ecosystem2Facet_ABI,
-        client,
-        chain: defineChain(11155111),
+      toast.update(toastId, {
+        render: "Processing transaction...",
+        isLoading: true,
       });
 
-      const tx = await prepareContractCall({
-        contract: diamondContract,
-        method: "addResourcesToLesson",
-        params: [lessonId, ContentTypeEnum[contentType], [newResource]],
+      const { finalLink } = await addLessonResource({
+        lessonId,
+        contentType,
+        resourceName,
+        resourceLink,
+        file,
       });
-      await sendTransaction({ transaction: tx, account });
+
       // Update local state
       setResources([
         ...resources,
@@ -106,7 +115,12 @@ const ResourcesCreation = () => {
         },
       ]);
 
-      toast.success("Resource added successfully!");
+      toast.update(toastId, {
+        render: "Resource added successfully!",
+        type: "success",
+        isLoading: false,
+        autoClose: 5000,
+      });
 
       // Reset form
       setResourceName("");
@@ -149,7 +163,7 @@ const ResourcesCreation = () => {
         {/* Lesson Selection */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Select Lesson
+            Select Lesson (from your courses)
           </label>
           <select
             value={lessonId}
@@ -157,9 +171,11 @@ const ResourcesCreation = () => {
             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm md:text-base"
           >
             <option value="" className="text-gray-500 dark:text-gray-400">
-              Choose a lesson
+              {userLessons.length === 0
+                ? "No lessons found - create a course first"
+                : "Choose a lesson"}
             </option>
-            {lessons.map((lesson) => (
+            {userLessons.map((lesson) => (
               <option
                 key={lesson.lessonId}
                 value={lesson.lessonId}
@@ -169,6 +185,12 @@ const ResourcesCreation = () => {
               </option>
             ))}
           </select>
+          {userLessons.length === 0 && address && (
+            <p className="text-sm text-amber-600 dark:text-amber-400">
+              No lessons found from your courses. Make sure you've created
+              courses, chapters, and lessons first.
+            </p>
+          )}
         </div>
 
         {/* Content Type Selection */}
