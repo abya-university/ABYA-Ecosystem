@@ -3,7 +3,6 @@ import {
   Book,
   Eye,
   Clock,
-  Check,
   AlertCircle,
   Wifi,
   Info,
@@ -12,29 +11,62 @@ import {
   Users,
   CheckCircle,
   WifiOff,
-  ChartBar,
   ArrowLeft,
-  ExternalLink,
-  WifiOffIcon,
+  Search,
+  Filter,
+  Star,
+  TrendingUp,
+  GraduationCap,
+  ChevronDown,
+  Grid,
+  List,
+  BookOpen,
+  Target,
+  Globe,
+  PlayCircle,
+  BarChart3,
+  FilePlus,
+  FileText as FileTextIcon,
+  Lock as LockIcon,
+  Video as VideoIcon,
+  Wifi as WifiIcon,
+  WifiOff as WifiOffIcon2,
+  Cloud as CloudIcon,
+  MapPin as MapPinIcon,
+  CircleDashed as CircleDashedIcon,
 } from "lucide-react";
 import { CourseContext } from "../contexts/courseContext";
 import { useUser } from "../contexts/userContext";
 import { ChapterContext } from "../contexts/chapterContext";
 import { LessonContext } from "../contexts/lessonContext";
 import { QuizContext } from "../contexts/quizContext";
-import Ecosystem1FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem1Facet.sol/Ecosystem1Facet.json";
-import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
-import { ethers } from "ethers";
-import { useEthersSigner } from "../components/useClientSigner";
-import { useAccount } from "wagmi";
+import { useRevenueSharing } from "../contexts/RevenueSharingContext";
+import CareerOnboardingForm from "../components/ProfileSurveyForm";
+import Ecosystem1FacetABI from "../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
+import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
 import { toast, ToastContainer } from "react-toastify";
+import { useActiveAccount, useSendTransaction } from "thirdweb/react";
+import { client } from "../services/client";
+import {
+  getContract,
+  prepareContractCall,
+  readContract,
+  toWei,
+} from "thirdweb";
+import { defineChain } from "thirdweb/chains";
+import { useChainMetadata } from "thirdweb/react";
+import CONTRACT_ADDRESSES from "../constants/addresses";
+import { useCertificates } from "../contexts/certificatesContext";
+import { useDarkMode } from "../contexts/themeContext";
 
-const EcosystemDiamondAddress = import.meta.env
-  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
+const FALLBACK_COURSE_IMAGE = "/Vision.jpg";
+const IPFS_GATEWAY_BASE = "https://ipfs.io/ipfs/";
 
-const CoursesPage = ({ onCourseSelect }) => {
+const CoursesPage = ({ onCourseSelect, onNavigateToCreateCourse }) => {
+  const { darkMode } = useDarkMode();
   const {
     courses,
     latestReviews,
@@ -44,35 +76,55 @@ const CoursesPage = ({ onCourseSelect }) => {
     setLatestReviews,
     getCourseData,
   } = useContext(CourseContext);
+  const { mutateAsync: sendTransaction, isPending: isSending } =
+    useSendTransaction();
   const [courseId, setCourseId] = useState(null);
-  const { role } = useUser();
+  const { role, enrolledCourses } = useUser();
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [detailsPosition, setDetailsPosition] = useState({ top: 0, left: 0 });
   const detailsRef = useRef(null);
   const { chapters, fetchChapters } = useContext(ChapterContext);
   const { lessons } = useContext(LessonContext);
   const { quizzes } = useContext(QuizContext);
+  const { purchaseCourse, purchaseLoading } = useRevenueSharing();
   const [isLoading, setIsLoading] = useState(false);
   const [courseStats, setCourseStats] = useState({
     totalLessons: 0,
     totalQuizzes: 0,
   });
-  const { address, isConnected } = useAccount();
-  const signerPromise = useEthersSigner();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
   const [requestSent, setRequestSent] = useState(false);
   const [success, setSuccess] = useState(null);
   const [error, setError] = useState(null);
   const [enrolled, setEnrolled] = useState(false);
   const [unEnrolled, setUnEnrolled] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [enrollingCourseId, setEnrollingCourseId] = useState(null);
+  const [unenrollingCourseId, setUnenrollingCourseId] = useState(null);
+
+  const { certificates } = useCertificates();
+  const [showUnenrollConfirm, setShowUnenrollConfirm] = useState(false);
+  const [courseToUnenroll, setCourseToUnenroll] = useState(null);
+
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDifficulty, setSelectedDifficulty] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'list'
+  const [sortBy, setSortBy] = useState("newest"); // 'newest', 'popular', 'price-low', 'price-high'
+  const [filteredCourses, setFilteredCourses] = useState([]);
+
+  // Survey modal state
+  const [showSurveyModal, setShowSurveyModal] = useState(false);
+  const [courseIdPendingEnrollment, setCourseIdPendingEnrollment] =
+    useState(null);
 
   const latestReview = latestReviews[courseId] || {};
   const allReviews = courseReviews[courseId] || [];
   const feedback = courseFeedback[courseId];
 
-  console.log("Latest Review for course", courseId, ":", latestReview);
-  console.log("All Reviews for course", courseId, ":", allReviews);
-  console.log("Feedback for course", courseId, ":", feedback);
+  const { data: chainMetadata } = useChainMetadata(defineChain(11155111));
 
   const [activeTab, setActiveTab] = useState("details");
 
@@ -80,6 +132,59 @@ const CoursesPage = ({ onCourseSelect }) => {
   const [filteredLessons, setFilteredLessons] = useState([]);
   const [filteredQuizzes, setFilteredQuizzes] = useState([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+
+  // Difficulty options
+  const difficultyOptions = [
+    { value: "all", label: "All Levels", icon: Globe },
+    { value: "0", label: "Beginner", icon: GraduationCap },
+    { value: "1", label: "Intermediate", icon: TrendingUp },
+    { value: "2", label: "Advanced", icon: Target },
+  ];
+
+  // Filter and search courses
+  useEffect(() => {
+    if (!courses) return;
+
+    let filtered = [...courses];
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (course) =>
+          course.courseName?.toLowerCase().includes(query) ||
+          course.description?.toLowerCase().includes(query) ||
+          course.creator?.toLowerCase().includes(query),
+      );
+    }
+
+    // Apply difficulty filter
+    if (selectedDifficulty !== "all") {
+      filtered = filtered.filter(
+        (course) => course.difficulty_level?.toString() === selectedDifficulty,
+      );
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "newest":
+          return (b.courseId || 0) - (a.courseId || 0);
+        case "popular":
+          const aStudents = getEnrolledStudentsCount(a.enrolledStudents);
+          const bStudents = getEnrolledStudentsCount(b.enrolledStudents);
+          return bStudents - aStudents;
+        case "price-low":
+          return (Number(a.priceUSDC) || 0) - (Number(b.priceUSDC) || 0);
+        case "price-high":
+          return (Number(b.priceUSDC) || 0) - (Number(a.priceUSDC) || 0);
+        default:
+          return 0;
+      }
+    });
+
+    setFilteredCourses(filtered);
+  }, [courses, searchQuery, selectedDifficulty, sortBy]);
 
   const getDifficultyLabel = (level) => {
     switch (Number(level)) {
@@ -94,103 +199,142 @@ const CoursesPage = ({ onCourseSelect }) => {
     }
   };
 
+  const formatPriceUSDC = (value) => {
+    if (value === null || value === undefined) {
+      return "Free";
+    }
+
+    const numeric = Number(value) / 1_000_000;
+    if (!Number.isFinite(numeric) || numeric === 0) {
+      return "Free";
+    }
+
+    const formatted = numeric.toLocaleString(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+    return `${formatted} USDC`;
+  };
+
+  const getCourseImage = (course) => {
+    const imageUrl = course?.imageURL?.trim();
+    if (!imageUrl) {
+      return FALLBACK_COURSE_IMAGE;
+    }
+
+    if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+      return imageUrl;
+    }
+
+    const normalizedHash = imageUrl.startsWith("ipfs://")
+      ? imageUrl.slice("ipfs://".length)
+      : imageUrl;
+    return `${IPFS_GATEWAY_BASE}${normalizedHash}`;
+  };
+
   useEffect(() => {
     if (courseId) {
       getCourseData(courseId);
     }
   }, [courseId, getCourseData]);
 
+  // Fetch chapters/lessons/quizzes for all courses to populate card counts
+  useEffect(() => {
+    const loadAllCourseData = async () => {
+      if (courses && courses.length > 0) {
+        try {
+          // Fetch chapters for all courses
+          for (const course of courses) {
+            await fetchChapters(course.courseId);
+          }
+        } catch (error) {
+          console.error("Error loading course data:", error);
+        }
+      }
+    };
+
+    loadAllCourseData();
+  }, [courses, fetchChapters]);
+
   const getDifficultyColor = (level) => {
     switch (Number(level)) {
       case 0:
-        return "text-green-500 bg-green-100";
+        return {
+          bg: "bg-green-500/10",
+          text: "text-green-600 dark:text-green-400",
+          border: "border-green-500/20",
+          light: "bg-green-50 dark:bg-green-900/20",
+        };
       case 1:
-        return "text-blue-500 bg-blue-100";
+        return {
+          bg: "bg-blue-500/10",
+          text: "text-blue-600 dark:text-blue-400",
+          border: "border-blue-500/20",
+          light: "bg-blue-50 dark:bg-blue-900/20",
+        };
       case 2:
-        return "text-red-500 bg-red-100";
+        return {
+          bg: "bg-red-500/10",
+          text: "text-red-600 dark:text-red-400",
+          border: "border-red-500/20",
+          light: "bg-red-50 dark:bg-red-900/20",
+        };
       default:
-        return "text-gray-500 bg-gray-100";
+        return {
+          bg: "bg-gray-500/10",
+          text: "text-gray-600 dark:text-gray-400",
+          border: "border-gray-500/20",
+          light: "bg-gray-50 dark:bg-gray-900/20",
+        };
     }
   };
 
-  // Add this inside the component before the return statement
   const calculateTotalDuration = (courseId) => {
-    // Convert courseId to number for comparison since it comes as string from the course object
     const numericCourseId = Number(courseId);
-
     const courseChapters = chapters.filter(
-      (chapter) => chapter.courseId === numericCourseId
+      (chapter) => chapter.courseId === numericCourseId,
     );
-
     const totalDuration = courseChapters.reduce(
       (total, chapter) => total + Number(chapter.duration),
-      0
+      0,
     );
-
-    console.log("Course ID:", numericCourseId);
-    console.log("Filtered Chapters:", courseChapters);
-    console.log("Total Duration:", totalDuration);
-
     return totalDuration;
   };
 
-  console.log("Chapters s:", chapters);
-
   const calculateCourseStats = (courseChapters) => {
-    // Get all lesson IDs that belong to the course chapters
     const courseLessons = lessons.filter((lesson) =>
-      courseChapters.some((chapter) => chapter.chapterId === lesson.chapterId)
+      courseChapters.some((chapter) => chapter.chapterId === lesson.chapterId),
     );
-
-    // Count quizzes that belong to the course lessons
     const courseQuizzes = quizzes.filter((quiz) =>
-      courseLessons.some((lesson) => lesson.lessonId === quiz.lessonId)
+      courseLessons.some((lesson) => lesson.lessonId === quiz.lessonId),
     );
-
     setCourseStats({
       totalLessons: courseLessons.length,
       totalQuizzes: courseQuizzes.length,
     });
   };
 
-  console.log("Courses:", courses);
-  console.log("Address:", address);
-  console.log("Role:", role);
-
-  // Debug useEffect to log enrollment status for all courses
-  useEffect(() => {
-    if (courses && courses.length > 0 && address) {
-      console.log("=== ENROLLMENT DEBUG INFO ===");
-      console.log("Current user address:", address);
-      console.log("Current role:", role);
-      courses.forEach((course) => {
-        const isEnrolled = isUserEnrolled(course.enrolledStudents, address);
-        console.log(`Course ${course.courseId}:`);
-        console.log(`  - Name: ${course.courseName}`);
-        console.log(`  - Approved: ${course.approved}`);
-        console.log(`  - enrolledStudents:`, course.enrolledStudents);
-        console.log(`  - User enrolled: ${isEnrolled}`);
-        console.log(
-          `  - Should show buttons: ${
-            role === "USER" && course.approved && address
-          }`
-        );
-        console.log("---");
-      });
-      console.log("=== END ENROLLMENT DEBUG ===");
-    }
-  }, [courses, address, role]);
-
   const getApprovalStatusStyle = (approved) => {
     if (approved) {
-      return "bg-green-500/20 text-green-500";
+      return {
+        bg: "bg-green-500/20",
+        text: "text-green-600 dark:text-green-400",
+        border: "border-green-500/30",
+        icon: CheckCircle,
+        label: "Approved",
+      };
     } else {
-      return "bg-yellow-500/20 text-yellow-500";
+      return {
+        bg: "bg-yellow-500/20",
+        text: "text-yellow-600 dark:text-yellow-400",
+        border: "border-yellow-500/30",
+        icon: Clock,
+        label: "Pending Review",
+      };
     }
   };
 
   const viewCourse = (courseId) => {
-    console.log("Viewing course:", courseId);
     onCourseSelect(courseId);
   };
 
@@ -210,11 +354,9 @@ const CoursesPage = ({ onCourseSelect }) => {
     setCourseId(course.courseId);
 
     try {
-      // Fetch chapters for the selected course
       await fetchChapters(course.courseId);
-      // Calculate lessons and quizzes based on the fetched chapters
       const courseChapters = chapters.filter(
-        (chapter) => chapter.courseId === course.courseId
+        (chapter) => chapter.courseId === course.courseId,
       );
       calculateCourseStats(courseChapters);
     } catch (error) {
@@ -235,36 +377,46 @@ const CoursesPage = ({ onCourseSelect }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // This function checks if a course is ready for eligibility check
   const checkCourseEligibility = async (courseId) => {
     try {
       setIsLoading(true);
       setError(null);
 
-      const signer = await signerPromise;
-      const diamondContract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem1Facet_ABI,
-        signer
-      );
+      const contract = getContract({
+        address: DiamondAddress,
+        abi: Ecosystem1Facet_ABI,
+        client,
+        chain: defineChain(11155111),
+      });
 
-      // First check if the course is ready for eligibility check
-      const isReadyForCheck =
-        await diamondContract.isCourseReadyForEligibilityCheck(courseId);
+      const isReadyForCheck = await readContract({
+        contract,
+        method:
+          "function isCourseReadyForEligibilityCheck(uint256 courseId) view returns (bool)",
+        params: [courseId],
+      });
 
       if (isReadyForCheck) {
-        // If ready, trigger the eligibility check
-        await diamondContract.checkCourseEligibilityAfterDelay(courseId);
+        await prepareContractCall({
+          contract,
+          method: "function checkCourseEligibilityAfterDelay(uint256 courseId)",
+          params: [courseId],
+        });
+
         toast.success("Course eligibility check completed!");
 
-        // Get feedback if any
-        const feedback = await diamondContract.getCourseFeedback(courseId);
+        const feedback = await readContract({
+          contract,
+          method:
+            "function getCourseFeedback(uint256 courseId) view returns (string)",
+          params: [courseId],
+        });
         if (feedback) {
           toast.success(`Course feedback: ${feedback}`);
         }
       } else {
         toast.error(
-          "Course is not yet ready for eligibility check or has already been checked."
+          "Course is not yet ready for eligibility check or has already been checked.",
         );
       }
     } catch (error) {
@@ -279,94 +431,57 @@ const CoursesPage = ({ onCourseSelect }) => {
     if (selectedCourse) {
       fetchCourseFeedback(selectedCourse.courseId);
 
-      // Step 1: Filter chapters by courseId
       const courseChapters = chapters.filter(
-        (chapter) => chapter.courseId === selectedCourse.courseId
+        (chapter) => chapter.courseId === selectedCourse.courseId,
       );
       setFilteredChapters(courseChapters);
 
-      // Step 2: Filter lessons by chapterId
       const courseLessons = courseChapters.flatMap((chapter) =>
-        lessons.filter((lesson) => lesson.chapterId === chapter.id)
+        lessons.filter((lesson) => lesson.chapterId === chapter.id),
       );
       setFilteredLessons(courseLessons);
 
-      // Step 3: Filter quizzes by lessonId
       const courseQuizzes = courseLessons.flatMap((lesson) =>
-        quizzes.filter((quiz) => quiz.lessonId === lesson.id)
+        quizzes.filter((quiz) => quiz.lessonId === lesson.id),
       );
       setFilteredQuizzes(courseQuizzes);
     }
   }, [selectedCourse, chapters, lessons, quizzes]);
 
-  // Function to get all course details
   const getCompleteCourseDeatils = async (courseId) => {
     try {
-      console.log(`Fetching complete details for course ID: ${courseId}`);
       setIsLoading(true);
 
-      // 1. Find the base course from existing courses
       const course = courses.find(
-        (c) => Number(c.courseId) === Number(courseId)
+        (c) => Number(c.courseId) === Number(courseId),
       );
       if (!course) {
-        console.error(`Course with ID ${courseId} not found`);
         return null;
       }
-      console.log("Base course found:", course);
 
-      // 2. Fetch chapters specifically for this course
       const chapters = await fetchChapters(courseId);
       const courseChapters = chapters.filter(
-        (chapter) => Number(chapter.courseId) === Number(courseId)
-      );
-      console.log(
-        `Found ${courseChapters.length} chapters for course:`,
-        courseChapters
+        (chapter) => Number(chapter.courseId) === Number(courseId),
       );
 
-      console.log("Lessons 4: ", lessons);
-
-      // Fixed function - use chapterId correctly
       const getLessonsForChapter = (chapterId) => {
-        // Make sure we're comparing the same types (numbers)
-        const lessonsForChapter = lessons.filter(
-          (lesson) => Number(lesson.chapterId) === Number(chapterId)
+        return lessons.filter(
+          (lesson) => Number(lesson.chapterId) === Number(chapterId),
         );
-        console.log(
-          `Found ${lessonsForChapter.length} lessons for chapter ${chapterId}:`,
-          lessonsForChapter
-        );
-        return lessonsForChapter;
       };
 
-      // Initialize courseLessons as an empty array
       const courseLessons = [];
-
-      // Fixed: Iterate over courseChapters and collect lessons using the correct property
       courseChapters.forEach((chapter) => {
-        // Use chapter.chapterId instead of chapter.id
         const lessonsForChapter = getLessonsForChapter(chapter.chapterId);
-        courseLessons.push(...lessonsForChapter); // Spread operator to merge arrays
+        courseLessons.push(...lessonsForChapter);
       });
 
-      console.log(
-        `Found ${courseLessons.length} lessons for course:`,
-        courseLessons
-      );
-
-      // 4. Get quizzes for these lessons - fixed to match correctly
       const courseQuizzes = quizzes.filter((quiz) =>
         courseLessons.some(
-          (lesson) => Number(lesson.lessonId) === Number(quiz.lessonId)
-        )
-      );
-      console.log(
-        `Found ${courseQuizzes.length} quizzes for course:`,
-        courseQuizzes
+          (lesson) => Number(lesson.lessonId) === Number(quiz.lessonId),
+        ),
       );
 
-      // 5. Compile everything into one object
       const completeDetails = {
         ...course,
         chapters: courseChapters,
@@ -374,13 +489,9 @@ const CoursesPage = ({ onCourseSelect }) => {
         quizzes: courseQuizzes,
       };
 
-      console.log("Complete course details:", completeDetails);
       return completeDetails;
     } catch (error) {
-      console.error(
-        `Error fetching complete details for course ${courseId}:`,
-        error
-      );
+      console.error(error);
       return null;
     } finally {
       setIsLoading(false);
@@ -388,81 +499,94 @@ const CoursesPage = ({ onCourseSelect }) => {
   };
 
   const approveCourse = async (course) => {
+    let toastId = null;
     try {
       setIsLoading(true);
-      const completeDetails = await getCompleteCourseDeatils(course.courseId);
+      toastId = toast.loading("Preparing course for review...");
 
+      const completeDetails = await getCompleteCourseDeatils(course.courseId);
       if (!completeDetails) {
-        toast.error("Failed to load course details for review.");
+        toast.update(toastId, {
+          render: "Failed to load course details for review.",
+          type: "error",
+          isLoading: false,
+          autoClose: 5000,
+        });
         return;
       }
 
-      // Generate and send markdown to evaluation service
+      toast.update(toastId, {
+        render: "Generating course documentation...",
+        isLoading: true,
+      });
+
       const courseMarkdown = generateCourseMarkdown(completeDetails);
-      console.log("Generated markdown length:", courseMarkdown.length);
+
+      toast.update(toastId, {
+        render: "Sending to AI evaluation service...",
+        isLoading: true,
+      });
 
       const formData = new FormData();
       const courseBlob = new Blob([courseMarkdown], { type: "text/plain" });
       formData.append("file", courseBlob, "course.txt");
 
-      console.log("Sending request to:", "http://localhost:5000/evaluate");
       const response = await fetch("http://localhost:5000/evaluate", {
         method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error(`Evaluation failed: ${response.statusText}`);
+        throw new Error(`AI evaluation failed: ${response.statusText}`);
       }
 
-      // Process evaluation results
-      const evaluationResult = await response.json();
-      console.log("Evaluation result:", evaluationResult);
+      toast.update(toastId, {
+        render: "Processing evaluation results...",
+        isLoading: true,
+      });
 
-      const finalScore = Math.floor(
-        (evaluationResult.finalScore || evaluationResult.score || 0) * 100
-      );
+      const evaluationResult = await response.json();
+
+      const finalScore = Math.floor(Number(evaluationResult.score) * 100);
       const category = evaluationResult.category || "General";
-      const grades = evaluationResult.grades || {};
       const passed =
         evaluationResult.passed === "Yes" || evaluationResult.passed === true;
 
-      // Create review object for smart contract
       const ensureValidNumber = (value) => {
         const num = Number(value);
-        return isNaN(num) ? 0 : num;
+        return isNaN(num) ? 0 : Math.min(Math.max(num, 0), 100);
       };
 
       const review = {
         learnerAgency: ensureValidNumber(
-          grades.learnerAgency || grades["Learner Agency"]
+          evaluationResult.grades?.learnerAgency,
         ),
         criticalThinking: ensureValidNumber(
-          grades.criticalThinking || grades["Critical Thinking"]
+          evaluationResult.grades?.criticalThinking,
         ),
         collaborativeLearning: ensureValidNumber(
-          grades.collaborativeLearning || grades["Collaborative Learning"]
+          evaluationResult.grades?.collaborativeLearning,
         ),
         reflectivePractice: ensureValidNumber(
-          grades.reflectivePractice || grades["Reflective Practice"]
+          evaluationResult.grades?.reflectivePractice,
         ),
         adaptiveLearning: ensureValidNumber(
-          grades.adaptiveLearning || grades["Adaptive Learning"]
+          evaluationResult.grades?.adaptiveLearning,
         ),
         authenticLearning: ensureValidNumber(
-          grades.authenticLearning || grades["Authentic Learning"]
+          evaluationResult.grades?.authenticLearning,
         ),
         technologyIntegration: ensureValidNumber(
-          grades.technologyIntegration || grades["Technology Integration"]
+          evaluationResult.grades?.technologyIntegration,
         ),
         learnerSupport: ensureValidNumber(
-          grades.learnerSupport || grades["Learner Support"]
+          evaluationResult.grades?.learnerSupport,
         ),
         assessmentForLearning: ensureValidNumber(
-          grades.assessmentForLearning || grades["Assessment for Learning"]
+          evaluationResult.grades?.assessmentForLearning,
         ),
         engagementAndMotivation: ensureValidNumber(
-          grades.engagementAndMotivation || grades["Engagement and Motivation"]
+          evaluationResult.grades?.engagementAndMotivation,
         ),
         isSubmitted: true,
         category: category,
@@ -470,50 +594,70 @@ const CoursesPage = ({ onCourseSelect }) => {
         passed: passed,
       };
 
-      console.log("Review object being sent to contract:", review);
-      const courseIdToApprove = course.courseId;
-      console.log("Approving course with ID:", courseIdToApprove);
+      if (!account) {
+        throw new Error("Account is undefined - please connect your wallet");
+      }
 
-      const signer = await signerPromise;
+      if (!account.address) {
+        throw new Error(
+          "Account address is missing - wallet may not be properly connected",
+        );
+      }
 
-      console.log("Creating contract instance...");
-      const diamondContract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem1Facet_ABI,
-        signer
-      );
+      toast.update(toastId, {
+        render: "Sending to blockchain for approval...",
+        isLoading: true,
+      });
 
-      console.log("Sending transaction to approve course...");
-      const tx = await diamondContract.approveCourse(
-        courseIdToApprove,
-        finalScore,
-        review
-      );
+      const contract = getContract({
+        address: DiamondAddress,
+        abi: Ecosystem1Facet_ABI,
+        client,
+        chain: defineChain(11155111),
+      });
 
-      console.log("Transaction sent:", tx.hash);
-      await tx.wait();
+      const transaction = prepareContractCall({
+        contract,
+        method: "approveCourse",
+        params: [course.courseId, finalScore, review],
+      });
 
-      toast.success("Course approved successfully!");
-      console.log("Course approved successfully!");
+      toast.update(toastId, {
+        render: "Waiting for blockchain confirmation...",
+        isLoading: true,
+      });
+
+      await sendTransaction(transaction);
+
+      toast.update(toastId, {
+        render: "Course submitted for review successfully!",
+        type: "success",
+        isLoading: false,
+        autoClose: 5000,
+      });
     } catch (error) {
       console.error("Error in course approval process:", error);
-      toast.error(`Failed to approve course: ${error.message}`);
+      if (toastId) {
+        toast.update(toastId, {
+          render: `Failed to submit course for review: ${error.message}`,
+          type: "error",
+          isLoading: false,
+          autoClose: 5000,
+        });
+      } else {
+        toast.error(`Failed to submit course for review: ${error.message}`);
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Helper function to generate markdown from course data
   const generateCourseMarkdown = (courseData) => {
-    console.log("Course data for markdown generation:", courseData);
-
     if (!courseData) {
-      console.error("No course data provided for markdown generation!");
       return "No course data available.";
     }
 
     if (!courseData.courseName) {
-      console.error("Course data is missing courseName!");
       return "Invalid course data - missing course name.";
     }
 
@@ -521,29 +665,23 @@ const CoursesPage = ({ onCourseSelect }) => {
     const lessons = courseData.lessons || [];
     const quizzes = courseData.quizzes || [];
 
-    console.log(
-      `Found ${chapters.length} chapters, ${lessons.length} lessons, ${quizzes.length} quizzes`
-    );
-
     let markdown = `# ${courseData.courseName}\n\n`;
     markdown += `## Description\n${
       courseData.description || "No description provided."
     }\n\n`;
     markdown += `## Difficulty Level\n${getDifficultyLabel(
-      courseData.difficulty_level
+      courseData.difficulty_level,
     )}\n\n`;
     markdown += `## Creator\n${courseData.creator || "Unknown"}\n\n`;
 
-    // Add chapters
     if (chapters && chapters.length > 0) {
       markdown += `## Chapters\n`;
       chapters.forEach((chapter, index) => {
         markdown += `### ${index + 1}. ${chapter.chapterName}\n`;
         markdown += `${chapter.description || "No chapter description"}\n\n`;
 
-        // Add lessons for each chapter - fixed to use chapterId
         const chapterLessons = lessons.filter(
-          (lesson) => Number(lesson.chapterId) === Number(chapter.chapterId)
+          (lesson) => Number(lesson.chapterId) === Number(chapter.chapterId),
         );
 
         if (chapterLessons.length > 0) {
@@ -552,15 +690,13 @@ const CoursesPage = ({ onCourseSelect }) => {
             markdown += `##### ${lessonIndex + 1}. ${lesson.lessonName}\n`;
             markdown += `${lesson.lessonContent || "No lesson content"}\n\n`;
 
-            // Add quizzes for each lesson - fixed to match correctly
             const lessonQuizzes = quizzes.filter(
-              (quiz) => Number(quiz.lessonId) === Number(lesson.lessonId)
+              (quiz) => Number(quiz.lessonId) === Number(lesson.lessonId),
             );
             if (lessonQuizzes.length > 0) {
               markdown += `###### Quizzes\n`;
               lessonQuizzes.forEach((quiz, quizIndex) => {
                 markdown += `- ${quiz.quizTitle}\n`;
-                // Add quiz questions if available - adjusted for your structure
                 if (quiz.questions && quiz.questions.length > 0) {
                   quiz.questions.forEach((question, qIndex) => {
                     markdown += `  - Q${qIndex + 1}: ${
@@ -585,7 +721,6 @@ const CoursesPage = ({ onCourseSelect }) => {
       markdown += `## Chapters\nNo chapters available for this course.\n\n`;
     }
 
-    console.log("Generated markdown preview:", markdown.substring(0, 1000));
     return markdown;
   };
 
@@ -596,39 +731,40 @@ const CoursesPage = ({ onCourseSelect }) => {
       for (const course of courses) {
         if (!course.approved) {
           try {
-            const signer = await signerPromise;
-            const diamondContract = new ethers.Contract(
-              EcosystemDiamondAddress,
-              Ecosystem1Facet_ABI,
-              signer
-            );
+            const contract = await getContract({
+              address: DiamondAddress,
+              abi: Ecosystem1Facet_ABI,
+              client,
+              chain: defineChain(11155111),
+            });
 
-            // Check if eligibility check is ready
-            const isReadyForCheck =
-              await diamondContract.isCourseReadyForEligibilityCheck(
-                course.courseId
-              );
+            const isReadyForCheck = await readContract({
+              contract,
+              method:
+                "function isCourseReadyForEligibilityCheck(uint256 courseId) view returns (bool)",
+              params: [courseId],
+            });
 
             if (isReadyForCheck) {
-              console.log(
-                `Course ${course.courseId} is ready for eligibility check`
-              );
-              await diamondContract.checkCourseEligibilityAfterDelay(
-                course.courseId
-              );
+              await prepareContractCall({
+                contract,
+                method:
+                  "function checkCourseEligibilityAfterDelay(uint256 courseId)",
+                params: [courseId],
+              });
 
-              // If eligibility check passes, submit for AI review
-              const feedback = await diamondContract.getCourseFeedback(
-                course.courseId
-              );
+              await new Promise((resolve) => setTimeout(resolve, 15000));
+
+              const feedback = await readContract({
+                contract,
+                method:
+                  "function getCourseFeedback(uint256 courseId) view returns (string)",
+                params: [courseId],
+              });
               if (!feedback.includes("Course meets eligibility criteria")) {
-                console.log(
-                  `Course ${course.courseId} failed eligibility check: ${feedback}`
-                );
-                continue; // Skip AI review if eligibility check failed
+                continue;
               }
 
-              // Submit for AI review
               await submitForAIReview(course.courseId);
             }
           } catch (error) {
@@ -639,22 +775,36 @@ const CoursesPage = ({ onCourseSelect }) => {
     };
 
     checkCoursesForApproval();
-    const intervalId = setInterval(checkCoursesForApproval, 60000); // Check every minute
+    const intervalId = setInterval(checkCoursesForApproval, 60000);
 
     return () => clearInterval(intervalId);
   }, [courses, isConnected, role]);
 
+  const hasCertificateForCourse = (courseId) => {
+    return certificates.some(
+      (cert) =>
+        cert.courseId.toString() === courseId.toString() &&
+        cert.owner.toLowerCase() === address.toLowerCase(),
+    );
+  };
+
   const fetchCourseFeedback = async (courseId) => {
     try {
       setFeedbackLoading(true);
-      const signer = await signerPromise;
-      const diamondContract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem1Facet_ABI,
-        signer
-      );
 
-      const feedback = await diamondContract.getCourseFeedback(courseId);
+      const contract = getContract({
+        address: DiamondAddress,
+        abi: Ecosystem1Facet_ABI,
+        client,
+        chain: defineChain(11155111),
+      });
+
+      const feedback = await readContract({
+        contract,
+        method:
+          "function getCourseFeedback(uint256 courseId) view returns (string)",
+        params: [courseId],
+      });
       setCourseFeedback(feedback);
     } catch (error) {
       console.error("Error fetching course feedback:", error);
@@ -665,374 +815,765 @@ const CoursesPage = ({ onCourseSelect }) => {
   };
 
   const enroll = async (courseId) => {
-    try {
-      setLoading(true);
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem2Facet_ABI,
-        signer
-      );
-      const tx = await contract.enroll(courseId);
-      await tx.wait();
-      console.log(`Transaction Receipt: ${tx.hash}`);
-      setEnrolled(true);
-      toast.success(`Enrolled into course ${courseId} successfully!`);
+    if (enrolledCourses.length === 0) {
+      setShowSurveyModal(true);
+      setCourseIdPendingEnrollment(courseId);
+      return;
+    }
 
-      // Refresh course data after enrollment
-      window.location.reload(); // Force page refresh to get updated course data
+    let toastId = null;
+    try {
+      setEnrollingCourseId(courseId);
+
+      const course = courses.find((c) => c.courseId === courseId);
+
+      if (!course) {
+        toast.error("Course not found");
+        setEnrollingCourseId(null);
+        return;
+      }
+
+      if (course.priceUSDC && Number(course.priceUSDC) > 0) {
+        toastId = toast.loading("Processing course purchase...");
+
+        const purchaseResult = await purchaseCourse(
+          address,
+          course.creator,
+          BigInt(courseId),
+          BigInt(course.priceUSDC),
+          "0x0000000000000000000000000000000000000000",
+        );
+
+        if (!purchaseResult.success) {
+          setEnrollingCourseId(null);
+          return;
+        }
+
+        if (toastId) {
+          toast.dismiss(toastId);
+          toastId = null;
+        }
+      }
+
+      toastId = toast.loading("Processing enrollment...");
+
+      const contract = getContract({
+        address: DiamondAddress,
+        abi: Ecosystem2Facet_ABI,
+        client,
+        chain: defineChain(11155111),
+      });
+
+      toast.update(toastId, {
+        render: "Preparing transaction...",
+        type: "info",
+        isLoading: true,
+      });
+
+      const transaction = prepareContractCall({
+        contract,
+        method: "enroll",
+        params: [courseId],
+      });
+
+      toast.update(toastId, {
+        render: "Sending transaction to blockchain...",
+        type: "info",
+        isLoading: true,
+      });
+
+      await sendTransaction(transaction);
+
+      setEnrolled(true);
+      toast.update(toastId, {
+        render: `Enrolled into course ${courseId} successfully!`,
+        type: "success",
+        isLoading: false,
+        autoClose: 3000,
+      });
     } catch (error) {
       console.error("Error enrolling in course:", error);
-      toast.error("Error enrolling in course. Please try again!");
-      setEnrolled(false);
+      if (toastId) {
+        toast.update(toastId, {
+          render: "Error enrolling in course. Please try again!",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000,
+        });
+      } else {
+        toast.error("Error enrolling in course. Please try again!");
+      }
     } finally {
-      setLoading(false);
+      setEnrollingCourseId(null);
+    }
+  };
+
+  const handleSurveyComplete = async (finalCourseId = null) => {
+    setShowSurveyModal(false);
+
+    if (!courseIdPendingEnrollment) {
+      return;
+    }
+
+    const courseToEnroll = finalCourseId || courseIdPendingEnrollment;
+
+    let toastId = null;
+    try {
+      setEnrollingCourseId(courseToEnroll);
+
+      const course = courses.find((c) => c.courseId === courseToEnroll);
+
+      if (!course) {
+        toast.error("Course not found");
+        setEnrollingCourseId(null);
+        setCourseIdPendingEnrollment(null);
+        return;
+      }
+
+      if (course.priceUSDC && Number(course.priceUSDC) > 0) {
+        toastId = toast.loading("Processing course purchase...");
+
+        const purchaseResult = await purchaseCourse(
+          address,
+          course.creator,
+          BigInt(courseToEnroll),
+          BigInt(course.priceUSDC),
+          "0x0000000000000000000000000000000000000000",
+        );
+
+        if (!purchaseResult.success) {
+          setEnrollingCourseId(null);
+          setCourseIdPendingEnrollment(null);
+          return;
+        }
+
+        if (toastId) {
+          toast.dismiss(toastId);
+          toastId = null;
+        }
+      }
+
+      toastId = toast.loading("Processing your enrollment...");
+
+      const contract = getContract({
+        address: DiamondAddress,
+        abi: Ecosystem2Facet_ABI,
+        client,
+        chain: defineChain(11155111),
+      });
+
+      toast.update(toastId, {
+        render: "Preparing your enrollment transaction...",
+        type: "info",
+        isLoading: true,
+      });
+
+      const transaction = prepareContractCall({
+        contract,
+        method: "enroll",
+        params: [courseToEnroll],
+      });
+
+      toast.update(toastId, {
+        render: "Sending transaction to blockchain...",
+        type: "info",
+        isLoading: true,
+      });
+
+      await sendTransaction(transaction);
+
+      setEnrolled(true);
+      toast.update(toastId, {
+        render: `Successfully enrolled into your first course! Welcome! 🎓`,
+        type: "success",
+        isLoading: false,
+        autoClose: 3000,
+      });
+    } catch (error) {
+      console.error("Error enrolling in course:", error);
+      if (toastId) {
+        toast.update(toastId, {
+          render: "Error enrolling in course. Please try again!",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000,
+        });
+      } else {
+        toast.error("Error enrolling in course. Please try again!");
+      }
+    } finally {
+      setEnrollingCourseId(null);
+      setCourseIdPendingEnrollment(null);
     }
   };
 
   const unEnroll = async (courseId) => {
+    let toastId = null;
     try {
-      setLoading(true);
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem2Facet_ABI,
-        signer
-      );
-      const tx = await contract.unEnroll(courseId);
-      await tx.wait();
-      console.log(`Transaction Receipt: ${tx.hash}`);
-      setUnEnrolled(true);
-      toast.success(`Unenrolled from course ${courseId} successfully!`);
+      setUnenrollingCourseId(courseId);
+      toastId = toast.loading("Processing unenrollment...");
 
-      // Refresh course data after unenrollment
-      window.location.reload(); // Force page refresh to get updated course data
+      const contract = getContract({
+        address: DiamondAddress,
+        abi: Ecosystem2Facet_ABI,
+        client,
+        chain: defineChain(11155111),
+      });
+
+      toast.update(toastId, {
+        render: "Preparing unenrollment transaction...",
+        type: "info",
+        isLoading: true,
+      });
+
+      const transaction = prepareContractCall({
+        contract,
+        method: "unEnroll",
+        params: [courseId],
+      });
+
+      toast.update(toastId, {
+        render: "Sending transaction to blockchain...",
+        type: "info",
+        isLoading: true,
+      });
+
+      await sendTransaction(transaction);
+      setUnEnrolled(true);
+      toast.update(toastId, {
+        render: `Unenrolled from course ${courseId} successfully!`,
+        type: "success",
+        isLoading: false,
+        autoClose: 2000,
+      });
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 2500);
     } catch (error) {
       console.error("Error unenrolling from course:", error);
-      toast.error("Error unenrolling from course. Please try again!");
-      setUnEnrolled(false);
+      if (toastId) {
+        toast.update(toastId, {
+          render: "Error unenrolling from course. Please try again!",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000,
+        });
+      } else {
+        toast.error("Error unenrolling from course. Please try again!");
+      }
     } finally {
-      setLoading(false);
+      setUnenrollingCourseId(null);
     }
   };
 
   const getEnrolledStudentsCount = (enrolledStudentsString) => {
-    // If empty or undefined, return 0
     if (!enrolledStudentsString) return 0;
 
-    // If it's an array, return its length
     if (Array.isArray(enrolledStudentsString)) {
       return enrolledStudentsString.length;
     }
 
-    // Convert to string if it's not already a string
     const studentsStr = String(enrolledStudentsString);
 
-    // If it's a single address, return 1
     if (studentsStr.startsWith("0x") && !studentsStr.includes(",")) {
       return 1;
     }
 
-    // If multiple addresses, split and count
     return studentsStr.split(",").length;
   };
 
-  // Helper function to check if current user is enrolled in a course
   const isUserEnrolled = (enrolledStudents, userAddress) => {
     if (!enrolledStudents || !userAddress) {
-      console.log(
-        "Missing data - enrolledStudents:",
-        enrolledStudents,
-        "userAddress:",
-        userAddress
-      );
       return false;
     }
 
-    // If it's an array, check if it includes the address
     if (Array.isArray(enrolledStudents)) {
-      const isEnrolled = enrolledStudents.some(
-        (addr) => addr.toLowerCase() === userAddress.toLowerCase()
+      return enrolledStudents.some(
+        (addr) => addr.toLowerCase() === userAddress.toLowerCase(),
       );
-      console.log(
-        "Array check - enrolledStudents:",
-        enrolledStudents,
-        "userAddress:",
-        userAddress,
-        "isEnrolled:",
-        isEnrolled
-      );
-      return isEnrolled;
     }
 
-    // Convert to string and check
     const studentsStr = String(enrolledStudents);
 
-    // If it's a single address, check if it matches
     if (studentsStr.startsWith("0x") && !studentsStr.includes(",")) {
-      const isEnrolled =
-        studentsStr.toLowerCase() === userAddress.toLowerCase();
-      console.log(
-        "Single address check - studentsStr:",
-        studentsStr,
-        "userAddress:",
-        userAddress,
-        "isEnrolled:",
-        isEnrolled
-      );
-      return isEnrolled;
+      return studentsStr.toLowerCase() === userAddress.toLowerCase();
     }
 
-    // If multiple addresses, split and check
     const addressList = studentsStr
       .split(",")
       .map((addr) => addr.trim().toLowerCase());
-    const isEnrolled = addressList.includes(userAddress.toLowerCase());
-    console.log(
-      "Multiple addresses check - addressList:",
-      addressList,
-      "userAddress:",
-      userAddress,
-      "isEnrolled:",
-      isEnrolled
-    );
-    return isEnrolled;
+    return addressList.includes(userAddress.toLowerCase());
   };
 
+  // Modern card style
+  const cardStyle = darkMode
+    ? "bg-gradient-to-br from-slate-900/90 to-slate-800/90 border-slate-700/50 hover:border-slate-600/50"
+    : "bg-gradient-to-br from-white to-slate-50/90 border-slate-200/70 hover:border-slate-300/70";
+
+  const glassCardStyle = darkMode
+    ? "bg-slate-800/40 backdrop-blur-xl border-slate-700/30"
+    : "bg-white/70 backdrop-blur-xl border-slate-200/50";
+
   return (
-    <div className="dark:bg-gray-900 dark:text-gray-100 bg-white text-gray-900 min-h-screen p-6 transition-colors duration-300 pt-[100px]">
-      <ToastContainer position="bottom-right" theme="colored" />
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center space-x-4">
-            <Book className="w-8 h-8 text-yellow-500" />
-            <h1 className="text-3xl font-bold dark:text-yellow-400 text-yellow-500">
-              Available Courses
-            </h1>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-4 md:p-6 transition-colors duration-300 pt-20 md:pt-[100px]">
+      <ToastContainer
+        position="bottom-right"
+        theme={darkMode ? "dark" : "light"}
+      />
+
+      <div className="max-w-7xl mx-auto">
+        {/* Header with gradient */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-yellow-500/10 via-yellow-400/5 to-transparent p-8 mb-8">
+          <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-yellow-500/20 blur-3xl" />
+          <div className="absolute bottom-0 left-0 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
+
+          <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex items-center gap-4">
+              <div className="rounded-2xl bg-gradient-to-br from-yellow-500/20 to-amber-500/20 p-4">
+                <Book className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
+              </div>
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-yellow-600 to-amber-600 dark:from-yellow-400 dark:to-amber-400 bg-clip-text text-transparent">
+                  Available Courses
+                </h1>
+                <p className="text-slate-600 dark:text-slate-300 mt-1">
+                  Explore our curated collection of blockchain and Web3 courses
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() =>
+                onNavigateToCreateCourse && onNavigateToCreateCourse()
+              }
+              className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-yellow-500 to-amber-500 px-6 py-3 text-black font-semibold transition-all duration-300 hover:shadow-lg hover:shadow-yellow-500/25"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+              <span className="relative flex items-center gap-2">
+                <FilePlus className="w-4 h-4" />
+                Create New Course
+              </span>
+            </button>
           </div>
-          <button className="bg-yellow-500 text-black px-6 py-2 rounded-lg hover:bg-yellow-600 transition-colors">
-            Create New Course
-          </button>
         </div>
-        {(success || error) && (
-          <div
-            className={`mb-4 p-4 rounded-lg flex items-center ${
-              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
-            }`}
-          >
-            {success ? (
-              <CheckCircle className="h-5 w-5 mr-2" />
-            ) : (
-              <AlertCircle className="h-5 w-5 mr-2" />
-            )}
-            <span>{success || error}</span>
-          </div>
-        )}
 
-        {/* Courses Grid */}
-        <div className="grid md:grid-cols-3 gap-6">
-          {courses?.length > 0 ? (
-            courses.map((course) => (
-              <div
-                key={course.courseId}
-                className="relative p-6 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200 transform hover:scale-105 transition-transform duration-1000 mb-5"
-              >
-                {/* Info Icon */}
+        {/* Search and Filter Bar */}
+        <div
+          className={`relative rounded-2xl border p-4 mb-6 ${glassCardStyle}`}
+        >
+          <div className="flex flex-col lg:flex-row gap-4">
+            {/* Search Input */}
+            <div className="flex-1 relative dark:text-white text-bla">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Search courses by name, description, or creator..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-yellow-500/20 transition-all"
+              />
+              {searchQuery && (
                 <button
-                  onClick={(e) => openCourseDetails(course, e)}
-                  className="absolute bottom-4 right-4 z-10 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-yellow-500 hover:bg-gray-400 mt-3 dark:hover:bg-gray-600 transition-colors"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
                 >
-                  <Info className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
+              )}
+            </div>
 
-                {/* Course Image */}
-                <div className="relative">
-                  <img
-                    src="/Vision.jpg"
-                    alt={course.courseName}
-                    className="w-full h-48 object-cover rounded-xl"
-                    style={{ opacity: 0.75 }}
-                  />
+            {/* Filter Toggle Button */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-4 py-3 rounded-xl border transition-all ${
+                showFilters
+                  ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-600 dark:text-yellow-400"
+                  : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+              }`}
+            >
+              <Filter className="w-5 h-5 dark:text-white text-bla" />
+              <span className="font-medium dark:text-white text-black">
+                Filters
+              </span>
+              <ChevronDown
+                className={`w-4 h-4 transition-transform dark:text-white text-bla ${
+                  showFilters ? "rotate-180" : ""
+                }`}
+              />
+            </button>
 
-                  <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
-                    {/* Difficulty Level Tag */}
-                    <div
-                      className={`px-3 py-1 rounded-full text-sm font-medium shadow-sm ${getDifficultyColor(
-                        course.difficulty_level
-                      )}`}
-                    >
-                      {getDifficultyLabel(course.difficulty_level)}
-                    </div>
+            {/* View Toggle */}
+            <div className="flex rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`p-3 transition-all ${
+                  viewMode === "grid"
+                    ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+                    : "hover:bg-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <Grid className="w-5 h-5 dark:text-white text-bla" />
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={`p-3 transition-all border-l border-slate-200 dark:border-slate-700 ${
+                  viewMode === "list"
+                    ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+                    : "hover:bg-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <List className="w-5 h-5 dark:text-white text-bla" />
+              </button>
+            </div>
+          </div>
 
-                    {/* Approval Status Badge */}
-                    <div
-                      className={`px-3 py-1 rounded-full text-sm font-medium shadow-sm flex items-center ${getApprovalStatusStyle(
-                        course.approved
-                      )}`}
-                    >
-                      {!course.approved ? (
-                        <>
-                          <Clock className="w-4 h-4 mr-1" />
-                          <span>Pending</span>
-                        </>
-                      ) : (
-                        <>
-                          <Check className="w-4 h-4 mr-1" />
-                          <span>Approved</span>
-                        </>
-                      )}
-                    </div>
+          {/* Expanded Filters */}
+          {showFilters && (
+            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Difficulty Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
+                    Difficulty Level
+                  </label>
+                  <div className="flex flex-wrap gap-2 dark:text-white text-bla">
+                    {difficultyOptions.map((option) => {
+                      const Icon = option.icon;
+                      const isSelected = selectedDifficulty === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          onClick={() => setSelectedDifficulty(option.value)}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
+                            isSelected
+                              ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-600 dark:text-yellow-400"
+                              : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                          <span className="text-sm font-medium">
+                            {option.label}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* Course Details */}
-                <div className="p-5">
-                  <h2 className="text-xl font-bold mb-2 text-yellow-500 truncate w-[300px]">
-                    {course.courseName}
-                  </h2>
-                  <p className="text-gray-400 mb-4 line-clamp-2">
-                    {course.description}
-                  </p>
+                {/* Sort By */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
+                    Sort By
+                  </label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-yellow-500/20 dark:text-white text-bla transition-all"
+                  >
+                    <option value="newest">Newest First</option>
+                    <option value="popular">Most Popular</option>
+                    <option value="price-low">Price: Low to High</option>
+                    <option value="price-high">Price: High to Low</option>
+                  </select>
+                </div>
 
-                  {/* Course Meta Information */}
-                  <div className="flex justify-between items-center mb-4">
-                    <div className="text-sm text-gray-500">
-                      <span className="mr-2 flex items-center">
-                        <Book className="inline-block w-4 h-4 mr-1 -mt-1" />
-                        <span className="truncate w-[100px] overflow-hidden text-ellipsis whitespace-nowrap">
-                          {course.creator}
-                        </span>
-                      </span>
-                      <span>
-                        <Clock className="inline-block w-4 h-4 mr-1 -mt-1" />
-                        {calculateTotalDuration(course.courseId)} Weeks
-                      </span>
-                    </div>
-                    <div className="text-yellow-500 font-semibold">10 ETH</div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex space-x-3">
-                    {/* {(role === "ADMIN" ||
-                      role === "Course Owner" ||
-                      role === "Reviewer") && (
-                      <button
-                        onClick={() => viewCourse(course.courseId)}
-                        className="flex-1 bg-yellow-500 text-sm text-black py-2 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center"
-                      >
-                        <Eye className="w-5 h-5 mr-2" />
-                        View Course
-                      </button>
-                    )} */}
-                    {!course.approved && course.creator === address && (
-                      <button
-                        onClick={async () => approveCourse(course)}
-                        className={`flex-1 bg-gray-800 text-white px-1 dark:bg-gray-300 text-sm dark:text-black py-2 rounded-lg 
-        ${
-          isLoading || course.approved
-            ? "opacity-70 cursor-not-allowed"
-            : "hover:bg-gray-600"
-        } 
-        transition-colors flex items-center justify-center`}
-                        disabled={isLoading || course.approved}
-                      >
-                        {isLoading ? (
-                          <Loader className="w-5 h-5 mr-2 animate-spin" />
-                        ) : (
-                          <AlertCircle className="w-5 h-5 mr-2" />
-                        )}
-                        {course.approved
-                          ? "Already Approved"
-                          : "Request Review"}
-                      </button>
-                    )}
-                    {/* Enroll/Unenroll Buttons */}
-                    {/* role === "USER" && */}
-                    {course.approved && address && (
-                      <>
-                        {(() => {
-                          const userEnrolled = isUserEnrolled(
-                            course.enrolledStudents,
-                            address
-                          );
-                          console.log(
-                            `RENDER: Course ${course.courseId} - User ${address} enrolled:`,
-                            userEnrolled
-                          );
-                          return userEnrolled;
-                        })() ? (
-                          <>
-                            <button
-                              onClick={() => viewCourse(course.courseId)}
-                              className="flex-1 bg-yellow-500 mt-3 text-gray-800 text-sm py-2 px-1 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center"
-                            >
-                              <Eye className="w-5 h-5 mr-2" />
-                              View Course
-                            </button>
-
-                            <button
-                              onClick={() => unEnroll(course.courseId)}
-                              disabled={loading}
-                              className={`flex-1 bg-red-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center ${
-                                loading ? "opacity-50 cursor-not-allowed" : ""
-                              }`}
-                            >
-                              <WifiOffIcon className="w-5 h-5 mr-2" />
-                              {loading ? "Unenrolling..." : "Unenroll"}
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => enroll(course.courseId)}
-                              disabled={loading}
-                              className={`flex-1 bg-gray-700 mt-3 text-white text-sm py-2 px-1 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center ${
-                                loading ? "opacity-50 cursor-not-allowed" : ""
-                              }`}
-                            >
-                              <Wifi className="w-5 h-5 mr-2" />
-                              {loading ? "Enrolling..." : "Enroll"}
-                            </button>
-                            {/* <div className="text-xs text-gray-500 mt-1">
-                              Debug: Not enrolled - showing enroll button
-                            </div> */}
-                          </>
-                        )}
-                      </>
-                    )}
-                    {/* Debug info - remove this later */}
-                    {/* {role === "USER" && (
-                      <div className="text-xs text-gray-400 mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded">
-                        Debug Info:
-                        <br />
-                        Role: {role}
-                        <br />
-                        Approved: {course.approved ? "Yes" : "No"}
-                        <br />
-                        Address: {address ? "Connected" : "Not connected"}
-                        <br />
-                        Enrolled:{" "}
-                        {isUserEnrolled(course.enrolledStudents, address)
-                          ? "Yes"
-                          : "No"}
-                        <br />
-                        EnrolledStudents:{" "}
-                        {JSON.stringify(course.enrolledStudents)}
-                      </div>
-                    )} */}
+                {/* Results Count */}
+                <div className="flex items-end">
+                  <div className="w-full px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800">
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      Showing{" "}
+                      <span className="font-bold text-yellow-600 dark:text-yellow-400">
+                        {filteredCourses.length}
+                      </span>{" "}
+                      of{" "}
+                      <span className="font-bold">{courses?.length || 0}</span>{" "}
+                      courses
+                    </p>
                   </div>
                 </div>
               </div>
-            ))
-          ) : (
-            <div className="text-gray-900 dark:text-gray-300 text-normal">
-              No courses available!
             </div>
           )}
         </div>
 
-        {/* Absolute Course Details Panel */}
+        {/* Status Messages */}
+        {(success || error) && (
+          <div
+            className={`mb-6 p-4 rounded-xl flex items-center gap-3 ${
+              success
+                ? "bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400"
+                : "bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400"
+            }`}
+          >
+            {success ? (
+              <CheckCircle className="h-5 w-5 flex-shrink-0" />
+            ) : (
+              <AlertCircle className="h-5 w-5 flex-shrink-0" />
+            )}
+            <span className="text-sm">{success || error}</span>
+          </div>
+        )}
+
+        {/* Courses Grid/List */}
+        {filteredCourses.length > 0 ? (
+          <div
+            className={
+              viewMode === "grid"
+                ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+                : "space-y-4"
+            }
+          >
+            {filteredCourses.map((course) => {
+              const difficultyColors = getDifficultyColor(
+                course.difficulty_level,
+              );
+              const approvalStatus = getApprovalStatusStyle(course.approved);
+              const ApprovalIcon = approvalStatus.icon;
+              const userEnrolled = isUserEnrolled(
+                course.enrolledStudents,
+                address,
+              );
+              const hasCertificate = hasCertificateForCourse(course.courseId);
+              const studentCount = getEnrolledStudentsCount(
+                course.enrolledStudents,
+              );
+
+              return (
+                <div
+                  key={course.courseId}
+                  className={`group relative overflow-hidden rounded-2xl border transition-all duration-300 hover:scale-[1.02] hover:shadow-xl ${
+                    viewMode === "list" ? "flex" : ""
+                  } ${cardStyle}`}
+                >
+                  {/* Course Image - List view adjustment */}
+                  <div
+                    className={viewMode === "list" ? "w-48 shrink-0" : "w-full"}
+                  >
+                    <div className="relative h-48 overflow-hidden">
+                      <img
+                        src={getCourseImage(course)}
+                        alt={course.courseName}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      />
+
+                      {/* Overlay gradient */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+
+                      {/* Difficulty Badge */}
+                      <div
+                        className={`absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm ${difficultyColors.bg} ${difficultyColors.border} border`}
+                      >
+                        {course.difficulty_level === 0 && (
+                          <GraduationCap className="w-3 h-3" />
+                        )}
+                        {course.difficulty_level === 1 && (
+                          <TrendingUp className="w-3 h-3" />
+                        )}
+                        {course.difficulty_level === 2 && (
+                          <Target className="w-3 h-3" />
+                        )}
+                        <span className={difficultyColors.text}>
+                          {getDifficultyLabel(course.difficulty_level)}
+                        </span>
+                      </div>
+
+                      {/* Approval Status Badge */}
+                      <div
+                        className={`absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm ${approvalStatus.bg} ${approvalStatus.border} border`}
+                      >
+                        <ApprovalIcon
+                          className={`w-3 h-3 ${approvalStatus.text}`}
+                        />
+                        <span className={approvalStatus.text}>
+                          {approvalStatus.label}
+                        </span>
+                      </div>
+
+                      {/* Info Button */}
+                      <button
+                        onClick={(e) => openCourseDetails(course, e)}
+                        className="absolute bottom-3 right-3 p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-yellow-500/80 transition-colors"
+                      >
+                        <Info className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Course Content */}
+                  <div className={viewMode === "list" ? "flex-1 p-5" : "p-5"}>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h3 className="text-lg font-bold line-clamp-1 text-slate-900 dark:text-white group-hover:text-yellow-600 dark:group-hover:text-yellow-400 transition-colors">
+                        {course.courseName}
+                      </h3>
+                    </div>
+
+                    <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 mb-4">
+                      {course.description}
+                    </p>
+
+                    {/* Course Stats */}
+                    <div className="grid grid-cols-3 gap-2 mb-4">
+                      <div className="text-center p-2 rounded-lg bg-slate-100/50 dark:bg-slate-800/50">
+                        <BookOpen className="w-4 h-4 mx-auto mb-1 text-yellow-500" />
+                        <span className="text-xs font-medium block text-slate-900 dark:text-white">
+                          {chapters.filter(
+                            (c) =>
+                              Number(c.courseId) === Number(course.courseId),
+                          ).length || 0}
+                        </span>
+                        <span className="text-xs text-slate-500 dark:text-slate-300">
+                          Chapters
+                        </span>
+                      </div>
+                      <div className="text-center p-2 rounded-lg bg-slate-100/50 dark:bg-slate-800/50">
+                        <PlayCircle className="w-4 h-4 mx-auto mb-1 text-blue-500" />
+                        <span className="text-xs font-medium block text-slate-900 dark:text-white">
+                          {lessons.filter((l) => {
+                            const chapterIds = chapters
+                              .filter(
+                                (c) =>
+                                  Number(c.courseId) ===
+                                  Number(course.courseId),
+                              )
+                              .map((c) => c.chapterId);
+                            return chapterIds.includes(l.chapterId);
+                          }).length || 0}
+                        </span>
+                        <span className="text-xs text-slate-500 dark:text-slate-300">
+                          Lessons
+                        </span>
+                      </div>
+                      <div className="text-center p-2 rounded-lg bg-slate-100/50 dark:bg-slate-800/50">
+                        <Users className="w-4 h-4 mx-auto mb-1 text-green-500" />
+                        <span className="text-xs font-medium block text-slate-900 dark:text-white">
+                          {studentCount}
+                        </span>
+                        <span className="text-xs text-slate-500 dark:text-slate-300">
+                          Students
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Meta Info */}
+                    <div className="flex items-center justify-between text-sm mb-4">
+                      <div className="flex items-center gap-2 text-slate-500">
+                        <Clock className="w-4 h-4" />
+                        <span>
+                          {calculateTotalDuration(course.courseId)} weeks
+                        </span>
+                      </div>
+                      <div className="font-bold text-yellow-600 dark:text-yellow-400">
+                        {formatPriceUSDC(course.priceUSDC)}
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      {!course.approved && course.creator === address && (
+                        <button
+                          onClick={async () => approveCourse(course)}
+                          disabled={isLoading || course.approved}
+                          className="flex-1 bg-gradient-to-r from-yellow-500 to-amber-500 text-black py-2 px-3 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-yellow-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {isLoading ? (
+                            <Loader className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4" />
+                          )}
+                          {course.approved ? "Approved" : "Request Review"}
+                        </button>
+                      )}
+
+                      {course.approved && address && (
+                        <>
+                          {userEnrolled ? (
+                            <>
+                              <button
+                                onClick={() => viewCourse(course.courseId)}
+                                className="flex-1 bg-gradient-to-r from-yellow-500 to-yellow-500 text-white py-2 px-3 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/25 transition-all flex items-center justify-center gap-2"
+                              >
+                                <Eye className="w-4 h-4" />
+                                View Course
+                              </button>
+
+                              {hasCertificate ? (
+                                <button
+                                  className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-2 px-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 cursor-default opacity-75"
+                                  disabled
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                  Completed
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setCourseToUnenroll(course);
+                                    setShowUnenrollConfirm(true);
+                                  }}
+                                  disabled={
+                                    unenrollingCourseId === course.courseId
+                                  }
+                                  className="flex-1 bg-gradient-to-r from-red-500 to-rose-500 text-white py-2 px-3 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-red-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                  <WifiOff className="w-4 h-4" />
+                                  {unenrollingCourseId === course.courseId
+                                    ? "..."
+                                    : "Unenroll"}
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => enroll(course.courseId)}
+                              disabled={enrollingCourseId === course.courseId}
+                              className="w-full bg-gradient-to-r from-gray-600 to-gray-700 text-white py-2 px-3 rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-white-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                              <Wifi className="w-4 h-4" />
+                              {enrollingCourseId === course.courseId
+                                ? "Enrolling..."
+                                : "Enroll Now"}
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    {/* Creator Info */}
+                    <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+                      <p className="text-xs text-slate-500 truncate">
+                        Created by:{" "}
+                        <span className="font-mono">
+                          {course.creator?.slice(0, 6)}...
+                          {course.creator?.slice(-4)}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div
+            className={`text-center py-16 rounded-3xl border ${glassCardStyle}`}
+          >
+            <div className="relative inline-block">
+              <Book className="w-16 h-16 mx-auto mb-4 text-slate-400" />
+              <div className="absolute inset-0 animate-ping">
+                <Book className="w-16 h-16 mx-auto opacity-20" />
+              </div>
+            </div>
+            <h3 className="text-xl font-semibold mb-2">No Courses Found</h3>
+            <p className="text-slate-500 dark:text-slate-400">
+              {searchQuery || selectedDifficulty !== "all"
+                ? "Try adjusting your search or filters"
+                : "No courses available at the moment"}
+            </p>
+          </div>
+        )}
+
+        {/* Course Details Panel */}
         {selectedCourse && (
           <div
             ref={detailsRef}
@@ -1040,17 +1581,17 @@ const CoursesPage = ({ onCourseSelect }) => {
               top: `${detailsPosition.top}px`,
               left: `${detailsPosition.left}px`,
             }}
-            className="fixed w-80 dark:bg-gray-900 bg-gray-100 dark:text-gray-100 text-gray-800 rounded-lg overflow-x-hidden shadow-xl p-4 z-50 dark:border dark:border-gray-700 border-none"
+            className={`fixed w-96 max-w-[calc(100vw-2rem)] rounded-2xl border shadow-2xl overflow-hidden z-50 ${glassCardStyle}`}
           >
-            {/* Panel Tabs */}
-            <div className="flex justify-between items-center mb-2">
-              <div className="flex gap-2">
+            {/* Panel Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+              <div className="flex gap-1">
                 <button
                   onClick={() => setActiveTab("details")}
-                  className={`px-3 py-1 text-sm font-medium rounded-t-lg ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     activeTab === "details"
-                      ? "bg-yellow-500 text-white"
-                      : "text-yellow-500 hover:bg-yellow-100 dark:hover:bg-gray-800"
+                      ? "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400"
+                      : "hover:bg-slate-100 dark:hover:bg-slate-800 dak:text-white text-black"
                   }`}
                 >
                   Details
@@ -1059,15 +1600,14 @@ const CoursesPage = ({ onCourseSelect }) => {
                   <button
                     onClick={() => {
                       setActiveTab("metrics");
-                      // Fetch metrics data if not already loaded
                       if (!latestReviews[selectedCourse.courseId]) {
                         getCourseData(selectedCourse.courseId);
                       }
                     }}
-                    className={`px-3 py-1 text-sm font-medium rounded-t-lg ${
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                       activeTab === "metrics"
-                        ? "bg-yellow-500 text-white"
-                        : "text-yellow-500 hover:bg-yellow-100 dark:hover:bg-gray-800"
+                        ? "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400"
+                        : "hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-white text-black"
                     }`}
                   >
                     Metrics
@@ -1076,384 +1616,480 @@ const CoursesPage = ({ onCourseSelect }) => {
               </div>
               <button
                 onClick={() => setSelectedCourse(null)}
-                className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-200"
+                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 dark:text-white text-black" />
               </button>
             </div>
 
-            {isLoading ? (
-              <div className="flex items-center justify-center h-64">
-                <Loader className="w-8 h-8 text-yellow-500 animate-spin" />
-              </div>
-            ) : (
-              <>
-                {/* DETAILS TAB */}
-                {activeTab === "details" && (
-                  <div className="space-y-4 max-h-96 overflow-y-auto">
-                    <div>
-                      <h4 className="font-semibold text-yellow-500">
-                        Course Name
-                      </h4>
-                      <p className="dark:text-gray-300 text-gray-700">
-                        {selectedCourse.courseName || ""}
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-yellow-500">
-                        Difficulty Level
-                      </h4>
-                      <div
-                        className={`inline-block px-3 py-1 rounded-full text-sm font-medium mt-1 ${getDifficultyColor(
-                          selectedCourse.difficulty_level
-                        )}`}
-                      >
-                        {getDifficultyLabel(selectedCourse.difficulty_level) ||
-                          ""}
-                      </div>
-                    </div>
-
-                    {/* Approval Status Section */}
-                    <div>
-                      <h4 className="font-semibold text-yellow-500">Status</h4>
-                      <div
-                        className={`inline-block px-3 py-1 rounded-full text-sm font-medium mt-1 ${
-                          selectedCourse.approved
-                            ? "bg-green-100 text-green-700"
-                            : "bg-yellow-100 text-yellow-700"
-                        }`}
-                      >
-                        {selectedCourse.approved ? "Approved" : "Pending"}
-                      </div>
-                    </div>
-
-                    {/* Score Section - Only show if course has been reviewed */}
-                    {selectedCourse.approvalCount > 0 && (
+            {/* Panel Content */}
+            <div className="p-4 max-h-[70vh] overflow-y-auto">
+              {isLoading ? (
+                <div className="flex items-center justify-center h-48">
+                  <Loader className="w-8 h-8 text-yellow-500 animate-spin" />
+                </div>
+              ) : (
+                <>
+                  {/* Details Tab */}
+                  {activeTab === "details" && (
+                    <div className="space-y-4">
                       <div>
-                        <h4 className="font-semibold text-yellow-500">
-                          Review Score
+                        <h4 className="text-sm font-medium text-yellow-500 mb-1">
+                          Course Name
+                        </h4>
+                        <p className="text-sm text-slate-900 dark:text-white">
+                          {selectedCourse.courseName}
+                        </p>
+                      </div>
+
+                      <div>
+                        <h4 className="text-sm font-medium text-yellow-500 mb-1">
+                          Difficulty Level
                         </h4>
                         <div
-                          className={`inline-block px-3 py-1 rounded-full text-sm font-medium mt-1 ${
-                            selectedCourse.approvalCount >= 80
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+                            getDifficultyColor(selectedCourse.difficulty_level)
+                              .bg
                           }`}
                         >
-                          {selectedCourse.approvalCount}%
+                          {selectedCourse.difficulty_level === 0 && (
+                            <GraduationCap className="w-3 h-3" />
+                          )}
+                          {selectedCourse.difficulty_level === 1 && (
+                            <TrendingUp className="w-3 h-3" />
+                          )}
+                          {selectedCourse.difficulty_level === 2 && (
+                            <Target className="w-3 h-3" />
+                          )}
+                          <span
+                            className={
+                              getDifficultyColor(
+                                selectedCourse.difficulty_level,
+                              ).text
+                            }
+                          >
+                            {getDifficultyLabel(
+                              selectedCourse.difficulty_level,
+                            )}
+                          </span>
                         </div>
                       </div>
-                    )}
 
-                    {/* Feedback Section - Only visible to course owner or admin */}
-                    {(selectedCourse.creator === address || role === "ADMIN") &&
-                      !selectedCourse.approved && (
+                      <div>
+                        <h4 className="text-sm font-medium text-yellow-500 mb-1">
+                          Status
+                        </h4>
+                        <div
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+                            selectedCourse.approved
+                              ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                              : "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+                          }`}
+                        >
+                          {selectedCourse.approved ? (
+                            <>
+                              <CheckCircle className="w-3 h-3" />
+                              <span>Approved</span>
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-3 h-3" />
+                              <span>Pending Review</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {selectedCourse.approvalCount > 0 && (
                         <div>
-                          <h4 className="font-semibold text-yellow-500">
-                            Feedback
+                          <h4 className="text-sm font-medium text-yellow-500 mb-1">
+                            Review Score
                           </h4>
-                          <div className="mt-1 p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
-                            {feedbackLoading ? (
-                              <div className="flex justify-center py-2">
-                                <Loader className="w-4 h-4 text-yellow-500 animate-spin" />
-                              </div>
-                            ) : courseFeedback ? (
-                              <p className="text-sm dark:text-gray-300 text-gray-700">
-                                {typeof courseFeedback === "string"
-                                  ? courseFeedback
-                                  : JSON.stringify(courseFeedback)}
-                              </p>
-                            ) : (
-                              <p className="text-sm text-gray-500 italic">
-                                No feedback available yet
-                              </p>
-                            )}
+                          <div
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+                              selectedCourse.approvalCount >= 80
+                                ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                                : "bg-red-500/10 text-red-600 dark:text-red-400"
+                            }`}
+                          >
+                            <Star className="w-3 h-3" />
+                            <span>{selectedCourse.approvalCount}%</span>
                           </div>
                         </div>
                       )}
 
-                    <div>
-                      <h4 className="font-semibold text-yellow-500">
-                        Description
-                      </h4>
-                      <p className="dark:text-gray-300 text-gray-700">
-                        {selectedCourse.description || ""}
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
+                      {(selectedCourse.creator === address ||
+                        role === "ADMIN") &&
+                        !selectedCourse.approved && (
+                          <div>
+                            <h4 className="text-sm font-medium text-yellow-500 mb-1">
+                              Feedback
+                            </h4>
+                            <div className="p-3 rounded-lg bg-slate-100/50 dark:bg-slate-800/50 text-sm text-slate-900 dark:text-white">
+                              {feedbackLoading ? (
+                                <div className="flex justify-center py-2">
+                                  <Loader className="w-4 h-4 text-yellow-500 animate-spin" />
+                                </div>
+                              ) : courseFeedback ? (
+                                <p className="text-slate-900 dark:text-white">
+                                  {typeof courseFeedback === "string"
+                                    ? courseFeedback
+                                    : JSON.stringify(courseFeedback)}
+                                </p>
+                              ) : (
+                                <p className="text-slate-500 dark:text-slate-300 italic">
+                                  No feedback available yet
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
                       <div>
-                        <h4 className="font-semibold text-yellow-500">
-                          Chapters
+                        <h4 className="text-sm font-medium text-yellow-500 mb-1">
+                          Description
                         </h4>
-                        <p className="dark:text-gray-300 text-gray-700">
-                          {chapters?.length || 0}
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          {selectedCourse.description}
                         </p>
                       </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 rounded-lg bg-slate-100/50 dark:bg-slate-800/50">
+                          <p className="text-xs text-slate-500 dark:text-slate-300 mb-1">
+                            Chapters
+                          </p>
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">
+                            {chapters?.filter(
+                              (c) =>
+                                Number(c.courseId) ===
+                                Number(selectedCourse.courseId),
+                            ).length || 0}
+                          </p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-slate-100/50 dark:bg-slate-800/50">
+                          <p className="text-xs text-slate-500 dark:text-slate-300 mb-1">
+                            Lessons
+                          </p>
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">
+                            {lessons?.length || 0}
+                          </p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-slate-100/50 dark:bg-slate-800/50">
+                          <p className="text-xs text-slate-500 dark:text-slate-300 mb-1">
+                            Quizzes
+                          </p>
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">
+                            {quizzes?.length || 0}
+                          </p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-slate-100/50 dark:bg-slate-800/50">
+                          <p className="text-xs text-slate-500 dark:text-slate-300 mb-1">
+                            Duration
+                          </p>
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">
+                            {calculateTotalDuration(selectedCourse.courseId)}{" "}
+                            weeks
+                          </p>
+                        </div>
+                      </div>
+
                       <div>
-                        <h4 className="font-semibold text-yellow-500">
-                          Lessons
+                        <h4 className="text-sm font-medium text-yellow-500 mb-1">
+                          Creator
                         </h4>
-                        <p className="dark:text-gray-300 text-gray-700">
-                          {lessons?.length || 0}
+                        <p className="font-mono text-sm bg-slate-100/50 dark:bg-slate-800/50 p-2 rounded-lg text-slate-900 dark:text-white">
+                          {selectedCourse.creator}
                         </p>
                       </div>
-                      <div>
-                        <h4 className="font-semibold text-yellow-500">
-                          Quizzes
-                        </h4>
-                        <p className="dark:text-gray-300 text-gray-700">
-                          {quizzes?.length || 0}
-                        </p>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-yellow-500">
-                          Duration
-                        </h4>
-                        <p className="dark:text-gray-300 text-gray-700">
-                          {typeof calculateTotalDuration(
-                            selectedCourse.courseId
-                          ) === "object"
-                            ? "0"
-                            : calculateTotalDuration(
-                                selectedCourse.courseId
-                              )}{" "}
-                          Weeks
-                        </p>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-yellow-500">
-                          Prerequisites
-                        </h4>
-                        <p className="dark:text-gray-300 text-gray-700">None</p>
-                      </div>
-                      <div className="flex gap-2 flex-col">
-                        <h4 className="font-semibold text-yellow-500">
-                          Enrolled
-                        </h4>
-                        <span className="dark:text-gray-300 text-gray-700">
-                          {typeof getEnrolledStudentsCount(
-                            selectedCourse?.enrolledStudents
-                          ) === "object"
-                            ? "0"
-                            : getEnrolledStudentsCount(
-                                selectedCourse?.enrolledStudents
-                              ) || 0}{" "}
-                          Student(s)
-                        </span>
+
+                      <div className="pt-2">
+                        <button
+                          onClick={() => setActiveTab("metrics")}
+                          className="w-full py-3 bg-gradient-to-r from-yellow-500 to-amber-500 text-black rounded-xl font-medium hover:shadow-lg hover:shadow-yellow-500/25 transition-all flex items-center justify-center gap-2"
+                        >
+                          <BarChart3 className="w-4 h-4" />
+                          View Course Metrics
+                        </button>
                       </div>
                     </div>
+                  )}
 
-                    <div>
-                      <h4 className="font-semibold text-yellow-500">Creator</h4>
-                      <p className="dark:text-gray-300 text-gray-700 truncate w-64">
-                        {selectedCourse.creator || ""}
-                      </p>
-                    </div>
-
-                    {/* View Metrics Button - Shows only for approved courses */}
-                    <div className="pt-2">
-                      <button
-                        onClick={() => setActiveTab("metrics")}
-                        className="w-full py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
-                      >
-                        <ChartBar className="w-5 h-5" />
-                        <span>View Course Metrics</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* METRICS TAB */}
-                {activeTab === "metrics" && (
-                  <div className="space-y-4 max-h-96 overflow-y-auto">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-xl font-bold text-yellow-500">
-                        Course Metrics
-                      </h3>
-                      <button
-                        onClick={() => setActiveTab("details")}
-                        className="text-yellow-500 hover:text-yellow-600 flex items-center gap-1"
-                      >
-                        <ArrowLeft className="w-4 h-4" />
-                        <span className="text-sm">Back</span>
-                      </button>
-                    </div>
-
-                    {!latestReviews[selectedCourse.courseId] ? (
-                      <div className="flex justify-center items-center h-64">
-                        <Loader className="w-8 h-8 text-yellow-500 animate-spin" />
+                  {/* Metrics Tab */}
+                  {activeTab === "metrics" && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-yellow-500 dark:text-white">
+                          Course Metrics
+                        </h3>
+                        <button
+                          onClick={() => setActiveTab("details")}
+                          className="text-yellow-500 dark:text-white hover:text-yellow-600 dark:hover:text-slate-300 flex items-center gap-1 text-sm"
+                        >
+                          <ArrowLeft className="w-3 h-3" />
+                          Back
+                        </button>
                       </div>
-                    ) : (
-                      <>
-                        {/* Evaluation Summary */}
-                        <div className="dark:bg-gray-800 bg-gray-200 rounded-lg p-4">
-                          <h4 className="text-yellow-500 font-medium mb-3">
-                            Evaluation Summary
-                          </h4>
-                          {/* Circular Progress for Evaluation Summary */}
-                          <div className="flex justify-center py-4">
-                            <div className="relative w-32 h-32">
-                              {/* Circular Progress */}
-                              {(() => {
-                                const latestReview =
-                                  latestReviews[selectedCourse.courseId];
-                                const approvalPercentage = latestReview?.score
-                                  ? latestReview.score / 100
-                                  : 0;
-                                const isPassed = approvalPercentage >= 50;
 
-                                return (
-                                  <>
-                                    <svg
-                                      className="w-full h-full"
-                                      viewBox="0 0 100 100"
-                                    >
-                                      {/* Background circle */}
-                                      <circle
-                                        cx="50"
-                                        cy="50"
-                                        r="45"
-                                        fill="transparent"
-                                        stroke="#f3f4f6"
-                                        strokeWidth="10"
-                                      />
+                      {!latestReviews[selectedCourse.courseId] ? (
+                        <div className="flex justify-center items-center h-48">
+                          <Loader className="w-8 h-8 text-yellow-500 animate-spin" />
+                        </div>
+                      ) : (
+                        <>
+                          {/* Evaluation Summary */}
+                          <div className="bg-gradient-to-br from-slate-100 to-white dark:from-slate-800 dark:to-slate-900 rounded-xl p-4">
+                            <h4 className="text-yellow-500 dark:text-white font-medium mb-3">
+                              Evaluation Summary
+                            </h4>
+                            <div className="flex justify-center py-4">
+                              <div className="relative w-32 h-32">
+                                {(() => {
+                                  const latestReview =
+                                    latestReviews[selectedCourse.courseId];
+                                  const approvalPercentage = latestReview?.score
+                                    ? latestReview.score / 100
+                                    : 0;
+                                  const isPassed = approvalPercentage >= 50;
 
-                                      {/* Progress arc */}
-                                      <circle
-                                        cx="50"
-                                        cy="50"
-                                        r="45"
-                                        fill="transparent"
-                                        stroke={
-                                          isPassed ? "#22c55e" : "#f43f5e"
-                                        }
-                                        strokeWidth="10"
-                                        strokeDasharray={`${
-                                          approvalPercentage * 2.83
-                                        } 283`}
-                                        strokeDashoffset="0"
-                                        transform="rotate(-90 50 50)"
-                                      />
-                                    </svg>
+                                  return (
+                                    <>
+                                      <svg
+                                        className="w-full h-full"
+                                        viewBox="0 0 100 100"
+                                      >
+                                        <circle
+                                          cx="50"
+                                          cy="50"
+                                          r="45"
+                                          fill="transparent"
+                                          stroke="#e2e8f0"
+                                          strokeWidth="10"
+                                        />
+                                        <circle
+                                          cx="50"
+                                          cy="50"
+                                          r="45"
+                                          fill="transparent"
+                                          stroke={
+                                            isPassed ? "#22c55e" : "#f43f5e"
+                                          }
+                                          strokeWidth="10"
+                                          strokeDasharray={`${
+                                            approvalPercentage * 2.83
+                                          } 283`}
+                                          strokeDashoffset="0"
+                                          transform="rotate(-90 50 50)"
+                                          className="transition-all duration-1000"
+                                        />
+                                      </svg>
+                                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                        <span className="text-2xl font-bold text-yellow-500">
+                                          {approvalPercentage.toFixed(2)}%
+                                        </span>
+                                        <span className="text-xs uppercase text-gray-400 dark:text-slate-400">
+                                          {isPassed ? "PASSED" : "FAILED"}
+                                        </span>
+                                      </div>
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
+                              <div>
+                                <span className="text-gray-400 dark:text-slate-400">
+                                  Category:
+                                </span>
+                                <p className="text-yellow-500 dark:text-white truncate">
+                                  {latestReviews[selectedCourse.courseId]
+                                    ?.category || "General"}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="text-gray-400 dark:text-slate-400">
+                                  Pass Mark:
+                                </span>
+                                <p className="text-yellow-500 dark:text-white">
+                                  75%
+                                </p>
+                              </div>
+                            </div>
+                          </div>
 
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                      <span className="text-2xl font-bold text-yellow-500 dark:text-yellow-500">
-                                        {approvalPercentage.toFixed(2)}%
+                          {/* Performance Breakdown */}
+                          <div className="bg-gradient-to-br from-slate-100 to-white dark:from-slate-800 dark:to-slate-900 rounded-xl p-4">
+                            <h4 className="text-yellow-500 dark:text-white font-medium mb-3">
+                              Performance Breakdown
+                            </h4>
+                            {latestReviews[selectedCourse.courseId] &&
+                            Object.keys(latestReviews[selectedCourse.courseId])
+                              .length > 0 ? (
+                              <div className="space-y-3">
+                                {Object.entries({
+                                  "Learner Agency":
+                                    latestReviews[selectedCourse.courseId]
+                                      .learnerAgency || 0,
+                                  "Critical Thinking":
+                                    latestReviews[selectedCourse.courseId]
+                                      .criticalThinking || 0,
+                                  "Collaborative Learning":
+                                    latestReviews[selectedCourse.courseId]
+                                      .collaborativeLearning || 0,
+                                  "Reflective Practice":
+                                    latestReviews[selectedCourse.courseId]
+                                      .reflectivePractice || 0,
+                                  "Adaptive Learning":
+                                    latestReviews[selectedCourse.courseId]
+                                      .adaptiveLearning || 0,
+                                  "Authentic Learning":
+                                    latestReviews[selectedCourse.courseId]
+                                      .authenticLearning || 0,
+                                  "Technology Integration":
+                                    latestReviews[selectedCourse.courseId]
+                                      .technologyIntegration || 0,
+                                  "Learner Support":
+                                    latestReviews[selectedCourse.courseId]
+                                      .learnerSupport || 0,
+                                  "Assessment for Learning":
+                                    latestReviews[selectedCourse.courseId]
+                                      .assessmentForLearning || 0,
+                                  "Engagement and Motivation":
+                                    latestReviews[selectedCourse.courseId]
+                                      .engagementAndMotivation || 0,
+                                }).map(([key, value]) => (
+                                  <div key={key}>
+                                    <div className="flex justify-between mb-1">
+                                      <span className="text-xs text-slate-600 dark:text-slate-300">
+                                        {key}
                                       </span>
-                                      <span className="text-xs uppercase text-gray-400">
-                                        {isPassed ? "PASSED" : "FAILED"}
+                                      <span
+                                        className={`text-xs font-medium ${
+                                          value >= 70
+                                            ? "text-green-500"
+                                            : value >= 50
+                                            ? "text-yellow-500"
+                                            : "text-red-500"
+                                        }`}
+                                      >
+                                        {value}%
                                       </span>
                                     </div>
-                                  </>
-                                );
-                              })()}
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
-                            <div>
-                              <span className="text-gray-400">Category:</span>
-                              <p className="text-yellow-500 truncate w-full">
-                                {latestReviews[selectedCourse.courseId]
-                                  ?.category || "General"}
-                              </p>
-                            </div>
-                            <div>
-                              <span className="text-gray-400">Pass Mark:</span>
-                              <p className="dark:text-yellow-500 text-gray-700">
-                                75%
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Performance Breakdown */}
-                        <div className="bg-gray-200 dark:bg-gray-800 rounded-lg p-4">
-                          <h4 className="text-yellow-500 font-medium mb-4">
-                            Performance Breakdown
-                          </h4>
-
-                          {/* Safely handle latestReviews data */}
-                          {latestReviews[selectedCourse.courseId] &&
-                          Object.keys(latestReviews[selectedCourse.courseId])
-                            .length > 0 ? (
-                            <div className="grid grid-cols-1 gap-3">
-                              {Object.entries({
-                                "Learner Agency":
-                                  latestReviews[selectedCourse.courseId]
-                                    .learnerAgency || 0,
-                                "Critical Thinking":
-                                  latestReviews[selectedCourse.courseId]
-                                    .criticalThinking || 0,
-                                "Collaborative Learning":
-                                  latestReviews[selectedCourse.courseId]
-                                    .collaborativeLearning || 0,
-                                "Reflective Practice":
-                                  latestReviews[selectedCourse.courseId]
-                                    .reflectivePractice || 0,
-                                "Adaptive Learning":
-                                  latestReviews[selectedCourse.courseId]
-                                    .adaptiveLearning || 0,
-                                "Authentic Learning":
-                                  latestReviews[selectedCourse.courseId]
-                                    .authenticLearning || 0,
-                                "Technology Integration":
-                                  latestReviews[selectedCourse.courseId]
-                                    .technologyIntegration || 0,
-                                "Learner Support":
-                                  latestReviews[selectedCourse.courseId]
-                                    .learnerSupport || 0,
-                                "Assessment for Learning":
-                                  latestReviews[selectedCourse.courseId]
-                                    .assessmentForLearning || 0,
-                                "Engagement and Motivation":
-                                  latestReviews[selectedCourse.courseId]
-                                    .engagementAndMotivation || 0,
-                              }).map(([key, value]) => (
-                                <div key={key} className="mb-1">
-                                  <div className="flex justify-between mb-1">
-                                    <span className="text-xs dark:text-gray-300 text-gray-700">
-                                      {key}
-                                    </span>
-                                    <span
-                                      className={`text-xs font-medium ${
-                                        value >= 70
-                                          ? "text-green-400"
-                                          : value >= 50
-                                          ? "text-yellow-400"
-                                          : "text-red-400"
-                                      }`}
-                                    >
-                                      {value}%
-                                    </span>
+                                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                                      <div
+                                        className={`h-2 rounded-full transition-all duration-500 ${
+                                          value >= 70
+                                            ? "bg-green-500"
+                                            : value >= 50
+                                            ? "bg-yellow-500"
+                                            : "bg-red-500"
+                                        }`}
+                                        style={{ width: `${value}%` }}
+                                      />
+                                    </div>
                                   </div>
-                                  <div className="w-full bg-gray-700 rounded-full h-2.5">
-                                    <div
-                                      className={`h-2.5 rounded-full ${
-                                        value >= 70
-                                          ? "bg-green-500"
-                                          : value >= 50
-                                          ? "bg-yellow-500"
-                                          : "bg-red-500"
-                                      }`}
-                                      style={{ width: `${value}%` }}
-                                    />
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-center py-4 text-gray-400">
-                              No detailed metrics available for this course
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-4 text-gray-400 dark:text-slate-400">
+                                No detailed metrics available
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
+        )}
+
+        {/* Unenrollment Confirmation Modal */}
+        {showUnenrollConfirm && courseToUnenroll && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div
+              className={`max-w-md w-full rounded-2xl border shadow-2xl overflow-hidden ${glassCardStyle}`}
+            >
+              <div className="p-6">
+                <div className="text-center">
+                  <div className="mx-auto w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
+                    <WifiOff className="w-8 h-8 text-red-500" />
+                  </div>
+
+                  <h3 className="text-xl font-bold mb-2 text-white">
+                    Confirm Unenrollment
+                  </h3>
+
+                  <p className="text-slate-600 dark:text-slate-400 mb-6">
+                    Are you sure you want to unenroll from{" "}
+                    <span className="font-semibold text-yellow-600 dark:text-yellow-400">
+                      {courseToUnenroll.courseName}
+                    </span>
+                    ? You will lose all your progress.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={() => {
+                        setShowUnenrollConfirm(false);
+                        setCourseToUnenroll(null);
+                      }}
+                      disabled={
+                        unenrollingCourseId === courseToUnenroll?.courseId
+                      }
+                      className="flex-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors font-medium dark:text-white text-black"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await unEnroll(courseToUnenroll.courseId);
+                          setShowUnenrollConfirm(false);
+                          setCourseToUnenroll(null);
+                        } catch (error) {
+                          console.error("Failed to unenroll:", error);
+                        }
+                      }}
+                      disabled={
+                        unenrollingCourseId === courseToUnenroll?.courseId
+                      }
+                      className="flex-1 bg-gradient-to-r from-red-500 to-rose-500 text-white px-4 py-3 rounded-xl font-medium hover:shadow-lg hover:shadow-red-500/25 transition-all flex items-center justify-center gap-2"
+                    >
+                      {unenrollingCourseId === courseToUnenroll?.courseId ? (
+                        <>
+                          <Loader className="w-4 h-4 animate-spin" />
+                          Unenrolling...
+                        </>
+                      ) : (
+                        "Yes, Unenroll"
+                      )}
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-slate-500 mt-4">
+                    This action cannot be undone
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Survey Modal */}
+        {showSurveyModal && (
+          <CareerOnboardingForm
+            userAddress={account?.address}
+            isModal={true}
+            onFormComplete={handleSurveyComplete}
+            courseIdToEnroll={courseIdPendingEnrollment}
+            onClose={() => {
+              setShowSurveyModal(false);
+              setCourseIdPendingEnrollment(null);
+            }}
+          />
         )}
       </div>
     </div>

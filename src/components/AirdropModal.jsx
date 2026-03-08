@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { X, Gift, Calendar } from "lucide-react";
 import { ethers } from "ethers";
-import { useEthersSigner } from "./useClientSigner";
-import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
+import CommunityGovernanceFacetABI from "../artifacts/contracts/CommunityGovernanceFacet.sol/CommunityGovernanceFacet.json";
 import { toast, ToastContainer } from "react-toastify";
+import { client } from "../services/client";
+import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
+import { defineChain } from "thirdweb/chains";
+import CONTRACT_ADDRESSES from "../constants/addresses";
+import { useActiveAccount } from "thirdweb/react";
 
-const Community_ABI = CommunityABI.abi;
-const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
+const CommunityGovernanceFacet_ABI = CommunityGovernanceFacetABI.abi;
 
 const AirdropModal = ({ setShowAirdropModal }) => {
   const [airdropData, setAirdropData] = useState({
@@ -17,18 +21,17 @@ const AirdropModal = ({ setShowAirdropModal }) => {
   const [distributeAirdropsLoading, setDistributeAirdropsLoading] =
     useState(false);
   const [error, setError] = useState("");
-  const signerPromise = useEthersSigner();
+  const account = useActiveAccount();
 
   const handleAirdrop = async () => {
     try {
       setDistributeAirdropsLoading(true);
-
-      const signer = await signerPromise;
-      const communityContract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const communityContract = await getContract({
+        address: DiamondAddress,
+        abi: CommunityGovernanceFacet_ABI,
+        client,
+        chain: defineChain(11155111), // Sepolia
+      });
 
       // Convert datetime strings to Unix timestamps
       const startTimestamp = Math.floor(
@@ -38,14 +41,16 @@ const AirdropModal = ({ setShowAirdropModal }) => {
         new Date(airdropData.endTime).getTime() / 1000
       );
 
-      // Call your contract function with the new parameters
-      const tx = await communityContract.createAirdropProposal(
-        ethers.parseEther(airdropData.amount),
-        startTimestamp,
-        endTimestamp
-      );
-
-      await tx.wait();
+      const tx = await prepareContractCall({
+        contract: communityContract,
+        method: "createAirdropProposal",
+        params: [
+          ethers.parseEther(airdropData.amount),
+          startTimestamp,
+          endTimestamp,
+        ],
+      });
+      await sendTransaction({ transaction: tx, account });
 
       // Success handling
       toast.success("Airdrop proposal submitted successfully");

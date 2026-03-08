@@ -1,1240 +1,76 @@
 import React, { useEffect, useState, useContext } from "react";
 import {
   Book,
-  FileText,
-  Plus,
   ChevronRight,
-  Image,
   CheckCircle,
-  AlertCircle,
+  FileText,
+  Zap,
+  Lock,
 } from "lucide-react";
-import Ecosystem1FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem1Facet.sol/Ecosystem1Facet.json";
-import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
-import { useEthersSigner } from "../components/useClientSigner";
-import { useAccount } from "wagmi";
-import { ethers } from "ethers";
-import { CourseContext } from "../contexts/courseContext";
-import { ChapterContext } from "../contexts/chapterContext";
-import { LessonContext } from "../contexts/lessonContext";
-import { QuizContext } from "../contexts/quizContext";
-import { uploadFileToPinata, uploadMetadataToIPFS } from "../components/pinata";
 import PreviewCourse from "../pages/PreviewCourse";
-import { toast, ToastContainer } from "react-toastify";
-
-const EcosystemDiamondAddress = import.meta.env
-  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
-const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
-const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
+import BulkCourseUpload from "./Course Creation Components/BulkCourseUpload";
+// import { toast, ToastContainer } from "react-toastify";
+import CourseBasicInfo from "./Course Creation Components/CourseBasicInfo";
+import ChapterCreation from "./Course Creation Components/ChapterCreation";
+import LessonCreation from "./Course Creation Components/LessonCreation";
+import QuizCreation from "./Course Creation Components/QuizCreation";
+import ResourcesCreation from "./Course Creation Components/ResourceCreation";
 
 const CourseCreationPipeline = () => {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [courseData, setCourseData] = useState({
-    basicInfo: {
-      name: "",
-      description: "",
-      difficulty_level: 0,
-      image: null,
-    },
-    chapters: [],
-    lessons: [],
-    quizzes: [],
-    resources: [],
-  });
-  const signerPromise = useEthersSigner();
-  const [success, setSuccess] = useState("");
-  const [error, setError] = useState("");
-  const { isConnected, address } = useAccount();
-  const [loading, setLoading] = useState(false);
-  const { courses } = useContext(CourseContext);
-  const { chapters, fetchChapters, setChapters } = useContext(ChapterContext);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [currentStep, setCurrentStep] = useState(0); // 0 for method selection
+  const [selectedMethod, setSelectedMethod] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
 
-  console.log("Courses Data:", courses);
-
-  const createCourse = async () => {
-    setLoading(true);
-    try {
-      const signer = await signerPromise;
-      const diamondContract = new ethers.Contract(
-        EcosystemDiamondAddress,
-        Ecosystem1Facet_ABI,
-        signer
-      );
-
-      console.log("Contract Details:", diamondContract);
-      console.log("Transaction Params:", courseData.basicInfo);
-
-      const tx = await diamondContract.createCourse(
-        courseData.basicInfo.name,
-        courseData.basicInfo.description,
-        courseData.basicInfo.difficulty_level
-      );
-      console.log("Transaction sent:", tx.hash);
-      const receipt = await tx.wait();
-      console.log("Transaction confirmed:", receipt.transactionHash);
-      toast.success("Course created successfully!");
-      setCourseData({
-        basicInfo: {
-          name: "",
-          description: "",
-          difficulty_level: 0,
-          image: null,
-        },
-      });
-
-      // Check if the role has been granted
-      const hasRole = await diamondContract.hasCourseOwnerRole(
-        signer.getAddress()
-      );
-      console.log("Has COURSE_OWNER_ROLE:", hasRole);
-
-      if (hasRole) {
-        console.log("Role granted successfully");
-      } else {
-        console.error("Role not granted");
-      }
-    } catch (err) {
-      console.error("Full Error Details:", {
-        name: err.name || "Unknown Error",
-        code: err.code || "No Error Code",
-        message: err.message || "No Error Message",
-        stack: err.stack || "No Stack Trace",
-      });
-
-      if (err.code === "INVALID_ARGUMENT") {
-        toast.error("Invalid transaction parameters. Please check your input.");
-      } else if (err.code === "UNSUPPORTED_OPERATION") {
-        toast.error(
-          "Unsupported network operation. Check your network settings."
-        );
-      } else {
-        toast.error(
-          `Failed to create course: ${err.message || "Unknown error"}`
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Step Components
-  const CourseBasicInfo = () => {
-    const handleImageUpload = (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        setCourseData((prev) => ({
-          ...prev,
-          basicInfo: { ...prev.basicInfo, image: file },
-        }));
-
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setImagePreview(reader.result);
-        };
-        reader.readAsDataURL(file);
-      }
-    };
-
-    return (
-      <div className="max-w-4xl mx-auto p-6">
-        <h2 className="text-2xl font-bold text-yellow-500 mb-6">
-          Course Basic Information
-        </h2>
-
-        {(success || error) && (
-          <div
-            className={`mb-4 p-4 rounded-lg flex items-center ${
-              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
-            }`}
-          >
-            {success ? (
-              <CheckCircle className="h-5 w-5 mr-2" />
-            ) : (
-              <AlertCircle className="h-5 w-5 mr-2" />
-            )}
-            <span>{success || error}</span>
-          </div>
-        )}
-
-        <div className="flex gap-6">
-          {/* Left side - Form inputs */}
-          <div className="flex-1 space-y-4">
-            <input
-              type="text"
-              placeholder="Course Name"
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-              value={courseData.basicInfo.name}
-              onChange={(e) =>
-                setCourseData((prev) => ({
-                  ...prev,
-                  basicInfo: { ...prev.basicInfo, name: e.target.value },
-                }))
-              }
-            />
-
-            <select
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-              value={courseData.basicInfo.difficulty_level}
-              onChange={(e) =>
-                setCourseData((prev) => ({
-                  ...prev,
-                  basicInfo: {
-                    ...prev.basicInfo,
-                    difficulty_level: Number(e.target.value),
-                  },
-                }))
-              }
-            >
-              <option value={0}>Beginner</option>
-              <option value={1}>Intermediate</option>
-              <option value={2}>Advanced</option>
-            </select>
-
-            <textarea
-              placeholder="Course Description"
-              className="w-full p-3 border rounded-lg h-32 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-              value={courseData.basicInfo.description}
-              onChange={(e) =>
-                setCourseData((prev) => ({
-                  ...prev,
-                  basicInfo: { ...prev.basicInfo, description: e.target.value },
-                }))
-              }
-            />
-
-            <div className="flex items-center gap-4">
-              <label className="inline-flex items-center space-x-2 bg-yellow-500 text-black px-4 py-2 rounded-lg cursor-pointer hover:bg-yellow-600 transition-colors">
-                <Image size={20} />
-                <span>Upload Course Image</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageUpload}
-                />
-              </label>
-
-              <button
-                onClick={createCourse}
-                disabled={loading}
-                className={`rounded-lg bg-yellow-500 p-2 px-6 hover:bg-yellow-600 transition-colors ${
-                  loading ? "opacity-50 cursor-not-allowed" : ""
-                }`}
-              >
-                {loading ? "Creating..." : "Create Course"}
-              </button>
-            </div>
-          </div>
-
-          {/* Right side - Image preview */}
-          <div className="w-64 flex-shrink-0">
-            <div className="p-4">
-              {imagePreview ? (
-                <div className="relative w-full h-48 rounded-lg overflow-hidden">
-                  <img
-                    src={imagePreview}
-                    alt="Course preview"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ) : (
-                <div className="w-full h-48 rounded-lg bg-gray-100 flex items-center justify-center">
-                  <div className="text-gray-400 text-center">
-                    <Image className="mx-auto mb-2 h-8 w-8" />
-                    <p className="text-sm">Course Image</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const ChapterCreation = () => {
-    const [chapterName, setChapterName] = useState("");
-    const [duration, setDuration] = useState(""); // Changed from durations array to single duration
-    const [chapters, setChapters] = useState([]);
-    const [durations, setDurations] = useState([]); // Separate array for all durations
-    const [courseId, setCourseId] = useState("");
-    const [success, setSuccess] = useState(""); // Added missing state
-    const [error, setError] = useState(""); // Added missing state
-
-    console.log("Coursess: ", courses);
-
-    const createChapter = async () => {
-      if (isConnected) {
-        setLoading(true);
-        try {
-          const signer = await signerPromise;
-          if (!signer) {
-            throw new Error("Signer is required to access the contract.");
-          }
-
-          const parsedCourseId = Number(courseId);
-
-          if (chapters.length === 0) {
-            throw new Error("Chapters array cannot be empty");
-          }
-
-          // Verify that chapters and durations arrays have the same length
-          if (chapters.length !== durations.length) {
-            throw new Error("Number of chapters and durations must match");
-          }
-
-          const diamondContract = new ethers.Contract(
-            EcosystemDiamondAddress,
-            Ecosystem2Facet_ABI,
-            signer
-          );
-
-          const tx = await diamondContract.addChapters(
-            parsedCourseId,
-            chapters,
-            durations
-          );
-          const receipt = await tx.wait();
-          console.log(receipt);
-          setChapters([]);
-          setDurations([]);
-          setCourseId("");
-          toast.success("Chapters created successfully!");
-        } catch (err) {
-          console.error("Full Error:", err);
-          toast.error(`Failed to create chapters: ${err.message}`);
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-
-    const addChapter = () => {
-      if (chapterName.trim() && duration) {
-        setChapters([...chapters, chapterName.trim()]);
-        setDurations([...durations, Number(duration)]); // Convert duration to number
-        setChapterName("");
-        setDuration(""); // Reset single duration input
-      }
-    };
-
-    return (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-yellow-500">
-          Create Chapters/Modules
-        </h2>
-        {(success || error) && (
-          <div
-            className={`mb-4 p-4 rounded-lg flex items-center ${
-              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
-            }`}
-          >
-            {success ? (
-              <CheckCircle className="h-5 w-5 mr-2" />
-            ) : (
-              <AlertCircle className="h-5 w-5 mr-2" />
-            )}
-            <span>{success || error}</span>
-          </div>
-        )}
-        <div className="flex space-x-4">
-          <input
-            type="text"
-            placeholder="Chapter Name"
-            className="flex-grow p-3 border rounded-lg"
-            value={chapterName}
-            onChange={(e) => setChapterName(e.target.value)}
-          />
-          <input
-            type="number"
-            placeholder="Duration in Weeks"
-            className="flex-grow p-3 border rounded-lg"
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-          />
-          <button
-            onClick={addChapter}
-            className="bg-yellow-500 text-black px-4 py-2 rounded-lg flex items-center"
-          >
-            <Plus size={20} />
-            Add Chapter
-          </button>
-        </div>
-
-        {/* Course Selection */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Select Course
-          </label>
-          <select
-            value={courseId}
-            onChange={(e) => setCourseId(e.target.value)}
-            className="w-full p-3 border rounded-lg"
-          >
-            <option value="">Choose a course</option>
-            {courses.map(
-              (course) =>
-                course.creator === address && (
-                  <option key={course.courseId} value={course.courseId}>
-                    {course.courseName}
-                  </option>
-                )
-            )}
-          </select>
-        </div>
-
-        {chapters.length > 0 && (
-          <div className="mt-4">
-            <h3 className="font-semibold mb-2 dark:text-gray-300">
-              Added Chapters:
-            </h3>
-            <div className="space-y-2">
-              {chapters.map((chapter, index) => (
-                <div
-                  key={index}
-                  className="bg-gray-100 p-2 rounded-lg flex justify-between items-center"
-                >
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {chapter}
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      Duration: {durations[index]} weeks
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setChapters(chapters.filter((_, i) => i !== index));
-                      setDurations(durations.filter((_, i) => i !== index));
-                    }}
-                    className="text-red-500"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-            {/* <button
-              onClick={createChapter}
-              className="bg-yellow-500 mt-4 text-black px-4 py-2 rounded-lg flex items-center"
-            >
-              Create Chapters
-            </button> */}
-            <button
-              onClick={createChapter}
-              disabled={loading}
-              className={`rounded-lg bg-yellow-500 mt-4 py-2 px-6 hover:bg-yellow-600 transition-colors ${
-                loading ? "opacity-50 cursor-not-allowed" : ""
-              }`}
-            >
-              {loading ? "Creating..." : "Create Chapters"}
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const LessonCreation = () => {
-    const [lessonName, setLessonName] = useState("");
-    const [lessonContent, setLessonContent] = useState("");
-    const [lessons, setLessons] = useState([]);
-    const [chapterId, setChapterId] = useState("");
-    const [courseId, setCourseId] = useState("");
-    const { fetchChapters, chapters, setChapters } = useContext(ChapterContext);
-    const { isConnected } = useAccount();
-    const [success, setSuccess] = useState("");
-    const [error, setError] = useState("");
-
-    const createLesson = async () => {
-      if (!isConnected) {
-        setError("Wallet is not connected");
-        return;
-      } else {
-        setLoading(true);
-        try {
-          const signer = await signerPromise;
-          if (!signer) {
-            throw new Error("Signer is required to access the contract.");
-          }
-
-          const diamondContract = new ethers.Contract(
-            EcosystemDiamondAddress,
-            Ecosystem2Facet_ABI,
-            signer
-          );
-          console.log("Chapter ID: ", chapterId);
-          console.log("Lesson Name: ", lessonName);
-          console.log("Lesson Content: ", lessonContent);
-
-          const tx = await diamondContract.addLesson(
-            chapterId.toString(),
-            lessonName,
-            lessonContent
-          );
-          const receipt = await tx.wait();
-          console.log(receipt);
-          toast.success(`${lessonName} lesson created successfully!`);
-          setLessonName("");
-          setLessonContent("");
-        } catch (err) {
-          console.error("Full Error:", err);
-          toast.error(`Failed to create lessons: ${err.message}`);
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-
-    const addLesson = () => {
-      if (lessonName.trim() && lessonContent.trim()) {
-        setLessons([
-          ...lessons,
-          { name: lessonName.trim(), content: lessonContent.trim() },
-        ]);
-
-        setLessonName("");
-        setLessonContent("");
-      }
-    };
-
-    useEffect(() => {
-      if (courseId) {
-        console.log("Fetching chapters for courseId:", courseId);
-        fetchChapters().then((fetchedChapters) => {
-          if (fetchedChapters) {
-            // Add debug logs
-            console.log("Raw fetched chapters:", fetchedChapters);
-
-            const formattedChapters = fetchedChapters
-              .filter((chapter) => {
-                // Convert both to strings or numbers for comparison
-                const chapterCourseId = Number(chapter.courseId);
-                const targetCourseId = Number(courseId);
-                console.log("Comparing:", chapterCourseId, targetCourseId);
-                return chapterCourseId === targetCourseId;
-              })
-              .map((chapter) => ({
-                chapterId: Number(chapter.chapterId),
-                chapterName: chapter.chapterName,
-              }));
-
-            console.log("Formatted chapters:", formattedChapters);
-            setChapters(formattedChapters);
-          } else {
-            setChapters([]);
-          }
-        });
-      }
-    }, [courseId, fetchChapters, chapters]);
-
-    return (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-yellow-500">Create Lessons</h2>
-        {(success || error) && (
-          <div
-            className={`mb-4 p-4 rounded-lg flex items-center ${
-              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
-            }`}
-          >
-            {success ? (
-              <CheckCircle className="h-5 w-5 mr-2" />
-            ) : (
-              <AlertCircle className="h-5 w-5 mr-2" />
-            )}
-            <span>{success || error}</span>
-          </div>
-        )}
-        <div className="grid gap-4">
-          <input
-            type="text"
-            placeholder="Lesson Name"
-            className="w-full p-3 border rounded-lg"
-            value={lessonName}
-            onChange={(e) => setLessonName(e.target.value)}
-          />
-          <textarea
-            placeholder="Lesson Content"
-            className="w-full p-3 border rounded-lg h-32"
-            value={lessonContent}
-            onChange={(e) => setLessonContent(e.target.value)}
-          />
-        </div>
-
-        {/* Course Selection */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Select Course
-          </label>
-          <select
-            value={courseId}
-            onChange={(e) => setCourseId(e.target.value)}
-            className="w-full p-3 border rounded-lg"
-          >
-            <option value="">Choose a course</option>
-            {courses.map(
-              (course) =>
-                course.creator === address && (
-                  <option key={course.courseId} value={course.courseId}>
-                    {course.courseName}
-                  </option>
-                )
-            )}
-          </select>
-          {/* <p>{courseId}</p> */}
-        </div>
-
-        {/* Chapter Selection */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Select Chapter
-          </label>
-          <select
-            value={chapterId}
-            onChange={(e) => setChapterId(e.target.value)}
-            className="w-full p-3 border rounded-lg"
-          >
-            <option value="">Choose a chapter</option>
-            {chapters?.map((chapter) => (
-              <option key={chapter.chapterId} value={chapter.chapterId}>
-                {chapter.chapterName}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* <button
-          onClick={createLesson}
-          className="bg-yellow-500 text-black px-4 py-2 rounded-lg flex items-center"
-        >
-          Create Lesson
-        </button> */}
-        <button
-          onClick={createLesson}
-          disabled={loading}
-          className={`rounded-lg bg-yellow-500 mt-4 py-2 px-6 hover:bg-yellow-600 transition-colors ${
-            loading ? "opacity-50 cursor-not-allowed" : ""
-          }`}
-        >
-          {loading ? "Creating..." : "Create Lesson"}
-        </button>
-      </div>
-    );
-  };
-
-  const QuizCreation = () => {
-    const [quizTitle, setQuizTitle] = useState("");
-    const [lessonId, setLessonId] = useState("");
-    const [quizId, setQuizId] = useState("");
-    const [questions, setQuestions] = useState([]);
-    const [question, setQuestion] = useState("");
-    const [options, setOptions] = useState([
-      { option: "", isCorrect: false },
-      { option: "", isCorrect: false },
-      { option: "", isCorrect: false },
-      { option: "", isCorrect: false },
-    ]);
-    const { lessons } = useContext(LessonContext);
-    const { quizzes } = useContext(QuizContext);
-    const [quizSuccess, setQuizSuccess] = useState("");
-    const [quizError, setQuizError] = useState("");
-    const [questionSuccess, setQuestionSuccess] = useState("");
-    const [questionError, setQuestionError] = useState("");
-    const [quizLoading, setQuizLoading] = useState(false);
-
-    console.log("Lessons: ", lessons);
-    console.log("Quizzes: ", quizzes);
-
-    const createQuiz = async () => {
-      if (!isConnected || !address) {
-        throw new Error("Please connect to a blockchain network");
-      }
-      setQuizLoading(true);
-      try {
-        // const lesson = lessons.find((lesson) => lesson.lessonId === lessonId);
-        const signer = await signerPromise;
-
-        const diamondContract = new ethers.Contract(
-          EcosystemDiamondAddress,
-          Ecosystem2Facet_ABI,
-          signer
-        );
-
-        console.log("Lesson Id: ", lessonId);
-        console.log("Quiz Title: ", quizTitle);
-
-        const tx = await diamondContract.createQuiz(lessonId, quizTitle);
-        const receipt = await tx.wait();
-        console.log("Quiz created: ", receipt);
-        setLessonId("");
-        setQuizTitle("");
-        toast.success(`${quizTitle} created successfully!!`);
-      } catch (error) {
-        console.error("Error creating quiz: ", error);
-        toast.error("Error creating quiz");
-      } finally {
-        setQuizLoading(false);
-      }
-    };
-
-    const createQuestion = async () => {
-      // Validate that there's a question, all options are filled, and exactly one correct option
-      const hasQuestion = question.trim();
-      const hasFilledOptions = options.every((option) => option.text?.trim());
-      const correctOptionIndex = options.findIndex(
-        (option) => option.isCorrect
-      );
-      const hasOneCorrectOption = correctOptionIndex !== -1;
-
-      if (hasQuestion && hasFilledOptions && hasOneCorrectOption) {
-        setQuestions([
-          ...questions,
-          {
-            question: question.trim(),
-            options: options.map((option) => ({
-              text: option.text.trim(),
-              isCorrect: option.isCorrect,
-            })),
-          },
-        ]);
-
-        if (!isConnected || !address) {
-          throw new Error("Please connect to a blockchain network");
-        }
-        setLoading(true);
-        try {
-          const signer = await signerPromise;
-          const diamondContract = new ethers.Contract(
-            EcosystemDiamondAddress,
-            Ecosystem2Facet_ABI,
-            signer
-          );
-
-          console.log("Quiz Id: ", quizId);
-          console.log("Question: ", question);
-          console.log(
-            "Options: ",
-            options.map((option) => option.text)
-          );
-          console.log("Correct Option Index: ", correctOptionIndex);
-
-          const tx = await diamondContract.createQuestionWithChoices(
-            quizId,
-            question,
-            options.map((option) => option.text),
-            correctOptionIndex // Send the index of the correct option instead of boolean array
-          );
-
-          const receipt = await tx.wait();
-          toast.success("Question created successfully!!");
-
-          // Reset inputs after adding
-          setQuestion("");
-          setOptions([
-            { text: "", isCorrect: false },
-            { text: "", isCorrect: false },
-            { text: "", isCorrect: false },
-            { text: "", isCorrect: false },
-          ]);
-        } catch (err) {
-          console.error("Error creating question: ", err);
-          toast.error("Error creating question");
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        alert(
-          "Please ensure: \n- Question is filled\n- All options are filled\n- Exactly one option is marked as correct"
-        );
-      }
-    };
-
-    const updateOption = (index, field, value) => {
-      setOptions((prev) =>
-        prev.map((option, i) =>
-          i === index
-            ? { ...option, [field]: value }
-            : field === "isCorrect"
-            ? { ...option, isCorrect: false }
-            : option
-        )
-      );
-    };
-
-    return (
-      <div className="space-y-6 p-4">
-        <h2 className="text-2xl font-bold text-yellow-500">Create Quiz</h2>
-        {(quizSuccess || quizError) && (
-          <div
-            className={`mb-4 p-4 rounded-lg flex items-center ${
-              quizSuccess
-                ? "bg-green-50 text-green-600"
-                : "bg-red-50 text-red-700"
-            }`}
-          >
-            {quizSuccess ? (
-              <CheckCircle className="h-5 w-5 mr-2" />
-            ) : (
-              <AlertCircle className="h-5 w-5 mr-2" />
-            )}
-            <span>{quizSuccess || quizError}</span>
-          </div>
-        )}
-        <div className="grid gap-4">
-          <input
-            type="text"
-            placeholder="Quiz Title"
-            className="w-full p-3 border rounded-lg"
-            value={quizTitle}
-            onChange={(e) => setQuizTitle(e.target.value)}
-          />
-
-          {/* Lesson Selection */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Select Lesson
-            </label>
-            <select
-              value={lessonId}
-              onChange={(e) => setLessonId(e.target.value)}
-              className="w-full p-3 border rounded-lg"
-            >
-              <option value="">Choose a lesson</option>
-              {lessons.map((lesson) => (
-                <option key={lesson.lessonId} value={lesson.lessonId}>
-                  {lesson.lessonName}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <button
-            onClick={createQuiz}
-            disabled={quizLoading}
-            className={`rounded-lg bg-yellow-500 py-2 px-4 w-[120px] hover:bg-yellow-600 transition-colors ${
-              quizLoading ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-          >
-            {quizLoading ? "Creating..." : "Create Quiz"}
-          </button>
-
-          {(questionSuccess || questionError) && (
-            <div
-              className={`mb-4 p-4 rounded-lg flex items-center ${
-                questionSuccess
-                  ? "bg-green-50 text-green-600"
-                  : "bg-red-50 text-red-700"
-              }`}
-            >
-              {questionSuccess ? (
-                <CheckCircle className="h-5 w-5 mr-2" />
-              ) : (
-                <AlertCircle className="h-5 w-5 mr-2" />
-              )}
-              <span>{questionSuccess || questionError}</span>
-            </div>
-          )}
-
-          {/* Quiz Selection */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Select Quiz
-            </label>
-            <select
-              value={quizId}
-              onChange={(e) => setQuizId(e.target.value)}
-              className="w-full p-3 border rounded-lg"
-            >
-              <option value="">Choose a Quiz</option>
-              {quizzes.map((quiz) => (
-                <option key={quiz.quizId} value={quiz.quizId}>
-                  {quiz.quizTitle}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Question Input */}
-          <div className="space-y-4">
-            <input
-              type="text"
-              placeholder="Question"
-              className="w-full p-3 border rounded-lg"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-            />
-
-            {/* Options with Radio Buttons */}
-            {options.map((option, index) => (
-              <div key={index} className="flex items-center space-x-2">
-                <input
-                  type="text"
-                  placeholder={`Option ${index + 1}`}
-                  className="flex-grow p-3 border rounded-lg"
-                  value={option.text}
-                  onChange={(e) => updateOption(index, "text", e.target.value)}
-                />
-                <div className="flex items-center">
-                  <input
-                    type="radio"
-                    id={`correct-${index}`}
-                    name="correctOption"
-                    checked={option.isCorrect}
-                    onChange={() => updateOption(index, "isCorrect", true)}
-                    className="mr-2"
-                  />
-                  <label
-                    className="dark:text-gray-300"
-                    htmlFor={`correct-${index}`}
-                  >
-                    Correct
-                  </label>
-                </div>
-              </div>
-            ))}
-
-            <button
-              onClick={createQuestion}
-              disabled={loading}
-              className={`rounded-lg bg-yellow-500 mt-4 py-2 px-6 hover:bg-yellow-600 transition-colors ${
-                loading ? "opacity-50 cursor-not-allowed" : ""
-              }`}
-            >
-              {loading ? "Creating..." : "Create Question"}
-            </button>
-
-            {/* Added Questions List */}
-            {questions.length > 0 && (
-              <div className="mt-4">
-                <h3 className="font-semibold mb-2 dark:text-gray-200 text-gray-800">
-                  Added Questions:
-                </h3>
-                <div className="space-y-2">
-                  {questions.map((q, index) => (
-                    <div
-                      key={index}
-                      className="bg-gray-100 p-2 rounded-lg flex justify-between items-center"
-                    >
-                      <div>
-                        <h3 className="font-semibold">{q.question}</h3>
-                        <ul>
-                          {q.options.map((option, optIndex) => (
-                            <li
-                              key={optIndex}
-                              className={
-                                option.isCorrect
-                                  ? "text-green-600 font-bold"
-                                  : ""
-                              }
-                            >
-                              {option.text} {option.isCorrect && "(Correct)"}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <button
-                        onClick={() =>
-                          setQuestions(questions.filter((_, i) => i !== index))
-                        }
-                        className="text-red-500"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const ResourcesCreation = () => {
-    const [resourceName, setResourceName] = useState("");
-    const [resourceLink, setResourceLink] = useState("");
-    const [contentType, setContentType] = useState("");
-    const [file, setFile] = useState(null);
-    const [resources, setResources] = useState([]);
-    const { lessons } = useContext(LessonContext);
-    const [lessonId, setLessonId] = useState("");
-    const [isUploading, setIsUploading] = useState(false);
-    const [success, setSuccess] = useState("");
-    const [error, setError] = useState("");
-
-    // Enum mapping matching the contract
-    const ContentTypeEnum = {
-      Video: 0,
-      Image: 1,
-      Document: 2,
-    };
-
-    const addResource = async () => {
-      try {
-        if (!lessonId || !contentType || !resourceName) {
-          alert("Please fill in all required fields");
-          return;
-        }
-
-        if (!isConnected || !address) {
-          setError("Wallet is not connected");
-          return;
-        }
-
-        setIsUploading(true);
-        let finalLink = "";
-
-        // Handle file upload for Image/Document
-        if (contentType !== "Video") {
-          if (!file) {
-            alert("Please upload a file");
-            return;
-          }
-          // Upload to Pinata
-          const fileCid = await uploadFileToPinata(file);
-          console.log("File uploaded to Pinata with CID:", fileCid);
-
-          // Create and upload metadata
-          const metadata = {
-            type: contentType.toLowerCase(),
-            file: fileCid,
-          };
-          finalLink = await uploadMetadataToIPFS(metadata);
-        } else {
-          finalLink = resourceLink;
-        }
-
-        // Create resource object matching contract structure
-        const newResource = {
-          contentType: ContentTypeEnum[contentType],
-          url: finalLink,
-          name: resourceName,
-        };
-
-        const signer = await signerPromise;
-        const diamondContract = new ethers.Contract(
-          EcosystemDiamondAddress,
-          Ecosystem2Facet_ABI,
-          signer
-        );
-
-        // Call contract with the new parameters
-        const tx = await diamondContract.addResourcesToLesson(
-          lessonId,
-          ContentTypeEnum[contentType],
-          [newResource] // Pass as array to match contract function
-        );
-
-        const receipt = await tx.wait();
-        console.log("Resources added to lesson:", receipt);
-
-        // Update local state
-        setResources([
-          ...resources,
-          {
-            name: resourceName,
-            link: finalLink,
-            contentType,
-          },
-        ]);
-
-        // Reset form
-        setResourceName("");
-        setResourceLink("");
-        setFile(null);
-        setContentType("");
-        toast.success("Resource added successfully!");
-      } catch (error) {
-        console.error("Error adding resource:", error);
-        toast.error("Error adding resource. Please try again.");
-      } finally {
-        setIsUploading(false);
-      }
-    };
-
-    return (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-yellow-500">Add Resources</h2>
-        {(success || error) && (
-          <div
-            className={`mb-4 p-4 rounded-lg flex items-center ${
-              success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-700"
-            }`}
-          >
-            {success ? (
-              <CheckCircle className="h-5 w-5 mr-2" />
-            ) : (
-              <AlertCircle className="h-5 w-5 mr-2" />
-            )}
-            <span>{success || error}</span>
-          </div>
-        )}
-        <div className="grid gap-4">
-          {/* Lesson Selection */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Select Lesson
-            </label>
-            <select
-              value={lessonId}
-              onChange={(e) => setLessonId(e.target.value)}
-              className="w-full p-3 border rounded-lg"
-            >
-              <option value="">Choose a lesson</option>
-              {lessons.map((lesson) => (
-                <option key={lesson.lessonId} value={lesson.lessonId}>
-                  {lesson.lessonName}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Content Type Selection */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Content Type
-            </label>
-            <select
-              value={contentType}
-              onChange={(e) => setContentType(e.target.value)}
-              className="w-full p-3 border rounded-lg"
-            >
-              <option value="">Select content type</option>
-              <option value="Video">Video</option>
-              <option value="Image">Image</option>
-              <option value="Document">Document</option>
-            </select>
-          </div>
-
-          <input
-            type="text"
-            placeholder="Resource Name"
-            className="w-full p-3 border rounded-lg"
-            value={resourceName}
-            onChange={(e) => setResourceName(e.target.value)}
-          />
-
-          {contentType === "Video" ? (
-            <input
-              type="text"
-              placeholder="YouTube Video URL"
-              className="w-full p-3 border rounded-lg"
-              value={resourceLink}
-              onChange={(e) => setResourceLink(e.target.value)}
-            />
-          ) : contentType ? (
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Upload {contentType}
-              </label>
-              <input
-                type="file"
-                accept={
-                  contentType === "Image"
-                    ? "image/*"
-                    : "application/pdf,.doc,.docx"
-                }
-                onChange={(e) => setFile(e.target.files[0])}
-                className="w-full p-3 border rounded-lg dark:text-gray-300"
-              />
-            </div>
-          ) : null}
-
-          <button
-            onClick={addResource}
-            disabled={isUploading}
-            className={`bg-yellow-500 text-black px-4 py-2 w-[160px] rounded-lg flex items-center ${
-              isUploading ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-          >
-            {isUploading ? (
-              <span>Uploading...</span>
-            ) : (
-              <>
-                <Plus size={20} />
-                Add Resource
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Display Added Resources */}
-        {resources.length > 0 && (
-          <div className="mt-4">
-            <h3 className="font-semibold mb-2">Added Resources:</h3>
-            <div className="space-y-2">
-              {resources.map((resource, index) => (
-                <div
-                  key={index}
-                  className="bg-gray-100 p-2 rounded-lg flex justify-between items-center"
-                >
-                  <div>
-                    <h3 className="font-semibold">{resource.name}</h3>
-                    <div className="text-sm">
-                      <span className="text-gray-500">
-                        Type: {resource.contentType}
-                      </span>
-                      <a
-                        href={resource.link}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="ml-2 text-blue-500"
-                      >
-                        {resource.contentType === "Video"
-                          ? "Watch Video"
-                          : "View Resource"}
-                      </a>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() =>
-                      setResources(resources.filter((_, i) => i !== index))
-                    }
-                    className="text-red-500"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
   const ProgressBar = () => {
-    const steps = ["Basic Info", "Chapters", "Lessons", "Quizzes", "Resources"];
+    const steps = [
+      "Choose Method",
+      "Basic Info",
+      "Chapters",
+      "Lessons",
+      "Quizzes",
+      "Resources",
+    ];
 
     return (
-      <div className="md:flex md:flex-wrap md:gap-2 lg:flex justify-between items-center mb-8 hidden">
+      <div className="flex flex-col md:flex-row md:flex-wrap justify-between items-center mb-8 gap-3 md:gap-2">
         {steps.map((step, index) => (
           <div
             key={index}
-            className={`flex items-center ${
+            className={`flex items-center transition-all duration-300 ${
               currentStep > index
                 ? "text-green-500"
-                : currentStep === index + 1
-                ? "text-yellow-500"
+                : currentStep === index
+                ? "text-yellow-500 font-semibold"
                 : "text-gray-300"
-            }`}
+            } ${index === 0 ? "flex-1" : ""}`}
           >
             {index > 0 && (
               <div
-                className={`w-16 h-1 mr-4 ${
-                  currentStep > index ? "bg-green-500" : "bg-gray-300"
+                className={`w-6 md:w-10 lg:w-12 h-1 mr-2 md:mr-3 transition-all duration-300 ${
+                  currentStep >= index ? "bg-green-500" : "bg-gray-300"
                 }`}
               />
             )}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 min-w-0 max-w-[130px] md:max-w-[160px]">
               {currentStep > index ? (
-                <CheckCircle size={24} />
+                <CheckCircle
+                  size={20}
+                  className="md:w-6 md:h-6 flex-shrink-0"
+                />
               ) : (
-                <Book size={24} />
+                <div
+                  className={`p-1 rounded-full ${
+                    currentStep === index
+                      ? "bg-yellow-100 dark:bg-yellow-900/30"
+                      : ""
+                  }`}
+                >
+                  <Book size={18} className="md:w-5 md:h-5 flex-shrink-0" />
+                </div>
               )}
-              <span>{step}</span>
+              <span className="text-xs md:text-sm leading-tight break-words text-center">
+                {step}
+              </span>
             </div>
           </div>
         ))}
@@ -1242,27 +78,146 @@ const CourseCreationPipeline = () => {
     );
   };
 
+  const MethodSelection = () => (
+    <div className="text-center py-8 md:py-12">
+      <h2 className="text-2xl md:text-3xl font-bold text-yellow-500 mb-2">
+        Choose Creation Method
+      </h2>
+      <p className="text-gray-600 dark:text-gray-400 mb-8 md:mb-12 text-sm md:text-base">
+        Select how you want to create your course
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 max-w-4xl mx-auto">
+        {/* Step-by-Step Method */}
+        <div
+          onClick={() => setSelectedMethod("pipeline")}
+          className={`p-6 md:p-8 rounded-xl border-2 cursor-pointer transition-all duration-300 transform hover:scale-105 ${
+            selectedMethod === "pipeline"
+              ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 shadow-lg"
+              : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-yellow-300 hover:shadow-md"
+          }`}
+        >
+          <div className="w-16 h-16 mx-auto mb-4 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
+            <Zap className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
+          </div>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+            Step-by-Step Builder
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 text-sm md:text-base mb-4">
+            Build your course gradually with our guided step-by-step process.
+            Perfect for creating structured and organized courses.
+          </p>
+          <ul className="text-left text-sm text-gray-500 dark:text-gray-400 space-y-2 mb-6">
+            <li className="flex items-center">
+              <CheckCircle className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+              Guided step-by-step process
+            </li>
+            <li className="flex items-center">
+              <CheckCircle className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+              Real-time validation
+            </li>
+            <li className="flex items-center">
+              <CheckCircle className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+              Preview as you build
+            </li>
+          </ul>
+          <div
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${
+              selectedMethod === "pipeline"
+                ? "bg-yellow-500 text-gray-900"
+                : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+            }`}
+          >
+            {selectedMethod === "pipeline" ? "Selected" : "Choose this method"}
+          </div>
+        </div>
+
+        {/* JSON Upload Method */}
+        <div
+          onClick={() => setSelectedMethod("json")}
+          className={`p-6 md:p-8 rounded-xl border-2 cursor-pointer transition-all duration-300 transform hover:scale-105 ${
+            selectedMethod === "json"
+              ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 shadow-lg"
+              : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-yellow-300 hover:shadow-md"
+          }`}
+        >
+          <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+            <FileText className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+          </div>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+            JSON Upload
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 text-sm md:text-base mb-4">
+            Upload your entire course structure in a single JSON file. Fast and
+            efficient for bulk course creation.
+          </p>
+          <ul className="text-left text-sm text-gray-500 dark:text-gray-400 space-y-2 mb-6">
+            <li className="flex items-center">
+              <CheckCircle className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+              Single file upload
+            </li>
+            <li className="flex items-center">
+              <CheckCircle className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+              Bulk course creation
+            </li>
+            <li className="flex items-center">
+              <CheckCircle className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+              JSON format support
+            </li>
+          </ul>
+          <div className="px-4 py-2 rounded-lg bg-blue-100 dark:bg-blue-600 text-blue-600 dark:text-white text-sm font-medium">
+            Open Bulk Upload
+          </div>
+        </div>
+      </div>
+
+      {/* Continue Button */}
+      {selectedMethod === "pipeline" && (
+        <div className="mt-8 md:mt-12">
+          <button
+            onClick={() => setCurrentStep(1)}
+            className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 px-8 py-3 rounded-lg font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center gap-3 mx-auto"
+          >
+            Start Building
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   const nextStep = () => {
-    if (currentStep < 5) {
+    if (currentStep < 6) {
       setCurrentStep(currentStep + 1);
     }
   };
 
   const prevStep = () => {
-    if (currentStep > 1) {
+    if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
     }
   };
 
   return (
-    <div className="w-[90%] md:w-[60%] lg:w-[50%] mx-auto p-8 bg-white dark:bg-gray-900 rounded-lg shadow-lg mt-[100px]">
+    <div className="w-[95%] md:w-[90%] lg:w-[85%] xl:w-[80%] mx-auto p-6 md:p-8 bg-white dark:bg-gray-900 rounded-xl shadow-lg mt-20 md:mt-[100px] border border-gray-200 dark:border-gray-700">
       <ProgressBar />
-      <ToastContainer position="bottom-right" theme="colored" />
+      {/* <ToastContainer position="bottom-right z-60" theme="colored" /> */}
 
       {showPreview ? (
         <PreviewCourse />
+      ) : selectedMethod === "json" ? (
+        <div className="mb-8">
+          <BulkCourseUpload
+            onBack={() => {
+              setSelectedMethod(null);
+              setCurrentStep(0);
+              setShowPreview(false);
+            }}
+          />
+        </div>
       ) : (
         <div className="mb-8">
+          {currentStep === 0 && <MethodSelection />}
           {currentStep === 1 && <CourseBasicInfo />}
           {currentStep === 2 && <ChapterCreation />}
           {currentStep === 3 && <LessonCreation />}
@@ -1271,32 +226,36 @@ const CourseCreationPipeline = () => {
         </div>
       )}
 
-      <div className="flex justify-between">
-        {currentStep > 1 && (
+      {/* Navigation Buttons - Only show when not in method selection and not using JSON upload */}
+      {currentStep > 0 && !showPreview && selectedMethod === "pipeline" && (
+        <div className="flex justify-between items-center pt-6 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={prevStep}
-            className="bg-gray-200 text-black px-6 py-2 rounded-lg"
+            className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 px-6 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
           >
+            <ChevronRight className="h-4 w-4 rotate-180" />
             Previous
           </button>
-        )}
-        {currentStep < 5 ? (
-          <button
-            onClick={nextStep}
-            className="bg-yellow-500 text-black px-6 py-2 rounded-lg flex items-center"
-          >
-            Next Step
-            <ChevronRight size={20} className="ml-2" />
-          </button>
-        ) : (
-          <button
-            onClick={() => setShowPreview(true)}
-            className="bg-green-500 text-white px-6 py-2 rounded-lg"
-          >
-            Preview Course
-          </button>
-        )}
-      </div>
+
+          {currentStep < 5 ? (
+            <button
+              onClick={nextStep}
+              className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 px-8 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105 flex items-center gap-2 shadow-lg hover:shadow-xl"
+            >
+              Next Step
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowPreview(true)}
+              className="bg-green-500 hover:bg-green-600 text-white lg:px-8 lg:py-3 md:px-8 md:py-3 px-3 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center gap-2"
+            >
+              Preview Course
+              <CheckCircle className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };

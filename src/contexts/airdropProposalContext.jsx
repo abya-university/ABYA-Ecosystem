@@ -1,12 +1,15 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { ethers } from "ethers";
-import { useAccount } from "wagmi";
-import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
-import { useEthersSigner } from "../components/useClientSigner";
+import { createContext, useContext, useState, useEffect } from "react";
+import CommunityGovernanceFacet from "../artifacts/contracts/CommunityGovernanceFacet.sol/CommunityGovernanceFacet.json";
 import { toast } from "react-toastify";
+import { useActiveAccount } from "thirdweb/react";
+import { client } from "../services/client";
+import { getContract, readContract } from "thirdweb";
+import { defineChain } from "thirdweb/chains";
+import { ethers } from "ethers";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
-const Community_ABI = CommunityABI.abi;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
+const CommunityGovernanceFacet_ABI = CommunityGovernanceFacet.abi;
 
 const AirdropProposalsContext = createContext();
 
@@ -18,8 +21,9 @@ export const AirdropProposalProvider = ({ children }) => {
   const [airdropProposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const signerPromise = useEthersSigner();
-  const { isConnected } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
 
   // Format proposals data from contract response
   const formatProposals = (proposalsData) => {
@@ -41,14 +45,19 @@ export const AirdropProposalProvider = ({ children }) => {
 
     setLoading(true);
     try {
-      const signer = await signerPromise;
-      const communityContract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const communityContract = await getContract({
+        address: DiamondAddress,
+        abi: CommunityGovernanceFacet_ABI,
+        client,
+        chain: defineChain(11155111), // Sepolia
+      });
 
-      const proposalsData = await communityContract.getAllAirdropProposals();
+      // const proposalsData = await communityContract.getAllAirdropProposals();
+      const proposalsData = await readContract({
+        contract: communityContract,
+        method: "getAllAirdropProposals",
+        params: [],
+      });
       const formattedProposals = formatProposals(proposalsData);
 
       setProposals(formattedProposals);

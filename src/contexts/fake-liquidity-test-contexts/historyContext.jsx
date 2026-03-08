@@ -4,37 +4,167 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import { ethers } from "ethers";
-import { useAccount } from "wagmi";
-import CONTRACT_ABI from "../../artifacts/fake-liquidity-abis/add_swap_contract.json";
-import { useEthersSigner } from "../../components/useClientSigner";
-import USDC_ABI from "../../artifacts/fake-liquidity-abis/usdc.json";
-import ABYTKN_ABI from "../../artifacts/fake-liquidity-abis/abyatkn.json";
+import CONTRACT_ABI from "../../artifacts/fakeLiquidityArtifacts/Add_Swap_Contract.sol/Add_Swap_Contract.json";
+import USDC_ABI from "../../artifacts/fakeLiquidityArtifacts/UsdCoin.sol/UsdCoin.json";
+import ABYTKN_ABI from "../../artifacts/fakeLiquidityArtifacts/ABYATKN.sol/ABYATKN.json";
+import { useActiveAccount, useReadContract } from "thirdweb/react";
+import { getContract, readContract } from "thirdweb";
+import { client } from "../../services/client";
+import { defineChain } from "thirdweb/chains";
+import CONTRACT_ADDRESSES from "../../constants/addresses";
 
-const contractAbi = CONTRACT_ABI.abi;
-const usdcAbi = USDC_ABI.abi;
-const abyatknAbi = ABYTKN_ABI.abi;
+// Constants and Configuration
+const CONTRACT_CONFIG = {
+  ABI: {
+    SWAP: CONTRACT_ABI.abi,
+    USDC: USDC_ABI.abi,
+    ABYTKN: ABYTKN_ABI.abi,
+  },
+  ADDRESSES: {
+    ADD_SWAP_CONTRACT: CONTRACT_ADDRESSES.Liquidity,
+    TOKEN0: CONTRACT_ADDRESSES.ABYTKN, // ABYTKN
+    TOKEN1: CONTRACT_ADDRESSES.USDC, // USDC
+    UNISWAP_POOL: CONTRACT_ADDRESSES.ABYTKN_USDC_POOL,
+  },
+  CHAIN: defineChain(11155111),
+};
+
+// Utility Functions
+const ContractUtils = {
+  createContract: (address, abi) => {
+    return getContract({
+      client,
+      address,
+      chain: CONTRACT_CONFIG.CHAIN,
+      abi,
+    });
+  },
+
+  readContractManual: async (contract, method, params = []) => {
+    return readContract({
+      contract,
+      method,
+      params,
+    });
+  },
+
+  formatTransaction: (tx, index) => {
+    const tokenMapping = {
+      [CONTRACT_CONFIG.ADDRESSES.TOKEN0?.toLowerCase()]: "ABYTKN",
+      [CONTRACT_CONFIG.ADDRESSES.TOKEN1?.toLowerCase()]: "USDC",
+    };
+
+    const fromToken = tokenMapping[tx.fromToken?.toLowerCase()] || "Unknown";
+    const toToken = tokenMapping[tx.toToken?.toLowerCase()] || "Unknown";
+
+    // Determine decimals based on token
+    const fromDecimals = fromToken === "USDC" ? 6 : 18;
+    const toDecimals = toToken === "USDC" ? 6 : 18;
+
+    return {
+      id: Number(tx.id) || index,
+      type: Number(tx.transactionType) === 1 ? "swap" : "liquidity",
+      fromToken: fromToken,
+      toToken: toToken,
+      fromAmount: ethers.formatUnits(tx.fromAmount || 0, fromDecimals),
+      toAmount: ethers.formatUnits(tx.toAmount || 0, toDecimals),
+      timestamp: new Date(Number(tx.timestamp || 0) * 1000),
+      hash: tx.hash,
+      status: tx.status || "confirmed",
+    };
+  },
+
+  getTokenBalance: async (contract, address, decimals = 18) => {
+    const balance = await ContractUtils.readContractManual(
+      contract,
+      "balanceOf",
+      [address],
+    );
+    return balance ? ethers.formatUnits(balance, decimals) : "0.0";
+  },
+};
+
+const PriceUtils = {
+  getTokenDecimals: (symbol) => {
+    const decimalsMap = {
+      ABYTKN: 18,
+      USDC: 6,
+    };
+    return decimalsMap[symbol] || 18;
+  },
+
+  calculatePriceImpact: (
+    inputAmount,
+    outputRaw,
+    slippageTolerance,
+    outputTokenSymbol,
+  ) => {
+    const impact = Math.min((parseFloat(inputAmount) / 1000) * 0.1, 5);
+
+    // Use BigInt for precise calculations
+    const outputBigInt = BigInt(outputRaw);
+    const outputDecimals = outputTokenSymbol === "ABYTKN" ? 18 : 6;
+
+    // Calculate minimum received with slippage
+    const slippageFactor = (1 - slippageTolerance / 100) * 10000;
+    const minReceivedBigInt =
+      (outputBigInt * BigInt(Math.floor(slippageFactor))) / 10000n;
+
+    return {
+      impact,
+      minReceived: minReceivedBigInt.toString(),
+    };
+  },
+
+  calculateRatioWithPoolPrice: (token0Amount, token1Amount, poolPrice) => {
+    if (!token0Amount || !token1Amount || !poolPrice) return null;
+
+    const amount0 = parseFloat(token0Amount);
+    const amount1 = parseFloat(token1Amount);
+
+    if (amount0 <= 0 || amount1 <= 0) return null;
+
+    const currentRatio = amount1 / amount0;
+    const tolerance = 0.05;
+
+    const isValidRatio =
+      Math.abs(currentRatio - poolPrice) / poolPrice <= tolerance;
+
+    return {
+      ratio: currentRatio,
+      poolPrice,
+      isValidRatio,
+      tolerance,
+      suggestedToken1Amount: (amount0 * poolPrice).toFixed(6),
+      suggestedToken0Amount: (amount1 / poolPrice).toFixed(6),
+      priceDifference: (((currentRatio - poolPrice) / poolPrice) * 100).toFixed(
+        2,
+      ),
+    };
+  },
+};
 
 // Create the context
 const TransactionHistoryContext = createContext();
 
-// Create a provider component
 export function TransactionHistoryProvider({ children }) {
   const [transactions, setTransactions] = useState([]);
+  const [allTransactions, setAllTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingAllTransactions, setLoadingAllTransactions] = useState(false);
   const [error, setError] = useState(null);
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const [isInitialRatio, setIsInitialRatio] = useState(true);
-  const [poolPrice, setPoolPrice] = useState(1000);
+  const [poolPrice, setPoolPrice] = useState(0.001); // 1 ABYTKN = 0.001 USDC
   const [slippageTolerance, setSlippageTolerance] = useState(0.5);
 
-  const { address, isConnected } = useAccount();
-  const signerPromise = useEthersSigner();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
 
-  const contract_address = import.meta.env.VITE_APP_ADD_SWAP_CONTRACT;
-
-  // Pool information
   const [poolInfo, setPoolInfo] = useState({
     liquidity: "0.0",
     volume24h: "0.0",
@@ -42,331 +172,408 @@ export function TransactionHistoryProvider({ children }) {
     apr: "0.0",
     token0Price: "0.0",
     token1Price: "0.0",
+    sqrtPriceX96: "N/A",
+    tick: "N/A",
+    token0Balance: "N/A",
+    token1Balance: "N/A",
   });
 
-  // Token balances
   const [balances, setBalances] = useState({
-    TOKEN0: "0.0",
-    TOKEN1: "0.0",
+    ABYTKN: "0.0",
+    USDC: "0.0",
     ETH: "0.0",
   });
 
-  const CONTRACT_ADDRESSES = {
-    ADD_SWAP_CONTRACT: import.meta.env.VITE_APP_ADD_SWAP_CONTRACT,
-    TOKEN0: import.meta.env.VITE_APP_USDC_ADDRESS, // USDC
-    TOKEN1: import.meta.env.VITE_APP_ABYATKN_ADDRESS, // ABYTKN
-    UNISWAP_POOL: import.meta.env.VITE_APP_ABYATKN_USDC_500, // Uniswap pool address
-  };
+  const isMountedRef = useRef(true);
 
-  // Function to fetch transaction history from the contract
+  const swapContract = React.useMemo(
+    () =>
+      ContractUtils.createContract(
+        CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
+        CONTRACT_CONFIG.ABI.SWAP,
+      ),
+    [],
+  );
+
+  const abytknContract = React.useMemo(
+    () =>
+      ContractUtils.createContract(
+        CONTRACT_CONFIG.ADDRESSES.TOKEN0,
+        CONTRACT_CONFIG.ABI.ABYTKN,
+      ),
+    [],
+  );
+
+  const usdcContract = React.useMemo(
+    () =>
+      ContractUtils.createContract(
+        CONTRACT_CONFIG.ADDRESSES.TOKEN1,
+        CONTRACT_CONFIG.ABI.USDC,
+      ),
+    [],
+  );
+
+  const handleError = useCallback((operation, error, fallbackMessage) => {
+    console.error(`Error ${operation}:`, error);
+    setError(fallbackMessage || `Failed to ${operation}`);
+    return null;
+  }, []);
+
+  const fetchAllTransactionHistory = useCallback(async () => {
+    if (!client) {
+      setAllTransactions([]);
+      setLoadingAllTransactions(false);
+      return;
+    }
+
+    setLoadingAllTransactions(true);
+    setError(null);
+
+    try {
+      const contract = getContract({
+        address: CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
+        abi: CONTRACT_CONFIG.ABI.SWAP,
+        client,
+        chain: CONTRACT_CONFIG.CHAIN,
+      });
+
+      const txHistoryData = await readContract({
+        contract,
+        method: "getAllTransactionHistory",
+        params: [],
+      });
+
+      if (Array.isArray(txHistoryData) && txHistoryData.length > 0) {
+        const formattedTransactions = txHistoryData.map((tx, index) =>
+          ContractUtils.formatTransaction(tx, index),
+        );
+        setAllTransactions(formattedTransactions);
+      } else {
+        setAllTransactions([]);
+      }
+    } catch (err) {
+      console.error("Error fetching all transaction history:", err);
+      handleError("fetching all transaction history", err);
+      setAllTransactions([]);
+    } finally {
+      if (isMountedRef.current) {
+        setLoadingAllTransactions(false);
+      }
+    }
+  }, [client, handleError]);
+
   const fetchTransactionHistory = useCallback(async () => {
-    if (!isConnected || !address || !signerPromise) return;
-
-    const signer = await signerPromise;
+    if (!isConnected || !address || !client) {
+      setTransactions([]);
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Request timeout")), 10000);
+    });
+
     try {
-      const contract = new ethers.Contract(
-        contract_address,
-        contractAbi,
-        signer
-      );
-
-      // Call the contract's getTransactionHistory function
-      const txHistoryData = await contract.getUserTransactionHistory();
-      console.log("Raw transaction history:", txHistoryData);
-
-      // Format the transaction data
-      // Update the mapping to match the contract's return structure
-      const formattedTransactions = txHistoryData.map((tx, index) => {
-        return {
-          id: Number(tx.id) || index,
-          type: Number(tx.transactionType) === 1 ? "swap" : "liquidity",
-          token0Symbol:
-            tx.fromToken === "0xac485503f2f2da0311159187374c0b568eb84e5a"
-              ? "TKN0(USDC)"
-              : tx.fromToken === "0xc1303afc18ab049bf0b9aab4231ac24ac93c92a4"
-              ? "TKN1(ABYATKN)"
-              : tx.fromToken || "TKN0",
-          token1Symbol:
-            tx.toToken === "0xac485503f2f2da0311159187374c0b568eb84e5a"
-              ? "TKN0(USDC)"
-              : tx.toToken === "0xc1303afc18ab049bf0b9aab4231ac24ac93c92a4"
-              ? "TKN1(ABYATKN)"
-              : tx.toToken || "TKN1",
-          token0Amount: ethers.formatUnits(tx.fromAmount || 0, 18), // Changed from amount0 to fromAmount
-          token1Amount: ethers.formatUnits(tx.toAmount || 0, 18), // Changed from amount1 to toAmount
-          timestamp: new Date(Number(tx.timestamp || 0) * 1000),
-          hash: tx.hash, // Changed from txHash to hash
-          status: tx.status || "confirmed",
-        };
+      const contract = getContract({
+        address: CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
+        abi: CONTRACT_CONFIG.ABI.SWAP,
+        client,
+        chain: CONTRACT_CONFIG.CHAIN,
       });
 
-      console.log("Formatted transactions:", formattedTransactions);
-      setTransactions(formattedTransactions);
+      const txHistoryData = await Promise.race([
+        readContract({
+          contract,
+          method: "getUserTransactionHistory",
+          params: [address],
+        }),
+        timeoutPromise,
+      ]);
+
+      if (Array.isArray(txHistoryData) && txHistoryData.length > 0) {
+        const formattedTransactions = txHistoryData.map((tx, index) =>
+          ContractUtils.formatTransaction(tx, index),
+        );
+        setTransactions(formattedTransactions);
+      } else {
+        setTransactions([]);
+      }
     } catch (err) {
       console.error("Error fetching transaction history:", err);
-      setError("Failed to fetch transaction history: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [isConnected, address, signerPromise, contract_address]);
 
-  // Fetch transaction history when the user connects their wallet
-  useEffect(() => {
-    if (isConnected) {
-      fetchTransactionHistory();
-    } else {
+      if (err.message === "Request timeout") {
+        setError("Request timed out. Please try again.");
+      } else {
+        handleError("fetching transaction history", err);
+      }
+
       setTransactions([]);
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
-  }, [isConnected, fetchTransactionHistory]);
-
-  // Function to refresh transaction history (can be called after new transactions)
-  const refreshHistory = () => {
-    fetchTransactionHistory();
-  };
+  }, [isConnected, address, client, handleError]);
 
   const loadBalances = useCallback(async () => {
     if (!isConnected || !address) return;
 
     try {
-      const signer = await signerPromise;
-      if (!signer) return;
+      const [manualAbytknBalance, manualUsdcBalance] = await Promise.all([
+        ContractUtils.getTokenBalance(abytknContract, address, 18),
+        ContractUtils.getTokenBalance(usdcContract, address, 6),
+      ]);
 
-      const provider = signer.provider;
-
-      const usdcContract = new ethers.Contract(
-        CONTRACT_ADDRESSES.TOKEN0,
-        usdcAbi,
-        signer
-      );
-      const abytknContract = new ethers.Contract(
-        CONTRACT_ADDRESSES.TOKEN1,
-        abyatknAbi,
-        signer
-      );
-
-      const usdcBalance = await usdcContract.balanceOf(address);
-      const abytknBalance = await abytknContract.balanceOf(address);
-      const ethBalance = await provider.getBalance(address);
-
-      console.log("USDC Balance:", usdcBalance);
-      console.log("ABYTKN Balance:", abytknBalance);
-      console.log("ETH Balance:", ethBalance);
-
-      setBalances({
-        TOKEN0: usdcBalance ? ethers.formatUnits(usdcBalance, 18) : "0.0",
-        TOKEN1: abytknBalance ? ethers.formatUnits(abytknBalance, 18) : "0.0",
-        ETH: ethBalance ? ethers.formatUnits(ethBalance, 18) : "0.0",
-      });
+      setBalances((prev) => ({
+        ...prev,
+        ABYTKN: manualAbytknBalance,
+        USDC: manualUsdcBalance,
+      }));
     } catch (error) {
-      console.error("Error loading balances:", error);
-      setError("Failed to load balances");
+      handleError("loading balances manually", error);
     }
-  }, [isConnected, address, signerPromise]);
+  }, [isConnected, address, abytknContract, usdcContract, handleError]);
 
-  // Function to calculate output amount (replace with actual price calculation)
   const calculateOutputAmount = useCallback(
     async (inputAmount, inputTokenSymbol, outputTokenSymbol) => {
-      if (!inputAmount || parseFloat(inputAmount) === 0)
+      if (!inputAmount || parseFloat(inputAmount) === 0) {
         return { output: "0", impact: 0, minReceived: "0" };
+      }
 
       try {
-        console.log("Starting price calculation...");
-        console.log("Contract address:", CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT);
-        console.log("Pool address:", CONTRACT_ADDRESSES.UNISWAP_POOL);
-
-        const signer = await signerPromise;
-        console.log("Signer obtained:", !!signer);
-
-        if (!signer) {
-          throw new Error("No signer available");
-        }
-
-        const contract = new ethers.Contract(
-          CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
-          contractAbi,
-          signer.provider || signer
+        const tokenPrice = await ContractUtils.readContractManual(
+          swapContract,
+          "getTokenPrice",
         );
 
-        console.log("Contract instance created");
+        // basePrice represents ABYTKN per USDC (e.g., 1000)
+        const basePrice = tokenPrice
+          ? parseFloat(ethers.formatUnits(tokenPrice, 18))
+          : 1000;
 
-        const poolAddress = CONTRACT_ADDRESSES.UNISWAP_POOL;
-
-        // Check if the contract method exists
-        if (!contract.getTokenPrice) {
-          throw new Error("getTokenPrice method not found on contract");
-        }
-
-        console.log("Calling getTokenPrice...");
-        const token0Price = await contract.getTokenPrice(poolAddress);
-        console.log("Token price retrieved:", token0Price.toString());
-
-        // Your existing logic continues...
-        const rate =
-          inputTokenSymbol === "TOKEN0"
-            ? parseFloat(ethers.formatUnits(token0Price, 18)) || 0
-            : 1 / (parseFloat(ethers.formatUnits(token0Price, 18)) || 1);
-
-        console.log("Calculated rate:", rate);
-
-        const output = (parseFloat(inputAmount) * rate).toFixed(6);
-        const impact = Math.min((parseFloat(inputAmount) / 1000) * 0.1, 5);
-        const minReceived = (
-          parseFloat(output) *
-          (1 - slippageTolerance / 100)
-        ).toFixed(6);
-
-        return { output, impact, minReceived };
-      } catch (error) {
-        console.error("Detailed price calculation error:", {
-          message: error.message,
-          code: error.code,
-          reason: error.reason,
-          stack: error.stack,
+        console.log("Price calculation:", {
+          basePrice,
+          inputAmount,
+          inputTokenSymbol,
+          outputTokenSymbol,
         });
 
-        // Fallback calculation
-        const rate = inputTokenSymbol === "TOKEN0" ? 1.2345 : 0.8102;
-        const output = (parseFloat(inputAmount) * rate).toFixed(6);
-        const impact = Math.min((parseFloat(inputAmount) / 1000) * 0.1, 5);
-        const minReceived = (
-          parseFloat(output) *
-          (1 - slippageTolerance / 100)
-        ).toFixed(6);
-        return { output, impact, minReceived };
+        let outputInUnits; // This is in human-readable units
+
+        if (inputTokenSymbol === "USDC" && outputTokenSymbol === "ABYTKN") {
+          // USDC → ABYTKN: multiply (1 USDC = 1000 ABYTKN)
+          // Use multiplication which is safe
+          outputInUnits = parseFloat(inputAmount) * basePrice;
+        } else if (
+          inputTokenSymbol === "ABYTKN" &&
+          outputTokenSymbol === "USDC"
+        ) {
+          // ABYTKN → USDC: divide (1000 ABYTKN = 1 USDC)
+          // To avoid floating point issues, use multiplication by reciprocal
+          // Instead of: parseFloat(inputAmount) / basePrice
+          // Do: (parseFloat(inputAmount) * 1e18) / (basePrice * 1e18) but that's complex
+
+          // Better: use integer math with BigInt
+          const inputAmountBigInt = BigInt(
+            Math.round(parseFloat(inputAmount) * 1e18),
+          );
+          const basePriceBigInt = BigInt(Math.round(basePrice * 1e18));
+
+          // Calculate: (inputAmount * 10^18) / basePrice
+          // This gives us the result scaled by 10^18
+          const resultScaled =
+            (inputAmountBigInt * BigInt(1e18)) / basePriceBigInt;
+
+          // Convert back to number (this will be accurate because we used BigInt)
+          outputInUnits = Number(resultScaled) / 1e18;
+        } else {
+          outputInUnits = 0;
+        }
+
+        console.log("Output in units (display value):", outputInUnits);
+
+        // Convert to raw blockchain amount with proper decimals
+        const outputDecimals = outputTokenSymbol === "ABYTKN" ? 18 : 6;
+
+        // For USDC output (when swapping ABYTKN to USDC), we need to be extra careful
+        if (outputTokenSymbol === "USDC") {
+          // USDC has 6 decimals, so we need to multiply by 10^6
+          // But first, ensure outputInUnits has high precision
+          const outputInUnitsStr = outputInUnits.toFixed(12); // Use more decimals for precision
+          const outputRaw = ethers.parseUnits(outputInUnitsStr, outputDecimals);
+          console.log("Output raw (blockchain value):", outputRaw.toString());
+
+          const { impact, minReceived } = PriceUtils.calculatePriceImpact(
+            inputAmount,
+            outputRaw.toString(),
+            slippageTolerance,
+            outputTokenSymbol,
+          );
+
+          return {
+            output: outputRaw.toString(),
+            impact,
+            minReceived,
+          };
+        } else {
+          // For ABYTKN output, use the regular method
+          const outputInUnitsStr = outputInUnits.toString();
+          const outputRaw = ethers.parseUnits(outputInUnitsStr, outputDecimals);
+
+          console.log("Output raw (blockchain value):", outputRaw.toString());
+
+          const { impact, minReceived } = PriceUtils.calculatePriceImpact(
+            inputAmount,
+            outputRaw.toString(),
+            slippageTolerance,
+            outputTokenSymbol,
+          );
+
+          return {
+            output: outputRaw.toString(),
+            impact,
+            minReceived,
+          };
+        }
+      } catch (error) {
+        console.error("Price calculation error:", error);
+
+        // Fallback calculation with better precision
+        const basePrice = 1000;
+        let outputInUnits;
+
+        if (inputTokenSymbol === "USDC" && outputTokenSymbol === "ABYTKN") {
+          outputInUnits = parseFloat(inputAmount) * basePrice;
+        } else if (
+          inputTokenSymbol === "ABYTKN" &&
+          outputTokenSymbol === "USDC"
+        ) {
+          // Use BigInt for precise division
+          const inputAmountBigInt = BigInt(
+            Math.round(parseFloat(inputAmount) * 1e18),
+          );
+          const basePriceBigInt = BigInt(Math.round(basePrice * 1e18));
+          const resultScaled =
+            (inputAmountBigInt * BigInt(1e18)) / basePriceBigInt;
+          outputInUnits = Number(resultScaled) / 1e18;
+        } else {
+          outputInUnits = 0;
+        }
+
+        const outputDecimals = outputTokenSymbol === "ABYTKN" ? 18 : 6;
+        const outputInUnitsStr = outputInUnits.toFixed(12);
+        const outputRaw = ethers.parseUnits(outputInUnitsStr, outputDecimals);
+
+        const { impact, minReceived } = PriceUtils.calculatePriceImpact(
+          inputAmount,
+          outputRaw.toString(),
+          slippageTolerance,
+          outputTokenSymbol,
+        );
+
+        return {
+          output: outputRaw.toString(),
+          impact,
+          minReceived,
+        };
       }
     },
-    [signerPromise, slippageTolerance]
+    [swapContract, slippageTolerance],
   );
 
-  // Wrap loadPoolInfo in useCallback
-  const loadPoolInfo = async () => {
+  const loadPoolInfo = useCallback(async () => {
     if (!isConnected) return;
 
     try {
-      const signer = await signerPromise;
-      if (!signer) {
-        console.log("No signer available");
-        return;
-      }
-
-      const contract = new ethers.Contract(
-        CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
-        contractAbi,
-        signer
-      );
-
-      const poolAddress = CONTRACT_ADDRESSES.UNISWAP_POOL;
+      const poolAddress = CONTRACT_CONFIG.ADDRESSES.UNISWAP_POOL;
 
       if (!poolAddress) {
-        console.error("Pool address not found in environment variables");
         setError("Pool address not configured");
         return;
       }
 
-      let poolData = {};
+      const [poolInfoData, balancesData, tokenPriceData, priceData] =
+        await Promise.allSettled([
+          ContractUtils.readContractManual(swapContract, "getPoolInfo"),
+          ContractUtils.readContractManual(swapContract, "getPoolBalances"),
+          ContractUtils.readContractManual(swapContract, "getTokenPrice"),
+          getCurrentPoolPrice(),
+        ]);
 
-      try {
-        const poolInfo = await contract.getPoolInfo(poolAddress);
-        poolData.sqrtPriceX96 = poolInfo[0]?.toString() || "0";
-        poolData.tick = poolInfo[1]?.toString() || "0";
-        poolData.liquidity = poolInfo[2]
-          ? ethers.formatUnits(poolInfo[2], 18)
-          : "0";
-      } catch (err) {
-        console.log("Error getting pool info:", err.message);
-        poolData.liquidity = "N/A";
-        poolData.sqrtPriceX96 = "N/A";
-        poolData.tick = "N/A";
+      const poolData = {
+        liquidity:
+          poolInfoData.status === "fulfilled" && poolInfoData.value?.[2]
+            ? ethers.formatUnits(poolInfoData.value[2], 18)
+            : "N/A",
+        sqrtPriceX96:
+          poolInfoData.status === "fulfilled"
+            ? poolInfoData.value?.[0]?.toString()
+            : "N/A",
+        tick:
+          poolInfoData.status === "fulfilled"
+            ? poolInfoData.value?.[1]?.toString()
+            : "N/A",
+        token0Balance:
+          balancesData.status === "fulfilled" &&
+          balancesData.value?.[0] !== undefined
+            ? ethers.formatUnits(balancesData.value[0], 18)
+            : "N/A",
+        token1Balance:
+          balancesData.status === "fulfilled" &&
+          balancesData.value?.[1] !== undefined
+            ? ethers.formatUnits(balancesData.value[1], 18)
+            : "N/A",
+        token0Price:
+          tokenPriceData.status === "fulfilled" &&
+          tokenPriceData.value !== undefined
+            ? (
+                parseFloat(ethers.formatUnits(tokenPriceData.value, 0)) *
+                Math.pow(10, 12)
+              ).toString()
+            : "N/A",
+      };
+
+      poolData.token1Price =
+        poolData.token0Price !== "N/A"
+          ? (1 / parseFloat(poolData.token0Price)).toFixed(6)
+          : "N/A";
+
+      if (priceData.status === "fulfilled") {
+        setPoolPrice(priceData.value.price);
+        setIsInitialRatio(priceData.value.isInitialRatio);
       }
-
-      try {
-        const balances = await contract.getPoolBalances(poolAddress);
-        poolData.token0Balance =
-          balances[0] !== undefined ? ethers.formatUnits(balances[0], 18) : "0";
-        poolData.token1Balance =
-          balances[1] !== undefined ? ethers.formatUnits(balances[1], 18) : "0";
-      } catch (err) {
-        console.log("Error getting pool balances:", err.message);
-        poolData.token0Balance = "N/A";
-        poolData.token1Balance = "N/A";
-      }
-
-      try {
-        const token0Price = await contract.getTokenPrice(poolAddress);
-        poolData.token0Price =
-          token0Price !== undefined
-            ? ethers.formatUnits(token0Price, 18)
-            : "N/A";
-        poolData.token1Price =
-          token0Price !== undefined
-            ? (1 / parseFloat(ethers.formatUnits(token0Price, 18))).toFixed(6)
-            : "N/A";
-        console.log("Token0 Price:", token0Price);
-      } catch (err) {
-        console.log("Error getting token price:", err.message);
-        poolData.token0Price = "N/A";
-        poolData.token1Price = "N/A";
-      }
-
-      // Get the current pool price for liquidity provision
-      const priceData = await getCurrentPoolPrice(contract);
-      setPoolPrice(priceData.price);
-      setIsInitialRatio(priceData.isInitialRatio);
-
-      console.log("Pool Info:", poolInfo);
-      console.log("Pool Balances:", balances);
-      console.log("Current Pool Price:", priceData);
 
       setPoolInfo({
-        liquidity: poolData.liquidity,
-        sqrtPriceX96: poolData.sqrtPriceX96,
-        tick: poolData.tick,
-        token0Balance: poolData.token0Balance,
-        token1Balance: poolData.token1Balance,
-        token0Price: poolData.token0Price,
-        token1Price: poolData.token1Price,
+        ...poolData,
         volume24h: "N/A",
         fees24h: "N/A",
         apr: "N/A",
       });
     } catch (error) {
-      console.error("Error loading pool info:", error);
-      setError("Failed to load pool info: " + error.message);
-      setPoolInfo({
-        liquidity: "N/A",
-        sqrtPriceX96: "N/A",
-        tick: "N/A",
-        token0Balance: "N/A",
-        token1Balance: "N/A",
-        token0Price: "N/A",
-        token1Price: "N/A",
-        volume24h: "N/A",
-        fees24h: "N/A",
-        apr: "N/A",
-      });
+      handleError("loading pool info", error, "Failed to load pool info");
     }
-  };
+  }, [isConnected, swapContract, handleError]);
 
-  const getCurrentPoolPrice = async (contract) => {
+  const getCurrentPoolPrice = useCallback(async () => {
     try {
-      const poolAddress = CONTRACT_ADDRESSES.UNISWAP_POOL;
+      const poolAddress = CONTRACT_CONFIG.ADDRESSES.UNISWAP_POOL;
 
       if (
         !poolAddress ||
         poolAddress === "0x0000000000000000000000000000000000000000"
       ) {
-        console.log("No pool address configured - using initial ratio");
-        return { price: 1000, isInitialRatio: true };
+        return { price: 0.001, isInitialRatio: true }; // 1 ABYTKN = 0.001 USDC
       }
 
-      console.log("Using pool address:", poolAddress);
-
-      // Try direct pool contract call using tick value instead
       try {
+        const provider = new ethers.JsonRpcProvider(
+          import.meta.env.VITE_APP_SEPOLIA_RPC_URL ||
+            import.meta.env.VITE_APP_RPC_URL,
+        );
+
         const poolInterface = new ethers.Interface([
           "function slot0() view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)",
           "function token0() view returns (address)",
@@ -377,263 +584,244 @@ export function TransactionHistoryProvider({ children }) {
         const poolContract = new ethers.Contract(
           poolAddress,
           poolInterface,
-          contract.runner
+          provider,
         );
 
-        // Get slot0 data which contains tick and sqrtPriceX96
-        const slot0 = await poolContract.slot0();
-        const poolToken0 = await poolContract.token0();
-        const poolToken1 = await poolContract.token1();
+        const [slot0, poolToken0, poolToken1, liquidity] = await Promise.all([
+          poolContract.slot0(),
+          poolContract.token0(),
+          poolContract.token1(),
+          poolContract.liquidity(),
+        ]);
 
-        // Get liquidity to check if pool has been initialized
-        const liquidity = await poolContract.liquidity();
-
-        console.log("Pool data:", {
-          sqrtPriceX96: slot0.sqrtPriceX96.toString(),
-          tick: slot0.tick.toString(),
-          poolToken0,
-          poolToken1,
-          liquidity: liquidity.toString(),
-        });
-
-        // Check if pool has liquidity
         if (liquidity.toString() === "0" && !slot0.tick) {
-          console.log("Pool has no liquidity - using initial ratio");
-          return { price: 1000, isInitialRatio: true };
+          return { price: 0.001, isInitialRatio: true }; // 1 ABYTKN = 0.001 USDC
         }
 
-        // Use the tick value to calculate price (more accurate than sqrtPriceX96 for display)
         const tick = parseInt(slot0.tick.toString());
         let rawPrice = Math.pow(1.0001, tick);
 
-        console.log("Raw price from tick:", rawPrice);
-
-        // Get token contracts to check decimals
         const token0Contract = new ethers.Contract(
           poolToken0,
-          USDC_ABI.abi, // Using as generic ERC20 ABI
-          contract.runner
+          CONTRACT_CONFIG.ABI.USDC,
+          provider,
         );
-
         const token1Contract = new ethers.Contract(
           poolToken1,
-          ABYTKN_ABI.abi, // Using as generic ERC20 ABI
-          contract.runner
+          CONTRACT_CONFIG.ABI.ABYTKN,
+          provider,
         );
 
-        // Get decimals
-        const token0Decimals = await token0Contract.decimals();
-        const token1Decimals = await token1Contract.decimals();
+        const [token0Decimals, token1Decimals] = await Promise.all([
+          token0Contract.decimals(),
+          token1Contract.decimals(),
+        ]);
 
-        console.log("Token decimals:", {
-          token0: token0Decimals,
-          token1: token1Decimals,
-        });
-
-        // Adjust for decimal differences
         const decimalAdjustment = Math.pow(10, token1Decimals - token0Decimals);
         rawPrice = rawPrice * decimalAdjustment;
 
-        console.log("Price after decimal adjustment:", rawPrice);
+        const token0IsABYTKN =
+          poolToken0.toLowerCase() ===
+          CONTRACT_CONFIG.ADDRESSES.TOKEN0.toLowerCase();
+        const finalPrice = token0IsABYTKN ? rawPrice : 1 / rawPrice;
 
-        // Check token ordering to determine if we need to invert
-        const token0IsUsdc =
-          poolToken0.toLowerCase() === CONTRACT_ADDRESSES.TOKEN0.toLowerCase();
-
-        let finalPrice;
-        if (token0IsUsdc) {
-          // If USDC is token0, price is USDC/ABYTKN, but we want ABYTKN/USDC
-          finalPrice = 1 / rawPrice;
-        } else {
-          // If ABYTKN is token0, price is ABYTKN/USDC which is what we want
-          finalPrice = rawPrice;
-        }
-
-        console.log("Final calculated price (ABYTKN per USDC):", finalPrice);
-
-        // Sanity check
         if (finalPrice > 0 && finalPrice < 1000000) {
           return { price: finalPrice, isInitialRatio: false };
-        } else {
-          console.warn("Price outside reasonable range:", finalPrice);
-          return { price: 1000, isInitialRatio: true };
         }
       } catch (directError) {
-        console.log("Error with direct pool call:", directError.message);
+        console.log("Direct pool call failed:", directError.message);
       }
 
-      // Fallback to contract methods if direct call fails
-      try {
-        const poolInfo = await contract.getPoolInfo(poolAddress);
-        if (poolInfo && poolInfo.length > 1) {
-          const tick = parseInt(poolInfo[1].toString());
-          console.log("Pool tick from contract:", tick);
-
-          // Calculate price from tick
-          const rawPrice = Math.pow(1.0001, tick);
-
-          // Check token ordering
-          const contractToken0 = await contract.token0();
-          const token0IsUsdc =
-            contractToken0.toLowerCase() ===
-            CONTRACT_ADDRESSES.TOKEN0.toLowerCase();
-
-          // Adjust based on token order
-          const price = token0IsUsdc ? 1 / rawPrice : rawPrice;
-
-          console.log("Contract method calculated price:", price);
-
-          if (price > 0 && price < 1000000) {
-            return { price, isInitialRatio: false };
-          }
-        }
-      } catch (contractError) {
-        console.log("Error using contract method:", contractError.message);
-      }
-
-      // Final fallback
-      console.log("All methods failed, using initial ratio");
-      return { price: 1000, isInitialRatio: true };
+      return { price: 0.001, isInitialRatio: true }; // 1 ABYTKN = 0.001 USDC
     } catch (error) {
       console.error("Error fetching pool price:", error);
-      return { price: 1000, isInitialRatio: true };
+      return { price: 0.001, isInitialRatio: true }; // 1 ABYTKN = 0.001 USDC
     }
-  };
+  }, []);
 
-  const fetchPoolPrice = async () => {
+  const fetchPoolPrice = useCallback(async () => {
     if (!isConnected) return;
 
     setIsLoadingPrice(true);
     try {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
-        contractAbi,
-        signer
-      );
-
-      const priceData = await getCurrentPoolPrice(contract);
+      const priceData = await getCurrentPoolPrice();
       setPoolPrice(priceData.price);
       setIsInitialRatio(priceData.isInitialRatio);
-
-      console.log("Pool price fetched:", priceData);
     } catch (error) {
-      console.error("Error fetching pool price:", error);
+      handleError("fetching pool price", error);
     } finally {
       setIsLoadingPrice(false);
     }
-  };
+  }, [isConnected, getCurrentPoolPrice, handleError]);
 
-  const refreshPoolPrice = async () => {
-    if (!signerPromise) return;
+  const refreshPoolPrice = useCallback(async () => {
+    if (!isConnected) return;
 
     setIsLoadingPrice(true);
     try {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        CONTRACT_ADDRESSES.ADD_SWAP_CONTRACT,
-        contractAbi,
-        signer
-      );
-
-      // Get the pool price
-      const tokenPrice = await contract.getTokenPrice(
-        CONTRACT_ADDRESSES.UNISWAP_POOL
+      const tokenPrice = await ContractUtils.readContractManual(
+        swapContract,
+        "getTokenPrice",
       );
 
       if (tokenPrice) {
-        // The contract's getTokenPrice might return different format based on token order
-        // Let's check what the actual token order is
-        const contractToken0 = await contract.token0();
-        const contractToken1 = await contract.token1();
+        // Get raw price and adjust for decimal differences
+        const priceRaw = parseFloat(ethers.formatUnits(tokenPrice, 0));
+        const decimalsToken0 = 18; // ABYTKN
+        const decimalsToken1 = 6; // USDC
+        const adjustmentFactor = Math.pow(10, decimalsToken0 - decimalsToken1);
+        let formattedPrice = priceRaw * adjustmentFactor; // Price of 1 ABYTKN in USDC
 
-        // Contract token0 is your config TOKEN1 (ABYTKN)
-        // Contract token1 is your config TOKEN0 (USDC)
+        const poolAddress = CONTRACT_CONFIG.ADDRESSES.UNISWAP_POOL;
+        if (poolAddress) {
+          const provider = new ethers.JsonRpcProvider(
+            import.meta.env.VITE_APP_SEPOLIA_RPC_URL,
+          );
+          const poolContract = new ethers.Contract(
+            poolAddress,
+            ["function token0() view returns (address)"],
+            provider,
+          );
 
-        // If getTokenPrice returns price of token1 in terms of token0
-        // That would be USDC price in terms of ABYTKN
-        // But we want ABYTKN price in terms of USDC for the UI
+          const actualToken0 = await poolContract.token0();
+          const token0IsABYTKN =
+            actualToken0.toLowerCase() ===
+            CONTRACT_CONFIG.ADDRESSES.TOKEN0.toLowerCase();
 
-        let formattedPrice = parseFloat(ethers.formatUnits(tokenPrice, 18));
-
-        // Check if we need to invert the price
-        const contractToken0IsABYTKN =
-          contractToken0.toLowerCase() ===
-          CONTRACT_ADDRESSES.TOKEN1.toLowerCase();
-
-        if (contractToken0IsABYTKN) {
-          // If contract token0 is ABYTKN, then the price might be USDC per ABYTKN
-          // We want ABYTKN per USDC, so we need to invert
-          if (formattedPrice > 0) {
+          if (!token0IsABYTKN && formattedPrice > 0) {
             formattedPrice = 1 / formattedPrice;
           }
         }
 
-        console.log("Refreshed pool price:", formattedPrice);
         setPoolPrice(formattedPrice);
         setIsInitialRatio(false);
       }
     } catch (error) {
-      console.error("Error refreshing pool price:", error);
-      // Fallback to a reasonable default
-      setPoolPrice(1000); // 1000 ABYTKN per USDC
+      handleError("refreshing pool price", error);
+      setPoolPrice(0.001); // Fallback: 1 ABYTKN = 0.001 USDC
       setIsInitialRatio(true);
     } finally {
       setIsLoadingPrice(false);
     }
-  };
+  }, [isConnected, swapContract, handleError]);
 
-  // Helper function to calculate and validate ratio
-  const calculateRatioWithPoolPrice = (
-    token0Amount,
-    token1Amount,
-    poolPrice
-  ) => {
-    if (!token0Amount || !token1Amount || !poolPrice) return null;
+  const { data: abytknBalance } = useReadContract({
+    contract: abytknContract,
+    method: "balanceOf",
+    params: [address || "0x"],
+  });
 
-    const amount0 = parseFloat(token0Amount); // USDC amount (from UI)
-    const amount1 = parseFloat(token1Amount); // ABYTKN amount (from UI)
+  const { data: usdcBalance } = useReadContract({
+    contract: usdcContract,
+    method: "balanceOf",
+    params: [address || "0x"],
+  });
 
-    if (amount0 <= 0 || amount1 <= 0) return null;
+  const { data: tokenPrice } = useReadContract({
+    contract: swapContract,
+    method: "getTokenPrice",
+    params: [],
+  });
 
-    const currentRatio = amount1 / amount0; // ABYTKN per USDC (UI ratio)
-    const tolerance = 0.05; // 5% tolerance
+  useEffect(() => {
+    if (isConnected) {
+      fetchTransactionHistory();
+    } else {
+      setTransactions([]);
+    }
+  }, [isConnected, fetchTransactionHistory]);
 
-    const isValidRatio =
-      Math.abs(currentRatio - poolPrice) / poolPrice <= tolerance;
+  useEffect(() => {
+    fetchAllTransactionHistory();
+  }, [fetchAllTransactionHistory]);
 
-    return {
-      ratio: currentRatio,
-      poolPrice: poolPrice,
-      isValidRatio,
-      tolerance,
-      suggestedToken1Amount: (amount0 * poolPrice).toFixed(6), // Suggested ABYTKN amount
-      suggestedToken0Amount: (amount1 / poolPrice).toFixed(6), // Suggested USDC amount
-      priceDifference: (((currentRatio - poolPrice) / poolPrice) * 100).toFixed(
-        2
-      ),
+  useEffect(() => {
+    if (abytknBalance && isMountedRef.current) {
+      setBalances((prev) => ({
+        ...prev,
+        ABYTKN: ethers.formatUnits(abytknBalance, 18),
+      }));
+    }
+  }, [abytknBalance]);
+
+  useEffect(() => {
+    if (usdcBalance && isMountedRef.current) {
+      setBalances((prev) => ({
+        ...prev,
+        USDC: ethers.formatUnits(usdcBalance, 6),
+      }));
+    }
+  }, [usdcBalance]);
+
+  useEffect(() => {
+    if (tokenPrice && isMountedRef.current) {
+      const priceRaw = parseFloat(ethers.formatUnits(tokenPrice, 0));
+      const formattedPrice = priceRaw * Math.pow(10, 12); // 1 ABYTKN in USDC
+      setPoolPrice(formattedPrice);
+      setIsInitialRatio(false);
+    }
+  }, [tokenPrice]);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
     };
-  };
+  }, []);
 
-  // Value provided by the context
-  const value = {
-    transactions,
-    loading,
-    error,
-    refreshHistory,
-    loadBalances,
-    calculateOutputAmount,
-    loadPoolInfo,
-    balances,
-    poolInfo,
-    fetchPoolPrice,
-    getCurrentPoolPrice,
-    refreshPoolPrice,
-    isLoadingPrice,
-    isInitialRatio,
-    poolPrice,
-    calculateRatioWithPoolPrice,
-  };
+  const refreshHistory = useCallback(() => {
+    fetchTransactionHistory();
+  }, [fetchTransactionHistory]);
+
+  const refreshAllHistory = useCallback(() => {
+    fetchAllTransactionHistory();
+  }, [fetchAllTransactionHistory]);
+
+  const value = React.useMemo(
+    () => ({
+      transactions,
+      allTransactions,
+      loading,
+      loadingAllTransactions,
+      error,
+      refreshHistory,
+      refreshAllHistory,
+      loadBalances,
+      calculateOutputAmount,
+      loadPoolInfo,
+      balances,
+      poolInfo,
+      fetchPoolPrice,
+      getCurrentPoolPrice,
+      refreshPoolPrice,
+      isLoadingPrice,
+      isInitialRatio,
+      poolPrice,
+      calculateRatioWithPoolPrice: PriceUtils.calculateRatioWithPoolPrice,
+      slippageTolerance,
+      setSlippageTolerance,
+    }),
+    [
+      transactions,
+      allTransactions,
+      loading,
+      loadingAllTransactions,
+      error,
+      refreshHistory,
+      refreshAllHistory,
+      loadBalances,
+      calculateOutputAmount,
+      loadPoolInfo,
+      balances,
+      poolInfo,
+      fetchPoolPrice,
+      getCurrentPoolPrice,
+      refreshPoolPrice,
+      isLoadingPrice,
+      isInitialRatio,
+      poolPrice,
+      slippageTolerance,
+    ],
+  );
 
   return (
     <TransactionHistoryContext.Provider value={value}>
@@ -642,13 +830,12 @@ export function TransactionHistoryProvider({ children }) {
   );
 }
 
-// Custom hook for using the transaction history context
 export function useTransactionHistory() {
   const context = useContext(TransactionHistoryContext);
 
   if (context === undefined) {
     throw new Error(
-      "useTransactionHistory must be used within a TransactionHistoryProvider"
+      "useTransactionHistory must be used within a TransactionHistoryProvider",
     );
   }
 

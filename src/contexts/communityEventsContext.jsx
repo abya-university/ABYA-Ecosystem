@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { ethers } from "ethers";
-import { useAccount } from "wagmi";
-import CommunityABI from "../artifacts/contracts/Community Contracts/Community.sol/Community.json";
-import { useEthersSigner } from "../components/useClientSigner";
+import CommunityEngagementFacetABI from "../artifacts/contracts/CommunityEngagementFacet.sol/CommunityEngagementFacet.json";
 import { toast } from "react-toastify";
+import { useActiveAccount } from "thirdweb/react";
+import { client } from "../services/client";
+import { getContract, readContract } from "thirdweb";
+import { defineChain } from "thirdweb/chains";
+import CONTRACT_ADDRESSES from "../constants/addresses";
 
-const CommunityAddress = import.meta.env.VITE_APP_COMMUNITY_CONTRACT_ADDRESS;
-const Community_ABI = CommunityABI.abi;
+const CommunityEngagementFacet_ABI = CommunityEngagementFacetABI.abi;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 
 const CommunityEventsContext = createContext();
 
@@ -18,8 +20,9 @@ export const CommunityEventsProvider = ({ children }) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const signerPromise = useEthersSigner();
-  const { isConnected } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
+  const isConnected = !!account;
 
   // Format events data from contract response
   const formatEvents = (eventsData) => {
@@ -61,18 +64,24 @@ export const CommunityEventsProvider = ({ children }) => {
     setError(null);
 
     try {
-      const signer = await signerPromise;
-      const contract = new ethers.Contract(
-        CommunityAddress,
-        Community_ABI,
-        signer
-      );
+      const contract = await getContract({
+        address: DiamondAddress,
+        abi: CommunityEngagementFacet_ABI,
+        client,
+        chain: defineChain(11155111),
+      });
 
-      const allEvents = await contract.getAllCommunityEvents();
-      console.log("All Events b4 formatting: ", allEvents);
+      // const allEvents = await contract.getAllCommunityEvents();
+      const allEvents = await readContract({
+        contract,
+        method: "getAllCommunityEvents",
+        params: [],
+      });
+      // console.log("All Events b4 formatting: ", allEvents);
       const formattedEvents = formatEvents(allEvents);
+      // toast.success("Community events loaded successfully");
       setEvents(formattedEvents);
-      console.log("All Events after formatting: ", formattedEvents);
+      // console.log("All Events after formatting: ", formattedEvents);
     } catch (err) {
       console.error("Error fetching community events:", err);
       setError("Failed to load events. Please try again later.");

@@ -85,7 +85,7 @@ const Certificate = ({ certificateData }) => {
                     <div className="text-wrapper">
                       {/* {certificateData.issue_date} */}
                       {new Date(
-                        Number(certificateData.issue_date) * 1000
+                        Number(certificateData.issue_date) * 1000,
                       ).toLocaleDateString()}
                     </div>
                     <div className="overlap-group-wrapper">

@@ -6,7 +6,7 @@ require("hardhat-contract-sizer");
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  solidity: "0.8.27",
+  solidity: "0.8.24",
   contractSizer: {
     alphaSort: true,
     disambiguatePaths: false,
@@ -32,6 +32,12 @@ module.exports = {
       chainId: 1020352220,
       allowUnlimitedContractSize: true,
     },
+    sepolia: {
+      url: process.env.SEPOLIA_RPC_URL,
+      accounts: [process.env.VITE_APP_PRIVATE_KEY],
+      chainId: 11155111,
+      allowUnlimitedContractSize: true,
+    },
     localhost: {
       chainId: 31337,
       allowUnlimitedContractSize: true,
@@ -44,10 +50,11 @@ module.exports = {
     artifacts: "./src/artifacts",
   },
   etherscan: {
-    apiKey: {
-      // Is not required by blockscout. Can be any non-empty string
-      'skale': "abc"
-    },
+    apiKey: process.env.ETHERSCAN_API_KEY || "",
+    // apiKey: {
+    //   // Is not required by blockscout. Can be any non-empty string
+    //   'skale': "abc"
+    // },
     customChains: [
       {
         network: "skale",

@@ -1,36 +1,45 @@
-import React, { createContext, useEffect, useState } from "react";
-import Ecosystem2FacetABI from "../artifacts/contracts/DiamondProxy/Ecosystem2Facet.sol/Ecosystem2Facet.json";
-import { useEthersSigner } from "../components/useClientSigner";
-import { useAccount } from "wagmi";
-import { ethers } from "ethers";
+import { createContext, useEffect, useState } from "react";
+import Ecosystem2FacetABI from "../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
+import { client } from "../services/client";
+import {
+  defineChain,
+  getContract,
+  prepareContractCall,
+  readContract,
+  sendTransaction,
+} from "thirdweb";
+import CONTRACT_ADDRESSES from "../constants/addresses";
+import { useActiveAccount } from "thirdweb/react";
+import { uploadFileToPinata, uploadMetadataToIPFS } from "../services/pinata";
 
-const EcosystemDiamondAddress = import.meta.env
-  .VITE_APP_DIAMOND_CONTRACT_ADDRESS;
+const DiamondAddress = CONTRACT_ADDRESSES.diamond;
 const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
 
 const QuizContext = createContext();
 
 const QuizProvider = ({ children }) => {
-  const { address } = useAccount();
-  const signer = useEthersSigner();
+  const account = useActiveAccount();
   const [quizzes, setQuizzes] = useState([]);
 
   const fetchQuizzes = async () => {
     console.log("Starting fetchQuizzes...");
-    const resolvedSigner = await signer;
-    console.log("ResolvedSigner: ", resolvedSigner);
 
-    if (resolvedSigner) {
+    if (client) {
       try {
-        const contract = new ethers.Contract(
-          EcosystemDiamondAddress,
-          Ecosystem2Facet_ABI,
-          resolvedSigner
-        );
+        const contract = getContract({
+          address: DiamondAddress,
+          abi: Ecosystem2Facet_ABI,
+          client,
+          chain: defineChain(11155111), // Sepolia
+        });
         console.log("Contract instance created");
 
-        // Call the function to get lessons from the mapping
-        const quizzesData = await contract.getAllQuizzes();
+        const quizzesData = await readContract({
+          contract,
+          method: "getAllQuizzes",
+          params: [],
+        });
+
         console.log("Raw quizzes data:", quizzesData);
 
         const quizzesArray = quizzesData.map((quiz) => ({
@@ -38,6 +47,7 @@ const QuizProvider = ({ children }) => {
           quizId: Number(quiz.quizId),
           quizTitle: quiz.quizTitle,
           exists: quiz.exists,
+          lockTime: Number(quiz.lockTime), // Added missing lockTime property
           questions: quiz.questions.map((question) => ({
             quizId: Number(question.quizId),
             questionId: Number(question.questionId),
@@ -48,8 +58,8 @@ const QuizProvider = ({ children }) => {
             })),
           })),
         }));
-        console.log("Processed quizzes array:", quizzesArray);
 
+        console.log("Processed quizzes array:", quizzesArray);
         setQuizzes(quizzesArray);
         return quizzesArray;
       } catch (fetchError) {
@@ -60,14 +70,174 @@ const QuizProvider = ({ children }) => {
     }
   };
 
+  const createQuiz = async (lessonId, quizTitle) => {
+    if (!account?.address) {
+      throw new Error("Please connect your wallet");
+    }
+
+    if (!client) {
+      throw new Error("Client is required to access the contract");
+    }
+
+    const diamondContract = getContract({
+      address: DiamondAddress,
+      abi: Ecosystem2Facet_ABI,
+      client,
+      chain: defineChain(11155111),
+    });
+
+    const tx = await prepareContractCall({
+      contract: diamondContract,
+      method: "createQuiz",
+      params: [lessonId, quizTitle],
+    });
+
+    const receipt = await sendTransaction({ transaction: tx, account });
+
+    // Fetch all quizzes and filter by lessonId to get the newly created quiz ID
+    const contract = getContract({
+      address: DiamondAddress,
+      abi: Ecosystem2Facet_ABI,
+      client,
+      chain: defineChain(11155111),
+    });
+
+    const allQuizzesData = await readContract({
+      contract,
+      method: "getAllQuizzes",
+      params: [],
+    });
+
+    // Filter quizzes by lessonId and get the latest one
+    const lessonQuizzes = allQuizzesData.filter(
+      (quiz) => Number(quiz.lessonId) === Number(lessonId),
+    );
+    if (!lessonQuizzes.length) {
+      throw new Error(
+        "Quiz was created but could not be resolved for this lesson",
+      );
+    }
+    const latestQuiz = lessonQuizzes[lessonQuizzes.length - 1];
+    const quizId = latestQuiz.quizId.toString();
+
+    await fetchQuizzes();
+
+    return {
+      receipt,
+      quizId,
+    };
+  };
+
+  const createQuestionWithChoices = async (
+    quizId,
+    question,
+    options,
+    correctOptionIndex,
+  ) => {
+    if (!account?.address) {
+      throw new Error("Please connect your wallet");
+    }
+
+    if (!client) {
+      throw new Error("Client is required to access the contract");
+    }
+
+    const diamondContract = getContract({
+      address: DiamondAddress,
+      abi: Ecosystem2Facet_ABI,
+      client,
+      chain: defineChain(11155111),
+    });
+
+    const tx = await prepareContractCall({
+      contract: diamondContract,
+      method: "createQuestionWithChoices",
+      params: [quizId, question, options, correctOptionIndex],
+    });
+
+    const receipt = await sendTransaction({ transaction: tx, account });
+    await fetchQuizzes();
+    return receipt;
+  };
+
+  const ContentTypeEnum = {
+    Video: 0,
+    Image: 1,
+    Document: 2,
+  };
+
+  const addLessonResource = async ({
+    lessonId,
+    contentType,
+    resourceName,
+    resourceLink,
+    file,
+  }) => {
+    if (!account?.address) {
+      throw new Error("Please connect your wallet");
+    }
+
+    if (!client) {
+      throw new Error("Client is required to access the contract");
+    }
+
+    let finalLink = "";
+
+    if (contentType !== "Video") {
+      const fileCid = await uploadFileToPinata(file);
+      const metadata = {
+        type: contentType.toLowerCase(),
+        file: fileCid,
+      };
+      finalLink = await uploadMetadataToIPFS(metadata);
+    } else {
+      finalLink = resourceLink;
+    }
+
+    const newResource = {
+      contentType: ContentTypeEnum[contentType],
+      url: finalLink,
+      name: resourceName,
+    };
+
+    const diamondContract = getContract({
+      address: DiamondAddress,
+      abi: Ecosystem2Facet_ABI,
+      client,
+      chain: defineChain(11155111),
+    });
+
+    const tx = await prepareContractCall({
+      contract: diamondContract,
+      method: "addResourcesToLesson",
+      params: [lessonId, ContentTypeEnum[contentType], [newResource]],
+    });
+
+    const receipt = await sendTransaction({ transaction: tx, account });
+
+    return {
+      receipt,
+      finalLink,
+    };
+  };
+
   useEffect(() => {
-    if (signer) {
+    if (client) {
       fetchQuizzes();
     }
-  }, [signer, address, quizzes]);
+  }, [client]);
 
   return (
-    <QuizContext.Provider value={{ quizzes, fetchQuizzes, setQuizzes }}>
+    <QuizContext.Provider
+      value={{
+        quizzes,
+        fetchQuizzes,
+        setQuizzes,
+        createQuiz,
+        createQuestionWithChoices,
+        addLessonResource,
+      }}
+    >
       {children}
     </QuizContext.Provider>
   );

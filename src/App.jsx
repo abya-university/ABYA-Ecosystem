@@ -1,42 +1,42 @@
-// src/App.jsx
-import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+// ABYA-Ecosystem/src/App.jsx
+import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import MasterPage from "./pages/MasterPage";
 import CourseCreationPipeline from "./components/courseCreationPipeline";
+import BulkCourseUpload from "./components/Course Creation Components/BulkCourseUpload";
 import ProfileDash from "./pages/ProfileDash";
-import ProfileForm from "./pages/ProfileForm";
-import ConnectProfile from "./pages/ConnectProfile";
-import TestProfile from "./pages/TestProfile";
-import VcForm from "./pages/VcForm";
-import VerifyVc from "./pages/VerifyVc";
-import WalletConnection from "./components/WalletConnection";
-// import { DidProvider } from "./contexts/DidContext";
-// import { ProfileProvider } from "./contexts/ProfileContext";
 import NotFoundPage from "./pages/404Page";
 import CourseMetricsPage from "./pages/CourseMetricsPage";
-import ErrorBoundary from "./components/ErrorBoundary";
+import { ToastContainer } from "react-toastify";
+import NetworkMainpage from "./pages/AmbassadorNetworkPages/NetworkMainpage";
+import FinanceMainpage from "./pages/LiquidityPages/FinanceMainpage";
+import SharePresentation from "./pages/SharePresentation";
 
 function App() {
   return (
     <>
-      <ErrorBoundary>
-        <WalletConnection />
-      </ErrorBoundary>
+      <ToastContainer
+        position="bottom-right"
+        theme="colored"
+        className="z-[9999]"
+      />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/mainpage" element={<MasterPage />} />
         <Route path="create-course" element={<CourseCreationPipeline />} />
+        <Route path="/bulk-course-upload" element={<BulkCourseUpload />} />
         <Route path="/ProfileDash" element={<ProfileDash />} />
-        <Route path="/ProfileForm" element={<ProfileForm />} />
-        <Route path="/ConnectProfile" element={<ConnectProfile />} />
-        <Route path="/TestProfile" element={<TestProfile />} />
-        <Route path="/VcForm" element={<VcForm />} />
-        <Route path="/VerifyVc" element={<VerifyVc />} />
+        {/* <Route path="/settings" element={<SettingsPage />} /> */}
+
         <Route
           path="/course-metrics/:courseId"
           element={<CourseMetricsPage />}
         />
+
+        <Route path="/networkMainpage" element={<NetworkMainpage />} />
+        <Route path="/share/view/:token" element={<SharePresentation />} />
+        <Route path="/liquidityMainpage" element={<FinanceMainpage />} />
+
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </>
