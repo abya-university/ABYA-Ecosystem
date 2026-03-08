@@ -118,6 +118,27 @@ const SwapComponent = () => {
       const num = parseFloat(balance);
       if (isNaN(num)) return "0";
 
+      if (tokenSymbol === "ABYTKN") {
+        // Check if it's a whole number
+        if (Number.isInteger(num)) {
+          return num.toLocaleString(undefined, {
+            maximumFractionDigits: 0,
+            minimumFractionDigits: 0,
+          });
+        }
+        return num.toLocaleString(undefined, {
+          maximumFractionDigits: 4,
+          minimumFractionDigits: 0,
+        });
+      }
+
+      if (tokenSymbol === "USDC") {
+        return num.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+      }
+
       if (num >= 1000) {
         return num.toLocaleString(undefined, {
           maximumFractionDigits: 4,
@@ -140,10 +161,39 @@ const SwapComponent = () => {
 
     try {
       const decimals = tokenSymbol === "ABYTKN" ? 18 : 6;
-      // Use ethers to format the raw amount
+      // Use ethers to format the raw amount - this returns a string like "1000.0"
       const formatted = ethers.formatUnits(rawAmount, decimals);
+
+      // Parse to number for formatting
       const num = parseFloat(formatted);
 
+      if (isNaN(num)) return "0.0";
+
+      // For ABYTKN, show whole numbers
+      if (tokenSymbol === "ABYTKN") {
+        if (Number.isInteger(num)) {
+          return num.toLocaleString(undefined, {
+            maximumFractionDigits: 0,
+            minimumFractionDigits: 0,
+          });
+        }
+        return num.toLocaleString(undefined, {
+          maximumFractionDigits: 4,
+          minimumFractionDigits: 0,
+        });
+      }
+
+      // For USDC, always show 2 decimals with proper rounding
+      if (tokenSymbol === "USDC") {
+        // Round to 2 decimal places for display
+        const roundedNum = Math.round(num * 100) / 100;
+        return roundedNum.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+      }
+
+      // Default formatting
       if (num >= 1000) {
         return num.toLocaleString(undefined, {
           maximumFractionDigits: 4,
@@ -196,13 +246,16 @@ const SwapComponent = () => {
       swapData.inputToken.symbol === "USDC" &&
       swapData.outputToken.symbol === "ABYTKN"
     ) {
-      return formatDisplayAmount((1 / poolPrice).toString());
+      // 1 USDC = ? ABYTKN
+      const rate = 1 / poolPrice;
+      return formatDisplayAmount(rate.toString());
     }
 
     if (
       swapData.inputToken.symbol === "ABYTKN" &&
       swapData.outputToken.symbol === "USDC"
     ) {
+      // 1 ABYTKN = ? USDC
       return formatDisplayAmount(poolPrice.toString());
     }
 
@@ -313,6 +366,7 @@ const SwapComponent = () => {
   }, [isConnected, address, loadBalances, loadPoolInfo, fetchPoolPrice]);
 
   // Handle swap
+  // Handle swap
   const handleSwap = async () => {
     if (!swapData.inputAmount || parseFloat(swapData.inputAmount) <= 0) {
       toast.error("Please enter a valid input amount");
@@ -340,10 +394,19 @@ const SwapComponent = () => {
     try {
       const inputTokenAddress = swapData.inputToken.address;
       const outputTokenAddress = swapData.outputToken.address;
+
+      // Parse input amount with correct decimals
       const amountToSwap = ethers.parseUnits(
         swapData.inputAmount,
         swapData.inputToken.decimals,
       );
+
+      console.log("Input amount details:", {
+        token: swapData.inputToken.symbol,
+        displayAmount: swapData.inputAmount,
+        decimals: swapData.inputToken.decimals,
+        rawAmount: amountToSwap.toString(),
+      });
 
       // Initialize input token contract
       const inputTokenAbi =
@@ -446,12 +509,13 @@ const SwapComponent = () => {
         params: [inputTokenAddress, outputTokenAddress, amountToSwap],
       });
 
-      console.log("Swap details:", {
+      console.log("Swap details before execution:", {
         inputToken: swapData.inputToken.symbol,
-        inputAmount: swapData.inputAmount,
+        inputDisplay: swapData.inputAmount,
         inputDecimals: swapData.inputToken.decimals,
-        parsedInputAmount: amountToSwap.toString(),
-        expectedOutputToken: swapData.outputToken.symbol,
+        inputRaw: amountToSwap.toString(),
+        outputToken: swapData.outputToken.symbol,
+        outputDecimals: swapData.outputToken.decimals,
         expectedOutputRaw: swapData.outputAmount,
         expectedOutputDisplay: ethers.formatUnits(
           swapData.outputAmount,
@@ -467,10 +531,29 @@ const SwapComponent = () => {
 
       console.log("Swap result:", swapResult);
 
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Wait for transaction to be processed
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
+      // Load new balances
       await loadBalances();
-      console.log("New balances:", balances);
+
+      // Also manually fetch the ABYTKN balance to verify
+      const newAbytknBalance = await readContract({
+        contract: getContract({
+          address: CONTRACT_CONFIG.ADDRESSES.TOKEN0,
+          abi: abyatknAbi,
+          client,
+          chain: CONTRACT_CONFIG.CHAIN,
+        }),
+        method: "balanceOf",
+        params: [address],
+      });
+
+      console.log("New ABYTKN balance (raw):", newAbytknBalance.toString());
+      console.log(
+        "New ABYTKN balance (display):",
+        ethers.formatUnits(newAbytknBalance, 18),
+      );
 
       toast.update(toastId, {
         render: (
@@ -504,7 +587,6 @@ const SwapComponent = () => {
         minimumReceived: "0",
       }));
 
-      await loadBalances();
       await loadPoolInfo();
       await fetchPoolPrice();
     } catch (error) {
