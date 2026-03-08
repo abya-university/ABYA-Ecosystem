@@ -57,13 +57,20 @@ const ContractUtils = {
       [CONTRACT_CONFIG.ADDRESSES.TOKEN1?.toLowerCase()]: "USDC",
     };
 
+    const fromToken = tokenMapping[tx.fromToken?.toLowerCase()] || "Unknown";
+    const toToken = tokenMapping[tx.toToken?.toLowerCase()] || "Unknown";
+
+    // Determine decimals based on token
+    const fromDecimals = fromToken === "USDC" ? 6 : 18;
+    const toDecimals = toToken === "USDC" ? 6 : 18;
+
     return {
       id: Number(tx.id) || index,
       type: Number(tx.transactionType) === 1 ? "swap" : "liquidity",
-      fromToken: tokenMapping[tx.fromToken?.toLowerCase()] || "Unknown",
-      toToken: tokenMapping[tx.toToken?.toLowerCase()] || "Unknown",
-      fromAmount: ethers.formatUnits(tx.fromAmount || 0, 18),
-      toAmount: ethers.formatUnits(tx.toAmount || 0, 18),
+      fromToken: fromToken,
+      toToken: toToken,
+      fromAmount: ethers.formatUnits(tx.fromAmount || 0, fromDecimals),
+      toAmount: ethers.formatUnits(tx.toAmount || 0, toDecimals),
       timestamp: new Date(Number(tx.timestamp || 0) * 1000),
       hash: tx.hash,
       status: tx.status || "confirmed",
@@ -330,148 +337,145 @@ export function TransactionHistoryProvider({ children }) {
     }
   }, [isConnected, address, abytknContract, usdcContract, handleError]);
 
-  // FIXED: calculateOutputAmount using ethers for precise calculations
   const calculateOutputAmount = useCallback(
     async (inputAmount, inputTokenSymbol, outputTokenSymbol) => {
       if (!inputAmount || parseFloat(inputAmount) === 0) {
-        console.warn(
-          "[calculateOutputAmount] Early return - empty or zero input",
-          { inputAmount, inputTokenSymbol },
-        );
         return { output: "0", impact: 0, minReceived: "0" };
       }
 
       try {
-        console.log(
-          `[calculateOutputAmount] Starting calculation: ${inputAmount} ${inputTokenSymbol} -> ${outputTokenSymbol}`,
-        );
-
         const tokenPrice = await ContractUtils.readContractManual(
           swapContract,
           "getTokenPrice",
         );
 
-        // Get raw price from contract (this is token1/token0 in smallest units)
-        const priceRaw = tokenPrice
-          ? parseFloat(ethers.formatUnits(tokenPrice, 0))
-          : 1e-15;
+        // basePrice represents ABYTKN per USDC (e.g., 1000)
+        const basePrice = tokenPrice
+          ? parseFloat(ethers.formatUnits(tokenPrice, 18))
+          : 1000;
 
-        // Adjust for decimal difference between tokens
-        // token0 = ABYTKN (18 decimals), token1 = USDC (6 decimals)
-        const decimalsToken0 = 18; // ABYTKN
-        const decimalsToken1 = 6; // USDC
+        console.log("Price calculation:", {
+          basePrice,
+          inputAmount,
+          inputTokenSymbol,
+          outputTokenSymbol,
+        });
 
-        // Convert raw price to human-readable: price of 1 ABYTKN in USDC
-        const adjustmentFactor = Math.pow(10, decimalsToken0 - decimalsToken1);
-        const basePrice = priceRaw * adjustmentFactor; // This gives price of 1 ABYTKN in USDC (e.g., 0.001)
-
-        console.log(
-          `[calculateOutputAmount] Token price - raw: ${priceRaw}, adjusted: ${basePrice} (1 ABYTKN = ${basePrice} USDC)`,
-        );
-
-        // inputAmount comes from form and is in DECIMAL units (e.g., "1" for 1 USDC, "1000" for 1000 ABYTKN)
-        const inputAsNumber = parseFloat(inputAmount);
-
-        console.log(
-          `[calculateOutputAmount] Input as decimal: inputAmount="${inputAmount}", parsed=${inputAsNumber}`,
-        );
-
-        let outputInUnits;
+        let outputInUnits; // This is in human-readable units
 
         if (inputTokenSymbol === "USDC" && outputTokenSymbol === "ABYTKN") {
-          // How many ABYTKN can I buy with X USDC?
-          outputInUnits = inputAsNumber / basePrice;
+          // USDC → ABYTKN: multiply (1 USDC = 1000 ABYTKN)
+          // Use multiplication which is safe
+          outputInUnits = parseFloat(inputAmount) * basePrice;
         } else if (
           inputTokenSymbol === "ABYTKN" &&
           outputTokenSymbol === "USDC"
         ) {
-          // How many USDC do I get for X ABYTKN?
-          outputInUnits = inputAsNumber * basePrice;
+          // ABYTKN → USDC: divide (1000 ABYTKN = 1 USDC)
+          // To avoid floating point issues, use multiplication by reciprocal
+          // Instead of: parseFloat(inputAmount) / basePrice
+          // Do: (parseFloat(inputAmount) * 1e18) / (basePrice * 1e18) but that's complex
+
+          // Better: use integer math with BigInt
+          const inputAmountBigInt = BigInt(
+            Math.round(parseFloat(inputAmount) * 1e18),
+          );
+          const basePriceBigInt = BigInt(Math.round(basePrice * 1e18));
+
+          // Calculate: (inputAmount * 10^18) / basePrice
+          // This gives us the result scaled by 10^18
+          const resultScaled =
+            (inputAmountBigInt * BigInt(1e18)) / basePriceBigInt;
+
+          // Convert back to number (this will be accurate because we used BigInt)
+          outputInUnits = Number(resultScaled) / 1e18;
         } else {
           outputInUnits = 0;
         }
 
-        // Use ethers to handle the decimal conversion
+        console.log("Output in units (display value):", outputInUnits);
+
+        // Convert to raw blockchain amount with proper decimals
         const outputDecimals = outputTokenSymbol === "ABYTKN" ? 18 : 6;
 
-        // Convert to string with full precision
-        const outputInUnitsStr = outputInUnits.toFixed(18);
+        // For USDC output (when swapping ABYTKN to USDC), we need to be extra careful
+        if (outputTokenSymbol === "USDC") {
+          // USDC has 6 decimals, so we need to multiply by 10^6
+          // But first, ensure outputInUnits has high precision
+          const outputInUnitsStr = outputInUnits.toFixed(12); // Use more decimals for precision
+          const outputRaw = ethers.parseUnits(outputInUnitsStr, outputDecimals);
+          console.log("Output raw (blockchain value):", outputRaw.toString());
 
-        // Use ethers to parse units - this handles the decimal conversion correctly
-        const outputRaw = ethers.parseUnits(outputInUnitsStr, outputDecimals);
+          const { impact, minReceived } = PriceUtils.calculatePriceImpact(
+            inputAmount,
+            outputRaw.toString(),
+            slippageTolerance,
+            outputTokenSymbol,
+          );
 
-        // Return as string
-        const outputStr = outputRaw.toString();
+          return {
+            output: outputRaw.toString(),
+            impact,
+            minReceived,
+          };
+        } else {
+          // For ABYTKN output, use the regular method
+          const outputInUnitsStr = outputInUnits.toString();
+          const outputRaw = ethers.parseUnits(outputInUnitsStr, outputDecimals);
 
-        console.log(`[calculateOutputAmount] Calculation complete:`, {
-          inputAmount,
-          inputAsNumber,
-          basePrice,
-          outputInUnits,
-          outputInUnitsStr,
-          outputRaw: outputRaw.toString(),
-          outputStr,
-        });
+          console.log("Output raw (blockchain value):", outputRaw.toString());
 
-        const { impact, minReceived } = PriceUtils.calculatePriceImpact(
-          inputAmount,
-          outputStr,
-          slippageTolerance,
-          outputTokenSymbol,
-        );
+          const { impact, minReceived } = PriceUtils.calculatePriceImpact(
+            inputAmount,
+            outputRaw.toString(),
+            slippageTolerance,
+            outputTokenSymbol,
+          );
 
-        return {
-          output: outputStr,
-          impact,
-          minReceived,
-        };
+          return {
+            output: outputRaw.toString(),
+            impact,
+            minReceived,
+          };
+        }
       } catch (error) {
-        console.error(
-          "[calculateOutputAmount] Error during calculation:",
-          error,
-        );
+        console.error("Price calculation error:", error);
 
-        // Fallback calculation - use the correct price representation
-        // 1 ABYTKN = 0.001 USDC (or 1 USDC = 1000 ABYTKN)
-        const basePrice = 0.001; // Price of 1 ABYTKN in USDC
-
-        // inputAmount is in human-readable decimal units
-        const inputInUnits = parseFloat(inputAmount);
-
+        // Fallback calculation with better precision
+        const basePrice = 1000;
         let outputInUnits;
 
         if (inputTokenSymbol === "USDC" && outputTokenSymbol === "ABYTKN") {
-          outputInUnits = inputInUnits / basePrice; // USDC / (ABYTKN price in USDC) = ABYTKN amount
+          outputInUnits = parseFloat(inputAmount) * basePrice;
         } else if (
           inputTokenSymbol === "ABYTKN" &&
           outputTokenSymbol === "USDC"
         ) {
-          outputInUnits = inputInUnits * basePrice; // ABYTKN * (ABYTKN price in USDC) = USDC amount
+          // Use BigInt for precise division
+          const inputAmountBigInt = BigInt(
+            Math.round(parseFloat(inputAmount) * 1e18),
+          );
+          const basePriceBigInt = BigInt(Math.round(basePrice * 1e18));
+          const resultScaled =
+            (inputAmountBigInt * BigInt(1e18)) / basePriceBigInt;
+          outputInUnits = Number(resultScaled) / 1e18;
         } else {
           outputInUnits = 0;
         }
 
         const outputDecimals = outputTokenSymbol === "ABYTKN" ? 18 : 6;
-        const outputInUnitsStr = outputInUnits.toFixed(18);
+        const outputInUnitsStr = outputInUnits.toFixed(12);
         const outputRaw = ethers.parseUnits(outputInUnitsStr, outputDecimals);
-        const outputStr = outputRaw.toString();
-
-        console.log(`[calculateOutputAmount] Fallback calculation:`, {
-          inputAmount,
-          basePrice,
-          outputInUnits,
-          outputStr,
-        });
 
         const { impact, minReceived } = PriceUtils.calculatePriceImpact(
           inputAmount,
-          outputStr,
+          outputRaw.toString(),
           slippageTolerance,
           outputTokenSymbol,
         );
 
         return {
-          output: outputStr,
+          output: outputRaw.toString(),
           impact,
           minReceived,
         };
