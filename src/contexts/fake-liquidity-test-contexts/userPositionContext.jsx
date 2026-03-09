@@ -7,11 +7,18 @@ import React, {
   useMemo,
 } from "react";
 import { ethers } from "ethers";
+import { toast } from "react-toastify";
 import contractAbi from "../../artifacts/fakeLiquidityArtifacts/Add_Swap_Contract.sol/Add_Swap_Contract.json";
 import { useActiveAccount, useReadContract } from "thirdweb/react";
-import { getContract, readContract, sendTransaction } from "thirdweb";
+import {
+  getContract,
+  readContract,
+  sendTransaction,
+  prepareContractCall,
+} from "thirdweb";
 import { client } from "../../services/client";
-import { defineChain } from "thirdweb";
+import { defineChain } from "thirdweb/chains";
+import CONTRACT_ADDRESSES from "../../constants/addresses";
 
 // Create context
 const UserPositionContext = createContext();
@@ -21,9 +28,9 @@ const contract_abi = contractAbi.abi;
 // Constants - Import from env or config
 const CONTRACT_CONFIG = {
   ADDRESSES: {
-    ADD_SWAP_CONTRACT: import.meta.env.VITE_APP_SEPOLIA_ADD_SWAP_CONTRACT,
-    TOKEN0: import.meta.env.VITE_APP_SEPOLIA_ABYATKN_ADDRESS, // ABYTKN (token0)
-    TOKEN1: import.meta.env.VITE_APP_SEPOLIA_USDC_ADDRESS, // USDC (token1)
+    ADD_SWAP_CONTRACT: CONTRACT_ADDRESSES.Liquidity,
+    TOKEN0: CONTRACT_ADDRESSES.ABYTKN, // ABYTKN (token0)
+    TOKEN1: CONTRACT_ADDRESSES.USDC, // USDC (token1)
   },
   CHAIN: defineChain(11155111), // Sepolia chain
 };
@@ -53,15 +60,18 @@ export function UserPositionProvider({ children }) {
       CONTRACT_CONFIG.ADDRESSES.ADD_SWAP_CONTRACT,
       CONTRACT_CONFIG.CHAIN,
       contract_abi,
-    ]
+    ],
   );
 
-  // Reactive data with thirdweb hooks
+  // Reactive data with thirdweb hooks - now includes address parameter
   const { data: userPositionsData, isLoading: positionsLoading } =
     useReadContract({
       contract: swapContract,
       method: "getUserPositions",
-      params: [],
+      params: [address],
+      queryOptions: {
+        enabled: !!address, // Only run query if address exists
+      },
     });
 
   // Common error handler
@@ -73,18 +83,19 @@ export function UserPositionProvider({ children }) {
 
   // Manual contract read for complex operations
   const readContractManual = useCallback(
-    async (method, params = []) => {
+    async (method, params = [], accountOverride) => {
       try {
         return await readContract({
           contract: swapContract,
           method,
           params,
+          account: accountOverride ?? address,
         });
       } catch (error) {
         throw new Error(`Contract read failed for ${method}: ${error.message}`);
       }
     },
-    [swapContract]
+    [swapContract, address],
   );
 
   // Fetch token decimals
@@ -245,20 +256,21 @@ export function UserPositionProvider({ children }) {
         } catch (error) {
           console.warn(
             "Could not use getPositionDetails, trying alternative methods:",
-            error
+            error,
           );
         }
 
         // Fallback method: Try to get position manager and call directly
         try {
           const positionManager = await readContractManual(
-            "positionManager"
+            "positionManager",
           ).catch(() => null);
 
           if (positionManager) {
             // Use ethers for direct position manager calls
             const provider = new ethers.JsonRpcProvider(
-              import.meta.env.VITE_APP_SKALE_RPC_URL
+              import.meta.env.VITE_APP_SEPOLIA_RPC_URL ||
+                import.meta.env.VITE_APP_RPC_URL,
             );
 
             const positionManagerInterface = new ethers.Interface([
@@ -268,11 +280,11 @@ export function UserPositionProvider({ children }) {
             const positionManagerContract = new ethers.Contract(
               positionManager,
               positionManagerInterface,
-              provider
+              provider,
             );
 
             const positionData = await positionManagerContract.positions(
-              tokenId
+              tokenId,
             );
 
             return {
@@ -294,7 +306,7 @@ export function UserPositionProvider({ children }) {
 
         // Final fallback: Return minimal object
         console.warn(
-          `Could not fetch complete details for position ${tokenId}`
+          `Could not fetch complete details for position ${tokenId}`,
         );
         return {
           tokenId: tokenId.toString(),
@@ -305,12 +317,12 @@ export function UserPositionProvider({ children }) {
       } catch (error) {
         console.error(
           `Failed to get position details for token ${tokenId}:`,
-          error
+          error,
         );
         return null;
       }
     },
-    [readContractManual]
+    [readContractManual],
   );
 
   // Get position values (amounts of tokens)
@@ -345,7 +357,7 @@ export function UserPositionProvider({ children }) {
         return { token0: "0", token1: "0" };
       }
     },
-    [readContractManual, token0Decimals, token1Decimals]
+    [readContractManual, token0Decimals, token1Decimals],
   );
 
   // Get estimated fees for a position
@@ -385,7 +397,7 @@ export function UserPositionProvider({ children }) {
         return { token0: "0", token1: "0" };
       }
     },
-    [readContractManual, token0Decimals, token1Decimals, getPositionDetails]
+    [readContractManual, token0Decimals, token1Decimals, getPositionDetails],
   );
 
   // Get all positions for the connected user (manual version for complex processing)
@@ -397,12 +409,13 @@ export function UserPositionProvider({ children }) {
 
     setLoading(true);
     setError(null);
+    const toastId = toast.loading("Loading your positions...");
 
     try {
-      console.log("Fetching user positions manually...");
+      console.log("Fetching user positions manually for address:", address);
 
-      // Use manual read for position IDs
-      const tokenIds = await readContractManual("getUserPositions");
+      // Use manual read for position IDs - pass address as parameter
+      const tokenIds = await readContractManual("getUserPositions", [address]);
       console.log("Raw user position IDs:", tokenIds);
 
       // Convert BigNumber to strings for display
@@ -412,6 +425,12 @@ export function UserPositionProvider({ children }) {
       if (!tokenIds || tokenIds.length === 0) {
         console.log("No positions found");
         setPositions([]);
+        toast.update(toastId, {
+          render: "No liquidity positions found",
+          type: "info",
+          isLoading: false,
+          autoClose: 3000,
+        });
         return [];
       }
 
@@ -438,11 +457,11 @@ export function UserPositionProvider({ children }) {
           } catch (error) {
             console.error(
               `Error fetching details for position ${tokenId}:`,
-              error
+              error,
             );
             return null;
           }
-        })
+        }),
       );
 
       // Filter out any positions that failed to load
@@ -450,10 +469,24 @@ export function UserPositionProvider({ children }) {
       console.log("Loaded positions:", validPositions);
 
       setPositions(validPositions);
+      toast.update(toastId, {
+        render: `Loaded ${validPositions.length} position${
+          validPositions.length !== 1 ? "s" : ""
+        }`,
+        type: "success",
+        isLoading: false,
+        autoClose: 3000,
+      });
       return validPositions;
     } catch (error) {
       console.error("Failed to fetch user positions:", error);
       setError(`Failed to load positions: ${error.message}`);
+      toast.update(toastId, {
+        render: `Error loading positions: ${error.message}`,
+        type: "error",
+        isLoading: false,
+        autoClose: 5000,
+      });
       return [];
     } finally {
       setLoading(false);
@@ -471,11 +504,17 @@ export function UserPositionProvider({ children }) {
   const collectFees = useCallback(
     async (tokenId) => {
       setLoading(true);
+      const toastId = toast.loading("Collecting fees from position...");
       try {
         console.log(`Collecting fees for token ID: ${tokenId}`);
 
         // First transaction: Approve position manager
         console.log(`Approving position manager for token ID: ${tokenId}`);
+        toast.update(toastId, {
+          render: "Approving position manager...",
+          isLoading: true,
+        });
+
         const approveTx = sendTransaction({
           contract: swapContract,
           method: "approvePositionManager",
@@ -485,11 +524,16 @@ export function UserPositionProvider({ children }) {
         const approveReceipt = await approveTx;
         console.log(
           "Position manager approved successfully:",
-          approveReceipt.transactionHash
+          approveReceipt.transactionHash,
         );
 
         // Second transaction: Collect fees
         console.log(`Collecting fees for token ID: ${tokenId}`);
+        toast.update(toastId, {
+          render: "Collecting accumulated fees...",
+          isLoading: true,
+        });
+
         const collectTx = sendTransaction({
           contract: swapContract,
           method: "collectFees",
@@ -499,11 +543,18 @@ export function UserPositionProvider({ children }) {
         const collectReceipt = await collectTx;
         console.log(
           "Fees collected successfully:",
-          collectReceipt.transactionHash
+          collectReceipt.transactionHash,
         );
 
         // Refresh user positions to update UI
         await getUserPositionsManual();
+
+        toast.update(toastId, {
+          render: "Fees collected successfully!",
+          type: "success",
+          isLoading: false,
+          autoClose: 5000,
+        });
 
         return {
           success: true,
@@ -513,6 +564,12 @@ export function UserPositionProvider({ children }) {
       } catch (error) {
         console.error("Failed to collect fees:", error);
         setError(error.message || "Failed to collect fees");
+        toast.update(toastId, {
+          render: `Error collecting fees: ${error.message}`,
+          type: "error",
+          isLoading: false,
+          autoClose: 5000,
+        });
         return {
           success: false,
           error: error.message || "Unknown error occurred",
@@ -521,31 +578,98 @@ export function UserPositionProvider({ children }) {
         setLoading(false);
       }
     },
-    [swapContract, getUserPositionsManual]
+    [swapContract, getUserPositionsManual],
   );
 
   // Remove liquidity from position using thirdweb transactions
   const removeLiquidity = useCallback(
     async (tokenId, liquidityAmount) => {
+      if (!account) {
+        toast.error("Wallet not connected");
+        return {
+          success: false,
+          error: "Wallet not connected",
+        };
+      }
+
       setLoading(true);
+      const toastId = toast.loading("Removing liquidity from position...");
       try {
-        const tx = sendTransaction({
-          contract: swapContract,
-          method: "removeLiquidity",
-          params: [tokenId, ethers.parseUnits(liquidityAmount.toString(), 18)],
+        console.log("Removing liquidity:", { tokenId, liquidityAmount });
+
+        // First transaction: Approve position manager
+        console.log(`Approving position manager for token ID: ${tokenId}`);
+        toast.update(toastId, {
+          render: "Approving position manager...",
+          isLoading: true,
         });
 
-        const receipt = await tx;
+        const approveTx = prepareContractCall({
+          contract: swapContract,
+          method: "approvePositionManager",
+          params: [tokenId],
+        });
+
+        const approveReceipt = await sendTransaction({
+          transaction: approveTx,
+          account,
+        });
+        console.log(
+          "Position manager approved successfully:",
+          approveReceipt.transactionHash,
+        );
+
+        // Second transaction: Remove liquidity
+        // Convert liquidity to uint128 (not uint256)
+        const liquidityBN = BigInt(
+          Math.floor(parseFloat(liquidityAmount) * 1e18),
+        );
+
+        const removeLiquidityTx = prepareContractCall({
+          contract: swapContract,
+          method: "removeLiquidity",
+          params: [BigInt(tokenId), liquidityBN],
+        });
+
+        console.log("Sending removeLiquidity transaction...");
+        toast.update(toastId, {
+          render: "Processing transaction...",
+          isLoading: true,
+        });
+
+        const txResult = await sendTransaction({
+          transaction: removeLiquidityTx,
+          account,
+        });
+
+        console.log("Transaction result:", txResult);
+
+        // Refresh positions after successful removal
+        await getUserPositionsManual();
+
+        toast.update(toastId, {
+          render: "Liquidity removed successfully!",
+          type: "success",
+          isLoading: false,
+          autoClose: 5000,
+        });
 
         return {
           success: true,
-          hash: receipt.transactionHash,
+          hash: txResult.transactionHash,
+          approveHash: approveReceipt.transactionHash,
         };
       } catch (error) {
         console.error(
           `Failed to remove liquidity for position ${tokenId}:`,
-          error
+          error,
         );
+        toast.update(toastId, {
+          render: `Error removing liquidity: ${error.message}`,
+          type: "error",
+          isLoading: false,
+          autoClose: 5000,
+        });
         return {
           success: false,
           error: error.message || "Transaction failed",
@@ -554,7 +678,7 @@ export function UserPositionProvider({ children }) {
         setLoading(false);
       }
     },
-    [swapContract]
+    [swapContract, account, getUserPositionsManual],
   );
 
   // Use reactive data when available, fallback to manual
@@ -570,11 +694,15 @@ export function UserPositionProvider({ children }) {
   useEffect(() => {
     if (isConnected) {
       console.log("Account connected - fetching data");
+      toast.info("Wallet connected. Loading positions...", {
+        autoClose: 2000,
+      });
       fetchTokenDecimals();
       getUserPositionsManual();
     } else {
       console.log("Account disconnected - clearing positions");
       setPositions([]);
+      setError(null);
     }
   }, [isConnected, fetchTokenDecimals, getUserPositionsManual]);
 
@@ -604,7 +732,7 @@ export function useUserPositions() {
   const context = useContext(UserPositionContext);
   if (context === undefined) {
     throw new Error(
-      "useUserPositions must be used within a UserPositionProvider"
+      "useUserPositions must be used within a UserPositionProvider",
     );
   }
   return context;

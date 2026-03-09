@@ -83,14 +83,14 @@ export default function Navbar() {
             Home
           </Link>
           <Link
-            to="/courses"
+            to="/mainpage?section=courses"
             onClick={handleLinkClick}
             className="text-base lg:text-lg font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200"
           >
             Courses
           </Link>
           <Link
-            to="/community"
+            to="/mainpage?section=community"
             onClick={handleLinkClick}
             className="text-base lg:text-lg font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200"
           >
@@ -244,14 +244,14 @@ export default function Navbar() {
               Home
             </Link>
             <Link
-              to="/courses"
+              to="/mainpage?section=courses"
               onClick={handleLinkClick}
               className="text-base font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200 py-3 px-6 hover:bg-gray-200 dark:hover:bg-gray-800 w-full text-center"
             >
               Courses
             </Link>
             <Link
-              to="/community"
+              to="/mainpage?section=community"
               onClick={handleLinkClick}
               className="text-base font-semibold text-gray-600 hover:text-yellow-500 dark:text-gray-200 transition-colors duration-200 py-3 px-6 hover:bg-gray-200 dark:hover:bg-gray-800 w-full text-center"
             >

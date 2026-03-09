@@ -6,9 +6,22 @@ import {
   RefreshCw,
   AlertCircle,
   CheckCircle,
+  ChevronDown,
+  Settings,
+  X,
+  ArrowDown,
+  HelpCircle,
+  TrendingUp,
+  BarChart3,
+  Droplets,
+  Zap,
+  Wallet,
+  Shield,
+  Award,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useActiveAccount } from "thirdweb/react";
+import { toast } from "react-toastify";
 import CONTRACT_ABI from "../../artifacts/fakeLiquidityArtifacts/Add_Swap_Contract.sol/Add_Swap_Contract.json";
 import USDC_ABI from "../../artifacts/fakeLiquidityArtifacts/UsdCoin.sol/UsdCoin.json";
 import ABYTKN_ABI from "../../artifacts/fakeLiquidityArtifacts/ABYATKN.sol/ABYATKN.json";
@@ -21,6 +34,8 @@ import {
   sendTransaction,
 } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
+import { useDarkMode } from "../../contexts/themeContext";
+import CONTRACT_ADDRESSES from "../../constants/addresses";
 
 const contractAbi = CONTRACT_ABI.abi;
 const usdcAbi = USDC_ABI.abi;
@@ -29,22 +44,50 @@ const abyatknAbi = ABYTKN_ABI.abi;
 // Constants - Aligned with our context configuration
 const CONTRACT_CONFIG = {
   ADDRESSES: {
-    ADD_SWAP_CONTRACT: import.meta.env.VITE_APP_SEPOLIA_ADD_SWAP_CONTRACT,
-    TOKEN0: import.meta.env.VITE_APP_SEPOLIA_ABYATKN_ADDRESS, // ABYTKN (token0)
-    TOKEN1: import.meta.env.VITE_APP_SEPOLIA_USDC_ADDRESS, // USDC (token1)
-    UNISWAP_POOL: import.meta.env.VITE_APP_SEPOLIA_ABYATKN_USDC_500,
+    ADD_SWAP_CONTRACT: CONTRACT_ADDRESSES.Liquidity,
+    TOKEN0: CONTRACT_ADDRESSES.ABYTKN, // ABYTKN (token0)
+    TOKEN1: CONTRACT_ADDRESSES.USDC, // USDC (token1)
+    UNISWAP_POOL: CONTRACT_ADDRESSES.ABYTKN_USDC_POOL,
   },
   CHAIN: defineChain(11155111), // Sepolia
 };
 
+// Token configuration
+const TOKENS = {
+  USDC: {
+    symbol: "USDC",
+    name: "USD Coin",
+    address: CONTRACT_CONFIG.ADDRESSES.TOKEN1,
+    decimals: 6,
+    icon: "/icons/usdc.svg",
+    color: "from-blue-500 to-cyan-500",
+    bgColor: "bg-blue-500/10",
+    textColor: "text-blue-600 dark:text-blue-400",
+    borderColor: "border-blue-500/30",
+  },
+  ABYTKN: {
+    symbol: "ABYTKN",
+    name: "ABYA Token",
+    address: CONTRACT_CONFIG.ADDRESSES.TOKEN0,
+    decimals: 18,
+    icon: "/icons/abytkn.svg",
+    color: "from-yellow-500 to-amber-500",
+    bgColor: "bg-yellow-500/10",
+    textColor: "text-yellow-600 dark:text-yellow-400",
+    borderColor: "border-yellow-500/30",
+  },
+};
+
 const AddLiquidity = () => {
-  const [error, setError] = useState(false);
+  const { darkMode } = useDarkMode();
   const [txHash, setTxHash] = useState("");
   const account = useActiveAccount();
   const address = account?.address;
   const isConnected = !!account;
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [activeTokenInput, setActiveTokenInput] = useState(null); // 'usdc' or 'abytkn'
 
   const {
     refreshHistory,
@@ -60,9 +103,15 @@ const AddLiquidity = () => {
 
   // Liquidity state - using clear token names
   const [liquidityData, setLiquidityData] = useState({
-    abytknAmount: "", // ABYTKN amount
-    usdcAmount: "", // USDC amount
+    usdcAmount: "", // USDC amount (token1)
+    abytknAmount: "", // ABYTKN amount (token0)
   });
+
+  // Settings state
+  const [slippageTolerance, setSlippageTolerance] = useState(0.5);
+  const [customSlippage, setCustomSlippage] = useState("");
+  const [slippagePresets] = useState([0.1, 0.5, 1.0]);
+  const [deadline, setDeadline] = useState(20); // minutes
 
   // Update useEffect to use stable references
   useEffect(() => {
@@ -80,26 +129,22 @@ const AddLiquidity = () => {
 
   // Handle add liquidity
   const handleAddLiquidity = async () => {
-    console.log("Liquidity Data:", liquidityData);
-
     if (
-      !liquidityData.abytknAmount ||
-      isNaN(parseFloat(liquidityData.abytknAmount)) ||
       !liquidityData.usdcAmount ||
-      isNaN(parseFloat(liquidityData.usdcAmount))
+      isNaN(parseFloat(liquidityData.usdcAmount)) ||
+      !liquidityData.abytknAmount ||
+      isNaN(parseFloat(liquidityData.abytknAmount))
     ) {
-      setError("Please enter valid amounts for both tokens");
-      setTimeout(() => setError(""), 3000);
+      toast.error("Please enter valid amounts for both tokens");
       return;
     }
 
     setLoading(true);
-    setError("");
-    setSuccess("");
+    const toastId = toast.loading("Adding liquidity...");
 
     try {
       if (!client || !address) {
-        setError("No client available or wallet not connected");
+        toast.error("No client available or wallet not connected");
         setLoading(false);
         return;
       }
@@ -138,32 +183,34 @@ const AddLiquidity = () => {
         }),
       ]);
 
-      console.log("Token decimals:", {
-        ABYTKN: abytknDecimals,
-        USDC: usdcDecimals,
-      });
+      // Override decimals based on known token addresses
+      // (in case contract returns wrong values)
+      const finalAbytknDecimals =
+        abytknDecimals === 6 && usdcDecimals === 18
+          ? 18 // Standard case
+          : 18; // ABYTKN is always 18
+      const finalUsdcDecimals =
+        usdcDecimals === 18 && abytknDecimals === 6
+          ? 6 // Standard case - swap was needed
+          : 6; // USDC is always 6
+
+      console.log(
+        `Decimals Read - ABYTKN: ${abytknDecimals}, USDC: ${usdcDecimals}`,
+      );
+      console.log(
+        `Decimals Final - ABYTKN: ${finalAbytknDecimals}, USDC: ${finalUsdcDecimals}`,
+      );
 
       // Prepare amounts based on contract token order
       // Contract expects: token0 (ABYTKN), token1 (USDC)
       const amount0Desired = ethers.parseUnits(
         liquidityData.abytknAmount.toString(),
-        abytknDecimals
+        finalAbytknDecimals,
       );
       const amount1Desired = ethers.parseUnits(
         liquidityData.usdcAmount.toString(),
-        usdcDecimals
+        finalUsdcDecimals,
       );
-
-      console.log("Liquidity amounts:", {
-        ABYTKN: {
-          value: ethers.formatUnits(amount0Desired, abytknDecimals),
-          raw: amount0Desired.toString(),
-        },
-        USDC: {
-          value: ethers.formatUnits(amount1Desired, usdcDecimals),
-          raw: amount1Desired.toString(),
-        },
-      });
 
       // Check balances
       const [abytknBalance, usdcBalance] = await Promise.all([
@@ -179,20 +226,25 @@ const AddLiquidity = () => {
         }),
       ]);
 
-      console.log("Current balances:", {
-        ABYTKN: ethers.formatUnits(abytknBalance, abytknDecimals),
-        USDC: ethers.formatUnits(usdcBalance, usdcDecimals),
-      });
+      // Debug logging
+      console.log("ABYTKN Balance:", abytknBalance.toString());
+      console.log("Amount0Desired (ABYTKN):", amount0Desired.toString());
+      console.log("USDC Balance:", usdcBalance.toString());
+      console.log("Amount1Desired (USDC):", amount1Desired.toString());
 
       // Check if balances are sufficient
       if (abytknBalance < amount0Desired) {
-        setError(`Insufficient ABYTKN balance`);
+        toast.error(
+          `Insufficient ABYTKN balance. Have: ${abytknBalance.toString()}, Need: ${amount0Desired.toString()}`,
+        );
         setLoading(false);
         return;
       }
 
       if (usdcBalance < amount1Desired) {
-        setError(`Insufficient USDC balance`);
+        toast.error(
+          `Insufficient USDC balance. Have: ${usdcBalance.toString()}, Need: ${amount1Desired.toString()}`,
+        );
         setLoading(false);
         return;
       }
@@ -211,10 +263,12 @@ const AddLiquidity = () => {
         }),
       ]);
 
-      console.log("Current allowances:", {
-        ABYTKN: ethers.formatUnits(allowanceABYTKN, abytknDecimals),
-        USDC: ethers.formatUnits(allowanceUSDC, usdcDecimals),
-      });
+      console.log(
+        "Allowances before approve - ABYTKN:",
+        allowanceABYTKN.toString(),
+        "USDC:",
+        allowanceUSDC.toString(),
+      );
 
       // Approve ABYTKN if needed
       if (allowanceABYTKN < amount0Desired) {
@@ -227,8 +281,7 @@ const AddLiquidity = () => {
             ethers.MaxUint256,
           ],
         });
-        await sendTransaction(approveABYTKNTx);
-        console.log("ABYTKN approved");
+        await sendTransaction({ transaction: approveABYTKNTx, account });
       }
 
       // Approve USDC if needed
@@ -242,88 +295,93 @@ const AddLiquidity = () => {
             ethers.MaxUint256,
           ],
         });
-        await sendTransaction(approveUSDCTx);
-        console.log("USDC approved");
+        await sendTransaction({ transaction: approveUSDCTx, account });
       }
 
       // Add liquidity
-      console.log("Adding liquidity...");
-
       try {
-        // Estimate gas
-        const gasEstimate = await prepareContractCall({
+        // Prepare the transaction
+        const addLiquidityTx = prepareContractCall({
           contract,
           method: "addLiquidity",
           params: [amount0Desired, amount1Desired],
-        }).then((tx) => tx.gasLimit);
+        });
 
-        console.log("Gas estimate:", gasEstimate.toString());
+        console.log("Sending addLiquidity transaction...");
 
-        // Add 20% buffer to gas estimate
-        const gasLimit = (gasEstimate * 120n) / 100n;
+        const txResult = await sendTransaction({
+          transaction: addLiquidityTx,
+          account,
+        });
 
-        const tx = await sendTransaction(
-          prepareContractCall({
-            contract,
-            method: "addLiquidity",
-            params: [amount0Desired, amount1Desired],
-            overrides: { gasLimit },
-          })
-        );
+        console.log("Transaction result:", txResult);
+        setTxHash(txResult.transactionHash);
 
-        setTxHash(tx.transactionHash);
-        console.log("Transaction sent:", tx.transactionHash);
-
-        const receipt = await tx.wait();
-        console.log("Transaction receipt:", receipt);
-
-        if (receipt.status === 1) {
-          setSuccess("Liquidity added successfully!");
+        // Check if transaction was successful
+        if (txResult.transactionHash) {
+          toast.update(toastId, {
+            render: "Liquidity added successfully!",
+            type: "success",
+            isLoading: false,
+            autoClose: 5000,
+          });
           setLiquidityData({
-            abytknAmount: "",
             usdcAmount: "",
+            abytknAmount: "",
           });
           loadBalances();
           if (typeof refreshHistory === "function") {
             refreshHistory();
           }
         } else {
-          setError("Transaction failed");
+          toast.update(toastId, {
+            render: "Transaction failed",
+            type: "error",
+            isLoading: false,
+            autoClose: 5000,
+          });
         }
       } catch (gasError) {
-        console.warn("Gas estimation failed:", gasError);
-
-        // If gas estimation fails, try with fixed gas limit
-        const tx = await sendTransaction(
-          prepareContractCall({
-            contract,
-            method: "addLiquidity",
-            params: [amount0Desired, amount1Desired],
-            overrides: { gasLimit: 1500000n },
-          })
-        );
-
-        setTxHash(tx.transactionHash);
-        console.log(
-          "Transaction sent with fixed gas limit:",
-          tx.transactionHash
-        );
-
-        const receipt = await tx.wait();
-        console.log("Transaction receipt:", receipt);
-
-        if (receipt.status === 1) {
-          setSuccess("Liquidity added successfully!");
-          setLiquidityData({
-            abytknAmount: "",
-            usdcAmount: "",
+        // If transaction fails, try again without gas estimation
+        console.log("Transaction failed, retrying...", gasError);
+        try {
+          const txResult = await sendTransaction({
+            transaction: prepareContractCall({
+              contract,
+              method: "addLiquidity",
+              params: [amount0Desired, amount1Desired],
+            }),
+            account,
           });
-          loadBalances();
-          if (typeof refreshHistory === "function") {
-            refreshHistory();
+
+          console.log("Retry transaction result:", txResult);
+          setTxHash(txResult.transactionHash);
+
+          if (txResult.transactionHash) {
+            toast.update(toastId, {
+              render: "Liquidity added successfully!",
+              type: "success",
+              isLoading: false,
+              autoClose: 5000,
+            });
+            setLiquidityData({
+              usdcAmount: "",
+              abytknAmount: "",
+            });
+            loadBalances();
+            if (typeof refreshHistory === "function") {
+              refreshHistory();
+            }
+          } else {
+            toast.update(toastId, {
+              render: "Transaction failed",
+              type: "error",
+              isLoading: false,
+              autoClose: 5000,
+            });
           }
-        } else {
-          setError("Transaction failed");
+        } catch (retryError) {
+          throw retryError;
         }
       }
     } catch (error) {
@@ -347,307 +405,406 @@ const AddLiquidity = () => {
         }
       }
 
-      setError(errorMsg);
+      toast.update(toastId, {
+        render: errorMsg,
+        type: "error",
+        isLoading: false,
+        autoClose: 5000,
+      });
     } finally {
       setLoading(false);
-      setTimeout(() => {
-        setSuccess("");
-        setError("");
-      }, 5000);
     }
   };
 
   // Set max balance
   const setMaxBalance = (tokenSymbol) => {
     const balance = balances[tokenSymbol];
-    if (tokenSymbol === "ABYTKN") {
-      handleABYTKNAmountChangeWithPoolPrice(balance, poolPrice);
-    } else if (tokenSymbol === "USDC") {
-      handleUSDCAmountChangeWithPoolPrice(balance, poolPrice);
+    if (tokenSymbol === "USDC") {
+      handleUSDCAmountChange(balance);
+    } else if (tokenSymbol === "ABYTKN") {
+      handleABYTKNAmountChange(balance);
     }
   };
 
-  // Handle ABYTKN amount change
-  const handleABYTKNAmountChangeWithPoolPrice = (value, poolPrice) => {
+  // Handle USDC amount change
+  const handleUSDCAmountChange = (value) => {
+    setActiveTokenInput("usdc");
     const newLiquidityData = {
-      abytknAmount: value,
-      usdcAmount:
-        value && poolPrice ? (parseFloat(value) * poolPrice).toFixed(6) : "",
+      usdcAmount: value,
+      abytknAmount:
+        value && poolPrice ? (parseFloat(value) * poolPrice).toFixed(18) : "",
     };
     setLiquidityData(newLiquidityData);
   };
 
-  // Handle USDC amount change
-  const handleUSDCAmountChangeWithPoolPrice = (value, poolPrice) => {
+  // Handle ABYTKN amount change
+  const handleABYTKNAmountChange = (value) => {
+    setActiveTokenInput("abytkn");
     const newLiquidityData = {
-      usdcAmount: value,
-      abytknAmount:
+      abytknAmount: value,
+      usdcAmount:
         value && poolPrice ? (parseFloat(value) / poolPrice).toFixed(6) : "",
     };
     setLiquidityData(newLiquidityData);
   };
 
   // Calculate ratio validation
-  const ratioValidation = calculateRatioWithPoolPrice?.(
-    liquidityData.abytknAmount,
-    liquidityData.usdcAmount,
-    poolPrice
-  );
+  const ratioValidation =
+    liquidityData.usdcAmount && liquidityData.abytknAmount
+      ? calculateRatioWithPoolPrice?.(
+          liquidityData.usdcAmount,
+          liquidityData.abytknAmount,
+          poolPrice,
+        )
+      : null;
+
+  const isValidRatio = ratioValidation?.isValidRatio || isInitialRatio;
+
+  // Modern card styles
+  const cardStyle = darkMode
+    ? "bg-slate-800/50 border-slate-700/50"
+    : "bg-white/50 border-slate-200/50";
+
+  const glassCardStyle = darkMode
+    ? "bg-slate-800/40 backdrop-blur-xl border-slate-700/30"
+    : "bg-white/70 backdrop-blur-xl border-slate-200/50";
 
   return (
-    <>
-      <div className="space-y-6">
-        {/* Token Order Info - Add this for clarity */}
-        <div className="bg-yellow-50 dark:bg-gray-800 border border-yellow-200 dark:border-yellow-500/30 rounded-xl p-4">
-          <div className="flex items-center gap-2">
-            <Info size={16} className="text-yellow-600 dark:text-yellow-500" />
+    <div className="space-y-4">
+      {/* Settings Panel */}
+      {showSettings && (
+        <div
+          className={`rounded-xl border p-4 animate-slideDown ${glassCardStyle}`}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              Transaction Settings
+            </h3>
+            <button
+              onClick={() => setShowSettings(false)}
+              className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {/* Slippage Tolerance */}
             <div>
-              <p className="text-sm text-yellow-800 dark:text-yellow-500 font-medium">
-                Pool Token Order
-              </p>
-              <p className="text-xs text-yellow-700 dark:text-gray-100">
-                Contract Token0: ABYTKN • Contract Token1: USDC
-              </p>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
+                Slippage Tolerance
+              </label>
+              <div className="flex gap-2 mb-2">
+                {slippagePresets.map((value) => (
+                  <button
+                    key={value}
+                    onClick={() => setSlippageTolerance(value)}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                      slippageTolerance === value
+                        ? "bg-gradient-to-r from-yellow-500 to-amber-500 text-white shadow-lg shadow-yellow-500/25"
+                        : "bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600"
+                    }`}
+                  >
+                    {value}%
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  placeholder="Custom"
+                  value={customSlippage}
+                  onChange={(e) => {
+                    setCustomSlippage(e.target.value);
+                    if (e.target.value)
+                      setSlippageTolerance(parseFloat(e.target.value));
+                  }}
+                  className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-yellow-500/20 text-sm"
+                />
+                <span className="text-sm text-slate-600 dark:text-slate-400">
+                  %
+                </span>
+              </div>
+            </div>
+
+            {/* Transaction Deadline */}
+            <div>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
+                Transaction Deadline
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={deadline}
+                  onChange={(e) => setDeadline(parseInt(e.target.value) || 20)}
+                  className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-yellow-500/20 text-sm"
+                />
+                <span className="text-sm text-slate-600 dark:text-slate-400">
+                  minutes
+                </span>
+              </div>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Pool Price Display */}
-        <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 dark:from-gray-800 dark:to-gray-700 border border-yellow-200 dark:border-yellow-500/30 rounded-xl p-4">
-          <div className="flex items-center justify-between">
+      {/* Main Liquidity Interface */}
+      <div className={`rounded-2xl border p-6 ${cardStyle}`}>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/20">
+              <Droplets className="w-5 h-5 text-green-600 dark:text-green-400" />
+            </div>
             <div>
-              <p className="text-sm text-gray-800 dark:text-gray-100">
-                <strong>Current Pool Price:</strong>{" "}
-                {isLoadingPrice ? (
-                  <span className="animate-pulse">Loading...</span>
-                ) : (
-                  <>
-                    {poolPrice.toFixed(2)} ABYTKN per USDC
-                    {isInitialRatio && (
-                      <span className="text-xs text-yellow-600 dark:text-yellow-500 ml-2">
-                        (Initial Ratio - Pool may not exist yet)
-                      </span>
-                    )}
-                  </>
-                )}
-              </p>
-              <p className="text-xs text-gray-600 dark:text-gray-100 mt-1">
-                Fee Tier: 0.05% (500) • Full Range Liquidity
+              <h3 className="font-semibold">Add Liquidity</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Provide liquidity to earn trading fees
               </p>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Refresh Button */}
             <button
               onClick={refreshPoolPrice}
               disabled={isLoadingPrice}
-              className="p-2 bg-yellow-100 dark:bg-gray-700 hover:bg-yellow-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
+              className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
               title="Refresh pool price"
             >
               <RefreshCw
-                size={16}
-                className={`${
-                  isLoadingPrice ? "animate-spin" : ""
-                } text-gray-800 dark:text-gray-100`}
+                className={`w-4 h-4 ${isLoadingPrice ? "animate-spin" : ""}`}
               />
+            </button>
+            {/* Settings Button */}
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className={`p-2 rounded-lg transition-all ${
+                showSettings
+                  ? "bg-yellow-500/20 text-yellow-600"
+                  : "hover:bg-slate-200 dark:hover:bg-slate-700"
+              }`}
+            >
+              <Settings className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* USDC Amount Input */}
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <label className="text-sm font-semibold text-gray-700 dark:text-gray-100">
-              USDC Amount
-              <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
-                (Contract Token1)
-              </span>
-            </label>
-            {isConnected && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  Balance: {balances.TOKEN0}
-                </span>
-                <button
-                  onClick={() => setMaxBalance("TOKEN0")}
-                  className="text-xs bg-yellow-100 dark:bg-gray-700 text-yellow-600 dark:text-yellow-500 px-2 py-1 rounded-md hover:bg-yellow-200 dark:hover:bg-gray-600 transition-colors"
-                >
-                  MAX
-                </button>
+        {/* Pool Info Card */}
+        <div className={`mb-6 rounded-xl border p-4 ${glassCardStyle}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex -space-x-2">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 border-2 border-white dark:border-slate-800" />
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-yellow-500 to-amber-500 border-2 border-white dark:border-slate-800" />
               </div>
-            )}
-          </div>
-          <div className="relative">
-            <input
-              type="number"
-              placeholder="0.0"
-              value={liquidityData.token0Amount}
-              onChange={(e) =>
-                handleUSDCAmountChangeWithPoolPrice(e.target.value, poolPrice)
-              }
-              className="w-full px-4 py-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent pr-24 text-gray-800 dark:text-gray-100"
-            />
-            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1 text-sm font-semibold text-gray-800 dark:text-gray-100">
-              USDC
+              <div>
+                <p className="font-semibold">ABYTKN / USDC</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Fee Tier: 0.05%
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-medium">Pool Price</p>
+              <p className="text-lg font-bold text-yellow-600 dark:text-yellow-400">
+                {isLoadingPrice ? (
+                  <span className="animate-pulse">...</span>
+                ) : (
+                  `${poolPrice.toFixed(4)}`
+                )}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                ABYTKN per USDC
+              </p>
             </div>
           </div>
         </div>
 
-        {/* ABYTKN Amount Input */}
-        <div className="space-y-2">
+        {/* USDC Input */}
+        <div className="space-y-2 mb-4">
           <div className="flex justify-between items-center">
-            <label className="text-sm font-semibold text-gray-700 dark:text-gray-100">
-              ABYTKN Amount
-              <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
-                (Contract Token0)
-              </span>
+            <label className="text-sm font-medium text-slate-600 dark:text-slate-400">
+              Deposit
             </label>
             {isConnected && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  Balance: {balances.TOKEN1}
-                </span>
-                <button
-                  onClick={() => setMaxBalance("TOKEN1")}
-                  className="text-xs bg-yellow-100 dark:bg-gray-700 text-yellow-600 dark:text-yellow-500 px-2 py-1 rounded-md hover:bg-yellow-200 dark:hover:bg-gray-600 transition-colors"
-                >
-                  MAX
-                </button>
-              </div>
+              <button
+                onClick={() => setMaxBalance("USDC")}
+                className="text-xs text-yellow-600 dark:text-yellow-400 hover:underline flex items-center gap-1"
+              >
+                <Wallet className="w-3 h-3" />
+                Balance: {balances.USDC || "0.00"}
+              </button>
             )}
           </div>
-          <div className="relative">
+
+          <div className="relative group">
             <input
               type="number"
               placeholder="0.0"
-              value={liquidityData.token1Amount}
-              onChange={(e) =>
-                handleABYTKNAmountChangeWithPoolPrice(e.target.value, poolPrice)
-              }
-              className="w-full px-4 py-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent pr-24 text-gray-800 dark:text-gray-100"
+              value={liquidityData.usdcAmount}
+              onChange={(e) => handleUSDCAmountChange(e.target.value)}
+              className={`w-full px-4 py-4 bg-slate-100 dark:bg-slate-800 border-2 rounded-xl text-xl font-semibold focus:outline-none focus:border-yellow-500/50 pr-36 transition-all ${
+                activeTokenInput === "usdc"
+                  ? "border-yellow-500/50"
+                  : "border-transparent"
+              }`}
             />
-            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1 text-sm font-semibold text-gray-800 dark:text-gray-100">
-              ABYTKN
+
+            {/* Token Selector */}
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+              <button
+                onClick={() => setMaxBalance("USDC")}
+                className="px-2 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 rounded-lg hover:bg-blue-500/20 transition-colors"
+              >
+                MAX
+              </button>
+              <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-700 rounded-lg shadow-md">
+                <div className="w-6 h-6 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" />
+                <span className="font-semibold">USDC</span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Enhanced Ratio Validation Display */}
-        {liquidityData.token0Amount && liquidityData.token1Amount && (
-          <div className="space-y-3">
-            {(() => {
-              const ratioValidation = calculateRatioWithPoolPrice(
-                liquidityData.token0Amount,
-                liquidityData.token1Amount,
-                poolPrice
-              );
+        {/* Arrow Down */}
+        <div className="relative flex justify-center my-2">
+          <div className="absolute inset-x-0 top-1/2 h-px bg-slate-200 dark:bg-slate-700" />
+          <div className="relative p-2 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-full">
+            <Plus className="w-4 h-4 text-slate-400" />
+          </div>
+        </div>
 
-              if (!ratioValidation) return null;
+        {/* ABYTKN Input */}
+        <div className="space-y-2 mb-6">
+          <div className="flex justify-between items-center">
+            <label className="text-sm font-medium text-slate-600 dark:text-slate-400">
+              and
+            </label>
+            {isConnected && (
+              <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                <Wallet className="w-3 h-3" />
+                Balance: {balances.ABYTKN || "0.00"}
+              </span>
+            )}
+          </div>
 
-              const isValid = ratioValidation.isValidRatio || isInitialRatio;
+          <div className="relative group">
+            <input
+              type="number"
+              placeholder="0.0"
+              value={liquidityData.abytknAmount}
+              onChange={(e) => handleABYTKNAmountChange(e.target.value)}
+              className={`w-full px-4 py-4 bg-slate-100 dark:bg-slate-800 border-2 rounded-xl text-xl font-semibold focus:outline-none focus:border-yellow-500/50 pr-36 transition-all ${
+                activeTokenInput === "abytkn"
+                  ? "border-yellow-500/50"
+                  : "border-transparent"
+              }`}
+            />
 
-              return (
-                <div
-                  className={`border rounded-xl p-4 ${
-                    isValid
-                      ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-500/30"
-                      : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-500/30"
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`w-2 h-2 rounded-full mt-2 ${
-                        isValid ? "bg-green-500" : "bg-red-500"
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+              <button
+                onClick={() => setMaxBalance("ABYTKN")}
+                className="px-2 py-1 text-xs font-semibold text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 rounded-lg hover:bg-yellow-500/20 transition-colors"
+              >
+                MAX
+              </button>
+              <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-700 rounded-lg shadow-md">
+                <div className="w-6 h-6 rounded-full bg-gradient-to-r from-yellow-500 to-amber-500" />
+                <span className="font-semibold">ABYTKN</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Ratio Validation Display */}
+        {liquidityData.usdcAmount && liquidityData.abytknAmount && (
+          <div
+            className={`mb-6 rounded-xl border p-4 transition-all ${
+              isValidRatio
+                ? "bg-green-500/5 border-green-500/20"
+                : "bg-red-500/5 border-red-500/20"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`w-2 h-2 rounded-full mt-2 ${
+                  isValidRatio
+                    ? "bg-green-500 animate-pulse"
+                    : "bg-red-500 animate-pulse"
+                }`}
+              />
+              <div className="flex-1">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p
+                      className={`text-xs font-medium ${
+                        isValidRatio
+                          ? "text-green-600 dark:text-green-400"
+                          : "text-red-600 dark:text-red-400"
                       }`}
-                    ></div>
-                    <div className="flex-1">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p
-                            className={`font-semibold ${
-                              isValid
-                                ? "text-green-800 dark:text-green-400"
-                                : "text-red-800 dark:text-red-400"
-                            }`}
-                          >
-                            Your Ratio
-                          </p>
-                          <p
-                            className={
-                              isValid
-                                ? "text-green-700 dark:text-green-300"
-                                : "text-red-700 dark:text-red-300"
-                            }
-                          >
-                            {ratioValidation.ratio.toFixed(2)} ABYTKN/USDC
-                          </p>
-                        </div>
-                        <div>
-                          <p
-                            className={`font-semibold ${
-                              isValid
-                                ? "text-green-800 dark:text-green-400"
-                                : "text-red-800 dark:text-red-400"
-                            }`}
-                          >
-                            Pool Price
-                          </p>
-                          <p
-                            className={
-                              isValid
-                                ? "text-green-700 dark:text-green-300"
-                                : "text-red-700 dark:text-red-300"
-                            }
-                          >
-                            {poolPrice.toFixed(2)} ABYTKN/USDC
-                          </p>
-                        </div>
-                      </div>
-
-                      {!isValid && !isInitialRatio && (
-                        <div className="mt-3 p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
-                          <p className="text-red-800 dark:text-red-400 text-sm font-semibold">
-                            Price Difference: {ratioValidation.priceDifference}%
-                          </p>
-                          <p className="text-red-700 dark:text-red-300 text-xs mt-1">
-                            Consider adjusting your amounts:
-                          </p>
-                          <div className="mt-2 space-y-1 text-xs">
-                            <p className="text-red-600 dark:text-red-400">
-                              • For {liquidityData.token0Amount} USDC → Use{" "}
-                              {ratioValidation.suggestedToken1Amount} ABYTKN
-                            </p>
-                            <p className="text-red-600 dark:text-red-400">
-                              • For {liquidityData.token1Amount} ABYTKN → Use{" "}
-                              {ratioValidation.suggestedToken0Amount} USDC
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {isValid && (
-                        <div className="mt-2">
-                          <p
-                            className={`text-xs ${
-                              isValid
-                                ? "text-green-600 dark:text-green-400"
-                                : "text-red-600 dark:text-red-400"
-                            }`}
-                          >
-                            {isInitialRatio
-                              ? "✅ Using initial pool ratio (pool may not exist yet)"
-                              : "✅ Ratio matches current pool price within tolerance"}
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    >
+                      Your Ratio
+                    </p>
+                    <p
+                      className={`text-sm font-semibold ${
+                        isValidRatio
+                          ? "text-green-700 dark:text-green-300"
+                          : "text-red-700 dark:text-red-300"
+                      }`}
+                    >
+                      {ratioValidation?.ratio.toFixed(4) || "0.0000"}{" "}
+                      ABYTKN/USDC
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      Pool Price
+                    </p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                      {poolPrice.toFixed(4)} ABYTKN/USDC
+                    </p>
                   </div>
                 </div>
-              );
-            })()}
+
+                {!isValidRatio && !isInitialRatio && (
+                  <div className="mt-3 p-3 bg-red-500/10 rounded-lg">
+                    <p className="text-red-600 dark:text-red-400 text-sm font-semibold flex items-center gap-1">
+                      <AlertCircle className="w-4 h-4" />
+                      Price Difference: {ratioValidation?.priceDifference}%
+                    </p>
+                    <div className="mt-2 space-y-1 text-xs text-red-600 dark:text-red-400">
+                      <p>
+                        • For {liquidityData.usdcAmount} USDC → Use{" "}
+                        {ratioValidation?.suggestedToken1Amount} ABYTKN
+                      </p>
+                      <p>
+                        • For {liquidityData.abytknAmount} ABYTKN → Use{" "}
+                        {ratioValidation?.suggestedToken0Amount} USDC
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {isValidRatio && (
+                  <div className="mt-2 flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                    <CheckCircle className="w-3 h-3" />
+                    <span>
+                      {isInitialRatio
+                        ? "Using initial pool ratio (pool may not exist yet)"
+                        : "Ratio matches current pool price"}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Quick Ratio Buttons */}
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4">
-          <p className="text-sm font-semibold text-gray-700 dark:text-gray-100 mb-3">
+        {/* Quick Add Presets */}
+        <div className={`mb-6 rounded-xl border p-4 ${glassCardStyle}`}>
+          <p className="text-sm font-semibold mb-3 flex items-center gap-2">
+            <Zap className="w-4 h-4 text-yellow-500" />
             Quick Add
           </p>
           <div className="grid grid-cols-3 gap-2">
@@ -658,10 +815,8 @@ const AddLiquidity = () => {
             ].map((preset, index) => (
               <button
                 key={index}
-                onClick={() =>
-                  handleUSDCAmountChangeWithPoolPrice(preset.usdc, poolPrice)
-                }
-                className="px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-gray-800 dark:text-gray-100"
+                onClick={() => handleUSDCAmountChange(preset.usdc)}
+                className="px-3 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
               >
                 {preset.label}
               </button>
@@ -669,65 +824,132 @@ const AddLiquidity = () => {
           </div>
         </div>
 
+        {/* Price Impact Warning */}
+        {liquidityData.usdcAmount &&
+          liquidityData.abytknAmount &&
+          !isValidRatio &&
+          !isInitialRatio && (
+            <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-yellow-700 dark:text-yellow-300">
+                    High Price Impact
+                  </p>
+                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                    Your liquidity ratio doesn't match the current pool price.
+                    This may result in significant price impact or failed
+                    transaction. Adjust your amounts using the suggestions
+                    above.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+        {/* Liquidity Details */}
+        {liquidityData.usdcAmount && liquidityData.abytknAmount && (
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className="w-full mb-4 flex items-center justify-between text-sm"
+          >
+            <span className="font-medium flex items-center gap-2">
+              <Info className="w-4 h-4" />
+              Liquidity Details
+            </span>
+            <ChevronDown
+              className={`w-4 h-4 transition-transform ${
+                showDetails ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+        )}
+
+        {showDetails &&
+          liquidityData.usdcAmount &&
+          liquidityData.abytknAmount && (
+            <div className="mb-6 space-y-2 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600 dark:text-slate-400">
+                  Your Share of Pool
+                </span>
+                <span className="font-medium">~0.12%</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600 dark:text-slate-400">
+                  Estimated APR
+                </span>
+                <span className="font-medium text-green-600">12.5%</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600 dark:text-slate-400">
+                  Pooled USDC
+                </span>
+                <span className="font-medium">
+                  {liquidityData.usdcAmount} USDC
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600 dark:text-slate-400">
+                  Pooled ABYTKN
+                </span>
+                <span className="font-medium">
+                  {liquidityData.abytknAmount} ABYTKN
+                </span>
+              </div>
+              <div className="h-px bg-slate-200 dark:bg-slate-700 my-2" />
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600 dark:text-slate-400">
+                  Share of Pool
+                </span>
+                <span className="font-medium">0.12%</span>
+              </div>
+            </div>
+          )}
+
         {/* Add Liquidity Button */}
         <button
           onClick={handleAddLiquidity}
           disabled={
             !isConnected ||
             loading ||
-            !liquidityData.token0Amount ||
-            !liquidityData.token1Amount ||
-            (!calculateRatioWithPoolPrice(
-              liquidityData.token0Amount,
-              liquidityData.token1Amount,
-              poolPrice
-            )?.isValidRatio &&
-              !isInitialRatio)
+            !liquidityData.usdcAmount ||
+            !liquidityData.abytknAmount ||
+            (!isValidRatio && !isInitialRatio)
           }
-          className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 dark:from-yellow-600 dark:to-yellow-700 text-white px-6 py-4 rounded-xl font-semibold hover:from-yellow-600 hover:to-yellow-700 dark:hover:from-yellow-700 dark:hover:to-yellow-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 hover:cursor-pointer"
+          className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:shadow-lg hover:shadow-green-500/25 hover:-translate-y-0.5 flex items-center justify-center gap-2"
         >
           {loading ? (
             <>
-              <Activity className="animate-spin" size={20} />
+              <Activity className="animate-spin" size={18} />
               Adding Liquidity...
             </>
           ) : isLoadingPrice ? (
             <>
-              <RefreshCw className="animate-spin" size={20} />
+              <RefreshCw className="animate-spin" size={18} />
               Loading Pool Price...
             </>
-          ) : !calculateRatioWithPoolPrice(
-              liquidityData.token0Amount,
-              liquidityData.token1Amount,
-              poolPrice
-            )?.isValidRatio &&
-            !isInitialRatio &&
-            liquidityData.token0Amount &&
-            liquidityData.token1Amount ? (
+          ) : !isConnected ? (
+            "Connect Wallet"
+          ) : !liquidityData.usdcAmount || !liquidityData.abytknAmount ? (
+            "Enter Amounts"
+          ) : !isValidRatio && !isInitialRatio ? (
             "Adjust Ratio to Match Pool Price"
           ) : (
             <>
-              <Plus size={20} />
+              <Plus size={18} />
               Add Liquidity
             </>
           )}
         </button>
-      </div>
 
-      {/* Notifications */}
-      {error && (
-        <div className="fixed bottom-4 right-4 bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-400 px-4 py-2 rounded-lg shadow-lg">
-          <AlertCircle size={20} className="inline-block mr-2" />
-          {error}
-        </div>
-      )}
-      {success && (
-        <div className="fixed bottom-4 right-4 bg-green-100 dark:bg-green-900/20 border border-green-200 dark:border-green-500/30 text-green-700 dark:text-green-400 px-4 py-2 rounded-lg shadow-lg">
-          <CheckCircle size={20} className="inline-block mr-2" />
-          {success}
-        </div>
-      )}
-    </>
+        {/* Disclaimer */}
+        <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-4">
+          By adding liquidity, you'll earn 0.05% of all trades on this pair
+          proportional to your share of the pool.
+        </p>
+      </div>
+    </div>
   );
 };
 

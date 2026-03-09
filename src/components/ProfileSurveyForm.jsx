@@ -76,8 +76,10 @@ export default function CareerOnboardingForm({
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [activeSection, setActiveSection] = useState("situationAndTech");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEnrolling, setIsEnrolling] = useState(false);
   const [careerRecommendation, setCareerRecommendation] = useState(null);
   const [submissionError, setSubmissionError] = useState(null);
+  const [enrollmentError, setEnrollmentError] = useState(null);
   const [finalCourseId, setFinalCourseId] = useState(courseIdToEnroll);
 
   const handleInputChange = (e) => {
@@ -260,24 +262,77 @@ export default function CareerOnboardingForm({
     }
   };
 
-  const handleContinueEnrollment = () => {
-    // If in modal mode, call the completion callback with the final course ID
-    if (isModal && onFormComplete) {
-      setTimeout(() => {
-        onFormComplete(finalCourseId);
-      }, 2000);
-      return;
-    }
+  const handleContinueEnrollment = async () => {
+    setIsEnrolling(true);
+    setEnrollmentError(null);
 
-    if (isModal && onClose) {
-      onClose();
-      return;
-    } else {
+    const courseBeingEnrolled =
+      courses.find((c) => c.courseId === finalCourseId)?.courseName || "Course";
+
+    const toastId = toast.loading(`🚀 Enrolling in ${courseBeingEnrolled}...`);
+
+    try {
+      // If in modal mode, call the completion callback with the final course ID
+      if (isModal && onFormComplete) {
+        toast.update(toastId, {
+          type: "info",
+          isLoading: true,
+          render: `⏳ Processing enrollment for ${courseBeingEnrolled}...`,
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+
+        toast.dismiss(toastId);
+        toast.success(
+          `✅ Successfully enrolled in ${courseBeingEnrolled}! Redirecting...`,
+        );
+
+        setTimeout(() => {
+          onFormComplete(finalCourseId);
+        }, 1000);
+        return;
+      }
+
+      if (isModal && onClose) {
+        toast.update(toastId, {
+          type: "info",
+          isLoading: false,
+          render: `✅ Enrollment prepared. Closing...`,
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        toast.dismiss(toastId);
+        onClose();
+        return;
+      }
+
+      // Standard enrollment flow
+      toast.update(toastId, {
+        type: "info",
+        isLoading: true,
+        render: `⏳ Finalizing your enrollment...`,
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
       setFormSubmitted(true);
-      // Otherwise navigate to dashboard
+      toast.dismiss(toastId);
+      toast.success(
+        `✅ Welcome to ${courseBeingEnrolled}! Redirecting to dashboard...`,
+      );
+
+      // Navigate to dashboard
       setTimeout(() => {
         navigate("/mainpage?section=dashboard");
-      }, 2000);
+      }, 1500);
+    } catch (error) {
+      console.error("Enrollment error:", error);
+      const errorMsg = error.message || "Failed to complete enrollment";
+      setEnrollmentError(errorMsg);
+      toast.dismiss(toastId);
+      toast.error(`❌ ${errorMsg}. Please try again.`);
+    } finally {
+      setIsEnrolling(false);
     }
   };
 
@@ -1848,14 +1903,28 @@ export default function CareerOnboardingForm({
                           <button
                             type="button"
                             onClick={handleContinueEnrollment}
+                            disabled={isEnrolling}
                             className={`px-7 py-2.5 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-                              darkMode
+                              isEnrolling
+                                ? darkMode
+                                  ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white opacity-70 cursor-not-allowed"
+                                  : "bg-gradient-to-r from-blue-500 to-purple-500 text-white opacity-70 cursor-not-allowed"
+                                : darkMode
                                 ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white"
                                 : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
                             }`}
                           >
-                            <GraduationCap size={18} />
-                            Continue Enrollment
+                            {isEnrolling ? (
+                              <>
+                                <Loader size={18} className="animate-spin" />
+                                Enrolling...
+                              </>
+                            ) : (
+                              <>
+                                <GraduationCap size={18} />
+                                Continue Enrollment
+                              </>
+                            )}
                           </button>
                         )}
                       </div>

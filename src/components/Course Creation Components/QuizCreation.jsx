@@ -1,20 +1,12 @@
 import { AlertCircle, CheckCircle, Plus } from "lucide-react";
-import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
-import Ecosystem1FacetABI from "../../artifacts/contracts/Ecosystem1Facet.sol/Ecosystem1Facet.json";
-import Ecosystem2FacetABI from "../../artifacts/contracts/Ecosystem2Facet.sol/Ecosystem2Facet.json";
-import CONTRACT_ADDRESSES from "../../constants/addresses";
 import { useState } from "react";
-import { defineChain } from "thirdweb/chains";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import { useActiveAccount } from "thirdweb/react";
-import { client } from "../../services/client";
-import { useContext } from "react";
+import { useContext, useMemo } from "react";
 import { LessonContext } from "../../contexts/lessonContext";
 import { QuizContext } from "../../contexts/quizContext";
-
-const DiamondAddress = CONTRACT_ADDRESSES.diamond;
-const Ecosystem1Facet_ABI = Ecosystem1FacetABI.abi;
-const Ecosystem2Facet_ABI = Ecosystem2FacetABI.abi;
+import { CourseContext } from "../../contexts/courseContext";
+import { ChapterContext } from "../../contexts/chapterContext";
 
 const QuizCreation = () => {
   const [quizTitle, setQuizTitle] = useState("");
@@ -29,7 +21,13 @@ const QuizCreation = () => {
     { text: "", isCorrect: false },
   ]);
   const { lessons } = useContext(LessonContext);
-  const { quizzes } = useContext(QuizContext);
+  const {
+    quizzes,
+    createQuiz: createQuizInContext,
+    createQuestionWithChoices,
+  } = useContext(QuizContext);
+  const { courses } = useContext(CourseContext);
+  const { chapters } = useContext(ChapterContext);
   const [quizSuccess, setQuizSuccess] = useState("");
   const [quizError, setQuizError] = useState("");
   const [questionSuccess, setQuestionSuccess] = useState("");
@@ -40,31 +38,133 @@ const QuizCreation = () => {
   const isConnected = !!address;
   const [loading, setLoading] = useState(false);
 
+  // Filter lessons to only show those from courses created by the current user
+  const userLessons = useMemo(() => {
+    if (!address || !courses?.length || !chapters?.length || !lessons?.length) {
+      console.log("🔍 QuizCreation - Missing data:", {
+        address,
+        coursesLength: courses?.length,
+        chaptersLength: chapters?.length,
+        lessonsLength: lessons?.length,
+      });
+      return [];
+    }
+
+    console.log("🔍 QuizCreation - All courses:", courses);
+    console.log("🔍 QuizCreation - All chapters:", chapters);
+    console.log("🔍 QuizCreation - All lessons:", lessons);
+
+    // Helper function to normalize IDs (handle BigInt, string, number)
+    const normalizeId = (id) => {
+      if (typeof id === "bigint") return id.toString();
+      if (typeof id === "number") return id.toString();
+      return String(id);
+    };
+
+    // Get course IDs created by current user
+    const userCourses = courses.filter(
+      (course) => course.creator?.toLowerCase() === address.toLowerCase(),
+    );
+
+    console.log("🔍 QuizCreation - User courses:", userCourses);
+
+    const userCourseIds = userCourses.map((course) =>
+      normalizeId(course.courseId),
+    );
+
+    console.log("🔍 QuizCreation - User course IDs:", userCourseIds);
+
+    // Get chapter IDs from those courses
+    const userChapters = chapters.filter((chapter) =>
+      userCourseIds.includes(normalizeId(chapter.courseId)),
+    );
+
+    console.log("🔍 QuizCreation - User chapters:", userChapters);
+
+    const userChapterIds = userChapters.map((chapter) =>
+      normalizeId(chapter.chapterId),
+    );
+
+    console.log("🔍 QuizCreation - User chapter IDs:", userChapterIds);
+
+    // Filter lessons from those chapters
+    const filteredLessons = lessons.filter((lesson) =>
+      userChapterIds.includes(normalizeId(lesson.chapterId)),
+    );
+
+    console.log("🔍 QuizCreation - Filtered lessons:", filteredLessons);
+
+    return filteredLessons;
+  }, [address, courses, chapters, lessons]);
+
+  // Filter quizzes to only show those from lessons belonging to user's courses
+  const userQuizzes = useMemo(() => {
+    if (!userLessons?.length || !quizzes?.length) {
+      console.log("🔍 QuizCreation - Missing quiz data:", {
+        userLessonsLength: userLessons?.length,
+        quizzesLength: quizzes?.length,
+      });
+      return [];
+    }
+
+    console.log("🔍 QuizCreation - All quizzes:", quizzes);
+
+    // Helper function to normalize IDs
+    const normalizeId = (id) => {
+      if (typeof id === "bigint") return id.toString();
+      if (typeof id === "number") return id.toString();
+      return String(id);
+    };
+
+    // Get lesson IDs from user's lessons
+    const userLessonIds = userLessons.map((lesson) =>
+      normalizeId(lesson.lessonId),
+    );
+
+    console.log("🔍 QuizCreation - User lesson IDs:", userLessonIds);
+
+    // Filter quizzes that belong to those lessons
+    const filteredQuizzes = quizzes.filter((quiz) =>
+      userLessonIds.includes(normalizeId(quiz.lessonId)),
+    );
+
+    console.log("🔍 QuizCreation - Filtered quizzes:", filteredQuizzes);
+
+    return filteredQuizzes;
+  }, [userLessons, quizzes]);
+
   const createQuiz = async () => {
     if (!isConnected || !address) {
-      throw new Error("Please connect to a blockchain network");
+      toast.error("Please connect to a blockchain network");
+      return;
     }
     setQuizLoading(true);
+    const toastId = toast.loading(`Creating quiz: ${quizTitle}...`);
     try {
-      const diamondContract = await getContract({
-        address: DiamondAddress,
-        abi: Ecosystem2Facet_ABI,
-        client,
-        chain: defineChain(11155111),
+      toast.update(toastId, {
+        render: "Waiting for transaction confirmation...",
+        isLoading: true,
       });
 
-      const tx = await prepareContractCall({
-        contract: diamondContract,
-        method: "createQuiz",
-        params: [lessonId, quizTitle],
+      await createQuizInContext(lessonId, quizTitle);
+
+      toast.update(toastId, {
+        render: `${quizTitle} created successfully!!`,
+        type: "success",
+        isLoading: false,
+        autoClose: 5000,
       });
-      await sendTransaction({ transaction: tx, account });
-      toast.success(`${quizTitle} created successfully!!`);
+
       setLessonId("");
       setQuizTitle("");
     } catch (error) {
       console.error("Error creating quiz: ", error);
-      toast.error("Error creating quiz");
+      toast.update(toastId, {
+        render: "Error creating quiz",
+        type: "error",
+        isLoading: false,
+        autoClose: 5000,
+      });
     } finally {
       setQuizLoading(false);
     }
@@ -89,29 +189,30 @@ const QuizCreation = () => {
       ]);
 
       if (!isConnected || !address) {
-        throw new Error("Please connect to a blockchain network");
+        toast.error("Please connect to a blockchain network");
+        return;
       }
       setLoading(true);
+      const toastId = toast.loading("Creating question...");
       try {
-        const diamondContract = await getContract({
-          address: DiamondAddress,
-          abi: Ecosystem2Facet_ABI,
-          client,
-          chain: defineChain(11155111),
+        toast.update(toastId, {
+          render: "Waiting for transaction confirmation...",
+          isLoading: true,
         });
 
-        const tx = await prepareContractCall({
-          contract: diamondContract,
-          method: "createQuestionWithChoices",
-          params: [
-            quizId,
-            question,
-            options.map((option) => option.text),
-            correctOptionIndex,
-          ],
+        await createQuestionWithChoices(
+          quizId,
+          question,
+          options.map((option) => option.text),
+          correctOptionIndex,
+        );
+
+        toast.update(toastId, {
+          render: "Question created successfully!!",
+          type: "success",
+          isLoading: false,
+          autoClose: 5000,
         });
-        await sendTransaction({ transaction: tx, account });
-        toast.success("Question created successfully!!");
 
         setQuestion("");
         setOptions([
@@ -121,13 +222,19 @@ const QuizCreation = () => {
           { text: "", isCorrect: false },
         ]);
       } catch (err) {
-        toast.error("Error creating question");
+        console.error("Error creating question: ", err);
+        toast.update(toastId, {
+          render: "Error creating question",
+          type: "error",
+          isLoading: false,
+          autoClose: 5000,
+        });
       } finally {
         setLoading(false);
       }
     } else {
-      alert(
-        "Please ensure: \n- Question is filled\n- All options are filled\n- Exactly one option is marked as correct"
+      toast.warning(
+        "Please ensure: Question is filled, all options are filled, and exactly one option is marked as correct",
       );
     }
   };
@@ -139,8 +246,8 @@ const QuizCreation = () => {
           ? { ...option, [field]: value }
           : field === "isCorrect"
           ? { ...option, isCorrect: false }
-          : option
-      )
+          : option,
+      ),
     );
   };
 
@@ -183,7 +290,7 @@ const QuizCreation = () => {
         {/* Lesson Selection */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Select Lesson
+            Select Lesson (from your courses)
           </label>
           <select
             value={lessonId}
@@ -191,9 +298,11 @@ const QuizCreation = () => {
             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm md:text-base"
           >
             <option value="" className="text-gray-500 dark:text-gray-400">
-              Choose a lesson
+              {userLessons.length === 0
+                ? "No lessons found - create a course first"
+                : "Choose a lesson"}
             </option>
-            {lessons.map((lesson) => (
+            {userLessons.map((lesson) => (
               <option
                 key={lesson.lessonId}
                 value={lesson.lessonId}
@@ -203,6 +312,12 @@ const QuizCreation = () => {
               </option>
             ))}
           </select>
+          {userLessons.length === 0 && address && (
+            <p className="text-sm text-amber-600 dark:text-amber-400">
+              No lessons found from your courses. Make sure you've created
+              courses, chapters, and lessons first.
+            </p>
+          )}
         </div>
 
         {/* Create Quiz Button */}
@@ -241,7 +356,7 @@ const QuizCreation = () => {
         {/* Quiz Selection */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Select Quiz
+            Select Quiz (from your courses)
           </label>
           <select
             value={quizId}
@@ -249,9 +364,11 @@ const QuizCreation = () => {
             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm md:text-base"
           >
             <option value="" className="text-gray-500 dark:text-gray-400">
-              Choose a Quiz
+              {userQuizzes.length === 0
+                ? "No quizzes found - create a quiz first"
+                : "Choose a Quiz"}
             </option>
-            {quizzes.map((quiz) => (
+            {userQuizzes.map((quiz) => (
               <option
                 key={quiz.quizId}
                 value={quiz.quizId}
@@ -261,6 +378,12 @@ const QuizCreation = () => {
               </option>
             ))}
           </select>
+          {userQuizzes.length === 0 && address && (
+            <p className="text-sm text-amber-600 dark:text-amber-400">
+              No quizzes found from your courses. Create a quiz first using the
+              form above.
+            </p>
+          )}
         </div>
 
         {/* Question Input Section */}

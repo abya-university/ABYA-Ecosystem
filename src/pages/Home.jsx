@@ -17,6 +17,7 @@ const Home = () => {
   const navList = [
     { name: "Explore", href: "#" },
     { name: "Ambassadors", href: "/networkMainpage" },
+    { name: "Finance & Liquidity", href: "/liquidityMainpage" },
     { name: "Courses", href: "#" },
     { name: "Community", href: "#" },
     { name: "About", href: "#" },

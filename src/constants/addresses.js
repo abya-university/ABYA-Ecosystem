@@ -12,13 +12,18 @@ const CONTRACT_ADDRESSES = {
         CommunityGovernanceFacet: "0x7F673F7ca3F8c86e378A45456787f870f4611777",
         CommunityBadgesFacet: "0x226506541C7F77e4B7A96ad98A4D8B873B922EC9",
         ProfileFacet: "0x14D5cF145676CaD0Bc293C4b19000Ec2d9ddBc6F",
-        AmbassadorNetworkFacet: "0x828841d093c9f8Eb34AfB30390C0Adb7ae98B449",
-        RevenueSharingFacet: "0x5345bf3F133e0b790f9B8Cd2f01c6A7d1Dd0cd8c",
-        VestingFacet: "0x7Cf8f0C492dd56A687EA70ed3116133Bdb32D825"
+        AmbassadorNetworkFacet: "0x7b3f8f4fEf4fddb0940FF5a605EAFD5c16Df9Af9",
+        RevenueSharingFacet: "0x519F9293bdEF30Ac6D1bb8Ae4480A0ab5ED4A3FE",
+        VestingFacet: "0x68dA4d41B184325c5A2dc9f3E7545371e04cE8bb"
     },
     init: {
         DiamondInit: "0xfaab9f879C3ECC7C212Bf36c1145951ef0E6aaa5"
-    }
+    },
+    ABYTKN: "0x5393FA2bf4B5923BFBe33620faB40BB8Eb0497FF",
+    USDC: "0xC77298df061BE9B1aCA1a8AB377Be6c39B2Bc85B",
+    WBTC: "0x79B4cFDE8956E39B85795CE6e3CaE943E60b46D8",
+    ABYTKN_USDC_POOL: "0x4167f81c94D231C1454D5f210bC4F59076d7cbB3",
+    Liquidity: "0x36e1c41Ce99f2B06Ec4Dda3F4dd7B943e7cbe416"
 };
 
 export default CONTRACT_ADDRESSES;
