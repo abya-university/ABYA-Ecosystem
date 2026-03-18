@@ -79,13 +79,13 @@ const ACCEPTABLE_COURSE_JSON_TEMPLATE = {
   course: {
     name: "DeFi Fundamentals",
     description: "Learn AMMs, DEXs, and liquidity mechanics.",
-    difficultyLevel: 1,
+    difficultyLevel: 1, //(0 - Beginner, 1 - Intermediate, 2 - Advanced),
     priceUSDCUnits: "89.60",
     imageUrl: "https://example.com/course-image.png",
     chapters: [
       {
         name: "Introduction to DeFi",
-        duration: "2 weeks",
+        duration: "2", // Duration in weeks (can also be "2 weeks")
         lessons: [
           {
             name: "Introduction to Uniswap and AMMs",
@@ -108,6 +108,41 @@ const ACCEPTABLE_COURSE_JSON_TEMPLATE = {
     ],
   },
 };
+
+// Template with comments preserved for UI display
+const TEMPLATE_STRING_WITH_COMMENTS = `{
+  "course": {
+    "name": "DeFi Fundamentals",
+    "description": "Learn AMMs, DEXs, and liquidity mechanics.",
+    "difficultyLevel": 1,  // (0 - Beginner, 1 - Intermediate, 2 - Advanced)
+    "priceUSDCUnits": "89.60",  // Price in USD (e.g., "89.60" for $89.60)
+    "imageUrl": "https://example.com/course-image.png",
+    "chapters": [
+      {
+        "name": "Introduction to DeFi",
+        "duration": "2",  // Duration in weeks (can also be "2 weeks")
+        "lessons": [
+          {
+            "name": "Introduction to Uniswap and AMMs",
+            "content": "Uniswap uses constant product market makers...",
+            "quizzes": [
+              {
+                "title": "AMM Basics",
+                "questions": [
+                  {
+                    "question": "What formula is used in constant product AMMs?",
+                    "options": ["x + y = k", "x * y = k", "x - y = k"],
+                    "correctIndex": 1  // Zero-based index of the correct answer
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}`;
 
 const BulkCourseUpload = ({ onBack }) => {
   const { darkMode } = useDarkMode();
@@ -785,9 +820,7 @@ const BulkCourseUpload = ({ onBack }) => {
   };
 
   const copyTemplateToClipboard = () => {
-    navigator.clipboard.writeText(
-      JSON.stringify(ACCEPTABLE_COURSE_JSON_TEMPLATE, null, 2),
-    );
+    navigator.clipboard.writeText(TEMPLATE_STRING_WITH_COMMENTS);
     toast.success("Template JSON copied to clipboard!");
   };
 
@@ -1087,7 +1120,7 @@ const BulkCourseUpload = ({ onBack }) => {
 
                 <div className="p-6">
                   <pre className="p-4 bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-green-400 border border-gray-200 dark:border-gray-700 rounded-lg overflow-x-auto text-xs max-h-[600px]">
-                    {JSON.stringify(ACCEPTABLE_COURSE_JSON_TEMPLATE, null, 2)}
+                    {TEMPLATE_STRING_WITH_COMMENTS}
                   </pre>
                   <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
                     Notes: <strong>duration</strong> should be in weeks (e.g.,

@@ -128,12 +128,15 @@ export const UserProvider = ({ children }) => {
           const ambassadorDetails = await readContract({
             contract: ambassadorContract,
             method:
-              "function getAmbassadorDetails(address _ambassador) view returns (bytes32 did, uint8 tier, uint8 level, address sponsor, address leftLeg, address rightLeg, uint256 totalDownlineSales, uint256 lifetimeCommissions, bool isActive)",
+              "function getAmbassadorDetails(address _ambassador) view returns (string did, uint8 tier, uint8 level, address sponsor, address leftLeg, address rightLeg, uint256 totalDownlineSales, uint256 lifetimeCommissions, bool isActive)",
             params: [address],
           });
 
-          // If DID is not bytes32(0), user is an ambassador
-          if (ambassadorDetails[0] !== ethers.ZeroHash) {
+          // If DID string is present, user is an ambassador
+          if (
+            typeof ambassadorDetails[0] === "string" &&
+            ambassadorDetails[0].trim() !== ""
+          ) {
             ambassadorTier = ambassadorDetails[1]; // tier is 2nd element (index 1)
             console.log(
               "Ambassador detected via fallback check. Tier:",
