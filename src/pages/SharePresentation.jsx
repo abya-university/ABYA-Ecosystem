@@ -1,3 +1,4 @@
+// src/pages/SharePresentation.jsx
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import QRCode from "react-qr-code";
@@ -30,7 +31,7 @@ import {
 } from "lucide-react";
 import { useDarkMode } from "../contexts/themeContext";
 
-// base64url decode helper (unchanged)
+// base64url decode helper
 function b64UrlDecode(input = "") {
   try {
     input = input.replace(/-/g, "+").replace(/_/g, "/");
@@ -447,7 +448,7 @@ export default function SharePresentation() {
     );
   }
 
-  // present values (minimal, non-sensitive)
+  // present values
   const vc = data.vc || {};
   const subject = vc.credentialSubject || {};
   const course = subject.course || "—";
@@ -717,76 +718,6 @@ export default function SharePresentation() {
                     )}
                   </button>
 
-                    <button onClick={copyPublicSnapshot} className="px-4 py-2 border rounded-full bg-white/5 hover:bg-gray-500/10" title="Copy public snapshot">
-                      <span className="inline-flex items-center gap-2"><Copy className="w-4 h-4" />Snapshot</span>
-                    </button>
-
-                    <button onClick={downloadProof} className="px-4 py-2 border rounded-full bg-white/5 hover:bg-gray-500/10" title="Download verification proof (minimal)">
-                      <span className="inline-flex items-center gap-2"><Download className="w-4 h-4" />Proof</span>
-                    </button>
-
-                    <button onClick={() => setQrOpen(true)} className="px-3 py-2 border rounded-full bg-white/5 hover:bg-gray-500/10" title="Open QR / link">
-                      <QrCode className="w-4 h-4 inline-block mr-1" /> Link
-                    </button>
-                  </div>
-
-                  {verifyMessage && (
-                    <div className={`mt-5 p-3 rounded-full text-center ${verified ? "bg-emerald-500/80 text-emerald-100" : "bg-rose-900/40 text-rose-200"}`}>
-                      <div className="text-sm font-medium">{verifyMessage}</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Right metadata */}
-              <aside className="p-6 mt-6 rounded-2xl border border-cyan-600/10 shadow-lg backdrop-blur-md">
-                <div className="text-md font-bold text-amber-500 mb-3">Snapshot</div>
-                <div className="space-y-4 text-slate-200">
-                  <div>
-                    <div className="text-xs text-slate-500">Presentation ID</div>
-                    <div className="font-mono text-sm text-gray-900 truncate">{presentationId}</div>
-                  </div>
-
-                  <div>
-                    <div className="text-xs text-slate-500">Holder DID</div>
-                    <div className="font-mono text-sm text-gray-900 truncate">{data.holderDid || "—"}</div>
-                  </div>
-
-                  <div>
-                    <div className="text-xs text-slate-500">Expires</div>
-                    <div className="text-sm font-mono text-gray-900">{expiresAt}</div>
-                  </div>
-
-                  <div>
-                    <div className="text-xs text-slate-500">Last action</div>
-                    <div className="text-sm text-gray-900">{verified === null ? 'No verification performed' : verified ? 'Last verification: success' : 'Last verification: failed'}</div>
-                  </div>
-                </div>
-              </aside>
-            </div>
-
-            <footer className="px-6 py-4 bg-black/20 border-t border-cyan-600/5 text-xs text-slate-900 flex items-center justify-between">
-              <div>Rendered by <strong>ABYA Passport</strong></div>
-              <div className="font-mono">{presentationId} • {expiresAt}</div>
-            </footer>
-          </div>
-        </div>
-
-        {/* QR Modal */}
-        {qrOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/50" onClick={() => setQrOpen(false)} />
-            <div className="relative bg-white/30 backdrop-blur-lg rounded-2xl p-6 w-[92%] max-w-md border border-white/10">
-              <div className="flex items-start justify-between">
-                <h3 className="text-lg font-semibold text-white">Share link</h3>
-                <button aria-label="Close QR" onClick={() => setQrOpen(false)} className="text-white/80">✕</button>
-              </div>
-
-              <div className="mt-4 flex flex-col items-center gap-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 1200 1200"><path fill="#fff" d="M0 0v1200h1200V573.486l-196.875 208.739v220.898h-806.25v-806.25h396.68V0zm857.861 0v225.977c-205.254.005-579.542 2.254-579.542 641.895c42.436-427.736 237.375-430.415 579.542-430.42v246.776L1200 342.09z" /></svg>
-                <div className="text-xs text-slate-300 text-center break-words overflow-hidden">{window.location.href}</div>
-
-                <div className="flex gap-3">
                   <button
                     onClick={() =>
                       handleCopy(JSON.stringify(data.raw || {}, null, 2))
