@@ -139,11 +139,6 @@ Every interface decision in ABYA Nexus is governed by five non-negotiable princi
 │  ├── Bundler RPC      — UserOperation processing                     │
 │  └── EntryPoint       — 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789  │
 ├──────────────────────────────────────────────────────────────────────┤
-│                    DEPLOYMENT (COOLIFY + SITEGROUND)                  │
-│                                                                      │
-│  Coolify VPS → Traefik (SSL) → Frontend + Backend + DB + Redis       │
-│  SiteGround DNS → A record → VPS IP                                  │
-└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
